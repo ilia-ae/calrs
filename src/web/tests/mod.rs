@@ -20,6 +20,7 @@ mod event_types;
 mod format;
 mod guards;
 mod hosts;
+mod ilia;
 mod invites;
 mod organizer;
 mod page_language;
