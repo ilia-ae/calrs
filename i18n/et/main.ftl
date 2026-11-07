@@ -212,6 +212,7 @@ base-loader-please-wait = Palun oota, laadime värskeimaid kalendriandmeid...
 base-stop-impersonating = Lõpeta teise kasutajana toimetamine
 base-theme-toggle = Vaheta teemat
 base-powered-by = Töötab platvormil
+base-source-code = Lähtekood
 
 # Profile (templates/profile.html)
 
