@@ -88,6 +88,9 @@ open = "5"
 fluent-bundle = "0.15"
 unic-langid = "0.9"
 
+# MCP server behind the admin socket (fork: src/web/agent)
+rmcp = { version = "=3.7.0", default-features = false, features = ["server", "macros"] }
+
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"

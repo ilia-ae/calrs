@@ -5,6 +5,7 @@
 use super::*;
 
 mod admin;
+mod agent;
 mod auth_pages;
 mod availability;
 mod booking;
