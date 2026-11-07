@@ -364,6 +364,10 @@
     }
     .powered a { color: var(--text-muted); text-decoration: none; }
     .powered a:hover { color: var(--text-secondary); }
+    /* ilia fork: AGPL source link, also shown when embedded. */
+    .source-link { text-align: center; font-size: 0.75rem; margin-top: 0.5rem; }
+    .source-link a { color: var(--text-muted); text-decoration: none; }
+    .source-link a:hover { color: var(--text-secondary); }
 
     .error {
       color: var(--error-text);
@@ -537,6 +541,7 @@
   <div class="container">
     {% block content %}{% endblock %}
     {% block footer %}<div class="powered"><span>{{ t('base-powered-by') }} <a href="https://cal.rs">calrs</a></span></div>{% endblock %}
+    {% if source_url %}<div class="source-link"><a href="{{ source_url }}" target="_blank" rel="noopener noreferrer">{{ t('base-source-code') }}</a></div>{% endif %}
     {% block theme_toggle %}
     <button id="theme-toggle" type="button" title="{{ t('base-theme-toggle') }}" aria-label="{{ t('base-theme-toggle') }}" class="theme-pill">
       <span class="theme-pill-track">
