@@ -1,4 +1,5 @@
 mod admin;
+pub(crate) mod agent;
 mod availability;
 mod booking;
 mod booking_actions;
@@ -699,6 +700,16 @@ async fn csp_middleware(
 }
 
 pub async fn create_router(pool: SqlitePool, data_dir: PathBuf, secret_key: [u8; 32]) -> Router {
+    router(build_state(pool, data_dir, secret_key).await)
+}
+
+/// The shared state `create_router` serves; `calrs serve` also hands it to
+/// the MCP agent (`agent::spawn`).
+pub(crate) async fn build_state(
+    pool: SqlitePool,
+    data_dir: PathBuf,
+    secret_key: [u8; 32],
+) -> Arc<AppState> {
     let mut env = Environment::new();
     env.set_undefined_behavior(minijinja::UndefinedBehavior::Lenient);
     env.set_loader(minijinja::path_loader("templates"));
@@ -716,7 +727,7 @@ pub async fn create_router(pool: SqlitePool, data_dir: PathBuf, secret_key: [u8;
     let initial_csp = build_csp(&initial_captcha);
     let initial_german_formal = load_german_formal(&pool).await;
 
-    let state = Arc::new(AppState {
+    Arc::new(AppState {
         pool,
         templates: env,
         // 10 login attempts per IP per 15 minutes
@@ -731,8 +742,11 @@ pub async fn create_router(pool: SqlitePool, data_dir: PathBuf, secret_key: [u8;
         csp: tokio::sync::RwLock::new(initial_csp),
         csp_baseline: build_csp(&None),
         german_formal: std::sync::atomic::AtomicBool::new(initial_german_formal),
-    });
+    })
+}
 
+/// Every route, over `state`.
+pub(crate) fn router(state: Arc<AppState>) -> Router {
     Router::new()
         .merge(crate::auth::auth_router())
         .merge(crate::mfa::router())

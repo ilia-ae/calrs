@@ -102,6 +102,12 @@ enum Commands {
         #[arg(long, default_value = "127.0.0.1")]
         host: std::net::IpAddr,
     },
+    /// Bridge stdio to calrs serve's admin socket (SSH forced command)
+    Mcp {
+        /// Admin socket path
+        #[arg(long)]
+        socket: Option<PathBuf>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -128,6 +134,13 @@ fn get_data_dir(custom: Option<PathBuf>) -> Result<PathBuf> {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    let cli = Cli::parse();
+    // The MCP pump starts before logging, the database and the key: it
+    // touches none of them, and its stdout carries only the protocol.
+    if let Commands::Mcp { socket } = &cli.command {
+        return commands::mcp::run(socket.clone()).await;
+    }
+
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -135,7 +148,6 @@ async fn main() -> Result<()> {
         )
         .init();
 
-    let cli = Cli::parse();
     let data_dir = get_data_dir(cli.data_dir)?;
     let pool = db::connect(&data_dir).await?;
     db::migrate(&pool).await?;
@@ -162,6 +174,7 @@ async fn main() -> Result<()> {
         Commands::User { command } => commands::user::run(&pool, &data_dir, command).await?,
         Commands::Resource { command } => commands::resource::run(command).await?,
         Commands::Config { command } => commands::config::run(&pool, &secret_key, command).await?,
+        Commands::Mcp { .. } => unreachable!("dispatched before startup"),
         Commands::Serve { port, host } => {
             let private_hosts = caldav::private_host_allowlist();
             if !private_hosts.is_empty() {
@@ -182,13 +195,16 @@ async fn main() -> Result<()> {
             let reminder_key = secret_key;
             tokio::spawn(web::run_reminder_loop(reminder_pool, reminder_key));
 
-            let router = web::create_router(pool, data_dir, secret_key).await;
+            let state = web::build_state(pool, data_dir, secret_key).await;
+            let (stop_tx, stop_rx) = tokio::sync::watch::channel(false);
+            let agent = web::agent::spawn(state.clone(), stop_rx);
+            let router = web::router(state);
             let addr = std::net::SocketAddr::from((host, port));
             tracing::info!("calrs server listening on {}", addr);
             let listener = tokio::net::TcpListener::bind(addr).await?;
 
             // Graceful shutdown on SIGINT (Ctrl+C) or SIGTERM
-            let shutdown = async {
+            let shutdown = async move {
                 let ctrl_c = tokio::signal::ctrl_c();
                 let mut sigterm =
                     tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
@@ -200,6 +216,7 @@ async fn main() -> Result<()> {
                 }
 
                 tracing::info!("Shutdown signal received, stopping gracefully...");
+                let _ = stop_tx.send(true);
             };
 
             // The TCP peer decides whether X-Forwarded-For is believed
@@ -210,6 +227,7 @@ async fn main() -> Result<()> {
             )
             .with_graceful_shutdown(shutdown)
             .await?;
+            agent.finish(std::time::Duration::from_secs(20)).await;
             // Booking emails are sent in the background after the response;
             // let the ones still in flight finish before the runtime stops.
             web::drain_emails(std::time::Duration::from_secs(30)).await;
