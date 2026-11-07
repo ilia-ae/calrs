@@ -184,6 +184,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+### Fixed
+
+- **Markdown links are limited to safe destinations** - In event type descriptions, team descriptions and profile bios, a Markdown link now stays a link only when it points to http, https, mailto or a relative path. Any other scheme (`javascript:`, `data:`, `vbscript:` and so on, in any letter case or entity-encoded) keeps its text and loses the link, since those would run in the visitor's browser on the public booking pages.
+
 ## [1.23.3] - 2026-11-09
 
 Security release for the 1.23 line. It backports three fixes from the 2.0 work; please upgrade. No migrations. Read the two upgrade notes below before upgrading.
