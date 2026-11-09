@@ -74,6 +74,22 @@ async fn owned_source(
     })
 }
 
+/// Whether calrs would refuse to connect to the source's saved address now:
+/// a private or reserved IP literal, or the host of an outbound proxy, not
+/// on the private-host allowlist (`net_guard::url_refused`, which the
+/// CalDAV and EWS clients apply at every request). Host names that resolve
+/// to such an address are refused by the clients' resolver when they
+/// connect; that cannot be told in advance without a lookup.
+fn source_address_refused(source_url: &str) -> bool {
+    reqwest::Url::parse(source_url.trim()).is_ok_and(|url| crate::net_guard::url_refused(&url))
+}
+
+/// What the model is told for a source [`source_address_refused`] names.
+/// No address: as `net_guard::REFUSED`, that is the administrator's to see.
+const ADDRESS_REFUSED: &str = "calrs refuses to connect to this source's server: its address is \
+     private or reserved and not on the private-host allowlist (CALRS_ALLOW_PRIVATE_HOSTS, or \
+     Admin panel, System settings)";
+
 // --- set_source_calendars ---
 
 /// The calendars of a source: id and whether it is synced.
@@ -242,6 +258,13 @@ pub(crate) async fn sync_source(
             "this source is switched off, so it is not synced",
         ));
     }
+    // Checked before the cooldown, so a refused source does not use it up:
+    // the sync would only record the same refusal.
+    if source_address_refused(&source.url) {
+        return Err(ToolError::unavailable(&format!(
+            "{ADDRESS_REFUSED}; nothing was synced"
+        )));
+    }
     // Keyed by an id the user owns, so the limiter holds no more entries
     // than the user has sources.
     if w.ctx.syncs.check_limited(&source_id).await {
@@ -286,7 +309,10 @@ pub(crate) async fn sync_source(
 /// is, anything else appended to the source's origin) and must stay on the
 /// source's server: same scheme, host and port, and no user name or password.
 /// Otherwise every booking, with the source's credentials, would be sent to
-/// wherever the href points.
+/// wherever the href points. Stricter than the clients' outbound policy
+/// (#363), which lets a server's hrefs name another public host: here only
+/// the source's own server, whose address `set_write_calendar` also checks
+/// against that policy.
 pub(crate) fn usable_write_href(provider: &str, source_url: &str, href: &str) -> bool {
     if href.trim().is_empty() {
         return false;
@@ -382,6 +408,14 @@ pub(crate) async fn set_write_calendar(
                     "this calendar's address leads off the source's server, so bookings \
                      cannot be written to it",
                 ));
+            }
+            // Same server as the source, so the source's address decides:
+            // every write would be refused, as the web's write-back is.
+            if source_address_refused(&source.url) {
+                return Err(ToolError::unavailable(&format!(
+                    "{ADDRESS_REFUSED}, so bookings cannot be written to its calendars; \
+                     nothing was changed"
+                )));
             }
             Some(href)
         }

@@ -488,6 +488,23 @@ pub(crate) async fn act(
 /// of the status it aims for. `resequenced`: its invite sequence went up
 /// meanwhile, which only the end or move of a confirmed booking does.
 fn refusal(action: Action, after: &str, resequenced: bool, response: &Response) -> ToolError {
+    // The handlers answer an internal error when a read fails, among them
+    // the fail-closed availability re-check of an approval (calendar,
+    // bookings, working hours, resources): the booking is left as it was.
+    if response.status().is_server_error() && after == action.from() {
+        tracing::warn!(
+            target: "calrs::agent",
+            status = %response.status(),
+            tool = action.tool(),
+            "the booking handler failed on an agent request"
+        );
+        return ToolError::unavailable(&format!(
+            "the web handler could not complete its checks (for an approval, most likely the \
+             host's availability could not be read), so nothing was changed and the booking \
+             is still {} (details are in the server log); try again later",
+            shown(after)
+        ));
+    }
     let Some(target) = redirect_target(response) else {
         tracing::warn!(
             target: "calrs::agent",

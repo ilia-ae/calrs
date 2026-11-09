@@ -935,7 +935,7 @@ pub(super) async fn compute_slots(
 /// of a default. Shared resources are not read strictly here: the booking
 /// paths check them with [`crate::resources::check_and_pick`].
 #[allow(clippy::too_many_arguments)]
-async fn compute_slots_read(
+pub(super) async fn compute_slots_read(
     pool: &SqlitePool,
     et_id: &str,
     duration: i32,

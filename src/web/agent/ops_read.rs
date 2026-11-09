@@ -20,8 +20,8 @@ use super::{
 use crate::booking_window::{today_in, MAX_DAYS_AHEAD};
 use crate::models::User;
 use crate::web::availability::{
-    booking_window_warnings, compute_slots, fetch_busy_times_for_user, get_booking_window,
-    get_host_tz, BusySource,
+    booking_window_warnings, compute_slots_read, get_booking_window, get_host_tz, server_tz,
+    try_fetch_busy_times_for_user, try_get_booking_window, BusySource,
 };
 use crate::web::AppState;
 use chrono::{NaiveDate, TimeZone, Utc};
@@ -588,6 +588,17 @@ async fn busy_calendars(
 /// (`public_pages.rs`, the `/u/{username}/{slug}` handler): sync stale
 /// sources, then `compute_slots` over the host's busy times. Disabled event
 /// types are computed too, as a preview.
+///
+/// Stricter than the page in one way: the page shows times even when the
+/// host's calendar, bookings, booking window, availability rules, date
+/// overrides, slot interval or timezone cannot be read (the booking itself is
+/// then refused, upstream's fail-closed re-check), but a model would relay
+/// such times as free. Here those reads fail the call instead, with the same
+/// strict slot computation the booking re-check uses (`compute_slots_read`).
+/// Shared resources stay lenient there, as in that re-check: a failed
+/// resource read can show a time as free, and booking it is then refused by
+/// `crate::resources::check_and_pick`. A failed frequency-cap read already
+/// hides every time upstream.
 pub(crate) async fn get_slots(
     state: &AppState,
     me: &User,
@@ -616,11 +627,24 @@ pub(crate) async fn get_slots(
         ),
     };
 
-    let (duration, buffer_before, buffer_after, min_notice): (i32, i32, i32, i32) = sqlx::query_as(
-        "SELECT duration_min, COALESCE(buffer_before, 0), COALESCE(buffer_after, 0),
-                    COALESCE(min_notice_min, 0)
-             FROM event_types WHERE id = ?",
-    )
+    // The timezone is read here, strictly, rather than with `get_host_tz`,
+    // which falls back to the server timezone on a failed read and would
+    // shift every time shown. The value and its fallbacks (no row, NULL or an
+    // unknown name: the server timezone) are the same as `get_host_tz`'s.
+    let (duration, buffer_before, buffer_after, min_notice, stored_tz): (
+        i32,
+        i32,
+        i32,
+        i32,
+        Option<String>,
+    ) = sqlx::query_as(&format!(
+        "SELECT et.duration_min, COALESCE(et.buffer_before, 0), COALESCE(et.buffer_after, 0),
+                COALESCE(et.min_notice_min, 0), {STORED_TZ}
+         FROM event_types et
+         LEFT JOIN accounts a ON a.id = et.account_id
+         LEFT JOIN users u ON u.id = a.user_id
+         WHERE et.id = ?"
+    ))
     .bind(&et_id)
     .fetch_one(pool)
     .await
@@ -628,8 +652,12 @@ pub(crate) async fn get_slots(
 
     crate::commands::sync::sync_if_stale(pool, &state.secret_key, &me.id).await;
 
-    let host_tz = get_host_tz(pool, &et_id).await;
-    let window = get_booking_window(pool, &et_id).await;
+    let host_tz = stored_tz
+        .and_then(|name| name.parse::<Tz>().ok())
+        .unwrap_or_else(server_tz);
+    let window = try_get_booking_window(pool, &et_id)
+        .await
+        .map_err(unreadable_availability)?;
     let today = today_in(host_tz);
     let from = requested_from.unwrap_or(today);
     let ahead = (from - today).num_days();
@@ -648,9 +676,11 @@ pub(crate) async fn get_slots(
     let end_date = now_host.date() + chrono::Duration::days(i64::from(start_offset + days_ahead));
     let window_end = end_date.and_hms_opt(23, 59, 59).unwrap_or(now_host);
     let busy = BusySource::Individual(
-        fetch_busy_times_for_user(pool, &me.id, now_host, window_end, host_tz, Some(&et_id)).await,
+        try_fetch_busy_times_for_user(pool, &me.id, now_host, window_end, host_tz, Some(&et_id))
+            .await
+            .map_err(unreadable_availability)?,
     );
-    let slot_days = compute_slots(
+    let slot_days = compute_slots_read(
         pool,
         &et_id,
         duration,
@@ -664,8 +694,10 @@ pub(crate) async fn get_slots(
         guest_tz,
         busy,
         None,
+        true,
     )
-    .await;
+    .await
+    .map_err(unreadable_availability)?;
 
     let mut left = SLOTS_MAX;
     let mut truncated = false;
@@ -692,6 +724,20 @@ pub(crate) async fn get_slots(
         days: out,
         truncated,
     })
+}
+
+/// A failed availability read in `get_slots`: logged in full, and the model
+/// is told no time was computed rather than shown times that look free.
+fn unreadable_availability(error: sqlx::Error) -> ToolError {
+    tracing::error!(
+        target: "calrs::agent",
+        %error,
+        "get_slots: the host's availability could not be read"
+    );
+    ToolError::unavailable(
+        "the host's calendar, bookings or availability settings could not be read, so no \
+         free times were computed (details are in the server log); try again later",
+    )
 }
 
 // --- list_sources ---

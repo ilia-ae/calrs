@@ -3962,3 +3962,150 @@ async fn agent_changes_run_to_the_end_when_the_caller_goes_away() {
     assert!(done.load(Ordering::SeqCst));
     assert_eq!(session.in_flight.count(), 0);
 }
+
+// --- calrs 1.23.2/1.23.3: fail-closed availability, outbound address policy ---
+
+/// Make every read of `table` fail, as `fail_closed.rs` does.
+async fn break_table(pool: &SqlitePool, table: &str, broken: bool) {
+    let (from, to) = if broken {
+        (table.to_string(), format!("{table}_unreadable"))
+    } else {
+        (format!("{table}_unreadable"), table.to_string())
+    };
+    sqlx::query(&format!("ALTER TABLE {from} RENAME TO {to}"))
+        .execute(pool)
+        .await
+        .unwrap();
+}
+
+/// The slot page shows times with the calendar or the event type's
+/// availability unreadable (upstream keeps slot grids lenient); `get_slots`
+/// fails instead, so the model never relays such times as free, nor times on
+/// a date the host blocked with an override. Readable again, the same call
+/// answers.
+#[tokio::test]
+async fn agent_get_slots_fails_when_availability_cannot_be_read() {
+    let fx = Fixture::new().await;
+    let from = next_monday().format("%Y-%m-%d").to_string();
+    let arguments = json!({"slug": "test-meeting", "from": from, "days": 1});
+    let mut client = fx.session(Role::ReadOnly).await;
+
+    for table in [
+        "events",
+        "bookings",
+        "availability_rules",
+        "availability_overrides",
+    ] {
+        break_table(&fx.pool, table, true).await;
+        let error = failure(&client.call("get_slots", arguments.clone()).await);
+        assert_eq!(
+            error,
+            "the host's calendar, bookings or availability settings could not be read, so no \
+             free times were computed (details are in the server log); try again later",
+            "{table}"
+        );
+        break_table(&fx.pool, table, false).await;
+    }
+    let slots = ok(&client.call("get_slots", arguments).await).clone();
+    assert_eq!(slots["days"][0]["times"][0], "09:00", "{slots}");
+}
+
+/// Upstream's approval re-check fails closed (#390): an unreadable calendar
+/// answers an internal error and the request stays pending. The agent says
+/// so, and the same approval goes through once the calendar reads.
+#[tokio::test]
+async fn agent_approval_fails_closed_when_availability_cannot_be_read() {
+    let fx = Fixture::new().await;
+    let request = booking_at(&fx, Duration::days(3), "pending", "wait@guest.test").await;
+    let mut client = fx.session(Role::Write).await;
+
+    break_table(&fx.pool, "events", true).await;
+    let error = failure(
+        &client
+            .call("approve_booking", json!({"booking_id": request}))
+            .await,
+    );
+    assert_eq!(
+        error,
+        "the web handler could not complete its checks (for an approval, most likely the \
+         host's availability could not be read), so nothing was changed and the booking is \
+         still pending (details are in the server log); try again later"
+    );
+    assert_eq!(booking_status(&fx.pool, &request).await, "pending");
+
+    break_table(&fx.pool, "events", false).await;
+    ok(&client
+        .call("approve_booking", json!({"booking_id": request}))
+        .await);
+    assert_eq!(booking_status(&fx.pool, &request).await, "confirmed");
+}
+
+/// A source saved on a private IP literal that is not on the private-host
+/// allowlist is refused at every request since 1.23.3 (#363). The agent
+/// neither syncs it (nor uses up the cooldown on it) nor points the write
+/// calendar at it, and names no address; allowlisted, the write calendar can
+/// be set again.
+#[tokio::test]
+async fn agent_refuses_a_source_on_a_private_address_off_the_allowlist() {
+    let _env = crate::test_support::ENV_LOCK.lock().await;
+    let _vars = crate::test_support::EnvGuard::new();
+    let fx = Fixture::new().await;
+    // Nothing listens there; no test puts it on the allowlist.
+    let base = "http://10.213.47.9:1/dav/";
+    let source = seed_write_source(&fx.pool, &fx.user_id, base).await;
+    calendar(&fx.pool, &source, "cal-p", "/dav/p/").await;
+    let mut client = fx.session(Role::Write).await;
+    let refused = "calrs refuses to connect to this source's server: its address is private \
+                   or reserved and not on the private-host allowlist (CALRS_ALLOW_PRIVATE_HOSTS, \
+                   or Admin panel, System settings)";
+
+    let sync = failure(
+        &client
+            .call("sync_source", json!({"source_id": source}))
+            .await,
+    );
+    assert_eq!(sync, format!("{refused}; nothing was synced"));
+    let again = failure(
+        &client
+            .call("sync_source", json!({"source_id": source}))
+            .await,
+    );
+    assert_eq!(again, sync, "refused again, not held back by the cooldown");
+    let write = failure(
+        &client
+            .call(
+                "set_write_calendar",
+                json!({"source_id": source, "calendar_id": "cal-p"}),
+            )
+            .await,
+    );
+    assert_eq!(
+        write,
+        format!("{refused}, so bookings cannot be written to its calendars; nothing was changed")
+    );
+    let href: Option<String> =
+        sqlx::query_scalar("SELECT write_calendar_href FROM caldav_sources WHERE id = ?")
+            .bind(&source)
+            .fetch_one(&fx.pool)
+            .await
+            .unwrap();
+    assert_eq!(href.as_deref(), Some("/dav/cal/"), "seeded, left as it was");
+    // Clearing the write calendar needs no connection, so it is allowed.
+    ok(&client
+        .call(
+            "set_write_calendar",
+            json!({"source_id": source, "calendar_id": null}),
+        )
+        .await);
+    assert!(!client.log.join("\n").contains("10.213"));
+
+    // Allowlisted, the policy lets it through. (No sync here: it would try
+    // to connect to that address.)
+    std::env::set_var("CALRS_ALLOW_PRIVATE_HOSTS", "10.213.47.9");
+    ok(&client
+        .call(
+            "set_write_calendar",
+            json!({"source_id": source, "calendar_id": "cal-p"}),
+        )
+        .await);
+}
