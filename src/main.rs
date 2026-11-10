@@ -13,6 +13,8 @@ mod booking_window;
 mod busy_only;
 mod caldav;
 mod commands;
+// ilia fork: secrets from systemd credentials (LoadCredentialEncrypted=).
+mod credentials;
 mod crypto;
 mod db;
 mod email;
@@ -140,8 +142,18 @@ fn get_data_dir(custom: Option<PathBuf>) -> Result<PathBuf> {
     Ok(proj.data_dir().to_path_buf())
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
+// ilia fork: `#[tokio::main]` became an explicit runtime, so systemd
+// credentials become environment variables before any thread exists
+// (`credentials::load_into_env`); the runtime is the one the macro built.
+fn main() -> Result<()> {
+    let credentials = credentials::load_into_env(credentials::NAMES);
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?
+        .block_on(run(credentials))
+}
+
+async fn run(credentials: credentials::Report) -> Result<()> {
     let cli = Cli::parse();
     // The MCP pump starts before logging, the database and the key: it
     // touches none of them, and its stdout carries only the protocol.
@@ -155,6 +167,7 @@ async fn main() -> Result<()> {
                 .unwrap_or_else(|_| "calrs=info,tower_http=info".into()),
         )
         .init();
+    credentials.log();
 
     let data_dir = get_data_dir(cli.data_dir)?;
     let pool = db::connect(&data_dir).await?;

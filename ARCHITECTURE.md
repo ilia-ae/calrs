@@ -50,6 +50,7 @@ Every user-facing string goes through Fluent (`i18n/`).
 | `src/auth.rs` | Passwords, sessions, OIDC, extractors (`AuthUser`, `AdminUser`, `OptionalAuthUser`), login/register handlers |
 | `src/mfa.rs` | Local TOTP two-factor authentication: enrollment, login challenges, recovery codes, the admin policy, `/auth/mfa` and `/dashboard/settings/mfa` routes (tests in `src/mfa/tests.rs`) |
 | `src/crypto.rs` | AES-256-GCM for stored credentials, secret key management |
+| `src/credentials.rs` | ilia fork: secrets from systemd credentials (`LoadCredentialEncrypted=`): `load_into_env(NAMES)` at the start of `main`, before the runtime, sets each variable from `$CREDENTIALS_DIRECTORY/<NAME>` unless already set; names only in the log, see CLAUDE.md "Systemd credentials" |
 | `src/settings.rs` | Runtime settings (base URL, private-host policy): env overrides DB |
 | `src/net_guard.rs` | Outbound HTTP to configured URLs: guarded resolver that checks and pins addresses (#363), literal and redirect checks, proxy handling (tests in `src/net_guard/tests.rs`) |
 | `src/trusted_proxies.rs` | Which TCP peers may set `X-Forwarded-For` (`CALRS_TRUSTED_PROXIES`), the client address and rate-limit key |

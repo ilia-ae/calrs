@@ -478,6 +478,14 @@ The country is **seeded, not guessed**. Only an explicit BCP-47 region subtag co
 
 ---
 
+## Systemd credentials (ilia fork)
+
+**Concept** (owner's decision 2026-11-10, ilia-booking docs/decisions.md, «секреты на сервере»): no secret lies on the server in plain text. The ilia-booking role encrypts each one on the server (`systemd-creds encrypt`, the host key plus the TPM2 when there is one) into `/etc/calrs/creds/<NAME>.cred` and gives it to `calrs serve` with `LoadCredentialEncrypted=<NAME>:…`; `calrs.env` keeps only non-secrets. systemd decrypts it at start into `$CREDENTIALS_DIRECTORY/<NAME>` (a per-service file only the service user reads), so the value is in neither `systemctl show` nor `/proc/<pid>/environ`. `src/credentials.rs` (fork-only): `load_into_env(NAMES)` runs first thing in `main`, before the tokio runtime exists (`std::env::set_var` is only sound while the process has one thread): for each name in `NAMES` (`CALRS_SMTP_PASSWORD`, `CALRS_SMS_API_SECRET`, `CALRS_TELEGRAM_BOT_TOKEN`, `CALRS_INBOX_IMAP_PASSWORD`, `CALRS_TON_API_KEY`, `CALRS_TON_API_URL`, `CALRS_TON_COINGECKO_KEY`, `CALRS_SECRET_KEY`; the credential name is the variable's name) whose file exists, it reads it, trims one trailing newline and sets the variable in this process, unless the variable is already set (an explicit override wins, with a warning). Everything else in calrs keeps reading the environment, unchanged. Refused: not a regular file, over 64 KiB, not UTF-8, a NUL. `Report::log` (after tracing starts) logs `secrets loaded from systemd credentials names=…`, names only; `CREDENTIALS_DIRECTORY` set but unreadable warns. `Value` has no `Debug` and is wiped on drop (`Zeroizing`). Outside systemd nothing happens. The role greps a release for `CREDENTIALS_DIRECTORY` before switching to it, so a release from before this cannot run without its secrets. Tests: `credentials::tests` (pure `collect` over a temp dir; one test sets real variables under `ENV_LOCK`; `every_name_is_a_secret_calrs_reads` checks each name against the module that reads it).
+
+**Upstream files touched:** `src/main.rs` (`mod credentials`; `#[tokio::main]` became `fn main()` that calls `credentials::load_into_env`, then builds the same multi-thread runtime with `enable_all` and blocks on `run(credentials)`, the former body; `credentials.log()` after the tracing subscriber is set).
+
+---
+
 ## Known issues & TODOs
 
 ### Security
