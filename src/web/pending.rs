@@ -165,6 +165,12 @@ pub(super) async fn sweep_pending_requests(
             reason = "expired: the host did not respond before the deadline",
             "pending request declined"
         );
+        // ilia fork: Telegram only queues, so it goes out now rather than
+        // behind the SMTP sends below (and is not lost when the server stops
+        // while they are still in flight).
+        // A priced booking (TON) says why it was released instead.
+        let event = ton_pay::telegram::expiry_event(pool, bid).await;
+        crate::telegram::notify(pool, bid, event);
         // Notifications go out in the background, like the booking flow's
         // (`spawn_emails`): a slow relay or a burst of expiries must not hold
         // up the reminders this loop sends next. The decline above is

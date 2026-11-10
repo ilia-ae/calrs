@@ -1309,6 +1309,14 @@ async fn cancel_orphaned_booking(
     );
     // The host's event is already gone; a claimant's copy is not (#269).
     crate::web::claimant_delete_booking(pool, key, &booking_uid).await;
+    crate::telegram::notify(
+        pool,
+        &booking_id,
+        crate::telegram::TelegramEvent::Cancelled {
+            by_host: true,
+            reason: None,
+        },
+    );
 
     // Send cancellation emails
     let smtp_config = match crate::email::load_smtp_config(pool, key).await {
@@ -2239,6 +2247,49 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(copies, 0);
+    }
+
+    /// ilia fork: a booking cancelled because its calendar event is gone
+    /// tells the guest's linked Telegram chat, once, as a host cancellation.
+    #[tokio::test]
+    async fn orphan_cancel_tells_the_linked_telegram_guest_once() {
+        let tg = crate::telegram::fake::install_fake("ilia_test_bot").await;
+        let pool = setup_test_db().await;
+        let (source_id, et_id) = seed_fixtures(&pool).await;
+        let booking_id = Uuid::new_v4().to_string();
+        sqlx::query(
+            "INSERT INTO bookings (id, event_type_id, uid, guest_name, guest_email, guest_timezone,
+                start_at, end_at, status, cancel_token, reschedule_token, caldav_calendar_href)
+             VALUES (?, ?, 'orphan-tg', 'Guest', 'guest@example.com', 'UTC',
+                '2030-06-15T10:00:00', '2030-06-15T10:30:00', 'confirmed', 'ctok-tg', 'rtok-tg',
+                '/calendars/host/default/')",
+        )
+        .bind(&booking_id)
+        .bind(&et_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO telegram_guest_links (booking_id, link_expires_at, chat_id, token_chat_id)
+             VALUES (?, '2999-01-01 00:00:00', 777, 777)",
+        )
+        .bind(&booking_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let outcome = cancel_orphaned_booking(
+            &pool,
+            &[0u8; 32],
+            OrphanCheck::Caldav(None),
+            &source_id,
+            "orphan-tg",
+        )
+        .await;
+        assert!(matches!(outcome, OrphanOutcome::Cancelled));
+        tg.flush(&pool).await;
+        let got = tg.api.texts_to(777);
+        assert_eq!(got.len(), 1, "{got:?}");
+        assert!(got[0].starts_with("The host cancelled: "), "{got:?}");
     }
 
     /// Issue #106 (cross-source isolation defense-in-depth): a sync of source A

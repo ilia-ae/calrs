@@ -332,10 +332,15 @@ pub async fn migrate(pool: &SqlitePool) -> Result<()> {
             "079_calendar_sync_enabled",
             include_str!("../migrations/079_calendar_sync_enabled.sql"),
         ),
-        // ilia fork, always last: own tables only (ilia-booking docs/ton.md).
+        // ilia fork, always last: own tables only, named, not numbered, so
+        // upstream's numbers stay free (ilia-booking docs/ton.md, docs/operations.md).
         (
             "ilia_001_ton_payments",
             include_str!("../migrations/ilia_001_ton_payments.sql"),
+        ),
+        (
+            "ilia_002_telegram",
+            include_str!("../migrations/ilia_002_telegram.sql"),
         ),
     ];
 
@@ -984,7 +989,8 @@ mod tests {
             .fetch_one(&pool)
             .await
             .unwrap();
-        assert_eq!(count.0, 80, "All 80 migrations should be tracked");
+        // 79 upstream + ilia_001_ton_payments + ilia_002_telegram.
+        assert_eq!(count.0, 81, "All 81 migrations should be tracked");
     }
 
     /// #324: calendars that existed before 079, and calendars discovered
@@ -1207,7 +1213,7 @@ mod tests {
             .fetch_one(&pool)
             .await
             .unwrap();
-        assert_eq!(count.0, 80, "Still 80 migrations after second run");
+        assert_eq!(count.0, 81, "Still 81 migrations after second run");
     }
 
     #[tokio::test]

@@ -3710,7 +3710,7 @@ const SQL_UUID_V4: &str = "lower(hex(randomblob(4))) || '-' || lower(hex(randomb
 
 /// Child tables copied along with an event type: table, the columns after
 /// `event_type_id`, and whether rows carry their own `id` (minted fresh).
-const COPIED_CHILD_TABLES: [(&str, &str, bool); 7] = [
+const COPIED_CHILD_TABLES: [(&str, &str, bool); 8] = [
     (
         "availability_rules",
         "day_of_week, start_time, end_time",
@@ -3730,6 +3730,8 @@ const COPIED_CHILD_TABLES: [(&str, &str, bool); 7] = [
     ("event_type_member_weights", "user_id, weight", false),
     ("event_type_watchers", "team_id", false),
     ("event_type_resources", "resource_id", false),
+    // ilia fork: the guest Telegram field (migration ilia_002_telegram).
+    ("telegram_event_types", "guest_mode", false),
 ];
 
 type Tx<'a> = sqlx::Transaction<'a, sqlx::Sqlite>;

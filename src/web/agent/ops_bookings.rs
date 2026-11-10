@@ -149,6 +149,21 @@ pub(crate) async fn get_booking(
     // when the event type asks for one; attendees in the order of every push.
     let (notes, phone) = booking_guest_input(pool, &uid).await;
     let invited = booking_additional_attendees(pool, &uid).await;
+    // ilia fork: the guest's Telegram. The usernames only: the chat id and
+    // the link token never leave the database.
+    let telegram: Option<(Option<String>, Option<String>, bool)> = sqlx::query_as(
+        "SELECT entered_username, telegram_username, chat_id IS NOT NULL
+           FROM telegram_guest_links WHERE booking_id = ?",
+    )
+    .bind(&id)
+    .fetch_optional(pool)
+    .await
+    .map_err(db("read booking"))?;
+    let (tg_entered, tg_actual, telegram_linked) = telegram.unwrap_or((None, None, false));
+    let at_name = |name: Option<String>| {
+        name.map(|n| format!("@{}", untrusted_text(&n, 32)))
+            .filter(|n| n.len() > 1)
+    };
     let tz = user_tz(me);
     let payment = super::ops_ton::payment_of(pool, &id, tz).await?;
     Ok(BookingDetail {
@@ -165,6 +180,7 @@ pub(crate) async fn get_booking(
         writeback_failed: writeback_failed != 0,
         language: crate::email::supported_language(language),
         payment,
+        telegram_linked,
         guest_supplied: GuestDetails {
             name: untrusted_text(&guest_name, GUEST_NAME_MAX),
             email: untrusted_text(&guest_email, EMAIL_MAX),
@@ -180,6 +196,8 @@ pub(crate) async fn get_booking(
                 .take(ATTENDEES_MAX)
                 .map(|email| untrusted_text(email, EMAIL_MAX))
                 .collect(),
+            telegram: at_name(tg_entered),
+            telegram_linked_as: at_name(tg_actual.filter(|_| telegram_linked)),
         },
     })
 }

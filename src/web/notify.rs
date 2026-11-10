@@ -215,6 +215,8 @@ pub(super) struct NewBookingEmails {
     pub(super) guest_reschedule_url: Option<String>,
     pub(super) cancel_notice_min: Option<i32>,
     pub(super) reschedule_notice_min: Option<i32>,
+    /// ilia fork: the guest's Telegram deep link (`crate::telegram`).
+    pub(super) telegram_link: Option<String>,
 }
 
 /// Send the guest and host emails for a just-committed booking in the
@@ -245,11 +247,12 @@ pub(super) fn send_new_booking_emails(m: NewBookingEmails) {
                 );
             }
             log_email_result(
-                crate::email::send_guest_pending_notice_ex(
+                crate::email::send_guest_pending_notice_tg(
                     &m.smtp_config,
                     &m.details,
                     m.guest_cancel_url.as_deref(),
                     m.guest_reschedule_url.as_deref(),
+                    m.telegram_link.as_deref(),
                 )
                 .await,
                 "guest_pending_notice",
@@ -257,13 +260,14 @@ pub(super) fn send_new_booking_emails(m: NewBookingEmails) {
             );
         } else {
             log_email_result(
-                crate::email::send_guest_confirmation_ex(
+                crate::email::send_guest_confirmation_tg(
                     &m.smtp_config,
                     &m.details,
                     m.guest_cancel_url.as_deref(),
                     m.guest_reschedule_url.as_deref(),
                     m.cancel_notice_min,
                     m.reschedule_notice_min,
+                    m.telegram_link.as_deref(),
                 )
                 .await,
                 "guest_confirmation",
@@ -368,7 +372,7 @@ pub async fn run_reminder_loop(pool: SqlitePool, secret_key: [u8; 32]) {
 
 /// One pass of the reminder batch: email and SMS reminders for confirmed
 /// bookings whose reminder time has come.
-async fn send_due_reminders(pool: SqlitePool, secret_key: [u8; 32]) {
+pub(super) async fn send_due_reminders(pool: SqlitePool, secret_key: [u8; 32]) {
     // Find bookings that need a reminder:
     // - status is confirmed
     // - reminder not yet sent
@@ -398,7 +402,7 @@ async fn send_due_reminders(pool: SqlitePool, secret_key: [u8; 32]) {
         .ok()
         .flatten()
         .is_some();
-    if smtp_config.is_none() && !sms_configured {
+    if smtp_config.is_none() && !sms_configured && !crate::telegram::enabled() {
         return;
     }
 
@@ -515,6 +519,11 @@ async fn send_due_reminders(pool: SqlitePool, secret_key: [u8; 32]) {
                     .await;
                 notified = true;
             }
+        }
+
+        // ilia fork: the guest's linked Telegram chat is a channel too.
+        if crate::telegram::notify_reminder(&pool, bid).await {
+            notified = true;
         }
 
         if !notified {

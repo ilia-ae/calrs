@@ -776,6 +776,7 @@ pub(super) async fn show_group_book_form(
             form_notes => "",
             invite_token => query.invite.as_deref().unwrap_or(""),
             sms_phone_mode => sms_phone_mode,
+            telegram_mode => super::telegram::form_mode(&state.pool, &et_id).await,
             phone_default_country => phone_default_country,
             form_phone => "",
             max_additional_guests => max_additional_guests,
@@ -1188,7 +1189,7 @@ async fn show_dynamic_group_book_form(
     .unwrap_or(None);
 
     let (
-        _,
+        et_id,
         et_slug,
         et_title,
         et_desc,
@@ -1280,6 +1281,7 @@ async fn show_dynamic_group_book_form(
             host_name => host_name,
             username => combined_username,
             sms_phone_mode => sms_phone_mode,
+            telegram_mode => super::telegram::form_mode(&state.pool, &et_id).await,
             phone_default_country => phone_default_country,
             form_phone => "",
             date => query.date,
@@ -1838,6 +1840,7 @@ pub(super) async fn show_book_form_for_user(
             host_name => host_name,
             username => username,
             sms_phone_mode => sms_phone_mode,
+            telegram_mode => super::telegram::form_mode(&state.pool, &et_id).await,
             phone_default_country => phone_default_country,
             form_phone => "",
             date => query.date,
@@ -2399,6 +2402,7 @@ pub(super) async fn show_book_form(
             form_notes => "",
             form_phone => "",
             sms_phone_mode => sms_phone_mode,
+            telegram_mode => super::telegram::form_mode(&state.pool, &et_id).await,
             phone_default_country => phone_default_country,
             max_additional_guests => max_additional_guests,
             company_link => state.company_link.read().await.clone(),

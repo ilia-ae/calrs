@@ -381,6 +381,8 @@ pub(crate) async fn pay_page(
             crate::email::load_smtp_config(&state.pool, &state.secret_key).await,
             Ok(Some(_))
         );
+    // ilia fork: the booking's Telegram link, while the booking stands.
+    let telegram_link = super::telegram::pay_page_link(&state, &row.booking_id, &token).await;
     let tmpl = match state.templates.get_template("ton_pay.html") {
         Ok(t) => t,
         Err(e) => return internal_error_response("internal", &e),
@@ -420,6 +422,7 @@ pub(crate) async fn pay_page(
             email_failed => query.sent.as_deref() == Some("0"),
             checked => query.checked.is_some(),
             rebook_url => rebook_url,
+            telegram_link => telegram_link,
         })
         .unwrap_or_else(|e| internal_error_body("template render", &e));
     private(Html(rendered).into_response())
@@ -541,9 +544,11 @@ pub(crate) async fn guest_mail(
     ))
 }
 
-/// Email the guest the links of an open invoice (its payment page, and the
-/// booking's cancel link), to the address the booking was made with, with
-/// when the time stops being held. No amount, address or coin in it.
+/// Email the guest the links of an open invoice (its payment page, the
+/// booking's cancel link, and its Telegram link when its event type offers
+/// Telegram, as the payment page shows it), to the address the booking was
+/// made with, with when the time stops being held. No amount, address or
+/// coin in it.
 /// `false` when it cannot go out (no base URL, no SMTP, booking gone).
 async fn email_links(
     state: &AppState,
@@ -575,12 +580,18 @@ async fn email_links(
     let base = base.trim_end_matches('/').to_string();
     let pay_url = format!("{base}/booking/pay/{pay_token}");
     let cancel_url = cancel_token.map(|t| format!("{base}/booking/cancel/{t}"));
+    let telegram_link = super::telegram::pay_page_link(state, booking_id, pay_token).await;
     let booking_id = booking_id.to_string();
     tracing::info!(target: TARGET, booking_id = %booking_id, "payment link emailed to the guest");
     crate::web::spawn_emails(async move {
-        let result =
-            crate::email::send_guest_ton_pay_link(&smtp, &mail, &pay_url, cancel_url.as_deref())
-                .await;
+        let result = crate::email::send_guest_ton_pay_link(
+            &smtp,
+            &mail,
+            &pay_url,
+            cancel_url.as_deref(),
+            telegram_link.as_deref(),
+        )
+        .await;
         crate::web::log_email_result(result, "guest_ton_pay_link", &booking_id);
     });
     true

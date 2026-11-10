@@ -483,3 +483,22 @@ ton-problem-host-busy-unpaid = Der Termin dieser unbezahlten Buchung wurde verge
 ton-problem-confirm-failed = Der Gast hat bezahlt, aber die Buchung konnte nach mehreren Versuchen nicht automatisch bestätigt werden (ein Fehler, kein belegter Gastgeber: siehe Serverprotokoll). Der Termin bleibt bis zum Beginn reserviert. Bestätigen Sie die Buchung von Hand oder lehnen Sie sie ab und erstatten Sie die Zahlung.
 ton-health-payment-alerts-held = Weitere Überweisungen sind für Buchungen eingegangen, zu denen Sie in der letzten Stunde schon eine E-Mail bekommen haben. Sie sind ohne eigene E-Mail erfasst: Prüfen Sie die Zahlungsdaten.
 ton-waive-body-partial = Diese Buchung ist nur teilweise bezahlt ({ $paid } von { $amount } TON erhalten, fällig bis { $time }). Wenn Sie sie bestätigen, bekommt der Gast den Termin, ohne die restlichen { $rest } TON zu zahlen. Erstatten Sie den erhaltenen Betrag, sofern nichts anderes vereinbart ist.
+
+## Telegram (ilia fork)
+
+tg-guest-cancelled-by-guest = Sie haben Ihre Buchung storniert: { $event }, { $when }.
+tg-guest-expired = Anfrage abgelaufen: { $event }, { $when }. Der Gastgeber hat nicht rechtzeitig geantwortet; bitte buchen Sie einen anderen Termin.
+tg-book-help-optional = Nach der Buchung können Sie Benachrichtigungen in Telegram einschalten.
+tg-settings-not-linked = Ihr Telegram ist nicht verbunden.
+
+## Telegram: TON payments (ilia fork; docs/ton.md)
+
+tg-guest-payment-due = Ihre Buchung wartet auf die Zahlung: { $event }, { $when }. Betrag: { $amount } TON (≈ { $usd } $). Bezahlen Sie bis { $deadline }, sonst wird der Termin freigegeben.
+tg-guest-payment-partial = Ein Teil der Zahlung für { $event }, { $when } ist eingegangen: { $paid } von { $amount } TON. Zahlen Sie die restlichen { $rest } TON bis { $deadline }, sonst wird der Termin freigegeben.
+tg-guest-payment-received = Zahlung erhalten, Ihre Buchung ist bestätigt: { $event }, { $when }. Gastgeber: { $host }.
+tg-guest-payment-late = Eine Zahlung von { $value } TON für { $event }, { $when } ist nach der Frist eingegangen und hat die Buchung deshalb nicht bestätigt. { $host } meldet sich wegen der Erstattung bei Ihnen.
+tg-guest-payment-expired = Die Zeit zum Bezahlen von { $event }, { $when } ist abgelaufen, deshalb wurde der Termin freigegeben. Sie können einen anderen Termin buchen.
+tg-guest-payment-taken = Der Termin, den Sie für { $event }, { $when } gewählt haben, wurde vergeben, bevor die Buchung bezahlt war, deshalb wurde sie freigegeben. Sie müssen nichts bezahlen. Sie können einen anderen Termin buchen.
+tg-guest-payment-refund = Wir haben Ihre Zahlung für { $event }, { $when } erhalten, aber der Termin konnte nicht bestätigt werden, deshalb wurde die Buchung freigegeben. { $host } erstattet die Zahlung und meldet sich bei Ihnen.
+tg-guest-payment-refund-part = Ein Teil der Zahlung war schon eingegangen: { $host } meldet sich wegen der Erstattung bei Ihnen.
+tg-guest-payment-held = Wir haben Ihre Zahlung für { $event }, { $when } erhalten, aber die Buchung konnte nicht automatisch bestätigt werden. { $host } meldet sich bei Ihnen.

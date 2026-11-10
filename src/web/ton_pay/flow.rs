@@ -135,7 +135,9 @@ pub(crate) async fn open_for_booking(
 }
 
 /// After the booking committed: no booking emails, no calendar push, no
-/// SMS (nothing is confirmed). The guest goes straight to the payment page;
+/// SMS (nothing is confirmed), and no host Telegram message. The guest goes
+/// straight to the payment page, which offers the Telegram link when the
+/// event type asks for it (`telegram_username`: what the form carried);
 /// inside the embedded widget, to a short page whose link opens it in the
 /// whole window (the payment page is not frameable, and wallets do not
 /// open `ton://` from an iframe).
@@ -143,12 +145,14 @@ pub(in crate::web) async fn after_booking(
     state: &AppState,
     booking_id: &str,
     opened: &OpenedInvoice,
+    telegram_username: Option<&str>,
     embed: &EmbedParams,
     lang: &str,
 ) -> Response {
     if let Some(rt) = state.ton.get() {
         invoice::invoice_opened(&rt, booking_id, opened);
     }
+    super::telegram::booking_created(state, booking_id, &opened.pay_token, telegram_username).await;
     let pay_url = format!("/booking/pay/{}", opened.pay_token);
     if !embed.is_embedded() {
         return Redirect::to(&pay_url).into_response();

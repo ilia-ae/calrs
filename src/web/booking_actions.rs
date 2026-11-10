@@ -469,6 +469,18 @@ pub(super) async fn approve_booking_by_token(
         });
     }
 
+    // ilia fork: a paid booking's guest hears "payment received, booking
+    // confirmed" from the payment notice instead (docs/ton.md).
+    if !ton_pay::telegram::approval_told_by_payment(&state, &bid).await {
+        crate::telegram::notify(
+            &state.pool,
+            &bid,
+            crate::telegram::TelegramEvent::Approved {
+                reschedule: reschedule_approval,
+            },
+        );
+    }
+
     // Confirmation SMS to the guest, now that the booking is confirmed. This
     // is the deferred half of the booking flow: a pending booking stays silent
     // until the host approves it here. An approved reschedule says "moved".
@@ -653,6 +665,13 @@ pub(super) async fn decline_booking_by_token(
     let date_label = format_date_label(&date, lang);
 
     let reason = form.reason.filter(|r| !r.trim().is_empty());
+    crate::telegram::notify(
+        &state.pool,
+        &bid,
+        crate::telegram::TelegramEvent::Declined {
+            reason: reason.clone(),
+        },
+    );
 
     // Send decline notification to guest
     if let Ok(Some(smtp_config)) =
@@ -1306,6 +1325,15 @@ pub(super) async fn guest_cancel_booking(
             }
         });
     }
+
+    crate::telegram::notify(
+        &state.pool,
+        &bid,
+        crate::telegram::TelegramEvent::Cancelled {
+            by_host: false,
+            reason: reason.clone(),
+        },
+    );
 
     // Cancellation SMS to the guest, independent of SMTP.
     if let Some(ctx) = crate::sms::SmsContext::for_cancellation(
@@ -2436,6 +2464,14 @@ pub(super) async fn guest_reschedule_booking(
         }
     }
 
+    crate::telegram::notify(
+        &state.pool,
+        &booking_id,
+        crate::telegram::TelegramEvent::Rescheduled {
+            pending: needs_approval,
+        },
+    );
+
     // Reschedule SMS to the guest. A reschedule that needs approval stays
     // silent here, like its email: the guest is told when the host approves.
     if !needs_approval {
@@ -2635,6 +2671,11 @@ pub(super) async fn host_reschedule_booking(
     .await;
 
     tracing::info!(booking_id = %bid, guest = %guest_email, "host requested reschedule — guest will pick new time");
+    crate::telegram::notify(
+        &state.pool,
+        &bid,
+        crate::telegram::TelegramEvent::RescheduleRequested,
+    );
 
     // Send email to guest asking them to pick a new time
     if let Ok(Some(smtp_config)) =

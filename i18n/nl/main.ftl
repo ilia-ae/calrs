@@ -1847,3 +1847,120 @@ ton-problem-confirm-failed = De gast heeft betaald, maar de boeking kon na meerd
 ton-health-capacity-near = Een nieuwe betaalde boeking nam de laatste open plek of het laatste dagbudget in. Volgende worden geweigerd tot boekingen betaald of vrijgegeven zijn. Als dit geen echte vraag is, houdt iemand misschien tijden vast zonder te betalen.
 ton-health-payment-alerts-held = Er zijn meer overboekingen binnengekomen voor boekingen waarover je het afgelopen uur al een e-mail kreeg. Ze zijn vastgelegd zonder aparte e-mail: bekijk het betaaloverzicht.
 ton-waive-body-partial = Deze boeking is maar deels betaald ({ $paid } van { $amount } TON ontvangen, te betalen vóór { $time }). Als je haar bevestigt, krijgt de gast de afspraak zonder de resterende { $rest } TON te betalen. Betaal het ontvangen bedrag terug, tenzij anders afgesproken.
+
+## Telegram (ilia fork)
+
+tg-when = { $date }, { $time } ({ $tz })
+tg-in-minutes =
+    { $count ->
+        [one] over { $count } minuut
+       *[other] over { $count } minuten
+    }
+tg-in-hours =
+    { $count ->
+        [one] over { $count } uur
+       *[other] over { $count } uur
+    }
+tg-in-days =
+    { $count ->
+        [one] over { $count } dag
+       *[other] over { $count } dagen
+    }
+tg-reason = Reden: { $reason }
+tg-link-line = { $label }: { $url }
+tg-guest-confirmed = Boeking bevestigd: { $event }, { $when }. Gastheer: { $host }.
+tg-guest-pending = Aanvraag verstuurd: { $event }, { $when }. Je krijgt het antwoord van de gastheer hier.
+tg-guest-approved = Je aanvraag is bevestigd: { $event }, { $when }.
+tg-guest-reschedule-approved = Je nieuwe tijd is bevestigd: { $event }, { $when }.
+tg-guest-declined = Je aanvraag is afgewezen: { $event }, { $when }.
+tg-guest-cancelled-by-host = De gastheer heeft geannuleerd: { $event }, { $when }.
+tg-guest-cancelled-by-guest = Je hebt je boeking geannuleerd: { $event }, { $when }.
+tg-guest-rescheduled = Boeking verplaatst: { $event } is nu { $when }.
+tg-guest-reschedule-pending = Nieuwe tijd aangevraagd: { $event }, { $when }. Je krijgt het antwoord van de gastheer hier.
+tg-guest-reschedule-requested = De gastheer vraagt je een nieuwe tijd te kiezen voor { $event }. Was: { $when }.
+tg-guest-reminder = Herinnering: { $event } begint { $in }, { $when }.
+tg-guest-expired = Aanvraag verlopen: { $event }, { $when }. De gastheer heeft niet op tijd gereageerd; boek een andere tijd.
+tg-button-cancel = Boeking annuleren
+tg-button-reschedule = Verplaatsen
+tg-button-calendar = Toevoegen aan agenda
+tg-button-pick-time = Nieuwe tijd kiezen
+tg-button-rebook = Andere tijd boeken
+tg-button-bookings = Boekingen openen
+tg-host-new-booking = Nieuwe boeking: { $event }, { $when }. Gast: { $guest }, { $email }.
+tg-host-approval-request = Aanvraag om goed te keuren: { $event }, { $when }. Gast: { $guest }, { $email }.
+tg-host-reschedule-approval = Nieuwe tijd om goed te keuren: { $event }, { $when }. Gast: { $guest }, { $email }.
+tg-host-rescheduled = { $guest } heeft { $event } verplaatst naar { $when }.
+tg-host-cancelled = { $guest } heeft geannuleerd: { $event }, { $when }.
+tg-host-guest-linked = { $guest } krijgt Telegram-meldingen voor { $event }, { $when }: { $username }.
+tg-host-guest-linked-differs = Ingevuld op het formulier: { $entered }.
+tg-host-no-username = geen gebruikersnaam
+tg-bot-help = Deze bot stuurt meldingen over boekingen op { $site }. Open de link op je bevestigingspagina of in je e-mail om ze aan te zetten; bij een betaalde boeking staat de link op de betaalpagina. /stop zet ze uit.
+tg-bot-linked-guest = Klaar: meldingen over deze boeking komen hier binnen.
+tg-bot-linked-host = Klaar: gastheermeldingen voor { $name } komen hier binnen.
+tg-bot-link-invalid = Deze link werkt niet meer: hij geldt maar in één Telegram-chat en alleen tot het einde van de afspraak.
+tg-bot-link-replaced = Deze link is vervangen. Open de betaalpagina van je boeking opnieuw en gebruik de Telegram-link daar.
+tg-bot-rate-limited = Te veel pogingen. Probeer het later opnieuw.
+tg-bot-stopped = Meldingen staan uit. Open voor een boeking de link uit de bevestigingsmail opnieuw om ze weer aan te zetten; gastheren maken een nieuwe link aan in Profiel en instellingen → Telegram.
+tg-bot-not-linked = Deze chat krijgt geen meldingen.
+tg-cmd-help = Hoe deze bot werkt
+tg-cmd-stop = Meldingen uitzetten
+tg-book-label = Telegram
+tg-book-placeholder = @gebruikersnaam
+tg-book-help-optional = Na het boeken kun je meldingen in Telegram aanzetten.
+tg-book-help-required = Open na het boeken de Telegram-link om meldingen te krijgen.
+tg-book-invalid-title = Controleer je Telegram-gebruikersnaam
+tg-book-invalid = Vul een Telegram-gebruikersnaam in zoals @naam (letters, cijfers en _, 4 tot 32 tekens).
+tg-book-required = Vul je Telegram-gebruikersnaam in.
+tg-confirmed-title = Meldingen in Telegram
+tg-confirmed-body = Open de bot en druk op de knop onderaan de chat: meldingen over deze boeking komen daar binnen.
+tg-confirmed-button = Telegram openen
+tg-email-button = Meldingen in Telegram
+tg-email-plain = Meldingen in Telegram: { $url }
+tg-settings-nav = Telegram-meldingen
+tg-settings-title = Telegram
+tg-settings-intro = Krijg gastheermeldingen in je eigen Telegram-chat: nieuwe boekingen, aanvragen om goed te keuren, annuleringen en verplaatsingen door gasten.
+tg-settings-off = Telegram is op deze server niet ingesteld.
+tg-settings-no-bot-name = De bot is nog niet klaar. Probeer het over een minuut opnieuw.
+tg-settings-linked = Gastheermeldingen gaan naar { $username }. Gekoppeld: { $date }.
+tg-settings-not-linked = Je Telegram is niet gekoppeld.
+tg-settings-link = Mijn Telegram koppelen
+tg-settings-link-open = Telegram openen
+tg-settings-link-expires = Druk in de chat op de knop onderaan. De link werkt één keer binnen 15 minuten.
+tg-settings-link-limited = Te veel links dit uur. Probeer het later opnieuw.
+tg-settings-unlink = Ontkoppelen
+tg-settings-modes = Telegram van de gast per afspraaktype
+tg-settings-modes-help = Optioneel of verplicht: het formulier vraagt naar de Telegram van de gast en de bevestiging biedt de link naar de bot.
+tg-settings-modes-none = Geen afspraaktypes om in te stellen.
+tg-settings-mode-off = Uit
+tg-settings-mode-optional = Optioneel
+tg-settings-mode-required = Verplicht
+tg-settings-save = Opslaan
+tg-settings-saved = Opgeslagen.
+tg-settings-team = Team { $team }
+tg-dashboard-label = Telegram { $username }
+tg-dashboard-entered = (ingevuld: { $entered })
+tg-dashboard-not-linked = (nog niet gekoppeld)
+tg-bot-already-linked = Staat al aan: meldingen over deze boeking komen in deze chat.
+tg-bot-link-invalid-host = Deze link is verlopen: links uit de instellingen werken één keer binnen 15 minuten. Maak een nieuwe aan in Profiel en instellingen → Telegram.
+tg-settings-linked-no-username = Gastheermeldingen gaan naar je Telegram-chat. Gekoppeld: { $date }.
+tg-bot-description = Deze bot stuurt meldingen over je boekingen op { $site }: bevestigingen, wijzigingen en herinneringen. Druk op de knop hieronder om ze voor je boeking aan te zetten. /stop zet ze uit.
+tg-bot-short-description = Boekingsmeldingen van { $site }.
+tg-button-join = Deelnemen
+
+## Telegram: TON payments (ilia fork; docs/ton.md)
+
+tg-guest-payment-due = Je boeking wacht op betaling: { $event }, { $when }. Bedrag: { $amount } TON (≈ $ { $usd }). Betaal vóór { $deadline }, anders wordt de tijd vrijgegeven.
+tg-guest-payment-partial = Een deel van de betaling voor { $event }, { $when } is binnen: { $paid } van { $amount } TON. Betaal de resterende { $rest } TON vóór { $deadline }, anders wordt de tijd vrijgegeven.
+tg-guest-payment-received = Betaling ontvangen, je boeking is bevestigd: { $event }, { $when }. Gastheer: { $host }.
+tg-guest-payment-late = Een betaling van { $value } TON voor { $event }, { $when } kwam na de deadline binnen en heeft de boeking dus niet bevestigd. { $host } neemt contact met je op over de terugbetaling.
+tg-guest-payment-expired = De tijd om { $event }, { $when } te betalen is verstreken, dus de tijd is vrijgegeven. Je kunt een andere tijd boeken.
+tg-guest-payment-taken = De tijd die je voor { $event }, { $when } koos, werd bezet voordat de boeking betaald was, dus de boeking is vrijgegeven. Je hoeft niets te betalen. Je kunt een andere tijd boeken.
+tg-guest-payment-refund = We hebben je betaling voor { $event }, { $when } ontvangen, maar de tijd kon niet worden bevestigd, dus de boeking is vrijgegeven. { $host } betaalt het bedrag terug en neemt contact met je op.
+tg-guest-payment-refund-part = Een deel van de betaling was al binnen: { $host } neemt contact met je op over de terugbetaling.
+tg-guest-payment-held = We hebben je betaling voor { $event }, { $when } ontvangen, maar de boeking kon niet automatisch worden bevestigd. { $host } neemt contact met je op.
+tg-button-pay = Betalen
+tg-host-payment-received = Betaald: { $event }, { $when }. Gast: { $guest }, { $email }. { $paid } TON ontvangen (≈ $ { $usd }); de boeking is bevestigd.
+tg-host-payment-problem = Betaling vraagt aandacht: { $event }, { $when }. Gast: { $guest }, { $email }.
+tg-host-payment-transfer = Overboeking: { $value } TON.
+tg-host-payment-amounts = Ontvangen: { $paid } van { $amount } TON.
+tg-host-payment-guest-telegram = Telegram van de gast: { $username }.

@@ -15,6 +15,7 @@ pub(crate) mod flow;
 pub(crate) mod invoice;
 pub(crate) mod page;
 pub(crate) mod store;
+pub(crate) mod telegram;
 pub(crate) mod watcher;
 
 use std::collections::HashMap;
@@ -374,6 +375,14 @@ impl TonSlot {
     pub(crate) fn install(&self, rt: Arc<TonRuntime>) {
         if let Ok(mut r) = self.runtime.write() {
             *r = Some(rt);
+        }
+    }
+
+    /// Payments off, as with an unset or invalid configuration.
+    #[cfg(test)]
+    pub(crate) fn uninstall(&self) {
+        if let Ok(mut r) = self.runtime.write() {
+            *r = None;
         }
     }
 }

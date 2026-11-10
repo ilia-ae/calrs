@@ -67,6 +67,7 @@ Every user-facing string goes through Fluent (`i18n/`).
 | `src/ews/` | Exchange Web Services client (SOAP, autodiscover, parsing) |
 | `src/providers/` | `CalendarProvider` trait (`mod.rs`), CalDAV adapter, dispatch in `src/providers/factory.rs` |
 | `src/sms/` | `SmsProvider` trait, gateway adapters, phone normalisation, message bodies |
+| `src/telegram/` | ilia fork: Telegram notifications. Bot API client and parsing (`api.rs`), token redaction (`config.rs`), long polling (`poller.rs`), commands (`commands.rs`), the outbox (`worker.rs`), message bodies (`message.rs`), SQL (`store.rs`), deep-link tokens, usernames, `TelegramEvent` and the `notify` seam (`mod.rs`) |
 | `src/email/` | Every email calrs sends (see below) |
 | `src/web/` | The web server (see below) |
 | `src/commands/` | One file per CLI subcommand; `src/commands/sync.rs` is also used by the web server |
@@ -97,6 +98,7 @@ Every user-facing string goes through Fluent (`i18n/`).
 | `admin.rs` | Admin panel: users, auth and OIDC, theme, captcha, SMTP, SMS, meeting links, resources, impersonation |
 | `branding.rs` | Theme CSS, embed pages, static assets baked into the binary |
 | `format.rs` | Date and time labels for pages, emails and the dashboard |
+| `telegram.rs` | ilia fork: Profile & Settings → Telegram (host linking, guest field per event type), the booking form's Telegram helpers, dashboard labels |
 | `week_start.rs` | Calendar display preference: event override → account owner's default → site default (Monday); named weekday keys, independent of availability's `0=Sunday` storage |
 | `tests/` | Web tests, one file per area (below) |
 
@@ -196,6 +198,11 @@ Call sites use `crate::email::name` whatever file `name` lives in.
   `src/web/admin.rs`).
 - **SMS** (`src/sms/`, sends from `src/web/notify.rs` and the booking and
   action handlers, admin card in `src/web/admin.rs`).
+- **Telegram** (ilia fork, `src/telegram/`, see CLAUDE.md "Telegram
+  notifications"): `crate::telegram::notify` from the same handlers, the
+  poller and outbox started by `serve`, pages in `src/web/telegram.rs`.
+  TON payment events reach it through `src/web/ton_pay/telegram.rs`
+  (the payment page's deep link, the alert sink, the expiry event).
 - **Captcha** (`src/web/captcha.rs`, CSP in `src/web/mod.rs`, widget in
   `templates/book.html`).
 - **Migrations** (`migrations/`, `src/db.rs`). A new file must also be added

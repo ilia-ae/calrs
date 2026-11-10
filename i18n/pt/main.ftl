@@ -1845,3 +1845,120 @@ ton-problem-confirm-failed = O convidado pagou, mas o agendamento não pôde ser
 ton-health-capacity-near = Um novo agendamento pago ocupou a última vaga aberta ou a última cota do dia. Os próximos serão recusados até que agendamentos sejam pagos ou liberados. Se não for procura real, alguém pode estar segurando horários sem pagar.
 ton-health-payment-alerts-held = Chegaram mais transferências para agendamentos sobre os quais você já recebeu um e-mail na última hora. Elas foram registradas sem um e-mail cada: confira o registro de pagamentos.
 ton-waive-body-partial = Este agendamento está pago só em parte ({ $paid } de { $amount } TON recebidos, prazo até { $time }). Se você confirmá-lo, o convidado terá a reunião sem pagar os { $rest } TON restantes. Reembolse o valor recebido, a menos que tenham combinado outra coisa.
+
+## Telegram (ilia fork)
+
+tg-when = { $date }, { $time } ({ $tz })
+tg-in-minutes =
+    { $count ->
+        [one] em { $count } minuto
+       *[other] em { $count } minutos
+    }
+tg-in-hours =
+    { $count ->
+        [one] em { $count } hora
+       *[other] em { $count } horas
+    }
+tg-in-days =
+    { $count ->
+        [one] em { $count } dia
+       *[other] em { $count } dias
+    }
+tg-reason = Motivo: { $reason }
+tg-link-line = { $label }: { $url }
+tg-guest-confirmed = Agendamento confirmado: { $event }, { $when }. Anfitrião: { $host }.
+tg-guest-pending = Solicitação enviada: { $event }, { $when }. Você receberá a resposta do anfitrião aqui.
+tg-guest-approved = Sua solicitação foi confirmada: { $event }, { $when }.
+tg-guest-reschedule-approved = Seu novo horário foi confirmado: { $event }, { $when }.
+tg-guest-declined = Sua solicitação foi recusada: { $event }, { $when }.
+tg-guest-cancelled-by-host = O anfitrião cancelou: { $event }, { $when }.
+tg-guest-cancelled-by-guest = Você cancelou seu agendamento: { $event }, { $when }.
+tg-guest-rescheduled = Agendamento remarcado: { $event } agora é { $when }.
+tg-guest-reschedule-pending = Novo horário solicitado: { $event }, { $when }. Você receberá a resposta do anfitrião aqui.
+tg-guest-reschedule-requested = O anfitrião pede que você escolha outro horário para { $event }. Era: { $when }.
+tg-guest-reminder = Lembrete: { $event } começa { $in }, { $when }.
+tg-guest-expired = Solicitação expirada: { $event }, { $when }. O anfitrião não respondeu a tempo; agende outro horário, por favor.
+tg-button-cancel = Cancelar agendamento
+tg-button-reschedule = Remarcar
+tg-button-calendar = Adicionar ao calendário
+tg-button-pick-time = Escolher novo horário
+tg-button-rebook = Agendar outro horário
+tg-button-bookings = Abrir agendamentos
+tg-host-new-booking = Novo agendamento: { $event }, { $when }. Convidado: { $guest }, { $email }.
+tg-host-approval-request = Solicitação para aprovar: { $event }, { $when }. Convidado: { $guest }, { $email }.
+tg-host-reschedule-approval = Novo horário para aprovar: { $event }, { $when }. Convidado: { $guest }, { $email }.
+tg-host-rescheduled = { $guest } remarcou { $event } para { $when }.
+tg-host-cancelled = { $guest } cancelou: { $event }, { $when }.
+tg-host-guest-linked = { $guest } receberá notificações no Telegram sobre { $event }, { $when }: { $username }.
+tg-host-guest-linked-differs = Informado no formulário: { $entered }.
+tg-host-no-username = sem nome de usuário
+tg-bot-help = Este bot envia notificações sobre agendamentos em { $site }. Para ativá-las, abra o link da sua página de confirmação ou do seu e-mail; em um agendamento pago, o link fica na página de pagamento dele. /stop as desativa.
+tg-bot-linked-guest = Pronto: as notificações deste agendamento chegarão aqui.
+tg-bot-linked-host = Pronto: as notificações de anfitrião para { $name } chegarão aqui.
+tg-bot-link-invalid = Este link não funciona mais: ele vale em um só chat do Telegram e só até o fim da reunião.
+tg-bot-link-replaced = Este link foi substituído. Abra de novo a página de pagamento do seu agendamento e use o link do Telegram que está lá.
+tg-bot-rate-limited = Tentativas demais. Tente novamente mais tarde.
+tg-bot-stopped = As notificações estão desativadas. Para ativá-las de novo para um agendamento, abra outra vez o link dele no e-mail de confirmação; anfitriões criam um novo link em Perfil e configurações → Telegram.
+tg-bot-not-linked = Este chat não recebe notificações.
+tg-cmd-help = Como este bot funciona
+tg-cmd-stop = Desativar notificações
+tg-book-label = Telegram
+tg-book-placeholder = @usuario
+tg-book-help-optional = Depois de agendar, você pode ativar as notificações no Telegram.
+tg-book-help-required = Depois de agendar, abra o link do Telegram para receber notificações.
+tg-book-invalid-title = Confira seu usuário do Telegram
+tg-book-invalid = Informe um usuário do Telegram como @nome (letras, números e _, de 4 a 32 caracteres).
+tg-book-required = Informe seu usuário do Telegram.
+tg-confirmed-title = Receba notificações no Telegram
+tg-confirmed-body = Abra o bot e toque no botão na parte de baixo do chat: as notificações deste agendamento chegarão lá.
+tg-confirmed-button = Abrir Telegram
+tg-email-button = Notificações no Telegram
+tg-email-plain = Receba notificações no Telegram: { $url }
+tg-settings-nav = Notificações do Telegram
+tg-settings-title = Telegram
+tg-settings-intro = Receba as notificações de anfitrião no seu próprio chat do Telegram: novos agendamentos, solicitações para aprovar, cancelamentos e remarcações dos convidados.
+tg-settings-off = O Telegram não está configurado neste servidor.
+tg-settings-no-bot-name = O bot ainda não está pronto. Tente novamente em um minuto.
+tg-settings-linked = As notificações de anfitrião vão para { $username }. Vinculado: { $date }.
+tg-settings-not-linked = Seu Telegram não está vinculado.
+tg-settings-link = Vincular meu Telegram
+tg-settings-link-open = Abrir o Telegram
+tg-settings-link-expires = No chat, toque no botão na parte de baixo. O link vale uma vez dentro de 15 minutos.
+tg-settings-link-limited = Links demais nesta hora. Tente novamente mais tarde.
+tg-settings-unlink = Desvincular
+tg-settings-modes = Telegram do convidado por tipo de reunião
+tg-settings-modes-help = Opcional ou obrigatório: o formulário pede o Telegram do convidado e a confirmação oferece o link para o bot.
+tg-settings-modes-none = Nenhum tipo de reunião para configurar.
+tg-settings-mode-off = Desativado
+tg-settings-mode-optional = Opcional
+tg-settings-mode-required = Obrigatório
+tg-settings-save = Salvar
+tg-settings-saved = Salvo.
+tg-settings-team = Equipe { $team }
+tg-dashboard-label = Telegram { $username }
+tg-dashboard-entered = (informado: { $entered })
+tg-dashboard-not-linked = (ainda não vinculado)
+tg-bot-already-linked = Já está ativado: as notificações deste agendamento chegam a este chat.
+tg-bot-link-invalid-host = Este link expirou: links das configurações valem uma vez dentro de 15 minutos. Crie um novo em Perfil e configurações → Telegram.
+tg-settings-linked-no-username = As notificações de anfitrião vão para o seu chat do Telegram. Vinculado: { $date }.
+tg-bot-description = Este bot envia notificações sobre os seus agendamentos em { $site }: confirmações, alterações e lembretes. Toque no botão abaixo para ativá-las para o seu agendamento. /stop as desativa.
+tg-bot-short-description = Notificações de agendamentos de { $site }.
+tg-button-join = Entrar
+
+## Telegram: TON payments (ilia fork; docs/ton.md)
+
+tg-guest-payment-due = Seu agendamento aguarda pagamento: { $event }, { $when }. Valor: { $amount } TON (≈ US$ { $usd }). Pague até { $deadline }; caso contrário, o horário será liberado.
+tg-guest-payment-partial = Parte do pagamento de { $event }, { $when } chegou: { $paid } de { $amount } TON. Pague os { $rest } TON restantes até { $deadline }; caso contrário, o horário será liberado.
+tg-guest-payment-received = Pagamento recebido, seu agendamento está confirmado: { $event }, { $when }. Anfitrião: { $host }.
+tg-guest-payment-late = Um pagamento de { $value } TON por { $event }, { $when } chegou depois do prazo, por isso não confirmou o agendamento. { $host } vai entrar em contato sobre o reembolso.
+tg-guest-payment-expired = O prazo para pagar { $event }, { $when } acabou, por isso o horário foi liberado. Você pode agendar outro horário.
+tg-guest-payment-taken = O horário que você escolheu para { $event }, { $when } foi ocupado antes de o agendamento ser pago, por isso o agendamento foi liberado. Você não precisa pagar nada. Você pode agendar outro horário.
+tg-guest-payment-refund = Recebemos seu pagamento de { $event }, { $when }, mas não foi possível confirmar o horário, por isso o agendamento foi liberado. { $host } vai reembolsar o pagamento e entrar em contato.
+tg-guest-payment-refund-part = Parte do pagamento já tinha chegado: { $host } vai entrar em contato sobre o reembolso.
+tg-guest-payment-held = Recebemos seu pagamento de { $event }, { $when }, mas não foi possível confirmar o agendamento automaticamente. { $host } vai entrar em contato.
+tg-button-pay = Pagar
+tg-host-payment-received = Pago: { $event }, { $when }. Convidado: { $guest }, { $email }. Recebidos { $paid } TON (≈ US$ { $usd }); o agendamento está confirmado.
+tg-host-payment-problem = Pagamento requer atenção: { $event }, { $when }. Convidado: { $guest }, { $email }.
+tg-host-payment-transfer = Transferência: { $value } TON.
+tg-host-payment-amounts = Recebidos { $paid } de { $amount } TON.
+tg-host-payment-guest-telegram = Telegram do convidado: { $username }.

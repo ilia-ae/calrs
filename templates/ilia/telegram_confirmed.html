@@ -1,0 +1,7 @@
+{# ilia fork: "Get notifications in Telegram", the booking's single-use deep link
+   (src/telegram/mod.rs, `booking_created`). #}
+<div class="card" style="text-align: center;">
+  <h2 style="margin: 0 0 0.5rem; font-size: 1.1rem;">{{ t("tg-confirmed-title") }}</h2>
+  <p style="color: var(--text-muted); font-size: 0.9rem; margin: 0 0 1rem;">{{ t("tg-confirmed-body") }}</p>
+  <a href="{{ telegram_link }}" target="_blank" rel="noopener noreferrer" style="display: inline-block; padding: 0.625rem 1.125rem; border-radius: var(--radius); background: #229ED9; color: #fff; text-decoration: none; font-weight: 600; font-size: 0.9rem;">{{ t("tg-confirmed-button") }}</a>
+</div>

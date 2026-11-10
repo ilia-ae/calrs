@@ -21,6 +21,29 @@ pub async fn send_guest_confirmation_ex(
     cancel_notice_min: Option<i32>,
     reschedule_notice_min: Option<i32>,
 ) -> Result<()> {
+    send_guest_confirmation_tg(
+        config,
+        details,
+        cancel_url,
+        reschedule_url,
+        cancel_notice_min,
+        reschedule_notice_min,
+        None,
+    )
+    .await
+}
+
+/// The confirmation, with the "Notifications in Telegram" deep link when the
+/// event type offers one (ilia fork, `crate::telegram`).
+pub async fn send_guest_confirmation_tg(
+    config: &SmtpConfig,
+    details: &BookingDetails,
+    cancel_url: Option<&str>,
+    reschedule_url: Option<&str>,
+    cancel_notice_min: Option<i32>,
+    reschedule_notice_min: Option<i32>,
+    telegram_link: Option<&str>,
+) -> Result<()> {
     let ics = generate_ics(details, "REQUEST");
     let lang = guest_lang(details);
 
@@ -74,7 +97,7 @@ pub async fn send_guest_confirmation_ex(
          {} {}\n\
          {}{}\
          {}\n\
-         {}{}{}\
+         {}{}{}{}\
          {}",
         greeting,
         headline,
@@ -111,6 +134,9 @@ pub async fn send_guest_confirmation_ex(
                 ta(lang, "email-confirm-need-to-cancel", [("url", u)])
             ))
             .unwrap_or_default(),
+        telegram_link
+            .map(|u| format!("\n{}\n", ta(lang, "tg-email-plain", [("url", u)])))
+            .unwrap_or_default(),
         signature,
     );
 
@@ -146,6 +172,15 @@ pub async fn send_guest_confirmation_ex(
     }
 
     let mut actions: Vec<EmailAction> = Vec::new();
+    // ilia fork: the Telegram link first, away from the red Cancel button
+    // (on a phone the three buttons wrap with no gap between the rows).
+    if let Some(u) = telegram_link {
+        actions.push(EmailAction {
+            label: t(lang, "tg-email-button"),
+            url: u.to_string(),
+            color: "#229ED9".to_string(),
+        });
+    }
     if let Some(u) = reschedule_url {
         actions.push(EmailAction {
             label: t(lang, "email-action-reschedule"),
@@ -756,8 +791,20 @@ pub async fn send_guest_pending_notice_ex(
     cancel_url: Option<&str>,
     reschedule_url: Option<&str>,
 ) -> Result<()> {
+    send_guest_pending_notice_tg(config, details, cancel_url, reschedule_url, None).await
+}
+
+/// The pending notice, with the Telegram deep link (ilia fork).
+pub async fn send_guest_pending_notice_tg(
+    config: &SmtpConfig,
+    details: &BookingDetails,
+    cancel_url: Option<&str>,
+    reschedule_url: Option<&str>,
+    telegram_link: Option<&str>,
+) -> Result<()> {
     let to = named_mailbox(&details.guest_name, &details.guest_email)?;
-    let composed = compose_guest_pending_notice(details, cancel_url, reschedule_url);
+    let composed =
+        compose_guest_pending_notice_tg(details, cancel_url, reschedule_url, telegram_link);
     let body = build_multipart_body(&composed.plain, &composed.html);
 
     let email = config
@@ -777,6 +824,16 @@ pub(super) fn compose_guest_pending_notice(
     details: &BookingDetails,
     cancel_url: Option<&str>,
     reschedule_url: Option<&str>,
+) -> ComposedEmail {
+    compose_guest_pending_notice_tg(details, cancel_url, reschedule_url, None)
+}
+
+/// The pending notice with the Telegram deep link (ilia fork).
+pub(super) fn compose_guest_pending_notice_tg(
+    details: &BookingDetails,
+    cancel_url: Option<&str>,
+    reschedule_url: Option<&str>,
+    telegram_link: Option<&str>,
 ) -> ComposedEmail {
     let lang = guest_lang(details);
 
@@ -830,6 +887,9 @@ pub(super) fn compose_guest_pending_notice(
             ta(lang, "email-confirm-need-to-cancel", [("url", u)])
         ));
     }
+    if let Some(u) = telegram_link {
+        plain.push_str(&format!("\n{}\n", ta(lang, "tg-email-plain", [("url", u)])));
+    }
     plain.push('\n');
     plain.push_str(&signature);
 
@@ -859,6 +919,15 @@ pub(super) fn compose_guest_pending_notice(
     }
 
     let mut actions: Vec<EmailAction> = Vec::new();
+    // ilia fork: the Telegram link first, away from the red Cancel button
+    // (on a phone the three buttons wrap with no gap between the rows).
+    if let Some(u) = telegram_link {
+        actions.push(EmailAction {
+            label: t(lang, "tg-email-button"),
+            url: u.to_string(),
+            color: "#229ED9".to_string(),
+        });
+    }
     if let Some(u) = reschedule_url {
         actions.push(EmailAction {
             label: t(lang, "email-action-reschedule"),

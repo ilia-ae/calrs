@@ -31,6 +31,8 @@ mod public_pages;
 mod resources;
 mod security;
 mod sources;
+// ilia fork: Telegram notifications.
+mod telegram;
 // ilia fork: TON payments.
 mod ton;
 mod writeback_failures;

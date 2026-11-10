@@ -172,9 +172,9 @@ impl TonTask {
 /// for invoices left open (their hard deadlines free the slots), no polling.
 pub(crate) fn spawn(state: Arc<AppState>, stop: watch::Receiver<bool>) -> TonTask {
     if let Some(rt) = state.ton.get() {
-        // The owner hears about payments and problems by email.
-        let sink = super::alerts::EmailSink::new(state.pool.clone(), state.secret_key);
-        let _ = rt.alerts.set(Arc::new(sink));
+        // The owner hears about payments and problems by email; the
+        // booking's Telegram chats (guest and hosts) when Telegram is on.
+        let _ = rt.alerts.set(Arc::new(super::telegram::serve_sink(&state)));
     }
     let handle = tokio::spawn(supervise(state, stop, SUPERVISOR_BACKOFF));
     TonTask {

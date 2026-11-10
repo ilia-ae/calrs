@@ -1075,6 +1075,12 @@ pub(crate) struct GuestDetails {
     pub(crate) notes: Option<String>,
     /// Addresses of the people the guest invited (at most 10 listed).
     pub(crate) additional_attendees: Vec<String>,
+    /// The Telegram username the guest typed on the booking form (`@name`),
+    /// when the event type asks for one.
+    pub(crate) telegram: Option<String>,
+    /// The Telegram username of the chat that linked itself to this booking,
+    /// as Telegram reported it (`@name`); may differ from `telegram`.
+    pub(crate) telegram_linked_as: Option<String>,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
@@ -1099,6 +1105,9 @@ pub(crate) struct BookingDetail {
     pub(crate) language: Option<String>,
     /// ilia fork: its TON payment; null when the booking was free.
     pub(crate) payment: Option<PaymentOut>,
+    /// The guest linked a Telegram chat to this booking and gets its
+    /// notifications there.
+    pub(crate) telegram_linked: bool,
     pub(crate) guest_supplied: GuestDetails,
 }
 

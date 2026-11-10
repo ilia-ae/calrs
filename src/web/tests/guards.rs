@@ -226,6 +226,8 @@ fn every_host_render_site_passes_lang() {
         "overrides.html",
         "auth/login.html",
         "auth/register.html",
+        // ilia fork
+        "ilia/telegram_settings.html",
     ];
 
     let mut offenders = Vec::new();

@@ -3,7 +3,8 @@
 //! Guests get two, both under the host's name: the link to their payment
 //! page (only when they ask for it, and with no amount, address or coin in
 //! it: a server mailing "pay in crypto" to any address typed into a form
-//! would be a spam channel), and "not booked" when the booking is released
+//! would be a spam channel; with the booking's Telegram link when its event
+//! type offers Telegram, as the payment page does), and "not booked" when the booking is released
 //! ([`TonReleased`]: the payment did not arrive in time, or the time was
 //! taken before it was paid, only when they asked for the link or paid
 //! part of it; or it was paid but could not be confirmed, always). The paid
@@ -83,15 +84,20 @@ const ACCENT_GUEST: &str = "#2563eb";
 const ACCENT_OK: &str = "#16a34a";
 const ACCENT_WARN: &str = "#d97706";
 const ACCENT_BAD: &str = "#dc2626";
+/// Telegram's blue, as on the confirmation emails' Telegram button.
+const ACCENT_TELEGRAM: &str = "#229ED9";
 
 // --- guest emails -----------------------------------------------------------
 
 /// The guest asked for their payment page by email (once per invoice).
+/// `telegram_link`: the booking's deep link to the bot, the one the payment
+/// page shows (ilia fork, `crate::telegram`).
 pub async fn send_guest_ton_pay_link(
     config: &SmtpConfig,
     mail: &TonGuestMail,
     pay_url: &str,
     cancel_url: Option<&str>,
+    telegram_link: Option<&str>,
 ) -> Result<()> {
     let to = named_mailbox(&mail.guest_name, &mail.guest_email)?;
     let lang = lang_or_en(Some(&mail.lang));
@@ -100,7 +106,7 @@ pub async fn send_guest_ton_pay_link(
         email: &mail.host_email,
         lang,
     };
-    let composed = compose_guest_ton_pay_link(mail, pay_url, cancel_url);
+    let composed = compose_guest_ton_pay_link(mail, pay_url, cancel_url, telegram_link);
     send_composed(config, sender, to, composed, None).await
 }
 
@@ -108,6 +114,7 @@ pub(super) fn compose_guest_ton_pay_link(
     mail: &TonGuestMail,
     pay_url: &str,
     cancel_url: Option<&str>,
+    telegram_link: Option<&str>,
 ) -> ComposedEmail {
     let lang = lang_or_en(Some(&mail.lang));
     let mut plain_lines = vec![ta(lang, "ton-email-link-line", [("url", pay_url)])];
@@ -116,6 +123,15 @@ pub(super) fn compose_guest_ton_pay_link(
         url: pay_url.to_string(),
         color: ACCENT_GUEST.to_string(),
     }];
+    // Before the red Cancel, as on the confirmation emails.
+    if let Some(url) = telegram_link {
+        plain_lines.push(ta(lang, "tg-email-plain", [("url", url)]));
+        actions.push(EmailAction {
+            label: t(lang, "tg-email-button"),
+            url: url.to_string(),
+            color: ACCENT_TELEGRAM.to_string(),
+        });
+    }
     if let Some(url) = cancel_url {
         plain_lines.push(ta(lang, "email-confirm-need-to-cancel", [("url", url)]));
         actions.push(EmailAction {
@@ -617,6 +633,7 @@ mod tests {
                 &guest(lang),
                 "https://cal.example.com/booking/pay/0123",
                 Some("https://cal.example.com/booking/cancel/9"),
+                None,
             );
             let text = all_text(&m);
             assert!(
@@ -663,10 +680,51 @@ mod tests {
     }
 
     #[test]
+    fn the_link_email_carries_the_telegram_link_before_cancel() {
+        let tg = "https://t.me/ilia_test_bot?start=b_abcdefghijklmnopqrstuvwxyz0123456789abcdefg";
+        for lang in ["en", "ru", "de", "fr"] {
+            let m = compose_guest_ton_pay_link(
+                &guest(lang),
+                "https://cal.example.com/booking/pay/0123",
+                Some("https://cal.example.com/booking/cancel/9"),
+                Some(tg),
+            );
+            assert!(
+                m.plain.contains(&ta(lang, "tg-email-plain", [("url", tg)])),
+                "{lang}: {}",
+                m.plain
+            );
+            let button = m.html.find(&t(lang, "tg-email-button")).expect("button");
+            let pay = m.html.find(&t(lang, "ton-email-link-action")).unwrap();
+            let cancel = m
+                .html
+                .find(&t(lang, "email-action-cancel-booking"))
+                .unwrap();
+            assert!(pay < button && button < cancel, "{lang}");
+            for word in ["TON", "12.35", "UQ", "crypto", "крипт", "$"] {
+                assert!(!all_text(&m).contains(word), "{lang}: {word:?}");
+            }
+        }
+        let without = compose_guest_ton_pay_link(
+            &guest("en"),
+            "https://cal.example.com/booking/pay/0123",
+            None,
+            None,
+        );
+        assert!(!all_text(&without).contains("t.me"));
+        assert!(!all_text(&without).contains(&t("en", "tg-email-button")));
+    }
+
+    #[test]
     fn the_link_email_says_until_when_the_time_is_held() {
         let mut mail = guest("en");
         mail.pay_by = "14:30 (Asia/Dubai)".into();
-        let m = compose_guest_ton_pay_link(&mail, "https://cal.example.com/booking/pay/0123", None);
+        let m = compose_guest_ton_pay_link(
+            &mail,
+            "https://cal.example.com/booking/pay/0123",
+            None,
+            None,
+        );
         assert!(m.plain.contains("14:30 (Asia/Dubai)"), "{}", m.plain);
         assert!(m.plain.contains(&t("en", "ton-email-row-pay-by")));
     }

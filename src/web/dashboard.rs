@@ -598,11 +598,20 @@ pub(super) async fn dashboard_bookings(
         .collect();
 
     let (impersonating, impersonating_name, _) = impersonation_ctx(&auth_user);
+    // ilia fork: the guest's Telegram, as linked (never the chat id).
+    let telegram_ids: Vec<String> = pending_bookings
+        .iter()
+        .map(|b| b.0.clone())
+        .chain(upcoming_bookings.iter().map(|b| b.0.clone()))
+        .collect();
+    let telegram_guests =
+        super::telegram::dashboard_labels(&state.pool, &telegram_ids, auth_user.lang).await;
 
     Html(
         tmpl.render(context! {
             sidebar => sidebar_context(&auth_user, "bookings"),
             lang => auth_user.lang,
+            telegram_guests => telegram_guests,
             error_message => error_message,
             pending_bookings => pending_ctx,
             claimable_bookings => claimable_ctx,
@@ -1406,6 +1415,21 @@ pub(super) async fn cancel_booking(
         });
     }
 
+    crate::telegram::notify(
+        &state.pool,
+        &bid,
+        if was_pending {
+            crate::telegram::TelegramEvent::Declined {
+                reason: guest_details.reason.clone(),
+            }
+        } else {
+            crate::telegram::TelegramEvent::Cancelled {
+                by_host: true,
+                reason: guest_details.reason.clone(),
+            }
+        },
+    );
+
     // Cancellation SMS to the guest, independent of SMTP. Declines
     // (pending -> declined) get the same "cancelled" wording as a confirmed
     // cancellation: the guest never had a confirmed slot to begin with, so the
@@ -1690,6 +1714,18 @@ pub(super) async fn confirm_booking(
             &details,
         )
         .await;
+    }
+
+    // ilia fork: a paid booking's guest hears "payment received, booking
+    // confirmed" from the payment notice instead (docs/ton.md).
+    if !ton_pay::telegram::approval_told_by_payment(&state, &bid).await {
+        crate::telegram::notify(
+            &state.pool,
+            &bid,
+            crate::telegram::TelegramEvent::Approved {
+                reschedule: reschedule_approval,
+            },
+        );
     }
 
     // Confirmation SMS to the guest, the same deferred send as the token

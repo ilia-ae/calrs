@@ -225,6 +225,20 @@ pub(super) async fn handle_group_booking(
         return ton_pay::refuse_group(&state, lang);
     }
     let needs_approval = requires_confirmation != 0;
+    // ilia fork: the guest's Telegram username, when the event type asks.
+    let telegram_username = match super::telegram::resolve_guest_telegram(
+        &state.pool,
+        &et_id,
+        form.telegram.as_deref(),
+        lang,
+    )
+    .await
+    {
+        Ok(value) => value,
+        Err((title, message)) => {
+            return render_booking_action_error_in(&state, lang, &title, &message);
+        }
+    };
     let sms_phone_mode: String =
         sqlx::query_scalar("SELECT sms_phone_mode FROM event_types WHERE id = ?")
             .bind(&et_id)
@@ -694,6 +708,13 @@ pub(super) async fn handle_group_booking(
     drop(resource_guard);
 
     tracing::info!(booking_id = %id, event_type = %slug, guest = %form.email, "booking created");
+    let telegram_link = crate::telegram::booking_created(
+        &state.pool,
+        &id,
+        telegram_username.as_deref(),
+        needs_approval,
+    )
+    .await;
 
     // Increment invite used_count if this was an invite-based booking
     if visibility == "private" || visibility == "internal" {
@@ -831,6 +852,7 @@ pub(super) async fn handle_group_booking(
             guest_reschedule_url,
             cancel_notice_min,
             reschedule_notice_min,
+            telegram_link: telegram_link.clone(),
         });
     }
 
@@ -865,6 +887,7 @@ pub(super) async fn handle_group_booking(
             guest_email => form.email,
             notes => form.notes,
             pending => needs_approval,
+            telegram_link => super::telegram::link_value(telegram_link),
             location_type => loc_type,
             location_value => location_display,
             additional_attendees => additional_attendees,
@@ -998,6 +1021,20 @@ async fn handle_dynamic_group_booking(
         return ton_pay::refuse_group(state, lang);
     }
     let needs_approval = requires_confirmation != 0;
+    // ilia fork: the guest's Telegram username, when the event type asks.
+    let telegram_username = match super::telegram::resolve_guest_telegram(
+        &state.pool,
+        &et_id,
+        form.telegram.as_deref(),
+        lang,
+    )
+    .await
+    {
+        Ok(value) => value,
+        Err((title, message)) => {
+            return render_booking_action_error_in(state, lang, &title, &message);
+        }
+    };
 
     // Parse additional guests
     let additional_attendees = match parse_additional_guests(
@@ -1328,6 +1365,13 @@ async fn handle_dynamic_group_booking(
     drop(resource_guard);
 
     tracing::info!(booking_id = %id, event_type = %slug, guest = %form.email, dynamic_group = %combined_username, "dynamic group booking created");
+    let telegram_link = crate::telegram::booking_created(
+        &state.pool,
+        &id,
+        telegram_username.as_deref(),
+        needs_approval,
+    )
+    .await;
 
     // Build BookingDetails once. CalDAV push and email send both need it,
     // and CalDAV push must run independently of whether SMTP is configured.
@@ -1421,6 +1465,7 @@ async fn handle_dynamic_group_booking(
             guest_reschedule_url,
             cancel_notice_min,
             reschedule_notice_min,
+            telegram_link: telegram_link.clone(),
         });
     }
 
@@ -1445,6 +1490,7 @@ async fn handle_dynamic_group_booking(
             guest_email => form.email,
             notes => form.notes,
             pending => needs_approval,
+            telegram_link => super::telegram::link_value(telegram_link),
             location_type => loc_type,
             location_value => location_display,
             additional_attendees => all_additional,
@@ -1555,6 +1601,20 @@ pub(super) async fn handle_booking_for_user(
 
     let lang = user_page_lang(user_lang.as_deref(), &page_mode, visitor);
     let needs_approval = requires_confirmation != 0;
+    // ilia fork: the guest's Telegram username, when the event type asks.
+    let telegram_username = match super::telegram::resolve_guest_telegram(
+        &state.pool,
+        &et_id,
+        form.telegram.as_deref(),
+        lang,
+    )
+    .await
+    {
+        Ok(value) => value,
+        Err((title, message)) => {
+            return render_booking_action_error_in(&state, lang, &title, &message);
+        }
+    };
     let sms_default_country: String = crate::sms::default_country_code(&state.pool).await;
     let phone_to_store = match resolve_guest_phone(
         &sms_phone_mode,
@@ -1920,9 +1980,19 @@ pub(super) async fn handle_booking_for_user(
                 .await;
         }
     }
+    // ilia fork: a priced booking goes to its payment page; hosts hear
+    // about it once it is paid (docs/ton.md).
     if let Some(opened) = opened {
-        return ton_pay::after_booking(&state, &id, &opened, &embed, lang).await;
+        let tg = telegram_username.as_deref();
+        return ton_pay::after_booking(&state, &id, &opened, tg, &embed, lang).await;
     }
+    let telegram_link = crate::telegram::booking_created(
+        &state.pool,
+        &id,
+        telegram_username.as_deref(),
+        needs_approval,
+    )
+    .await;
 
     // Build BookingDetails once. CalDAV push and email send both need it,
     // and CalDAV push must run independently of whether SMTP is configured.
@@ -2027,6 +2097,7 @@ pub(super) async fn handle_booking_for_user(
                 guest_reschedule_url,
                 cancel_notice_min,
                 reschedule_notice_min,
+                telegram_link: telegram_link.clone(),
             });
         }
     }
@@ -2071,6 +2142,7 @@ pub(super) async fn handle_booking_for_user(
             guest_email => form.email,
             notes => form.notes,
             pending => needs_approval,
+            telegram_link => super::telegram::link_value(telegram_link),
             location_type => loc_type,
             location_value => location_display,
             additional_attendees => additional_attendees,
@@ -2210,6 +2282,10 @@ pub(super) struct BookForm {
     /// `sms_phone_mode` set; ignored otherwise even if posted.
     #[serde(default)]
     phone: Option<String>,
+    /// ilia fork: the guest's Telegram username, read only when the event
+    /// type's Telegram mode is not `off` (`web::telegram`).
+    #[serde(default)]
+    telegram: Option<String>,
 }
 
 /// Whether `user` may put an event type into an SMS-sending mode.
@@ -2392,6 +2468,20 @@ pub(super) async fn handle_booking(
         visitor,
     );
     let needs_approval = requires_confirmation != 0;
+    // ilia fork: the guest's Telegram username, when the event type asks.
+    let telegram_username = match super::telegram::resolve_guest_telegram(
+        &state.pool,
+        &et_id,
+        form.telegram.as_deref(),
+        lang,
+    )
+    .await
+    {
+        Ok(value) => value,
+        Err((title, message)) => {
+            return render_booking_action_error_in(&state, lang, &title, &message);
+        }
+    };
 
     // Optional phone number, only meaningful (and only stored) when this
     // event type opted into SMS notifications. A guest-posted phone value
@@ -2733,9 +2823,19 @@ pub(super) async fn handle_booking(
     drop(resource_guard);
 
     tracing::info!(booking_id = %id, event_type = %slug, guest = %form.email, "booking created");
+    // ilia fork: a priced booking goes to its payment page; hosts hear
+    // about it once it is paid (docs/ton.md).
     if let Some(opened) = opened {
-        return ton_pay::after_booking(&state, &id, &opened, &embed, lang).await;
+        let tg = telegram_username.as_deref();
+        return ton_pay::after_booking(&state, &id, &opened, tg, &embed, lang).await;
     }
+    let telegram_link = crate::telegram::booking_created(
+        &state.pool,
+        &id,
+        telegram_username.as_deref(),
+        needs_approval,
+    )
+    .await;
 
     // Build BookingDetails once. CalDAV push and email send both need it,
     // and CalDAV push must run independently of whether SMTP is configured.
@@ -2840,6 +2940,7 @@ pub(super) async fn handle_booking(
                 guest_reschedule_url,
                 cancel_notice_min,
                 reschedule_notice_min,
+                telegram_link: telegram_link.clone(),
             });
         }
     }
@@ -2887,6 +2988,7 @@ pub(super) async fn handle_booking(
             guest_email => form.email,
             notes => form.notes,
             pending => needs_approval,
+            telegram_link => super::telegram::link_value(telegram_link),
             additional_attendees => additional_attendees,
             ics_url => format!("/booking/ics/{}", cancel_token),
             cancel_notice_min => cancel_notice_min,

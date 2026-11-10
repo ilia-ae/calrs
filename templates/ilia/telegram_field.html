@@ -1,0 +1,10 @@
+{# ilia fork: the guest's Telegram username (src/web/telegram.rs, `form_mode`). Information for
+   the host only: the deep link on the confirmation page is what turns notifications on. #}
+{% if telegram_mode is defined and telegram_mode and telegram_mode != "off" %}
+{% set tg_required = telegram_mode == "required" %}
+<div class="form-group">
+  <label for="telegram">{{ t("tg-book-label") }} {% if not tg_required %}<span class="hint">{{ t("book-notes-optional") }}</span>{% endif %}</label>
+  <input type="text" id="telegram" name="telegram" maxlength="64" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="{{ t('tg-book-placeholder') }}" pattern="\s*((https?://)?(t\.me|telegram\.me)/)?@?[A-Za-z][A-Za-z0-9_]{2,30}[A-Za-z0-9]\s*" title="{{ t('tg-book-invalid') }}"{% if tg_required %} required{% endif %}>
+  <div style="color: var(--text-muted); font-size: 0.8rem; margin-top: 0.25rem;">{% if tg_required %}{{ t("tg-book-help-required") }}{% else %}{{ t("tg-book-help-optional") }}{% endif %}</div>
+</div>
+{% endif %}

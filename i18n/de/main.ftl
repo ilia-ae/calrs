@@ -1845,3 +1845,120 @@ ton-problem-confirm-failed = Der Gast hat bezahlt, aber die Buchung konnte nach 
 ton-health-capacity-near = Eine neue bezahlte Buchung hat den letzten offenen Platz oder das letzte Kontingent des Tages belegt. Weitere werden abgelehnt, bis Buchungen bezahlt oder freigegeben sind. Wenn das keine echte Nachfrage ist, blockiert womöglich jemand Termine, ohne zu zahlen.
 ton-health-payment-alerts-held = Weitere Überweisungen sind für Buchungen eingegangen, zu denen du in der letzten Stunde schon eine E-Mail bekommen hast. Sie sind ohne eigene E-Mail erfasst: Prüfe die Zahlungsdaten.
 ton-waive-body-partial = Diese Buchung ist nur teilweise bezahlt ({ $paid } von { $amount } TON erhalten, fällig bis { $time }). Wenn du sie bestätigst, bekommt der Gast den Termin, ohne die restlichen { $rest } TON zu zahlen. Erstatte den erhaltenen Betrag, sofern nichts anderes vereinbart ist.
+
+## Telegram (ilia fork)
+
+tg-when = { $date }, { $time } ({ $tz })
+tg-in-minutes =
+    { $count ->
+        [one] in { $count } Minute
+       *[other] in { $count } Minuten
+    }
+tg-in-hours =
+    { $count ->
+        [one] in { $count } Stunde
+       *[other] in { $count } Stunden
+    }
+tg-in-days =
+    { $count ->
+        [one] in { $count } Tag
+       *[other] in { $count } Tagen
+    }
+tg-reason = Grund: { $reason }
+tg-link-line = { $label }: { $url }
+tg-guest-confirmed = Buchung bestätigt: { $event }, { $when }. Gastgeber: { $host }.
+tg-guest-pending = Anfrage gesendet: { $event }, { $when }. Die Antwort des Gastgebers kommt hier an.
+tg-guest-approved = Anfrage bestätigt: { $event }, { $when }.
+tg-guest-reschedule-approved = Neuer Termin bestätigt: { $event }, { $when }.
+tg-guest-declined = Anfrage abgelehnt: { $event }, { $when }.
+tg-guest-cancelled-by-host = Vom Gastgeber abgesagt: { $event }, { $when }.
+tg-guest-cancelled-by-guest = Du hast deine Buchung storniert: { $event }, { $when }.
+tg-guest-rescheduled = Buchung verschoben: { $event } ist jetzt am { $when }.
+tg-guest-reschedule-pending = Neuer Termin angefragt: { $event }, { $when }. Die Antwort des Gastgebers kommt hier an.
+tg-guest-reschedule-requested = Der Gastgeber bittet um einen neuen Termin für { $event }. Bisher: { $when }.
+tg-guest-reminder = Erinnerung: { $event } beginnt { $in }, { $when }.
+tg-guest-expired = Anfrage abgelaufen: { $event }, { $when }. Der Gastgeber hat nicht rechtzeitig geantwortet; bitte buche einen anderen Termin.
+tg-button-cancel = Buchung stornieren
+tg-button-reschedule = Verschieben
+tg-button-calendar = Zum Kalender hinzufügen
+tg-button-pick-time = Neuen Termin wählen
+tg-button-rebook = Anderen Termin buchen
+tg-button-bookings = Buchungen öffnen
+tg-host-new-booking = Neue Buchung: { $event }, { $when }. Gast: { $guest }, { $email }.
+tg-host-approval-request = Zu bestätigen: { $event }, { $when }. Gast: { $guest }, { $email }.
+tg-host-reschedule-approval = Neuer Termin zu bestätigen: { $event }, { $when }. Gast: { $guest }, { $email }.
+tg-host-rescheduled = { $guest } hat { $event } verschoben auf { $when }.
+tg-host-cancelled = { $guest } hat abgesagt: { $event }, { $when }.
+tg-host-guest-linked = { $guest } erhält Telegram-Benachrichtigungen zu { $event }, { $when }: { $username }.
+tg-host-guest-linked-differs = Im Formular angegeben: { $entered }.
+tg-host-no-username = kein Benutzername
+tg-bot-help = Dieser Bot sendet Benachrichtigungen zu Buchungen auf { $site }. Zum Einschalten den Link auf der Bestätigungsseite oder in der E-Mail öffnen; bei einer kostenpflichtigen Buchung steht der Link auf ihrer Zahlungsseite. /stop schaltet sie aus.
+tg-bot-linked-guest = Fertig: Benachrichtigungen zu dieser Buchung kommen hier an.
+tg-bot-linked-host = Fertig: Gastgeber-Benachrichtigungen für { $name } kommen hier an.
+tg-bot-link-invalid = Dieser Link funktioniert nicht mehr: Er gilt nur in einem Telegram-Chat und nur bis zum Ende des Termins.
+tg-bot-link-replaced = Dieser Link wurde ersetzt. Die Zahlungsseite der Buchung erneut öffnen und den Telegram-Link von dort verwenden.
+tg-bot-rate-limited = Zu viele Versuche. Bitte später erneut versuchen.
+tg-bot-stopped = Benachrichtigungen sind aus. Zum erneuten Einschalten für eine Buchung ihren Link aus der Bestätigungs-E-Mail noch einmal öffnen; Gastgeber erstellen einen neuen Link unter Profil & Einstellungen → Telegram.
+tg-bot-not-linked = Dieser Chat erhält keine Benachrichtigungen.
+tg-cmd-help = So funktioniert dieser Bot
+tg-cmd-stop = Benachrichtigungen ausschalten
+tg-book-label = Telegram
+tg-book-placeholder = @benutzername
+tg-book-help-optional = Nach der Buchung kannst du Benachrichtigungen in Telegram einschalten.
+tg-book-help-required = Nach der Buchung den Telegram-Link öffnen, um Benachrichtigungen zu erhalten.
+tg-book-invalid-title = Telegram-Benutzername prüfen
+tg-book-invalid = Einen Telegram-Benutzernamen wie @name angeben (Buchstaben, Ziffern und _, 4 bis 32 Zeichen).
+tg-book-required = Telegram-Benutzernamen angeben.
+tg-confirmed-title = Benachrichtigungen in Telegram
+tg-confirmed-body = Den Bot öffnen und unten im Chat auf „Starten“ tippen: Benachrichtigungen zu dieser Buchung kommen dort an.
+tg-confirmed-button = Telegram öffnen
+tg-email-button = Benachrichtigungen in Telegram
+tg-email-plain = Benachrichtigungen in Telegram: { $url }
+tg-settings-nav = Telegram-Benachrichtigungen
+tg-settings-title = Telegram
+tg-settings-intro = Gastgeber-Benachrichtigungen im eigenen Telegram-Chat: neue Buchungen, zu bestätigende Anfragen, Absagen und Verschiebungen durch Gäste.
+tg-settings-off = Telegram ist auf diesem Server nicht eingerichtet.
+tg-settings-no-bot-name = Der Bot ist noch nicht bereit. Bitte in einer Minute erneut versuchen.
+tg-settings-linked = Gastgeber-Benachrichtigungen gehen an { $username }. Verbunden: { $date }.
+tg-settings-not-linked = Dein Telegram ist nicht verbunden.
+tg-settings-link = Mein Telegram verbinden
+tg-settings-link-open = Telegram öffnen
+tg-settings-link-expires = Im Chat unten auf „Starten“ tippen. Der Link gilt einmal innerhalb von 15 Minuten.
+tg-settings-link-limited = Zu viele Links in dieser Stunde. Bitte später erneut versuchen.
+tg-settings-unlink = Trennen
+tg-settings-modes = Telegram des Gastes pro Termintyp
+tg-settings-modes-help = Optional oder erforderlich: Das Buchungsformular fragt nach dem Telegram des Gastes, und die Bestätigung bietet den Link zum Bot an.
+tg-settings-modes-none = Keine Termintypen einzustellen.
+tg-settings-mode-off = Aus
+tg-settings-mode-optional = Optional
+tg-settings-mode-required = Erforderlich
+tg-settings-save = Speichern
+tg-settings-saved = Gespeichert.
+tg-settings-team = Team { $team }
+tg-dashboard-label = Telegram { $username }
+tg-dashboard-entered = (angegeben: { $entered })
+tg-dashboard-not-linked = (noch nicht verbunden)
+tg-bot-already-linked = Schon eingeschaltet: Benachrichtigungen zu dieser Buchung kommen in diesen Chat.
+tg-bot-link-invalid-host = Dieser Link ist abgelaufen: Links aus den Einstellungen gelten einmal innerhalb von 15 Minuten. Einen neuen unter Profil & Einstellungen → Telegram erstellen.
+tg-settings-linked-no-username = Gastgeber-Benachrichtigungen gehen an den verbundenen Telegram-Chat. Verbunden: { $date }.
+tg-bot-description = Dieser Bot sendet Benachrichtigungen zu Buchungen auf { $site }: Bestätigungen, Änderungen und Erinnerungen. Zum Einschalten für eine Buchung unten auf die Schaltfläche tippen. /stop schaltet sie aus.
+tg-bot-short-description = Buchungsbenachrichtigungen von { $site }.
+tg-button-join = Teilnehmen
+
+## Telegram: TON payments (ilia fork; docs/ton.md)
+
+tg-guest-payment-due = Deine Buchung wartet auf die Zahlung: { $event }, { $when }. Betrag: { $amount } TON (≈ { $usd } $). Bezahle bis { $deadline }, sonst wird der Termin freigegeben.
+tg-guest-payment-partial = Ein Teil der Zahlung für { $event }, { $when } ist eingegangen: { $paid } von { $amount } TON. Zahle die restlichen { $rest } TON bis { $deadline }, sonst wird der Termin freigegeben.
+tg-guest-payment-received = Zahlung erhalten, deine Buchung ist bestätigt: { $event }, { $when }. Gastgeber: { $host }.
+tg-guest-payment-late = Eine Zahlung von { $value } TON für { $event }, { $when } ist nach der Frist eingegangen und hat die Buchung deshalb nicht bestätigt. { $host } meldet sich wegen der Erstattung bei dir.
+tg-guest-payment-expired = Die Zeit zum Bezahlen von { $event }, { $when } ist abgelaufen, deshalb wurde der Termin freigegeben. Du kannst einen anderen Termin buchen.
+tg-guest-payment-taken = Der Termin, den du für { $event }, { $when } gewählt hast, wurde vergeben, bevor die Buchung bezahlt war, deshalb wurde sie freigegeben. Du musst nichts bezahlen. Du kannst einen anderen Termin buchen.
+tg-guest-payment-refund = Wir haben deine Zahlung für { $event }, { $when } erhalten, aber der Termin konnte nicht bestätigt werden, deshalb wurde die Buchung freigegeben. { $host } erstattet die Zahlung und meldet sich bei dir.
+tg-guest-payment-refund-part = Ein Teil der Zahlung war schon eingegangen: { $host } meldet sich wegen der Erstattung bei dir.
+tg-guest-payment-held = Wir haben deine Zahlung für { $event }, { $when } erhalten, aber die Buchung konnte nicht automatisch bestätigt werden. { $host } meldet sich bei dir.
+tg-button-pay = Bezahlen
+tg-host-payment-received = Bezahlt: { $event }, { $when }. Gast: { $guest }, { $email }. { $paid } TON erhalten (≈ { $usd } $), die Buchung ist bestätigt.
+tg-host-payment-problem = Zahlung braucht Aufmerksamkeit: { $event }, { $when }. Gast: { $guest }, { $email }.
+tg-host-payment-transfer = Überweisung: { $value } TON.
+tg-host-payment-amounts = Erhalten: { $paid } von { $amount } TON.
+tg-host-payment-guest-telegram = Telegram des Gastes: { $username }.

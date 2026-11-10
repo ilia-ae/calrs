@@ -1900,3 +1900,126 @@ ton-problem-confirm-failed = Гость оплатил встречу, но по
 ton-health-capacity-near = Новая платная запись заняла последнее место среди открытых счетов или исчерпала дневной лимит. Следующие записи не будут приниматься, пока открытые не оплатят или не снимут. Если это не настоящий спрос, возможно, кто-то занимает время, не оплачивая его.
 ton-health-payment-alerts-held = Пришли ещё переводы по записям, о которых вы уже получили письмо в течение часа. Они сохранены без отдельных писем — проверьте записи о платежах.
 ton-waive-body-partial = Эта запись оплачена лишь частично (получено { $paid } из { $amount } TON, срок до { $time }). Если вы её подтвердите, гость получит встречу без доплаты оставшихся { $rest } TON. Верните полученную сумму, если вы не договорились иначе.
+
+## Telegram (ilia fork)
+
+tg-when = { $date }, { $time } ({ $tz })
+tg-in-minutes =
+    { $count ->
+        [one] через { $count } минуту
+        [few] через { $count } минуты
+        [many] через { $count } минут
+       *[other] через { $count } минуты
+    }
+tg-in-hours =
+    { $count ->
+        [one] через { $count } час
+        [few] через { $count } часа
+        [many] через { $count } часов
+       *[other] через { $count } часа
+    }
+tg-in-days =
+    { $count ->
+        [one] через { $count } день
+        [few] через { $count } дня
+        [many] через { $count } дней
+       *[other] через { $count } дня
+    }
+tg-reason = Причина: { $reason }
+tg-link-line = { $label }: { $url }
+tg-guest-confirmed = Запись подтверждена: { $event }, { $when }. Организатор: { $host }.
+tg-guest-pending = Запрос отправлен: { $event }, { $when }. Ответ организатора придёт сюда.
+tg-guest-approved = Ваш запрос подтверждён: { $event }, { $when }.
+tg-guest-reschedule-approved = Новое время подтверждено: { $event }, { $when }.
+tg-guest-declined = Запрос отклонён: { $event }, { $when }.
+tg-guest-cancelled-by-host = Встреча отменена организатором: { $event }, { $when }.
+tg-guest-cancelled-by-guest = Вы отменили запись: { $event }, { $when }.
+tg-guest-rescheduled = Запись перенесена: { $event }, теперь { $when }.
+tg-guest-reschedule-pending = Запрошено новое время: { $event }, { $when }. Ответ организатора придёт сюда.
+tg-guest-reschedule-requested = Организатор просит выбрать другое время для встречи «{ $event }». Было: { $when }.
+tg-guest-reminder = Напоминание: { $event } начнётся { $in }, { $when }.
+tg-guest-expired = Запрос истёк: { $event }, { $when }. Организатор не успел ответить, выберите, пожалуйста, другое время.
+tg-button-cancel = Отменить запись
+tg-button-reschedule = Перенести
+tg-button-calendar = Добавить в календарь
+tg-button-pick-time = Выбрать новое время
+tg-button-rebook = Записаться снова
+tg-button-bookings = Открыть записи
+tg-host-new-booking = Новая запись: { $event }, { $when }. Гость: { $guest }, { $email }.
+tg-host-approval-request = Нужно подтвердить запись: { $event }, { $when }. Гость: { $guest }, { $email }.
+tg-host-reschedule-approval = Нужно подтвердить новое время: { $event }, { $when }. Гость: { $guest }, { $email }.
+tg-host-rescheduled = Перенос записи: { $event }, теперь { $when }. Гость: { $guest }.
+tg-host-cancelled = Отмена записи: { $event }, { $when }. Гость: { $guest }.
+tg-host-guest-linked = { $guest } будет получать уведомления о встрече «{ $event }», { $when }, в Telegram: { $username }.
+tg-host-guest-linked-differs = В форме указано: { $entered }.
+tg-host-no-username = без имени пользователя
+tg-bot-help = Этот бот присылает уведомления о записях на { $site }. Чтобы включить их, откройте ссылку со страницы подтверждения или из письма; у платной записи ссылка — на странице оплаты. Отключить: /stop.
+tg-bot-linked-guest = Готово: уведомления об этой записи будут приходить сюда.
+tg-bot-linked-host = Готово: сюда будут приходить уведомления организатора для { $name }.
+tg-bot-link-invalid = Ссылка больше не действует: она работает только в одном чате Telegram и только до конца встречи.
+tg-bot-link-replaced = Эта ссылка заменена. Откройте страницу оплаты записи ещё раз и воспользуйтесь ссылкой на Telegram оттуда.
+tg-bot-rate-limited = Слишком много попыток. Попробуйте позже.
+tg-bot-stopped = Уведомления отключены. Чтобы снова включить их для записи, ещё раз откройте её ссылку из письма с подтверждением; организатор создаёт новую ссылку в разделе «Профиль и настройки» → Telegram.
+tg-bot-not-linked = Этот чат не получает уведомлений.
+tg-cmd-help = Как работает бот
+tg-cmd-stop = Отключить уведомления
+tg-book-label = Telegram
+tg-book-placeholder = @username
+tg-book-help-optional = После записи можно включить уведомления в Telegram.
+tg-book-help-required = После записи откройте ссылку на Telegram, чтобы получать уведомления.
+tg-book-invalid-title = Проверьте имя пользователя Telegram
+tg-book-invalid = Укажите имя пользователя Telegram в виде @name: латиница, цифры и _, от 4 до 32 символов.
+tg-book-required = Укажите имя пользователя Telegram.
+tg-confirmed-title = Уведомления в Telegram
+tg-confirmed-body = Откройте бота и нажмите «Запустить» внизу чата: уведомления об этой записи будут приходить туда.
+tg-confirmed-button = Открыть Telegram
+tg-email-button = Уведомления в Telegram
+tg-email-plain = Уведомления в Telegram: { $url }
+tg-settings-nav = Уведомления в Telegram
+tg-settings-title = Telegram
+tg-settings-intro = Уведомления организатора в вашем чате Telegram: новые записи, запросы на подтверждение, отмены и переносы гостями.
+tg-settings-off = Telegram на этом сервере не настроен.
+tg-settings-no-bot-name = Бот ещё не готов. Попробуйте через минуту.
+tg-settings-linked = Уведомления организатора приходят в { $username }. Подключено: { $date }.
+tg-settings-not-linked = Ваш Telegram не подключён.
+tg-settings-link = Подключить мой Telegram
+tg-settings-link-open = Открыть Telegram
+tg-settings-link-expires = В чате нажмите «Запустить» внизу. Ссылка срабатывает один раз в течение 15 минут.
+tg-settings-link-limited = Слишком много ссылок за час. Попробуйте позже.
+tg-settings-unlink = Отключить
+tg-settings-modes = Telegram гостя по типам встреч
+tg-settings-modes-help = «По желанию» или «обязательно»: форма записи спрашивает Telegram гостя, а подтверждение предлагает ссылку на бота.
+tg-settings-modes-none = Нет типов встреч для настройки.
+tg-settings-mode-off = Выключено
+tg-settings-mode-optional = По желанию
+tg-settings-mode-required = Обязательно
+tg-settings-save = Сохранить
+tg-settings-saved = Сохранено.
+tg-settings-team = Команда { $team }
+tg-dashboard-label = Telegram { $username }
+tg-dashboard-entered = (указано { $entered })
+tg-dashboard-not-linked = (ещё не подключён)
+tg-bot-already-linked = Уже включено: уведомления об этой записи приходят в этот чат.
+tg-bot-link-invalid-host = Срок действия ссылки истёк: ссылка из настроек срабатывает один раз в течение 15 минут. Создайте новую в разделе «Профиль и настройки» → Telegram.
+tg-settings-linked-no-username = Уведомления организатора приходят в ваш чат Telegram. Подключено: { $date }.
+tg-bot-description = Этот бот присылает уведомления о ваших записях на { $site }: подтверждения, изменения и напоминания. Нажмите кнопку ниже, чтобы включить их для своей записи. Отключить: /stop.
+tg-bot-short-description = Уведомления о записях на { $site }.
+tg-button-join = Подключиться
+
+## Telegram: TON payments (ilia fork; docs/ton.md)
+
+tg-guest-payment-due = Запись ждёт оплаты: { $event }, { $when }. К оплате: { $amount } TON (≈ ${ $usd }). Срок оплаты — { $deadline }; если оплата не поступит, время освободится.
+tg-guest-payment-partial = Часть оплаты за встречу «{ $event }», { $when }, получена: { $paid } из { $amount } TON. Доплатите оставшиеся { $rest } TON. Срок оплаты — { $deadline }; если оплата не поступит, время освободится.
+tg-guest-payment-received = Оплата получена, запись подтверждена: { $event }, { $when }. Организатор: { $host }.
+tg-guest-payment-late = Платёж { $value } TON за встречу «{ $event }», { $when }, пришёл после срока, поэтому запись не подтверждена. { $host } свяжется с вами насчёт возврата.
+tg-guest-payment-expired = Срок оплаты встречи «{ $event }», { $when }, истёк, и это время освобождено. Вы можете выбрать другое время.
+tg-guest-payment-taken = Выбранное вами время встречи «{ $event }», { $when }, заняли до того, как запись была оплачена, поэтому запись отменена. Платить ничего не нужно. Вы можете выбрать другое время.
+tg-guest-payment-refund = Мы получили оплату встречи «{ $event }», { $when }, но подтвердить это время не удалось, поэтому запись отменена. { $host } вернёт деньги и свяжется с вами.
+tg-guest-payment-refund-part = Часть оплаты уже поступила: { $host } свяжется с вами насчёт возврата.
+tg-guest-payment-held = Мы получили оплату встречи «{ $event }», { $when }, но подтвердить запись автоматически не удалось. { $host } свяжется с вами.
+tg-button-pay = Оплатить
+tg-host-payment-received = Оплачено: { $event }, { $when }. Гость: { $guest }, { $email }. Получено { $paid } TON (≈ ${ $usd }), запись подтверждена.
+tg-host-payment-problem = Оплата требует внимания: { $event }, { $when }. Гость: { $guest }, { $email }.
+tg-host-payment-transfer = Перевод: { $value } TON.
+tg-host-payment-amounts = Получено { $paid } из { $amount } TON.
+tg-host-payment-guest-telegram = Telegram гостя: { $username }.

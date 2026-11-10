@@ -547,18 +547,33 @@ pub(crate) async fn settled(pool: &SqlitePool, booking_id: &str) -> bool {
     matches!(invoice_status(pool, booking_id).await, Ok(Some(s)) if is_settled(&s))
 }
 
-/// The booking's invoice is still open and nothing was paid on it (a guest
-/// cancel then sends nothing). With a part paid, the usual cancellation
-/// notices go out: the host has money to return.
+/// The hosts have not been told about a priced booking: nothing was paid
+/// on its invoice, which is open (awaiting the payment) or ended unpaid
+/// (expired, or released as taken, in the minute before calrs's sweep
+/// declines the booking), and the booking was not confirmed. One rule for
+/// the guest-cancel emails and SMS ([`cancel_is_quiet`]) and the hosts'
+/// Telegram chats (`telegram::PaymentFacts::hosts_unaware`).
+pub(crate) fn hosts_unaware(invoice_status: &str, paid_nano: i64, booking_status: &str) -> bool {
+    paid_nano <= 0
+        && matches!(invoice_status, "open" | "expired" | "closed")
+        && booking_status != "confirmed"
+}
+
+/// The hosts were never told about this booking ([`hosts_unaware`]): a
+/// guest cancel then sends nothing. With a part paid, the usual
+/// cancellation notices go out: the host has money to return.
 pub(crate) async fn cancel_is_quiet(pool: &SqlitePool, booking_id: &str) -> bool {
-    sqlx::query_scalar::<_, i64>(
-        "SELECT EXISTS (SELECT 1 FROM ton_invoices
-                        WHERE booking_id = ? AND status = 'open' AND paid_nano = 0)",
+    sqlx::query_as::<_, (String, i64, String)>(
+        "SELECT i.status, i.paid_nano, b.status FROM ton_invoices i
+         JOIN bookings b ON b.id = i.booking_id
+         WHERE i.booking_id = ?",
     )
     .bind(booking_id)
-    .fetch_one(pool)
+    .fetch_optional(pool)
     .await
-    .is_ok_and(|v| v != 0)
+    .ok()
+    .flatten()
+    .is_some_and(|(status, paid, booking)| hosts_unaware(&status, paid, &booking))
 }
 
 /// The event type has an enabled price. A database error answers `true`:

@@ -23,6 +23,8 @@ pub(crate) const CHILD_TABLES: &[&str] = &[
     "event_type_member_weights",
     // ilia fork: the price (docs/ton.md); setting it changes the version.
     "ton_prices",
+    // ilia fork: the guest Telegram field (migration ilia_002_telegram).
+    "telegram_event_types",
 ];
 
 /// Tables with an `event_type_id` column that are not configuration: what

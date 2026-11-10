@@ -678,13 +678,42 @@ const SENTINEL_COLUMNS: &[(&str, &str)] = &[
     ("ton_payments", "source_friendly"),
     ("ton_payments", "address_raw"),
     ("ton_watch", "address_raw"),
+    // ilia fork: Telegram. A host's own username and the bot's are never
+    // returned (the chat ids are integers: `SENTINEL_INT_COLUMNS`).
+    ("telegram_user_chats", "telegram_username"),
+    ("telegram_state", "bot_username"),
 ];
+
+/// INTEGER columns that must never be returned: planted with
+/// `SENTINEL_INT + rowid`, a real integer, so that code reading them the way
+/// production does (`typeof(chat_id) = 'integer'`) sees a value and would
+/// leak it; a text sentinel would read as NULL there and prove nothing.
+const SENTINEL_INT_COLUMNS: &[(&str, &str)] = &[
+    ("telegram_guest_links", "chat_id"),
+    ("telegram_guest_links", "token_chat_id"),
+    ("telegram_user_chats", "chat_id"),
+    ("telegram_state", "bot_id"),
+];
+
+/// The base of the integer sentinels; its decimal prefix is what the
+/// outputs are searched for.
+const SENTINEL_INT: i64 = 900_000_000_000;
+const SENTINEL_INT_PREFIX: &str = "90000000000";
 
 fn secret_named(column: &str) -> bool {
     ["token", "secret", "password", "hash", "ical"]
         .iter()
         .any(|word| column.contains(word))
         || column.ends_with("_enc")
+}
+
+async fn plant_int(pool: &SqlitePool, table: &str, column: &str) {
+    sqlx::query(&format!(
+        "UPDATE \"{table}\" SET \"{column}\" = {SENTINEL_INT} + rowid"
+    ))
+    .execute(pool)
+    .await
+    .unwrap_or_else(|e| panic!("{table}.{column}: {e}"));
 }
 
 async fn plant(pool: &SqlitePool, table: &str, column: &str) {
@@ -844,6 +873,41 @@ async fn seed_everything(fx: &Fixture) {
     ] {
         sqlx::query(statement).execute(pool).await.unwrap();
     }
+    // ilia fork: Telegram, a linked guest on the confirmed booking and a
+    // pending link on the request, a host chat and a host link token.
+    sqlx::query(
+        "INSERT INTO telegram_guest_links (booking_id, entered_username, link_token_hash,
+                                           link_expires_at, chat_id, telegram_username, linked_at)
+         VALUES (?, 'Guest_x', NULL, '2999-01-01 00:00:00', 987654321, 'RealName', datetime('now')),
+                (?, NULL, 'link-hash', '2999-01-01 00:00:00', NULL, NULL, NULL)",
+    )
+    .bind(&confirmed)
+    .bind(&pending)
+    .execute(pool)
+    .await
+    .unwrap();
+    for statement in [
+        "INSERT INTO telegram_user_chats (user_id, chat_id, telegram_username) VALUES (?, 555, 'host_tg')",
+        "INSERT INTO telegram_user_link_tokens (token_hash, user_id, expires_at)
+         VALUES ('user-hash', ?, '2999-01-01 00:00:00')",
+    ] {
+        sqlx::query(statement)
+            .bind(&fx.user_id)
+            .execute(pool)
+            .await
+            .unwrap();
+    }
+    sqlx::query("UPDATE telegram_state SET bot_username = 'ilia_test_bot', update_offset = 7")
+        .execute(pool)
+        .await
+        .unwrap();
+    sqlx::query(
+        "INSERT INTO telegram_event_types (event_type_id, guest_mode) VALUES (?, 'optional')",
+    )
+    .bind(&fx.et_id)
+    .execute(pool)
+    .await
+    .unwrap();
 }
 
 /// Plant sentinels: every secret-named TEXT column of every table (found in
@@ -875,6 +939,9 @@ async fn plant_sentinels(pool: &SqlitePool) {
     assert!(planted >= 20, "only {planted} secret columns found");
     for (table, column) in SENTINEL_COLUMNS {
         plant(pool, table, column).await;
+    }
+    for (table, column) in SENTINEL_INT_COLUMNS {
+        plant_int(pool, table, column).await;
     }
     sqlx::query(
         "UPDATE bookings SET guest_email = 'full.guest.' || rowid || '@sentinel-mail.test'",
@@ -1125,6 +1192,10 @@ async fn agent_outputs_never_carry_secrets_or_full_guest_addresses() {
     }
     let all = lines.join("\n");
     assert!(!all.contains("SENTINEL"), "a sentinel leaked:\n{all}");
+    assert!(
+        !all.contains(SENTINEL_INT_PREFIX),
+        "a chat id leaked:\n{all}"
+    );
     assert!(!all.contains("full.guest."), "a full guest address leaked");
     assert!(!all.contains("friend@example.com"), "an attendee leaked");
     assert!(
@@ -2411,6 +2482,7 @@ async fn agent_update_event_type_with_an_empty_patch_changes_nothing() {
         // ilia fork: a TON price.
         "INSERT INTO ton_prices (event_type_id, price_usd_cents, window_min, updated_at)
          VALUES ('et-rich', 4000, 30, '2030-01-01T00:00:00Z')",
+        "INSERT INTO telegram_event_types (event_type_id, guest_mode) VALUES ('et-rich', 'optional')",
     ];
     for statement in statements {
         sqlx::query(statement).execute(pool).await.unwrap();
@@ -3925,6 +3997,20 @@ async fn agent_get_booking_shows_the_guest_but_no_tokens_or_links() {
         .execute(&fx.pool)
         .await
         .unwrap();
+    // The guest's Telegram: what they typed (hostile), and what they linked
+    // with; the chat id stays an integer sentinel.
+    sqlx::query(
+        "UPDATE telegram_guest_links SET entered_username = 'Guest\u{202E}_x',
+                telegram_username = 'RealName' WHERE telegram_username IS NOT NULL",
+    )
+    .execute(&fx.pool)
+    .await
+    .unwrap();
+    // The request's link is not used yet (the sentinels filled every chat id).
+    sqlx::query("UPDATE telegram_guest_links SET chat_id = NULL WHERE telegram_username IS NULL")
+        .execute(&fx.pool)
+        .await
+        .unwrap();
     let ids: Vec<String> = sqlx::query_scalar("SELECT id FROM bookings ORDER BY start_at")
         .fetch_all(&fx.pool)
         .await
@@ -3973,6 +4059,26 @@ async fn agent_get_booking_shows_the_guest_but_no_tokens_or_links() {
         json!(["friend@example.com"])
     );
     assert_eq!(detail["additional_guests"], 1);
+    // The confirmed booking carries the attendee and the linked Telegram.
+    assert_eq!(detail["telegram_linked"], true);
+    assert_eq!(detail["guest_supplied"]["telegram"], "@Guest_x");
+    assert_eq!(detail["guest_supplied"]["telegram_linked_as"], "@RealName");
+    let pending: String = sqlx::query_scalar("SELECT id FROM bookings WHERE status = 'pending'")
+        .fetch_one(&fx.pool)
+        .await
+        .unwrap();
+    let unlinked = ok(&client
+        .call("get_booking", json!({"booking_id": pending}))
+        .await)
+    .clone();
+    assert_eq!(unlinked["telegram_linked"], false);
+    assert_eq!(unlinked["guest_supplied"]["telegram"], Value::Null);
+    assert_eq!(
+        unlinked["guest_supplied"]["telegram_linked_as"],
+        Value::Null
+    );
+    outputs.push(unlinked.to_string());
+    outputs.push(detail.to_string());
 
     // Read-only connections get none of it.
     let mut reader = fx.session(Role::ReadOnly).await;
@@ -3994,6 +4100,29 @@ async fn agent_get_booking_shows_the_guest_but_no_tokens_or_links() {
     outputs.push(hidden.to_string());
     let results = outputs.join("\n");
     assert!(!results.contains("://"), "a link leaked:\n{results}");
+    // The planted chat ids (real integers, readable the way production reads
+    // them), the token chat and the bot id; and no deep link.
+    for secret in [SENTINEL_INT_PREFIX, "t.me/", "start="] {
+        assert!(!all.contains(secret), "{secret} leaked:\n{all}");
+    }
+    let planted: i64 = sqlx::query_scalar(
+        "SELECT chat_id FROM telegram_guest_links WHERE telegram_username = 'RealName'",
+    )
+    .fetch_one(&fx.pool)
+    .await
+    .unwrap();
+    assert!(planted > SENTINEL_INT, "{planted}");
+    // And production's own reads see it: a DTO built from them would leak it.
+    let booking: String = sqlx::query_scalar(
+        "SELECT booking_id FROM telegram_guest_links WHERE telegram_username = 'RealName'",
+    )
+    .fetch_one(&fx.pool)
+    .await
+    .unwrap();
+    let row = crate::telegram::store::booking_row(&fx.pool, &booking)
+        .await
+        .unwrap();
+    assert_eq!(row.guest_chat, Some(planted));
 }
 
 #[tokio::test]

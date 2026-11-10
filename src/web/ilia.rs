@@ -21,13 +21,17 @@ pub(crate) fn source_url_from(raw: Option<&str>) -> Option<String> {
 }
 
 /// Template globals of the fork: `source_url`, the AGPL source link that
-/// `base.html` shows on every page, the embedded booking widget included.
+/// `base.html` shows on every page, the embedded booking widget included, and
+/// `telegram_enabled()`.
 /// The URL is validated above (no quotes, angle brackets or whitespace), so it
 /// goes into the `href` as is rather than with every `/` entity-escaped.
 pub(crate) fn register(env: &mut Environment<'static>, source_url: Option<&str>) {
     if let Some(url) = source_url_from(source_url) {
         env.add_global("source_url", minijinja::Value::from_safe_string(url));
     }
+    // Whether Telegram is on (`CALRS_TELEGRAM_BOT_TOKEN`), read at render
+    // time: Profile & Settings links the Telegram page only then.
+    env.add_function("telegram_enabled", crate::telegram::enabled);
 }
 
 #[cfg(test)]

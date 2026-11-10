@@ -26,6 +26,7 @@ mod resources;
 mod rrule;
 mod settings;
 mod sms;
+mod telegram;
 #[cfg(test)]
 mod test_support;
 // ilia fork: TON payments (ilia-booking docs/ton.md).
@@ -199,6 +200,7 @@ async fn main() -> Result<()> {
 
             let state = web::build_state(pool, data_dir, secret_key).await;
             let (stop_tx, stop_rx) = tokio::sync::watch::channel(false);
+            let telegram = telegram::spawn(state.pool.clone(), stop_rx.clone()).await;
             let agent = web::agent::spawn(state.clone(), stop_rx.clone());
             let ton = web::ton_pay::spawn(state.clone(), stop_rx);
             let router = web::router(state);
@@ -230,8 +232,14 @@ async fn main() -> Result<()> {
             )
             .with_graceful_shutdown(shutdown)
             .await?;
-            agent.finish(std::time::Duration::from_secs(20)).await;
-            ton.finish(std::time::Duration::from_secs(20)).await;
+            // The agent and the TON watcher stop side by side.
+            tokio::join!(
+                agent.finish(std::time::Duration::from_secs(20)),
+                ton.finish(std::time::Duration::from_secs(20)),
+            );
+            // Last: the web server, the agent and the watcher may still have
+            // queued notifications (a payment confirmed while stopping).
+            telegram.finish(std::time::Duration::from_secs(10)).await;
             // Booking emails are sent in the background after the response;
             // let the ones still in flight finish before the runtime stops.
             web::drain_emails(std::time::Duration::from_secs(30)).await;

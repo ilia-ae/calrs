@@ -15,6 +15,10 @@ use crate::web::ton_pay::{AlertSink, TonAlert, TonRuntime};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 
+// ilia fork integration: the payment events in Telegram.
+#[path = "ton_telegram.rs"]
+mod telegram;
+
 const OUR: &str = "0:83DFD552E63729B472FCBCC8C45EBCC6691702558B68EC7527E1BA403A0F31A8";
 const OTHER: &str = "0:077F69B02858C4A6BC33E5F052E64E5BAD13AB95DB61442CFE0958B97959BDE4";
 const OTHER_UQ: &str = "UQAHf2mwKFjEprwz5fBS5k5brROrldthRCz-CVi5eVm95EuN";
@@ -1330,9 +1334,13 @@ async fn guards_follow_the_invoice_status() {
         );
         assert_eq!(invoice::unpaid(&e.pool, &bid).await, refused, "{status}");
         assert_eq!(invoice::settled(&e.pool, &bid).await, !refused, "{status}");
+        // Nothing paid and the booking pending: the hosts never heard of
+        // it, also in the minute between an expiry or a release and the
+        // sweep that declines it.
         assert_eq!(
             invoice::cancel_is_quiet(&e.pool, &bid).await,
-            status == "open"
+            refused,
+            "{status}"
         );
     }
 }

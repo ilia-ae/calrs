@@ -19,6 +19,8 @@ mod pending;
 mod public_pages;
 mod sources;
 mod teams;
+// ilia fork: Telegram notifications (ilia-booking docs/operations.md).
+mod telegram;
 // ilia fork: TON payments (ilia-booking docs/ton.md).
 pub(crate) mod ton_pay;
 mod week_start;
@@ -757,6 +759,7 @@ pub(crate) fn router(state: Arc<AppState>) -> Router {
         .merge(crate::mfa::router())
         // ilia fork: the TON payment page and the dashboard waive.
         .merge(ton_pay::router())
+        .merge(telegram::router())
         .route("/", get(root_redirect))
         .route("/dashboard", get(dashboard))
         .route("/dashboard/event-types", get(dashboard_event_types))

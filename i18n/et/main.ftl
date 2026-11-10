@@ -1845,3 +1845,120 @@ ton-problem-confirm-failed = Külaline maksis, kuid broneeringut ei õnnestunud 
 ton-health-capacity-near = Uus tasuline broneering võttis viimase vaba koha avatud arvete seas või päeva viimase limiidi. Järgmised lükatakse tagasi, kuni broneeringud on tasutud või vabastatud. Kui see pole päris nõudlus, hoiab keegi ehk aegu kinni ilma maksmata.
 ton-health-payment-alerts-held = Saabus veel ülekandeid broneeringutele, mille kohta said viimase tunni jooksul juba kirja. Need on salvestatud ilma eraldi kirjata: kontrolli maksete kirjeid.
 ton-waive-body-partial = See broneering on ainult osaliselt tasutud ({ $paid } / { $amount } TON saadud, tähtaeg { $time }). Kui kinnitad selle, saab külaline kohtumise ilma ülejäänud { $rest } TON-i maksmata. Maksa saadud summa tagasi, kui pole teisiti kokku lepitud.
+
+## Telegram (ilia fork)
+
+tg-when = { $date }, { $time } ({ $tz })
+tg-in-minutes =
+    { $count ->
+        [one] { $count } minuti pärast
+       *[other] { $count } minuti pärast
+    }
+tg-in-hours =
+    { $count ->
+        [one] { $count } tunni pärast
+       *[other] { $count } tunni pärast
+    }
+tg-in-days =
+    { $count ->
+        [one] { $count } päeva pärast
+       *[other] { $count } päeva pärast
+    }
+tg-reason = Põhjus: { $reason }
+tg-link-line = { $label }: { $url }
+tg-guest-confirmed = Broneering kinnitatud: { $event }, { $when }. Korraldaja: { $host }.
+tg-guest-pending = Taotlus saadetud: { $event }, { $when }. Korraldaja vastus tuleb siia.
+tg-guest-approved = Sinu taotlus on kinnitatud: { $event }, { $when }.
+tg-guest-reschedule-approved = Uus aeg on kinnitatud: { $event }, { $when }.
+tg-guest-declined = Sinu taotlus lükati tagasi: { $event }, { $when }.
+tg-guest-cancelled-by-host = Korraldaja tühistas: { $event }, { $when }.
+tg-guest-cancelled-by-guest = Sa tühistasid broneeringu: { $event }, { $when }.
+tg-guest-rescheduled = Broneering nihutatud: { $event } on nüüd { $when }.
+tg-guest-reschedule-pending = Uus aeg taotletud: { $event }, { $when }. Korraldaja vastus tuleb siia.
+tg-guest-reschedule-requested = Korraldaja palub valida uue aja kohtumisele { $event }. Oli: { $when }.
+tg-guest-reminder = Meeldetuletus: { $event } algab { $in }, { $when }.
+tg-guest-expired = Taotlus aegus: { $event }, { $when }. Korraldaja ei vastanud õigel ajal; palun broneeri teine aeg.
+tg-button-cancel = Tühista broneering
+tg-button-reschedule = Muuda aega
+tg-button-calendar = Lisa kalendrisse
+tg-button-pick-time = Vali uus aeg
+tg-button-rebook = Broneeri teine aeg
+tg-button-bookings = Ava broneeringud
+tg-host-new-booking = Uus broneering: { $event }, { $when }. Külaline: { $guest }, { $email }.
+tg-host-approval-request = Kinnitamist ootav taotlus: { $event }, { $when }. Külaline: { $guest }, { $email }.
+tg-host-reschedule-approval = Kinnita uus aeg: { $event }, { $when }. Külaline: { $guest }, { $email }.
+tg-host-rescheduled = { $guest } nihutas kohtumise { $event } ajale { $when }.
+tg-host-cancelled = { $guest } tühistas: { $event }, { $when }.
+tg-host-guest-linked = { $guest } saab Telegrami teavitusi kohtumise { $event } kohta, { $when }: { $username }.
+tg-host-guest-linked-differs = Vormis märgitud: { $entered }.
+tg-host-no-username = kasutajanimeta
+tg-bot-help = See bot saadab teavitusi broneeringute kohta saidil { $site }. Sisselülitamiseks ava link kinnituslehelt või e-kirjast; tasulise broneeringu link on selle makselehel. /stop lülitab need välja.
+tg-bot-linked-guest = Valmis: selle broneeringu teavitused tulevad siia.
+tg-bot-linked-host = Valmis: korraldaja teavitused kasutajale { $name } tulevad siia.
+tg-bot-link-invalid = See link enam ei tööta: see kehtib ainult ühes Telegrami vestluses ja ainult kohtumise lõpuni.
+tg-bot-link-replaced = See link on asendatud. Ava broneeringu makseleht uuesti ja kasuta sealset Telegrami linki.
+tg-bot-rate-limited = Liiga palju katseid. Proovi hiljem uuesti.
+tg-bot-stopped = Teavitused on välja lülitatud. Broneeringu teavituste uuesti sisselülitamiseks ava selle link kinnituskirjast uuesti; korraldajad loovad uue lingi jaotises Profiil ja seaded → Telegram.
+tg-bot-not-linked = See vestlus teavitusi ei saa.
+tg-cmd-help = Kuidas see bot töötab
+tg-cmd-stop = Lülita teavitused välja
+tg-book-label = Telegram
+tg-book-placeholder = @kasutajanimi
+tg-book-help-optional = Pärast broneerimist saad teavitused Telegramis sisse lülitada.
+tg-book-help-required = Pärast broneerimist ava Telegrami link, et teavitusi saada.
+tg-book-invalid-title = Kontrolli Telegrami kasutajanime
+tg-book-invalid = Sisesta Telegrami kasutajanimi kujul @nimi (tähed, numbrid ja _, 4 kuni 32 märki).
+tg-book-required = Sisesta oma Telegrami kasutajanimi.
+tg-confirmed-title = Saa teavitusi Telegramis
+tg-confirmed-body = Ava bot ja vajuta vestluse allosas olevat nuppu: selle broneeringu teavitused tulevad sinna.
+tg-confirmed-button = Ava Telegram
+tg-email-button = Teavitused Telegramis
+tg-email-plain = Saa teavitusi Telegramis: { $url }
+tg-settings-nav = Telegrami teavitused
+tg-settings-title = Telegram
+tg-settings-intro = Saa korraldaja teavitusi oma Telegrami vestlusse: uued broneeringud, kinnitamist ootavad taotlused, külaliste tühistamised ja ajamuutused.
+tg-settings-off = Telegram pole selles serveris seadistatud.
+tg-settings-no-bot-name = Bot pole veel valmis. Proovi minuti pärast uuesti.
+tg-settings-linked = Korraldaja teavitused lähevad kasutajale { $username }. Ühendatud: { $date }.
+tg-settings-not-linked = Sinu Telegram pole ühendatud.
+tg-settings-link = Ühenda minu Telegram
+tg-settings-link-open = Ava Telegram
+tg-settings-link-expires = Vajuta vestluses allosas olevat nuppu. Link kehtib üks kord 15 minuti jooksul.
+tg-settings-link-limited = Selles tunnis on liiga palju linke. Proovi hiljem uuesti.
+tg-settings-unlink = Katkesta ühendus
+tg-settings-modes = Külalise Telegram kohtumise tüübi kaupa
+tg-settings-modes-help = Valikuline või kohustuslik: broneerimisvorm küsib külalise Telegrami ja kinnitus pakub lingi botile.
+tg-settings-modes-none = Seadistatavaid kohtumise tüüpe pole.
+tg-settings-mode-off = Väljas
+tg-settings-mode-optional = Valikuline
+tg-settings-mode-required = Kohustuslik
+tg-settings-save = Salvesta
+tg-settings-saved = Salvestatud.
+tg-settings-team = Meeskond { $team }
+tg-dashboard-label = Telegram { $username }
+tg-dashboard-entered = (märgitud { $entered })
+tg-dashboard-not-linked = (pole veel ühendatud)
+tg-bot-already-linked = Juba sees: selle broneeringu teavitused tulevad sellesse vestlusse.
+tg-bot-link-invalid-host = See link on aegunud: seadete lingid kehtivad üks kord 15 minuti jooksul. Loo uus jaotises Profiil ja seaded → Telegram.
+tg-settings-linked-no-username = Korraldaja teavitused lähevad sinu Telegrami vestlusesse. Ühendatud: { $date }.
+tg-bot-description = See bot saadab teavitusi sinu broneeringute kohta saidil { $site }: kinnitused, muudatused ja meeldetuletused. Vajuta allolevat nuppu, et need oma broneeringu jaoks sisse lülitada. /stop lülitab need välja.
+tg-bot-short-description = Broneeringuteavitused saidilt { $site }.
+tg-button-join = Liitu
+
+## Telegram: TON payments (ilia fork; docs/ton.md)
+
+tg-guest-payment-due = Sinu broneering ootab makset: { $event }, { $when }. Summa: { $amount } TON (≈ { $usd } $). Maksetähtaeg: { $deadline }. Kui makset ei laeku, aeg vabastatakse.
+tg-guest-payment-partial = Osa makset kohtumise { $event }, { $when } eest on laekunud: { $paid } / { $amount } TON. Maksa ülejäänud { $rest } TON. Maksetähtaeg: { $deadline }. Kui makset ei laeku, aeg vabastatakse.
+tg-guest-payment-received = Makse laekus, sinu broneering on kinnitatud: { $event }, { $when }. Korraldaja: { $host }.
+tg-guest-payment-late = Makse { $value } TON kohtumise { $event }, { $when } eest laekus pärast tähtaega, seega see broneeringut ei kinnitanud. { $host } võtab sinuga tagasimakse asjus ühendust.
+tg-guest-payment-expired = Kohtumise { $event }, { $when } maksmise aeg sai läbi, seega aeg vabastati. Saad broneerida mõne muu aja.
+tg-guest-payment-taken = Aeg, mille valisid kohtumisele { $event }, { $when }, võeti enne broneeringu tasumist, seega broneering vabastati. Sa ei pea midagi maksma. Saad broneerida mõne muu aja.
+tg-guest-payment-refund = Saime sinu makse kohtumise { $event }, { $when } eest, kuid aega ei õnnestunud kinnitada, seega broneering vabastati. { $host } maksab raha tagasi ja võtab sinuga ühendust.
+tg-guest-payment-refund-part = Osa makset oli juba laekunud: { $host } võtab sinuga tagasimakse asjus ühendust.
+tg-guest-payment-held = Saime sinu makse kohtumise { $event }, { $when } eest, kuid broneeringut ei õnnestunud automaatselt kinnitada. { $host } võtab sinuga ühendust.
+tg-button-pay = Maksa
+tg-host-payment-received = Makstud: { $event }, { $when }. Külaline: { $guest }, { $email }. Laekus { $paid } TON (≈ { $usd } $), broneering on kinnitatud.
+tg-host-payment-problem = Makse vajab tähelepanu: { $event }, { $when }. Külaline: { $guest }, { $email }.
+tg-host-payment-transfer = Ülekanne: { $value } TON.
+tg-host-payment-amounts = Laekunud { $paid } / { $amount } TON.
+tg-host-payment-guest-telegram = Külalise Telegram: { $username }.
