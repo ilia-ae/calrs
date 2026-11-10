@@ -485,7 +485,7 @@ async fn guest_cancel_notifies_the_assigned_member_not_the_owner() {
 
 /// A webhook SMS gateway on a local port that records each request and
 /// accepts it.
-async fn spawn_sms_webhook() -> (u16, Arc<std::sync::Mutex<Vec<String>>>) {
+pub(super) async fn spawn_sms_webhook() -> (u16, Arc<std::sync::Mutex<Vec<String>>>) {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let port = listener.local_addr().unwrap().port();
@@ -528,7 +528,7 @@ async fn spawn_sms_webhook() -> (u16, Arc<std::sync::Mutex<Vec<String>>>) {
     (port, received)
 }
 
-async fn use_sms_webhook(pool: &SqlitePool, port: u16) {
+pub(super) async fn use_sms_webhook(pool: &SqlitePool, port: u16) {
     sqlx::query(
         "INSERT INTO sms_config (id, provider, sender, base_url, default_country_code) \
              VALUES ('cfg', 'webhook', 'calrs', ?, '+33')",

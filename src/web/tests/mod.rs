@@ -31,6 +31,8 @@ mod public_pages;
 mod resources;
 mod security;
 mod sources;
+// ilia fork: TON payments.
+mod ton;
 mod writeback_failures;
 
 // --- has_conflict tests ---

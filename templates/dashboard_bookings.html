@@ -10,15 +10,17 @@
 <div class="card">
   <h2>{{ t("bookings-pending-approval") }}</h2>
   {% for b in pending_bookings %}
+  {% set pay = ton[b.id] if ton is defined else none %}
   <div class="booking-row" {% if not loop.last %}style="border-bottom: 1px solid var(--border);"{% endif %}>
     <div class="booking-info">
-      <div>{{ t("bookings-with", title='<strong>' ~ (b.event_title | escape) ~ '</strong>', guest=b.guest_name | escape) | safe }}</div>
+      <div>{{ t("bookings-with", title='<strong>' ~ (b.event_title | escape) ~ '</strong>', guest=b.guest_name | escape) | safe }}{% if pay %}{% include "partials/ton_booking_badge.html" %}{% endif %}</div>
       <div style="color: var(--text-muted); font-size: 0.85rem;">{{ b.start_at }} &middot; {{ b.guest_email }}{% if b.guest_phone %} &middot; {{ b.guest_phone }}{% endif %}</div>
       {% if b.start_at_guest %}<div style="color: var(--text-muted); font-size: 0.75rem;">{{ t("bookings-guest-booked") }} {{ b.start_at_guest }}</div>{% endif %}
       {% if b.resource_name %}<div style="color: var(--text-muted); font-size: 0.75rem;">{{ t("bookings-resource") }} {{ b.resource_name }}</div>{% endif %}
       {% if b.notes %}<div class="booking-notes" tabindex="0"><strong>{{ t("confirmed-detail-notes") }}</strong> {{ b.notes }}</div>{% endif %}
     </div>
     <div class="booking-actions">
+      {% if pay and pay.unpaid %}{% include "partials/ton_unpaid_actions.html" %}{% else %}
       <form method="post" action="/dashboard/bookings/{{ b.id }}/confirm" style="margin: 0;">
         <button type="submit" class="slot-btn" style="font-size: 0.8rem; cursor: pointer; color: var(--success); border-color: var(--success);">{{ t("bookings-confirm") }}</button>
       </form>
@@ -26,6 +28,7 @@
       <form method="post" action="/dashboard/bookings/{{ b.id }}/cancel" style="margin: 0;">
         <button type="submit" class="slot-btn" style="font-size: 0.8rem; cursor: pointer; color: var(--error-text);">{{ t("bookings-decline") }}</button>
       </form>
+      {% endif %}
     </div>
   </div>
   {% endfor %}
@@ -68,6 +71,7 @@
           {% if b.writeback_error %}
             <span class="badge badge-error" style="margin-left: 0.25rem;" title="{{ b.writeback_error }}">{{ t("bookings-badge-writeback-failed") }}</span>
           {% endif %}
+          {% set pay = ton[b.id] if ton is defined else none %}{% if pay %}{% include "partials/ton_booking_badge.html" %}{% endif %}
         </div>
         <div style="color: var(--text-muted); font-size: 0.85rem;">
           {{ b.start_at }} &middot; {{ b.guest_email }}{% if b.guest_phone %} &middot; {{ b.guest_phone }}{% endif %}

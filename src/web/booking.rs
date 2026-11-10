@@ -220,6 +220,10 @@ pub(super) async fn handle_group_booking(
             .into_response()
         }
     };
+    // ilia fork: priced types are booked on personal pages only (docs/ton.md).
+    if ton_pay::is_priced(&state.pool, &et_id).await {
+        return ton_pay::refuse_group(&state, lang);
+    }
     let needs_approval = requires_confirmation != 0;
     let sms_phone_mode: String =
         sqlx::query_scalar("SELECT sms_phone_mode FROM event_types WHERE id = ?")
@@ -988,6 +992,11 @@ async fn handle_dynamic_group_booking(
         return render_booking_action_error_in(state, lang, &title, &message);
     }
 
+    // ilia fork: a dynamic group link takes the first member's personal
+    // type; a priced one is booked on its own page only (docs/ton.md).
+    if ton_pay::is_priced(&state.pool, &et_id).await {
+        return ton_pay::refuse_group(state, lang);
+    }
     let needs_approval = requires_confirmation != 0;
 
     // Parse additional guests
@@ -1675,6 +1684,23 @@ pub(super) async fn handle_booking_for_user(
     let reschedule_token = uuid::Uuid::new_v4().to_string();
     let (start_at, end_at) = (encoded_start, encoded_end);
 
+    // ilia fork: a priced type waits for its TON payment (docs/ton.md).
+    let priced = match ton_pay::prepare_for_booking(
+        &state,
+        &et_id,
+        &start_at,
+        min_notice,
+        &form.email,
+        &client_ip,
+        lang,
+    )
+    .await
+    {
+        Ok(p) => p,
+        Err(refusal) => return refusal,
+    };
+    let needs_approval = needs_approval || priced.is_some();
+
     let initial_status = if needs_approval {
         "pending"
     } else {
@@ -1852,6 +1878,14 @@ pub(super) async fn handle_booking_for_user(
             return internal_error_response("database query", &e);
         }
     }
+    let opened = match ton_pay::open_for_booking(&mut tx, &id, priced.as_ref(), &state, lang).await
+    {
+        Ok(o) => o,
+        Err(refusal) => {
+            let _ = tx.rollback().await;
+            return refusal;
+        }
+    };
 
     // Insert additional attendees
     for attendee_email in &additional_attendees {
@@ -1885,6 +1919,9 @@ pub(super) async fn handle_booking_for_user(
                 .execute(&state.pool)
                 .await;
         }
+    }
+    if let Some(opened) = opened {
+        return ton_pay::after_booking(&state, &id, &opened, &embed, lang).await;
     }
 
     // Build BookingDetails once. CalDAV push and email send both need it,
@@ -2251,6 +2288,7 @@ pub(super) async fn handle_booking(
     State(state): State<Arc<AppState>>,
     headers: axum::http::HeaderMap,
     Path(slug): Path<String>,
+    Query(embed): Query<EmbedParams>,
     Form(form): Form<BookForm>,
 ) -> impl IntoResponse {
     if let Err(resp) = verify_csrf_token(&headers, &form._csrf) {
@@ -2469,6 +2507,23 @@ pub(super) async fn handle_booking(
     let reschedule_token = uuid::Uuid::new_v4().to_string();
     let (start_at, end_at) = (encoded_start, encoded_end);
 
+    // ilia fork: a priced type waits for its TON payment (docs/ton.md).
+    let priced = match ton_pay::prepare_for_booking(
+        &state,
+        &et_id,
+        &start_at,
+        min_notice,
+        &form.email,
+        &client_ip,
+        lang,
+    )
+    .await
+    {
+        Ok(p) => p,
+        Err(refusal) => return refusal,
+    };
+    let needs_approval = needs_approval || priced.is_some();
+
     let initial_status = if needs_approval {
         "pending"
     } else {
@@ -2647,6 +2702,14 @@ pub(super) async fn handle_booking(
             return internal_error_response("database query", &e);
         }
     }
+    let opened = match ton_pay::open_for_booking(&mut tx, &id, priced.as_ref(), &state, lang).await
+    {
+        Ok(o) => o,
+        Err(refusal) => {
+            let _ = tx.rollback().await;
+            return refusal;
+        }
+    };
 
     // Insert additional attendees
     for attendee_email in &additional_attendees {
@@ -2670,6 +2733,9 @@ pub(super) async fn handle_booking(
     drop(resource_guard);
 
     tracing::info!(booking_id = %id, event_type = %slug, guest = %form.email, "booking created");
+    if let Some(opened) = opened {
+        return ton_pay::after_booking(&state, &id, &opened, &embed, lang).await;
+    }
 
     // Build BookingDetails once. CalDAV push and email send both need it,
     // and CalDAV push must run independently of whether SMTP is configured.

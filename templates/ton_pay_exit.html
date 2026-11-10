@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{#- ilia fork: inside the embedded widget, the payment page opens in the whole
+    window (it is not frameable, and wallets do not open ton:// from an iframe). -#}
+
+{% block title %}{{ t("ton-exit-title") }}{% endblock %}
+
+{% block content %}
+<div class="card" style="text-align: center;">
+  <div class="check" style="background: #d97706;">&#8987;</div>
+  <h1>{{ t("ton-exit-title") }}</h1>
+  <p class="subtitle">{{ t("ton-exit-body", time=held_until, zone=zone) }}</p>
+  <p style="margin-top: 1.25rem;"><a class="btn" href="{{ pay_url }}" target="_top" rel="noopener">{{ t("ton-exit-go") }}</a></p>
+</div>
+{% endblock %}

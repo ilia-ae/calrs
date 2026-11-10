@@ -75,6 +75,9 @@ pub(crate) enum BookingFilter {
     Upcoming,
     /// Bookings that started in the last 90 days, any status, newest first.
     Past,
+    /// ilia fork: pending requests whose TON payment is still awaited (an
+    /// open invoice), soonest first.
+    AwaitingPayment,
 }
 
 /// A page of bookings.
@@ -82,7 +85,7 @@ pub(crate) enum BookingFilter {
 #[serde(deny_unknown_fields)]
 #[schemars(crate = "rmcp::schemars")]
 pub(crate) struct BookingsArgs {
-    /// pending, upcoming (default) or past.
+    /// pending, upcoming (default), past or awaiting_payment.
     #[serde(default)]
     pub(crate) filter: Option<BookingFilter>,
     /// `next_cursor` from the previous page; omit for the first page.
@@ -266,6 +269,8 @@ pub(crate) struct EventTypeSummary {
     /// Confirmed and pending bookings of all time, past ones included (the
     /// dashboard's count).
     pub(crate) active_bookings: i64,
+    /// ilia fork: the price guests pay in TON; null when it books free.
+    pub(crate) price: Option<PriceOut>,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
@@ -329,6 +334,9 @@ pub(crate) struct EventTypeDetail {
     /// The calendars whose events block its slots.
     pub(crate) busy_calendars: BusyCalendarsOut,
     pub(crate) frequency_limits: Vec<FrequencyLimitOut>,
+    /// ilia fork: the price guests pay in TON; null when it books free.
+    /// Set it with set_event_type_price.
+    pub(crate) price: Option<PriceOut>,
     /// Notices about the bookable date range.
     pub(crate) warnings: Vec<String>,
 }
@@ -524,6 +532,8 @@ pub(crate) struct BookingSummary {
     pub(crate) awaiting_reschedule: bool,
     /// Writing the booking to the host calendar failed.
     pub(crate) writeback_failed: bool,
+    /// ilia fork: its TON payment; null when the booking was free.
+    pub(crate) payment: Option<PaymentOut>,
     pub(crate) guest_supplied: GuestSupplied,
 }
 
@@ -1087,6 +1097,8 @@ pub(crate) struct BookingDetail {
     /// The language of the guest's emails, a calrs language code; null
     /// means English.
     pub(crate) language: Option<String>,
+    /// ilia fork: its TON payment; null when the booking was free.
+    pub(crate) payment: Option<PaymentOut>,
     pub(crate) guest_supplied: GuestDetails,
 }
 
@@ -1128,4 +1140,112 @@ pub(crate) struct SourceSynced {
     pub(crate) succeeded: bool,
     /// As list_sources shows it now.
     pub(crate) source: SourceOut,
+}
+
+// --- ilia fork: TON payments (docs/ton.md) ---
+
+/// The price of an event type, paid in TON at the rate of the moment the
+/// guest books.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+#[schemars(crate = "rmcp::schemars")]
+pub(crate) struct PriceOut {
+    /// US dollars, e.g. "40.00".
+    pub(crate) usd: String,
+    /// Minutes the guest has to pay; null means the server's default.
+    pub(crate) window_min: Option<i64>,
+    /// Guests are charged. false: the price is kept but switched off (in the
+    /// web form), and the event type books free.
+    pub(crate) enabled: bool,
+}
+
+/// The TON payment of a booking. Amounts are decimal TON; no payment link,
+/// comment code or wallet address.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+#[schemars(crate = "rmcp::schemars")]
+pub(crate) struct PaymentOut {
+    /// open (waiting for the payment), paid (paid, not confirmed yet),
+    /// confirmed, expired (not paid in time), closed (ended unpaid) or
+    /// waived (the owner confirmed it without payment).
+    pub(crate) status: String,
+    /// The price in US dollars, e.g. "40.00".
+    pub(crate) price_usd: String,
+    /// USD per TON, fixed when the guest booked.
+    pub(crate) rate_usd: String,
+    /// The amount asked, in TON.
+    pub(crate) amount_ton: String,
+    /// Received so far, in TON.
+    pub(crate) paid_ton: String,
+    /// Still due, in TON (never below 0): the amount_ton waive_payment takes.
+    pub(crate) remaining_ton: String,
+    /// Received beyond the amount, to refund by hand; null when none.
+    pub(crate) excess_ton: Option<String>,
+    /// End of the payment window the guest was shown (RFC 3339).
+    pub(crate) expires_at: String,
+    /// The last moment a transfer still counts (the window plus a grace).
+    pub(crate) settle_by: String,
+    /// host_busy (paid, but the time is taken), partial, overpaid,
+    /// refund_due, confirmed_unpaid, address_revoked, host_busy_unpaid
+    /// (released unpaid: the time was taken) or confirm_failed (paid, the
+    /// automatic confirmation kept failing: confirm by hand); null when
+    /// none.
+    pub(crate) problem: Option<String>,
+}
+
+/// A new price for an event type, on top of the version last read.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+#[schemars(crate = "rmcp::schemars")]
+pub(crate) struct SetPriceArgs {
+    #[schemars(length(min = 1, max = 100))]
+    pub(crate) slug: String,
+    /// `version` from get_event_type.
+    pub(crate) version: String,
+    /// Required: the price in US dollars, "1" to "10000" with at most two
+    /// decimals ("40", "40.50"), or null to remove the price so the event
+    /// type books free again.
+    #[serde(deserialize_with = "present")]
+    #[schemars(required, length(min = 1, max = 12))]
+    pub(crate) price_usd: Option<String>,
+    /// Minutes the guest has to pay, 10 to 240; omit or null for the
+    /// server's default.
+    #[serde(default)]
+    #[schemars(range(min = 10, max = 240))]
+    pub(crate) window_min: Option<i64>,
+}
+
+/// An event type's price after set_event_type_price.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+#[schemars(crate = "rmcp::schemars")]
+pub(crate) struct PriceChanged {
+    pub(crate) slug: String,
+    /// Whether this call changed anything.
+    pub(crate) changed: bool,
+    /// The price now; null when the event type books free.
+    pub(crate) price: Option<PriceOut>,
+    /// Bookings of this event type whose payment is still open or paid but
+    /// not confirmed: they keep the terms they were booked with.
+    pub(crate) unsettled_payments: i64,
+    /// TON payments are on in this server. When false, a priced event type
+    /// cannot be booked at all until they are.
+    pub(crate) payments_enabled: bool,
+    pub(crate) warnings: Vec<String>,
+    /// The event type's version now.
+    pub(crate) version: String,
+}
+
+/// A booking whose payment the owner waives.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+#[schemars(crate = "rmcp::schemars")]
+pub(crate) struct WaivePaymentArgs {
+    /// The booking's id, as list_bookings shows it.
+    #[schemars(length(min = 1, max = 100))]
+    pub(crate) booking_id: String,
+    /// The amount still due, exactly as remaining_ton shows it (e.g.
+    /// "12.35"), so the owner sees what is given up.
+    #[schemars(length(min = 1, max = 24))]
+    pub(crate) amount_ton: String,
 }

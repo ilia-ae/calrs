@@ -1,0 +1,379 @@
+//! ilia fork: TON payments, the part that needs `crate::web` (ilia-booking
+//! docs/ton.md): the runtime held in `AppState.ton`, invoices and their
+//! guards, and the ton-watcher background task. The pure rules are in
+//! `crate::ton`.
+//!
+//! The rule everything here keeps: a priced booking is confirmed only after
+//! its payment is final on chain, or by an explicit waive. A bad setting, a
+//! missing rate, an indexer that is down or on the wrong network makes a
+//! priced type unbookable or lets an open booking run to its hard deadline;
+//! none of these ever makes a booking free.
+
+pub(crate) mod admin;
+pub(crate) mod alerts;
+pub(crate) mod flow;
+pub(crate) mod invoice;
+pub(crate) mod page;
+pub(crate) mod store;
+pub(crate) mod watcher;
+
+use std::collections::HashMap;
+use std::sync::Arc;
+
+use async_trait::async_trait;
+use chrono::{DateTime, Utc};
+
+use crate::ton::config::TonConfig;
+use crate::ton::rate::{AcceptedRate, HttpRates, RateRefusal, RateSource};
+use crate::ton::toncenter::{HttpIndexer, TonIndexer};
+use crate::web::{AppState, RateLimiter};
+
+pub(crate) use admin::{
+    copy_price, dashboard_badges, price_badge, price_form_ctx, price_form_from_post,
+    save_price_form, validate_price_form,
+};
+pub(in crate::web) use flow::{
+    after_booking, approval_refused_for_token, approval_refused_page, booking_ended,
+    guest_reschedule_refused, handle_expired_notice, open_for_booking, prepare_for_booking,
+    refuse_group,
+};
+pub(crate) use invoice::{approval_refused, cancel_is_quiet, is_priced, settled, unpaid};
+pub(crate) use watcher::spawn;
+
+/// The payment page, its status and actions, and the dashboard waive.
+pub(crate) fn router() -> axum::Router<Arc<AppState>> {
+    use axum::routing::{get, post};
+    axum::Router::new()
+        .route("/booking/pay/{token}", get(page::pay_page))
+        .route("/booking/pay/{token}/status", get(page::pay_status))
+        .route("/booking/pay/{token}/check", post(page::pay_check))
+        .route("/booking/pay/{token}/email", post(page::pay_email))
+        .route("/booking/pay/resend", post(page::resend_links))
+        .route(
+            "/dashboard/ton/waive/{booking_id}",
+            get(admin::waive_form).post(admin::waive),
+        )
+}
+
+/// Marks the Approve handler's answer when the booking was refused because
+/// its host (or a required resource) is taken, as opposed to an error: the
+/// watcher then holds a paid booking for the owner instead of retrying.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct ApprovalBusy;
+
+/// The Approve handler's "host busy" and "resource gone" pages, marked.
+pub(crate) fn mark_busy(mut resp: axum::response::Response) -> axum::response::Response {
+    resp.extensions_mut().insert(ApprovalBusy);
+    resp
+}
+
+/// Wake the watcher (a price was switched on or changed): it then keeps
+/// its heartbeat fresh, so the first guest is not refused.
+pub(crate) fn wake_watcher(state: &AppState) {
+    if let Some(rt) = state.ton.get() {
+        rt.wake.notify_one();
+    }
+}
+
+/// The minimum notice a slot page applies: a priced type adds the time
+/// an invoice needs before the meeting
+/// ([`crate::ton::deadlines::min_lead_min`]), so no slot is offered that
+/// the booking would refuse as too late. Unchanged for a free type.
+pub(crate) async fn slot_min_notice(state: &AppState, event_type_id: &str, min_notice: i32) -> i32 {
+    if !matches!(
+        store::price_for(&state.pool, event_type_id).await,
+        Ok(Some(_))
+    ) {
+        return min_notice;
+    }
+    let grace = state.ton.get().map(|rt| rt.cfg.grace_min).unwrap_or(15);
+    let lead = i32::try_from(crate::ton::deadlines::min_lead_min(grace)).unwrap_or(i32::MAX);
+    min_notice.max(0).saturating_add(lead)
+}
+
+/// Log target of everything TON.
+pub(crate) const TARGET: &str = "calrs::ton";
+
+/// The time format of every TON column: comparable as text, like
+/// `bookings.pending_expires_at`.
+pub(crate) fn stamp(t: DateTime<Utc>) -> String {
+    t.format("%Y-%m-%dT%H:%M:%SZ").to_string()
+}
+
+pub(crate) fn parse_stamp(s: &str) -> Option<DateTime<Utc>> {
+    DateTime::parse_from_rfc3339(s)
+        .ok()
+        .map(|t| t.with_timezone(&Utc))
+}
+
+/// Something the owner must hear about. Delivery (email) is plugged in
+/// through [`AlertSink`]; claims make each one go out once.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum TonAlert {
+    /// One `ton_payments` row: `kind` is `partial`, `overpaid`, `late`,
+    /// `unmatched` or an ignore reason (`failed`, `not_text`, …).
+    Payment { tx_hex: String, kind: String },
+    /// An invoice's `problem` was set or changed.
+    InvoiceProblem { invoice_id: String, problem: String },
+    /// An invoice reached `confirmed` with money on it.
+    PaymentReceived { invoice_id: String },
+    /// Watcher health, rate, capacity: at most once an hour per kind.
+    Health { kind: String, detail: String },
+}
+
+/// Where alerts go. Without one, payment and invoice alerts stay unclaimed
+/// in the database (so nothing is lost) and health alerts are only logged.
+#[async_trait]
+pub(crate) trait AlertSink: Send + Sync {
+    async fn deliver(&self, alert: TonAlert);
+}
+
+/// What the watcher last learned about the indexer and the wallet. "Payments
+/// enabled" is derived from it ([`TonRuntime::ready`]).
+#[derive(Clone, Debug, Default)]
+pub(crate) struct Health {
+    pub(crate) account_status: Option<String>,
+    pub(crate) account_checked_at: Option<DateTime<Utc>>,
+    pub(crate) network_ok: Option<bool>,
+    pub(crate) last_ok: Option<DateTime<Utc>>,
+    pub(crate) last_error: Option<String>,
+    pub(crate) failures: u32,
+    pub(crate) failing_since: Option<DateTime<Utc>>,
+}
+
+/// Why a priced booking cannot be taken right now.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum NotReady {
+    WalletNotActive,
+    WrongNetwork,
+    WatcherStale,
+}
+
+impl std::fmt::Display for NotReady {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::WalletNotActive => "the receiving wallet is not active (or not checked yet)",
+            Self::WrongNetwork => "the indexer is on another network (or not checked yet)",
+            Self::WatcherStale => "the watcher has not completed a step in the last 2 minutes",
+        })
+    }
+}
+
+/// Rates are reused for this long.
+const RATE_CACHE: std::time::Duration = std::time::Duration::from_secs(300);
+/// Upper bound of fetching both rate sources.
+const RATE_FETCH_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+/// The heartbeat a new invoice requires.
+const HEARTBEAT_MAX_AGE_SECS: i64 = 120;
+/// The wallet status a new invoice requires is at most this old.
+const ACCOUNT_CHECK_MAX_AGE_SECS: i64 = 2 * 3600;
+
+pub(crate) struct TonRuntime {
+    pub(crate) cfg: TonConfig,
+    pub(crate) indexer: Arc<dyn TonIndexer>,
+    pub(crate) rates: Arc<dyn RateSource>,
+    /// Set once: by the test that builds the runtime, or by `spawn` (the
+    /// owner's emails) in `calrs serve`.
+    pub(crate) alerts: std::sync::OnceLock<Arc<dyn AlertSink>>,
+    /// New invoices (and, later, "I have paid") wake the watcher.
+    pub(crate) wake: tokio::sync::Notify,
+    pub(crate) health: std::sync::Mutex<Health>,
+    rate_cache: tokio::sync::Mutex<Option<(AcceptedRate, std::time::Instant)>>,
+    /// The last rate both sources agreed on: anchors the one-source rule.
+    anchor: std::sync::Mutex<Option<(u64, DateTime<Utc>)>>,
+    /// Invoices whose payment is visible but not final yet.
+    pub(crate) seen: std::sync::Mutex<HashMap<String, std::time::Instant>>,
+    /// The configured address has its cursor row and is marked current.
+    pub(crate) bootstrapped: std::sync::atomic::AtomicBool,
+}
+
+impl TonRuntime {
+    pub(crate) fn new(
+        cfg: TonConfig,
+        indexer: Arc<dyn TonIndexer>,
+        rates: Arc<dyn RateSource>,
+        alerts: Option<Arc<dyn AlertSink>>,
+    ) -> Self {
+        let slot = std::sync::OnceLock::new();
+        if let Some(sink) = alerts {
+            let _ = slot.set(sink);
+        }
+        Self {
+            cfg,
+            indexer,
+            rates,
+            alerts: slot,
+            wake: tokio::sync::Notify::new(),
+            health: std::sync::Mutex::new(Health::default()),
+            rate_cache: tokio::sync::Mutex::new(None),
+            anchor: std::sync::Mutex::new(None),
+            seen: std::sync::Mutex::new(HashMap::new()),
+            bootstrapped: std::sync::atomic::AtomicBool::new(false),
+        }
+    }
+
+    /// The production runtime: toncenter over HTTPS and both rate sources.
+    pub(crate) fn http(cfg: TonConfig) -> Self {
+        // One request a second overall, toncenter's keyless limit; a key
+        // gives head room, not a faster loop.
+        let indexer = HttpIndexer::new(
+            &cfg.api_url,
+            cfg.api_key.clone(),
+            std::time::Duration::from_secs(1),
+        );
+        let rates = HttpRates::new(&cfg);
+        Self::new(cfg, Arc::new(indexer), Arc::new(rates), None)
+    }
+
+    pub(crate) fn health(&self) -> Health {
+        self.health.lock().map(|h| h.clone()).unwrap_or_default()
+    }
+
+    pub(crate) fn with_health(&self, f: impl FnOnce(&mut Health)) {
+        if let Ok(mut h) = self.health.lock() {
+            f(&mut h);
+        }
+    }
+
+    /// May a new invoice be opened now? The wallet is active, the indexer is
+    /// on our network, and the watcher completed a step recently.
+    pub(crate) fn ready(&self, now: DateTime<Utc>) -> Result<(), NotReady> {
+        let h = self.health();
+        let checked = h
+            .account_checked_at
+            .is_some_and(|t| (now - t).num_seconds() <= ACCOUNT_CHECK_MAX_AGE_SECS);
+        if !checked || h.account_status.as_deref() != Some("active") {
+            return Err(NotReady::WalletNotActive);
+        }
+        if h.network_ok != Some(true) {
+            return Err(NotReady::WrongNetwork);
+        }
+        if !h
+            .last_ok
+            .is_some_and(|t| (now - t).num_seconds() <= HEARTBEAT_MAX_AGE_SECS)
+        {
+            return Err(NotReady::WatcherStale);
+        }
+        Ok(())
+    }
+
+    /// The rate for a new invoice: the cached one when younger than five
+    /// minutes, else freshly decided from both sources (at most 5 s).
+    pub(crate) async fn rate(
+        &self,
+        pool: &sqlx::SqlitePool,
+        now: DateTime<Utc>,
+    ) -> Result<AcceptedRate, RateRefusal> {
+        let mut cache = self.rate_cache.lock().await;
+        if let Some((rate, at)) = cache.as_ref() {
+            if at.elapsed() < RATE_CACHE {
+                return Ok(rate.clone());
+            }
+        }
+        let quotes: Vec<_> = tokio::time::timeout(RATE_FETCH_TIMEOUT, self.rates.quotes())
+            .await
+            .unwrap_or_default();
+        let mut ok = Vec::new();
+        for q in quotes {
+            match q {
+                Ok(q) => ok.push(q),
+                Err(e) => tracing::warn!(target: TARGET, error = %e, "rate source failed"),
+            }
+        }
+        let anchor = match self.anchor.lock().ok().and_then(|a| *a) {
+            Some(a) => Some(a),
+            None => store::last_confirmed_rate(pool).await,
+        };
+        let rate = crate::ton::rate::decide(&ok, &self.cfg.rate_policy, anchor, now)?;
+        if rate.confirmed {
+            if let Ok(mut a) = self.anchor.lock() {
+                *a = Some((rate.usd_micro, rate.at));
+            }
+        }
+        *cache = Some((rate.clone(), std::time::Instant::now()));
+        Ok(rate)
+    }
+
+    /// The cached rate, for showing an approximate amount; never fetches.
+    pub(crate) fn cached_rate(&self) -> Option<AcceptedRate> {
+        let cache = self.rate_cache.try_lock().ok()?;
+        cache
+            .as_ref()
+            .filter(|(_, at)| at.elapsed() < RATE_CACHE)
+            .map(|(r, _)| r.clone())
+    }
+
+    #[cfg(test)]
+    pub(crate) fn forget_rate(&self) {
+        if let Ok(mut c) = self.rate_cache.try_lock() {
+            *c = None;
+        }
+    }
+}
+
+/// `AppState.ton`: the runtime when payments are configured, else `None`.
+pub(crate) struct TonSlot {
+    runtime: std::sync::RwLock<Option<Arc<TonRuntime>>>,
+    /// Why payments are off, for the log and status (no secrets).
+    disabled: std::sync::RwLock<Option<String>>,
+    /// Payment page and status GETs per client address.
+    pub(crate) page_limiter: RateLimiter,
+    /// "I have paid" per invoice.
+    pub(crate) check_limiter: RateLimiter,
+    /// "Email me this link" per client address (each invoice once anyway).
+    pub(crate) email_limiter: RateLimiter,
+    /// "Email me the links" of an open booking, per client address and per
+    /// guest email.
+    pub(crate) resend_limiter: RateLimiter,
+    pub(crate) resend_email_limiter: RateLimiter,
+}
+
+impl TonSlot {
+    fn with(runtime: Option<Arc<TonRuntime>>, reason: Option<String>) -> Self {
+        Self {
+            runtime: std::sync::RwLock::new(runtime),
+            disabled: std::sync::RwLock::new(reason),
+            page_limiter: RateLimiter::new(120, 60),
+            check_limiter: RateLimiter::new(1, 10),
+            email_limiter: RateLimiter::new(5, 3600),
+            resend_limiter: RateLimiter::new(5, 3600),
+            resend_email_limiter: RateLimiter::new(1, 600),
+        }
+    }
+
+    pub(crate) fn off(reason: Option<String>) -> Self {
+        Self::with(None, reason)
+    }
+
+    /// From the `CALRS_TON_*` environment. Unset: off. Invalid: off, with
+    /// the reason logged as an error.
+    pub(crate) fn from_env() -> Self {
+        match TonConfig::from_env() {
+            Ok(Some(cfg)) => Self::with(Some(Arc::new(TonRuntime::http(cfg))), None),
+            Ok(None) => Self::off(Some("CALRS_TON_NETWORK is not set".into())),
+            Err(e) => {
+                tracing::error!(
+                    target: TARGET,
+                    reason = %e,
+                    "ton payments disabled: invalid configuration; priced event types are not bookable"
+                );
+                Self::off(Some(e.0))
+            }
+        }
+    }
+
+    pub(crate) fn get(&self) -> Option<Arc<TonRuntime>> {
+        self.runtime.read().ok().and_then(|r| r.clone())
+    }
+
+    pub(crate) fn disabled_reason(&self) -> Option<String> {
+        self.disabled.read().ok().and_then(|r| r.clone())
+    }
+
+    #[cfg(test)]
+    pub(crate) fn install(&self, rt: Arc<TonRuntime>) {
+        if let Ok(mut r) = self.runtime.write() {
+            *r = Some(rt);
+        }
+    }
+}

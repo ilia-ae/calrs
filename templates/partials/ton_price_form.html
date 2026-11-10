@@ -1,0 +1,30 @@
+{#- ilia fork: the TON price of a personal event type (docs/ton.md). -#}
+<details class="card collapsible-section" id="ton-price-section" style="margin-top: 1rem;"{% if ton_price.enabled or ton_price.usd %} open{% endif %}>
+  <summary class="collapsible-header">
+    <h2>{{ t("ton-etf-section") }}</h2>
+    <span class="collapsible-hint"></span>
+    <span class="collapsible-chevron"></span>
+  </summary>
+  <div class="collapsible-body">
+    {% if not ton_price.payments_on %}
+    <p style="color: var(--error-text); font-size: 0.85rem; margin-bottom: 0.75rem;">{{ t("ton-etf-off-note") }}</p>
+    {% endif %}
+    <label style="display: flex; align-items: center; gap: 0.625rem; cursor: pointer; padding: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius);">
+      <input type="checkbox" name="ton_price_enabled" {% if ton_price.enabled %}checked{% endif %} style="accent-color: var(--accent); width: 1.125rem; height: 1.125rem;">
+      <div>
+        <strong style="font-size: 0.925rem;">{{ t("ton-etf-enabled") }}</strong>
+        <div style="color: var(--text-muted); font-size: 0.825rem;">{{ t("ton-etf-enabled-help") }}</div>
+      </div>
+    </label>
+    <div class="form-group" style="margin-top: 0.75rem;">
+      <label for="ton_price_usd">{{ t("ton-etf-price") }}</label>
+      <input type="text" id="ton_price_usd" name="ton_price_usd" value="{{ ton_price.usd }}" inputmode="decimal" placeholder="40.00" style="padding: 0.625rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.925rem; font-family: inherit; background: var(--surface); color: var(--text); width: 100%;">
+      <span class="hint" style="font-size: 0.825rem; color: var(--text-muted); display: block; margin-top: 0.375rem;">{{ t("ton-etf-price-help") }}</span>
+    </div>
+    <div class="form-group" style="margin-top: 0.75rem; margin-bottom: 0;">
+      <label for="ton_window_min">{{ t("ton-etf-window") }}</label>
+      <input type="number" id="ton_window_min" name="ton_window_min" value="{{ ton_price.window }}" min="10" max="240" placeholder="{{ ton_price.default_window }}" style="padding: 0.625rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.925rem; font-family: inherit; background: var(--surface); color: var(--text); width: 100%;">
+      <span class="hint" style="font-size: 0.825rem; color: var(--text-muted); display: block; margin-top: 0.375rem;">{{ t("ton-etf-window-help", minutes=ton_price.default_window) }}</span>
+    </div>
+  </div>
+</details>

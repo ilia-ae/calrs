@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{#- ilia fork: the TON payment page (ilia-booking docs/ton.md). Never shows the
+    guest's details, sender addresses or anything written on chain. -#}
+
+{% block title %}{{ t("ton-pay-page-title", title=event_title) }}{% endblock %}
+
+{% block head %}
+{% if live %}<noscript><meta http-equiv="refresh" content="15"></noscript>{% endif %}
+<style>
+  .ton-amount { font-size: 1.75rem; font-weight: 700; letter-spacing: -0.01em; }
+  .ton-row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin: 0.375rem 0; }
+  .ton-row code { font-size: 0.95rem; padding: 0.25rem 0.5rem; background: var(--surface-hover); border: 1px solid var(--border); border-radius: 6px; word-break: break-all; user-select: all; -webkit-user-select: all; }
+  .ton-label { color: var(--text-muted); font-size: 0.85rem; min-width: 6.5rem; }
+  .ton-qr { width: 220px; max-width: 100%; margin: 0.75rem 0; padding: 0; border-radius: 8px; overflow: hidden; }
+  .ton-qr svg { display: block; width: 100%; height: auto; }
+  .ton-warn { margin-top: 1rem; padding: 0.75rem 1rem; border: 1px solid #f59e0b; border-radius: var(--radius); background: rgba(245,158,11,0.08); font-size: 0.875rem; }
+  .ton-warn li { margin-left: 1.1rem; }
+  .ton-state { padding: 0.75rem 1rem; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface-hover); margin-bottom: 1rem; }
+  .ton-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 1.25rem; }
+  .ton-actions form { margin: 0; }
+  .ton-copy { font-size: 0.8rem; cursor: pointer; padding: 0.25rem 0.625rem; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="logo"><img src="/logo" alt="" onerror="this.closest('.logo').style.display='none'"></div>
+
+<div class="card">
+  <h1>{{ event_title }}</h1>
+  <p class="subtitle">{{ t("email-date-at-time", date=meeting_date, time=meeting_time) }}</p>
+
+  <div class="ton-state" id="ton-state" data-state="{{ pay_state }}">
+    {% if pay_state == "waiting" %}{{ t("ton-pay-state-waiting") }}
+    {% elif pay_state == "seen" %}{{ t("ton-pay-state-seen") }}
+    {% elif pay_state == "partial" %}{{ t("ton-pay-state-partial", paid=paid_ton, rest=amount_ton) }}
+    {% elif pay_state == "checking" %}{{ t("ton-pay-state-checking") }}
+    {% elif pay_state == "paid" %}{{ t("ton-pay-state-paid") }}
+    {% elif pay_state == "confirmed" %}{{ t("ton-pay-state-confirmed") }}
+    {% elif pay_state == "waived" %}{{ t("ton-pay-state-waived") }}
+    {% elif pay_state == "busy" %}{{ t("ton-pay-state-busy") }}
+    {% elif pay_state == "expired" %}{{ t("ton-pay-state-expired") }}
+    {% elif pay_state == "late" %}{{ t("ton-pay-state-late") }}
+    {% elif pay_state == "revoked" %}{{ t("ton-pay-state-revoked") }}
+    {% elif pay_state == "taken" %}{{ t("ton-pay-state-taken") }}
+    {% elif pay_state == "refund" %}{{ t("ton-pay-state-refund", paid=paid_ton) }}
+    {% else %}{{ t("ton-pay-state-closed") }}{% endif %}
+  </div>
+  {% if host_email %}<p style="font-size: 0.875rem;">{{ t("ton-pay-contact", host=host_name, email=host_email) }}</p>{% endif %}
+
+  {% if emailed %}<p style="color: var(--success); font-size: 0.875rem;">{{ t("ton-pay-emailed") }}</p>{% endif %}
+  {% if email_failed %}<p style="color: var(--error-text); font-size: 0.875rem;">{{ t("ton-pay-email-unavailable") }}</p>{% endif %}
+  {% if checked and live %}<p style="color: var(--text-muted); font-size: 0.875rem;">{{ t("ton-pay-checking-now") }}</p>{% endif %}
+
+  {% if can_pay %}
+  <p style="margin-bottom: 0.25rem;"><strong>{{ t("ton-pay-held-until", time=held_until, zone=zone) }}</strong> <span id="ton-left" data-seconds="{{ seconds_left }}" style="color: var(--text-muted);"></span></p>
+
+  <div style="margin-top: 1rem;">
+    <div class="ton-label">{{ t("ton-pay-amount-label") }}</div>
+    <div class="ton-amount">{{ amount_ton }} TON</div>
+    <div style="color: var(--text-muted); font-size: 0.85rem;">{{ t("ton-pay-rate", usd=usd, rate=rate, sources=rate_sources, time=rate_time) }}</div>
+  </div>
+
+  <div class="ton-actions">
+    <a class="btn" href="{{ ton_link }}" rel="noopener noreferrer">{{ t("ton-pay-open-wallet") }}</a>
+    <a class="slot-btn" href="{{ keeper_link }}" rel="noopener noreferrer" style="text-decoration: none; align-self: center;">{{ t("ton-pay-open-tonkeeper") }}</a>
+  </div>
+
+  {% if qr_svg %}
+  <div class="ton-qr" role="img"
+       aria-label="{{ t('ton-pay-qr-alt') }}">
+    {{ qr_svg | safe }}
+  </div>
+  <p style="color: var(--text-muted); font-size: 0.85rem;">{{ t("ton-pay-scan") }}</p>
+  {% endif %}
+
+  <div style="margin-top: 1rem;">
+    <div class="ton-row"><span class="ton-label">{{ t("ton-pay-address") }}</span><code id="ton-address">{{ address }}</code><button type="button" class="ton-copy" data-copy="ton-address" aria-label="{{ t('ton-pay-copy-address') }}" hidden>{{ t("ton-pay-copy") }}</button></div>
+    <div class="ton-row"><span class="ton-label">{{ t("ton-pay-comment") }}</span><code id="ton-comment">{{ comment }}</code><button type="button" class="ton-copy" data-copy="ton-comment" aria-label="{{ t('ton-pay-copy-comment') }}" hidden>{{ t("ton-pay-copy") }}</button></div>
+    <p id="ton-copy-status" role="status" aria-live="polite" style="color: var(--text-muted); font-size: 0.85rem; min-height: 1em; margin: 0.25rem 0 0;"></p>
+  </div>
+
+  <div class="ton-warn">
+    <ul>
+      <li><strong>{{ t("ton-pay-warn-comment") }}</strong></li>
+      <li>{{ t("ton-pay-warn-encrypt") }}</li>
+      <li>{{ t("ton-pay-warn-token") }}</li>
+      <li>{{ t("ton-pay-warn-exchange") }}</li>
+      <li>{{ t("ton-pay-warn-deadline", time=held_until) }}</li>
+    </ul>
+  </div>
+
+  <div class="ton-actions">
+    <form method="post" action="{{ check_url }}"><button type="submit" class="slot-btn" style="cursor: pointer;">{{ t("ton-pay-check") }}</button></form>
+    {% if show_email %}<form method="post" action="{{ email_url }}"><button type="submit" class="slot-btn" style="cursor: pointer;">{{ t("ton-pay-email") }}</button></form>{% endif %}
+  </div>
+  {% endif %}
+
+  {% if rebook_url %}
+  <p style="margin-top: 1rem;"><a href="{{ rebook_url }}" style="color: var(--accent);">{{ t("ton-pay-rebook") }}</a></p>
+  {% endif %}
+</div>
+
+<script>
+(function () {
+  var I18N = { left: {{ t("ton-pay-left") | tojson }}, copied: {{ t("ton-pay-copied") | tojson }}, manual: {{ t("ton-pay-copy-manual") | tojson }} };
+  var status = document.getElementById('ton-copy-status');
+  var say = function (text) { if (status) status.textContent = text; };
+  // Select the text, so a failed copy still leaves it ready to copy by hand.
+  var select = function (el) {
+    try {
+      var range = document.createRange(); range.selectNodeContents(el);
+      var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+      return true;
+    } catch (e) { return false; }
+  };
+  var fallback = function (el) {
+    var ok = false;
+    if (select(el)) { try { ok = document.execCommand('copy'); } catch (e) { ok = false; } }
+    say(ok ? I18N.copied : I18N.manual);
+  };
+  document.querySelectorAll('.ton-copy').forEach(function (btn) {
+    btn.hidden = false;
+    btn.addEventListener('click', function () {
+      var el = document.getElementById(btn.getAttribute('data-copy'));
+      if (!el) return;
+      var text = el.textContent.trim();
+      if (!navigator.clipboard || !navigator.clipboard.writeText) { fallback(el); return; }
+      navigator.clipboard.writeText(text).then(function () {
+        var old = btn.textContent; btn.textContent = I18N.copied; say(I18N.copied);
+        setTimeout(function () { btn.textContent = old; say(''); }, 1500);
+      }, function () { fallback(el); });
+    });
+  });
+  var left = document.getElementById('ton-left');
+  if (left) {
+    var end = Date.now() + parseInt(left.getAttribute('data-seconds'), 10) * 1000;
+    var tick = function () {
+      var s = Math.max(0, Math.round((end - Date.now()) / 1000));
+      var mm = Math.floor(s / 60), ss = s % 60;
+      left.textContent = I18N.left.replace('%1', mm + ':' + (ss < 10 ? '0' : '') + ss);
+    };
+    tick(); setInterval(tick, 1000);
+  }
+  {% if live %}
+  var current = {{ pay_state | tojson }};
+  var poll = function () {
+    fetch({{ status_url | tojson }}, { credentials: 'same-origin', cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (j) { if (j && j.state && j.state !== current) location.reload(); })
+      .catch(function () {});
+  };
+  setInterval(poll, 5000);
+  {% endif %}
+})();
+</script>
+{% endblock %}

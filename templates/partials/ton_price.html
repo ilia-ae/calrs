@@ -1,0 +1,7 @@
+{#- ilia fork: the price of a paid event type (docs/ton.md). -#}
+{% if ton_price is defined and ton_price %}
+<div class="ton-price" style="margin: 0.375rem 0 0.5rem; font-size: 0.9rem; color: var(--text-secondary);">
+  <strong>{{ t("ton-slots-price", usd=ton_price.usd) }}</strong>{% if ton_price.ton %} {{ t("ton-slots-price-approx", ton=ton_price.ton) }}{% endif %}
+  <span style="color: var(--text-muted);">· {{ t("ton-slots-price-note") }}</span>
+</div>
+{% endif %}

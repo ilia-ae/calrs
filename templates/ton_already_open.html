@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{#- ilia fork: a guest who already holds an unpaid priced booking (ilia-booking
+    docs/ton.md). The payment page has no cancel button (its link may be passed
+    to whoever pays), so this offers to email that booking's links to the
+    address it was made with: pay there, or cancel it to free the time. -#}
+
+{% block title %}{{ t("action-error-page-title") }}{% endblock %}
+
+{% block content %}
+<div class="card" style="text-align: center;">
+  <div class="check" style="background: #d97706;">!</div>
+  <h1>{{ t("ton-bae-title-unavailable") }}</h1>
+  <p class="subtitle">{{ t("ton-bae-body-already-open") }}</p>
+  {% if email %}
+  <form method="post" action="/booking/pay/resend" style="margin-top: 1.25rem;">
+    <input type="hidden" name="email" value="{{ email }}">
+    <button type="submit" class="btn" style="cursor: pointer;">{{ t("ton-resend-submit") }}</button>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

@@ -79,7 +79,7 @@ pub(crate) fn check_booking_id(id: &str) -> Result<&str, ToolError> {
 }
 
 /// A status as an error message may name it.
-fn shown(status: &str) -> &str {
+pub(super) fn shown(status: &str) -> &str {
     if STATUSES.contains(&status) {
         status
     } else {
@@ -150,6 +150,7 @@ pub(crate) async fn get_booking(
     let (notes, phone) = booking_guest_input(pool, &uid).await;
     let invited = booking_additional_attendees(pool, &uid).await;
     let tz = user_tz(me);
+    let payment = super::ops_ton::payment_of(pool, &id, tz).await?;
     Ok(BookingDetail {
         id,
         event_type: EventTypeRef {
@@ -163,6 +164,7 @@ pub(crate) async fn get_booking(
         awaiting_reschedule: reschedule != 0,
         writeback_failed: writeback_failed != 0,
         language: crate::email::supported_language(language),
+        payment,
         guest_supplied: GuestDetails {
             name: untrusted_text(&guest_name, GUEST_NAME_MAX),
             email: untrusted_text(&guest_email, EMAIL_MAX),
@@ -183,7 +185,7 @@ pub(crate) async fn get_booking(
 }
 
 /// Booking `booking_id` as list_bookings shows it.
-async fn summary(
+pub(super) async fn summary(
     pool: &SqlitePool,
     me: &User,
     booking_id: &str,
@@ -197,8 +199,11 @@ async fn summary(
     .fetch_optional(pool)
     .await
     .map_err(db("read booking"))?;
-    row.map(|row| summary_from(row, user_tz(me)))
-        .ok_or_else(|| ToolError::not_found("booking"))
+    let mut booking = row
+        .map(|row| summary_from(row, user_tz(me)))
+        .ok_or_else(|| ToolError::not_found("booking"))?;
+    booking.payment = super::ops_ton::payment_of(pool, &booking.id, user_tz(me)).await?;
+    Ok(booking)
 }
 
 // --- approve_booking, decline_booking, cancel_booking ---
@@ -239,16 +244,16 @@ impl Action {
 }
 
 /// The status, times and invite sequence of a booking in scope.
-struct BookingState {
-    status: String,
-    start: Option<DateTime<Utc>>,
+pub(super) struct BookingState {
+    pub(super) status: String,
+    pub(super) start: Option<DateTime<Utc>>,
     end: Option<DateTime<Utc>>,
     /// `ics_sequence`: bumped when a confirmed booking ends or is moved,
     /// never when a pending one ends or is approved.
-    sequence: i64,
+    pub(super) sequence: i64,
 }
 
-async fn state_of(
+pub(super) async fn state_of(
     pool: &SqlitePool,
     me: &User,
     booking_id: &str,
@@ -351,7 +356,7 @@ fn top_level_domain(
 }
 
 /// Whether SMTP is switched on, as the handlers find it when they send.
-async fn smtp_on(pool: &SqlitePool) -> bool {
+pub(super) async fn smtp_on(pool: &SqlitePool) -> bool {
     matches!(
         crate::email::load_smtp_status(pool).await,
         Ok(Some(status)) if status.enabled
@@ -370,7 +375,7 @@ fn redirect_target(response: &Response) -> Option<&str> {
 }
 
 /// POST the approval as the dashboard's Approve button does.
-async fn post_approve(w: &Writer<'_>, booking_id: &str) -> Result<Response, ToolError> {
+pub(super) async fn post_approve(w: &Writer<'_>, booking_id: &str) -> Result<Response, ToolError> {
     let (user, headers, form) = web_form::<CsrfForm>(w.me, &[]).await?;
     let state = State(w.ctx.state.clone());
     let path = Path(booking_id.to_string());
@@ -438,6 +443,14 @@ pub(crate) async fn act(
         }
         _ => {}
     }
+    // ilia fork: an unpaid priced booking is never approved (docs/ton.md);
+    // said before the cap is counted, with what is due and the way out.
+    if action == Action::Approve {
+        if let Some(refused) = super::ops_ton::approval_block(pool, booking_id, user_tz(w.me)).await
+        {
+            return Err(refused);
+        }
+    }
     // Counted once the booking is known to be one this call may act on, so
     // mistakes in the arguments do not use up the guest-facing caps.
     let limited = match action {
@@ -487,7 +500,12 @@ pub(crate) async fn act(
 /// Why an action that reached the handler left the booking `after` instead
 /// of the status it aims for. `resequenced`: its invite sequence went up
 /// meanwhile, which only the end or move of a confirmed booking does.
-fn refusal(action: Action, after: &str, resequenced: bool, response: &Response) -> ToolError {
+pub(super) fn refusal(
+    action: Action,
+    after: &str,
+    resequenced: bool,
+    response: &Response,
+) -> ToolError {
     // The handlers answer an internal error when a read fails, among them
     // the fail-closed availability re-check of an approval (calendar,
     // bookings, working hours, resources): the booking is left as it was.
@@ -521,6 +539,12 @@ fn refusal(action: Action, after: &str, resequenced: bool, response: &Response) 
                  the request stays pending",
             )
         }
+        // ilia fork: an unpaid priced booking is never approved (docs/ton.md).
+        (Action::Approve, "pending") if target.contains("error=unpaid") => ToolError::unavailable(
+            "the booking waits for a TON payment that has not arrived, so it cannot be \
+                 approved; it stays pending until paid or released at its deadline (the \
+                 owner can confirm it without payment from the dashboard)",
+        ),
         (Action::Approve, "pending") if target.contains("error=resource-busy") => {
             ToolError::unavailable(
                 "a shared resource the event type needs is no longer free at that time; \
@@ -657,6 +681,13 @@ mod tests {
             &redirect("/dashboard/bookings?error=resource-busy"),
         );
         assert!(resource.message().contains("shared resource"));
+        let unpaid = refusal(
+            Action::Approve,
+            "pending",
+            false,
+            &redirect("/dashboard/bookings?error=unpaid"),
+        );
+        assert!(unpaid.message().contains("TON payment"));
         let moved = refusal(
             Action::Cancel,
             "declined",

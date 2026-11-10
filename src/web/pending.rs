@@ -361,6 +361,10 @@ async fn notify_pending_expired(
     smtp_config: Option<&crate::email::SmtpConfig>,
     booking_id: &str,
 ) {
+    // ilia fork: an unpaid priced booking has its own notices (docs/ton.md).
+    if ton_pay::handle_expired_notice(pool, smtp_config, booking_id).await {
+        return;
+    }
     let Some((
         uid,
         guest_name,

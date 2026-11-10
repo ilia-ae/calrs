@@ -1666,3 +1666,182 @@ directory-manual-copy = Kopiere diesen Link manuell:
 directory-empty = Keine Termine gefunden. Versuche eine andere Suche.
 directory-favorites-empty = Keine Favoriten gefunden. Markiere Termine im Verzeichnis als Favoriten, um sie hier zu sehen.
 directory-with-hosts = Mit { $names }
+
+## ilia fork: TON payments (docs/ton.md)
+
+# Price on the slot and booking pages
+ton-slots-price = Preis: { $usd } $
+ton-slots-price-approx = (≈ { $ton } TON)
+ton-slots-price-note = Zahlung in TON nach der Terminwahl
+
+# Event type form
+ton-etf-section = Zahlung in TON
+ton-etf-off-note = TON-Zahlungen sind auf diesem Server nicht eingerichtet. Ein kostenpflichtiger Termintyp kann erst gebucht werden, wenn sie eingerichtet sind.
+ton-etf-enabled = Kostenpflichtige Buchung
+ton-etf-enabled-help = Gäste zahlen in TON direkt nach der Terminwahl. Während der Zahlung bleibt der Termin für sie reserviert; eine unbezahlte Buchung wird automatisch freigegeben.
+ton-etf-price = Preis (USD)
+ton-etf-price-help = Von 1 $ bis 10000 $. Der Betrag in TON wird beim Buchen zum aktuellen Kurs berechnet.
+ton-etf-window = Zahlungsfrist (Minuten)
+ton-etf-window-help = Von 10 bis 240. Leer lassen für den Standardwert des Servers ({ $minutes } Min.).
+ton-form-error-price = Der Preis muss zwischen 1 und 10000 US-Dollar liegen, mit höchstens zwei Nachkommastellen.
+ton-form-error-window = Die Zahlungsfrist muss zwischen 10 und 240 Minuten liegen.
+ton-form-error-team = Team-Termintypen können nicht kostenpflichtig sein.
+
+# Booking error pages
+ton-bae-title-unavailable = Dieser Termin kann nicht gebucht werden
+ton-bae-body-unavailable = Die Zahlung ist vorübergehend nicht verfügbar, daher kann dieser Termin gerade nicht gebucht werden. Versuch es in ein paar Minuten noch einmal.
+ton-bae-body-too-late = Bis zu diesem Termin bleibt zu wenig Zeit für die Zahlung. Wähle bitte einen späteren Termin.
+ton-bae-body-already-open = Du hast mit dieser E-Mail-Adresse bereits eine unbezahlte Buchung. Wir können dir ihre Links schicken: Dort kannst du sie bezahlen oder stornieren, um den Termin freizugeben, und dann neu buchen.
+ton-bae-body-personal-only = Dieser Termin kann nur auf der eigenen Seite des Gastgebers gebucht werden.
+ton-bae-title-unpaid = Buchung nicht bezahlt
+ton-bae-body-unpaid = Diese Buchung ist nicht bezahlt und kann daher nicht bestätigt werden. Um sie kostenlos zu bestätigen, nutze „Ohne Zahlung bestätigen“ auf der Buchungsseite deines Dashboards.
+ton-bae-body-reschedule-unpaid = Diese Buchung ist nicht bezahlt und kann daher nicht verschoben werden. Bezahle sie oder storniere sie und buche einen anderen Termin.
+ton-bae-body-pay-link-invalid = Dieser Zahlungslink ist ungültig.
+
+# Payment page
+ton-pay-page-title = Zahlung: { $title }
+ton-pay-held-until = Der Termin ist bis { $time } ({ $zone }) für dich reserviert.
+ton-pay-left = noch %1
+ton-pay-amount-label = Zu zahlender Betrag
+ton-pay-rate = ≈ { $usd } $ · 1 TON = { $rate } $ ({ $sources }, { $time } UTC)
+ton-pay-open-wallet = Wallet öffnen
+ton-pay-open-tonkeeper = In Tonkeeper öffnen
+ton-pay-qr-alt = QR-Code mit den Zahlungsdaten
+ton-pay-scan = Oder scanne diesen Code mit deiner Wallet-App.
+ton-pay-address = Adresse
+ton-pay-comment = Kommentar
+ton-pay-copy = Kopieren
+ton-pay-copied = Kopiert
+ton-pay-warn-comment = Der Kommentar ist Pflicht: Daran erkennen wir deine Zahlung.
+ton-pay-warn-encrypt = Verschlüssle den Kommentar nicht.
+ton-pay-warn-token = Zahle in TON, nicht mit Tokens.
+ton-pay-warn-exchange = Du zahlst von einer Börse? Trag den Code oben ins Memo-Feld (Kommentar) ein.
+ton-pay-warn-deadline = Sende die Zahlung vor { $time }. Eine später gesendete Zahlung wird womöglich nicht berücksichtigt.
+ton-pay-check = Ich habe bezahlt, jetzt prüfen
+ton-pay-email = Link per E-Mail senden
+ton-pay-emailed = Wir haben diesen Link an die E-Mail-Adresse deiner Buchung gesendet.
+ton-pay-email-unavailable = Der Link konnte nicht gesendet werden. Lass diese Seite offen oder speichere ihre Adresse.
+ton-pay-checking-now = Wir prüfen deine Zahlung. Diese Seite aktualisiert sich von selbst.
+ton-pay-state-waiting = Wir warten auf deine Zahlung.
+ton-pay-state-seen = Deine Zahlung ist im Netzwerk sichtbar. Wir warten, bis sie endgültig ist, was meist ein paar Sekunden dauert.
+ton-pay-state-partial = Wir haben { $paid } TON erhalten. Bitte zahle die restlichen { $rest } TON mit demselben Kommentar.
+ton-pay-state-checking = Die Zahlungsfrist ist abgelaufen. Falls du die Zahlung schon gesendet hast, prüfen wir sie. Diese Seite aktualisiert sich von selbst.
+ton-pay-state-paid = Zahlung erhalten. Deine Buchung wird bestätigt …
+ton-pay-state-confirmed = Bezahlt. Deine Buchung ist bestätigt, die Bestätigungs-E-Mail ist unterwegs.
+ton-pay-state-waived = Für diese Buchung ist keine Zahlung nötig. Der Gastgeber bestätigt sie.
+ton-pay-state-busy = Zahlung erhalten, aber dieser Termin ist nicht mehr frei. Wir melden uns bei dir.
+ton-pay-state-expired = Die Zahlungsfrist ist abgelaufen und der Termin wurde freigegeben. Falls du trotzdem gezahlt hast, schreib uns von der E-Mail-Adresse deiner Buchung, dann erstatten wir den Betrag.
+ton-pay-state-late = Deine Zahlung kam nach Ablauf der Frist, daher wurde die Buchung nicht bestätigt. Wir melden uns wegen der Erstattung. Du kannst uns auch von der E-Mail-Adresse deiner Buchung schreiben.
+ton-pay-state-closed = Diese Buchung ist nicht mehr aktiv.
+ton-pay-state-revoked = Diese Zahlungsadresse wird nicht mehr verwendet. Sende nichts an sie und buche bitte erneut.
+ton-pay-rebook = Anderen Termin buchen
+
+# Leaving the embedded widget
+ton-exit-title = Termin reserviert
+ton-exit-body = Der Termin ist bis { $time } ({ $zone }) für dich reserviert. Schließ die Zahlung ab, um deine Buchung zu bestätigen.
+ton-exit-go = Zur Zahlung
+
+# Dashboard
+ton-dash-badge-awaiting = wartet auf Zahlung · { $amount } TON · bis { $time }
+ton-dash-badge-partial = teilweise bezahlt · { $paid } von { $amount } TON · bis { $time }
+ton-dash-badge-paid = bezahlt · { $amount } TON
+ton-dash-badge-overpaid = bezahlt · { $excess } TON zu viel
+ton-dash-badge-busy = bezahlt, Termin nicht mehr frei
+ton-dash-badge-confirm-failed = bezahlt, nicht bestätigt · von Hand bestätigen
+ton-dash-badge-refund = { $amount } TON bezahlt · Erstattung fällig
+ton-dash-badge-waived = ohne Zahlung bestätigt
+ton-dash-badge-unpaid = nicht bezahlt
+ton-dash-waive = Ohne Zahlung bestätigen
+ton-dash-error-unpaid = Diese Buchung ist nicht bezahlt und kann daher weder bestätigt noch verschoben werden. Nutze „Ohne Zahlung bestätigen“, um sie kostenlos zu bestätigen, oder lehne sie ab.
+ton-dash-error-waive-failed = Die Buchung konnte nicht ohne Zahlung bestätigt werden: Sie wartet nicht mehr auf eine Zahlung.
+ton-waive-page-title = Ohne Zahlung bestätigen
+ton-waive-heading = Diese Buchung ohne Zahlung bestätigen?
+ton-waive-body = Diese Buchung ist NICHT bezahlt ({ $amount } TON, fällig bis { $time }). Wenn du sie bestätigst, bekommt der Gast den Termin kostenlos, und eine später eingehende Zahlung muss von Hand erstattet werden.
+ton-waive-submit = Kostenlos bestätigen
+ton-waive-back = Zurück zu den Buchungen
+
+# Guest emails
+ton-email-link-subject = Schließ deine Buchung ab: { $event }
+ton-email-link-message = Du hast begonnen, { $event } mit { $host } zu buchen. Schließ deine Buchung auf der Seite unten ab, bevor die Zeit abläuft.
+ton-email-link-action = Buchung abschließen
+ton-email-link-line = Schließ deine Buchung ab: { $url }
+ton-email-expired-subject = Nicht gebucht: { $event }, { $date }
+ton-email-expired-message = Die Zahlung für { $event } ist nicht rechtzeitig eingegangen, daher wurde der Termin freigegeben. Du kannst gern einen anderen Termin wählen.
+ton-email-expired-partial = Wir haben einen Teil der Zahlung erhalten und melden uns wegen der Erstattung.
+ton-email-rebook-line = Anderen Termin wählen: { $url }
+
+# Owner emails
+ton-email-row-amount = Betrag:
+ton-email-row-paid = Erhalten:
+ton-email-row-excess = Zu viel gezahlt:
+ton-email-row-transfer = Überweisung:
+ton-email-row-sender = Absender:
+ton-email-row-tx = Transaktion:
+ton-email-row-detail = Details:
+ton-email-amount-value = { $amount } TON ≈ { $usd } $ (1 TON = { $rate } $)
+ton-email-sender-wallet = { $address } (eine Wallet)
+ton-email-sender-other = { $address } (keine Wallet: eine Börse oder ein Contract)
+ton-email-dashboard-line = Buchungen: { $url }
+ton-email-dashboard-action = Buchungen öffnen
+ton-email-refund-rule = Erstattungen erfolgen von Hand aus deiner Wallet: an die Absenderadresse, wenn sie eine Wallet ist; sonst nur an eine Adresse, die der Gast von der E-Mail-Adresse seiner Buchung anfragt, in einer Nachricht mit seinem Zahlungs- oder Stornolink. Buchungscode, Betrag und Transaktion sind öffentlich und beweisen nichts.
+ton-email-received-subject = Zahlung erhalten: { $event }, { $guest } ({ $date })
+ton-email-received-heading = Zahlung erhalten
+ton-email-received-message = { $guest } hat { $amount } TON bezahlt. Die Buchung ist bestätigt.
+ton-email-alert-subject = TON-Zahlung braucht Aufmerksamkeit: { $what }
+ton-email-alert-heading = Eine Zahlung braucht deine Aufmerksamkeit
+ton-alert-partial = Teilzahlung
+ton-alert-partial-body = Ein Teil des fälligen Betrags ist eingegangen. Die Buchung bleibt unbestätigt, bis der Rest kommt; sonst wird sie zur Frist freigegeben und der erhaltene Betrag muss erstattet werden.
+ton-alert-overpaid = Überzahlung
+ton-alert-overpaid-body = Eine Zahlung ist für eine bereits bezahlte Buchung eingegangen. Erstatte sie, wenn es sich lohnt.
+ton-alert-late = verspätete Zahlung
+ton-alert-late-body = Eine Zahlung ist nach ihrer Frist eingegangen. Die Buchung war bereits freigegeben und kann nicht mehr bestätigt werden. Erstatte die Zahlung oder bitte den Gast, neu zu buchen, und bestätige die neue Buchung ohne Zahlung.
+ton-alert-unmatched = unbekannte Zahlung
+ton-alert-unmatched-body = Eine Zahlung ohne bekannten Buchungscode ist eingegangen. Finde die zugehörige Buchung oder erstatte sie.
+ton-alert-failed = fehlgeschlagene Überweisung
+ton-alert-failed-body = Eine Überweisung an die Zahlungsadresse ist im Netzwerk fehlgeschlagen. Das Geld liegt womöglich noch in deiner Wallet: Prüfe die Transaktion im Explorer.
+ton-alert-not-text = Überweisung ohne lesbaren Kommentar
+ton-alert-not-text-body = Eine Überweisung mit verschlüsseltem Kommentar, einem Token oder anderem Inhalt ist eingegangen. Sie wird nie automatisch angerechnet: Prüfe sie von Hand.
+ton-alert-other = ungewöhnliche Überweisung
+ton-alert-other-body = Eine Überweisung konnte nicht automatisch verarbeitet werden. Prüfe sie in den Zahlungsdaten.
+ton-email-problem-subject = Problem mit TON-Zahlung: { $event } ({ $date })
+ton-email-problem-urgent-subject = Dringend: Eine bezahlte Buchung braucht eine Entscheidung: { $event } ({ $date })
+ton-email-problem-heading = Eine bezahlte Buchung braucht deine Aufmerksamkeit
+ton-problem-host-busy = Der Gast hat bezahlt, aber der Termin ist nicht mehr frei (ein Kalendereintrag oder eine andere Buchung). Der Termin bleibt bis zum Beginn reserviert. Bitte den Gast um einen neuen Termin, bestätige die Buchung von Hand oder lehne sie ab und erstatte die Zahlung.
+ton-problem-partial = Nur ein Teil des Betrags wurde bezahlt, und die Buchung ist danach abgelaufen, wurde storniert oder abgelehnt oder ohne Zahlung bestätigt. Erstatte den erhaltenen Betrag, sofern du mit dem Gast nichts anderes vereinbart hast.
+ton-problem-overpaid = Die Buchung ist bezahlt und bestätigt, aber mit mehr als dem fälligen Betrag. Erstatte den Überschuss, wenn es sich lohnt.
+ton-problem-refund-due = Die Buchung wurde bezahlt und danach storniert oder abgelehnt. Erstatte die Zahlung.
+ton-problem-confirmed-unpaid = Eine unbezahlte Buchung ist bestätigt. Das darf nie passieren: Prüfe, wie sie bestätigt wurde.
+ton-problem-address-revoked = Die Zahlungsadresse dieser Buchung wurde widerrufen, die Buchung wird freigegeben.
+ton-email-health-subject = TON-Zahlungen brauchen Aufmerksamkeit ({ $kind })
+ton-email-health-heading = TON-Zahlungen brauchen Aufmerksamkeit
+ton-health-indexer-down = Die Zahlungsüberwachung erreicht den Indexer nicht. Zahlungen werden nicht geprüft, und neue kostenpflichtige Buchungen werden abgelehnt, bis er wieder erreichbar ist.
+ton-health-auth-failed = Der Indexer hat den API-Schlüssel abgelehnt (falsch oder für das andere Netzwerk). Prüfe CALRS_TON_API_KEY.
+ton-health-wrong-network = Der Indexer antwortet für ein anderes Netzwerk als das eingestellte. Bis das behoben ist, wird nichts angerechnet und nichts läuft ab.
+ton-health-wallet-inactive = Die Empfangs-Wallet ist nicht aktiv. Kostenpflichtige Buchungen werden abgelehnt, bis sie mindestens eine ausgehende Überweisung gemacht hat.
+ton-health-lagging = Die Zahlungsüberwachung hinkt den Überweisungen an die Adresse hinterher (womöglich Spam). Unbezahlte Buchungen laufen erst ab, wenn sie aufgeholt hat.
+ton-health-stuck-finality = Eine Überweisung ist seit Langem nicht endgültig. Die Überwachung wartet darauf, bevor sie weiterliest.
+ton-health-watcher-crashed = Die Zahlungsüberwachung ist mehrmals abgestürzt und startet immer wieder neu. Prüfe das Serverprotokoll.
+ton-health-disabled-with-open = TON-Zahlungen sind ausgeschaltet, während unbezahlte Buchungen offen sind. Ihre Termine werden zur Frist freigegeben.
+ton-health-other-network-open = Es gibt offene Buchungen in einem anderen TON-Netzwerk als dem eingestellten. Sie werden zur Frist freigegeben.
+ton-health-rate-unavailable = Es gibt keinen brauchbaren TON-Kurs (Quellen fehlen, weichen ab oder liegen außerhalb deines Korridors). Kostenpflichtige Buchungen werden abgelehnt, bis es einen gibt.
+ton-health-capacity = Die Grenze offener oder täglicher unbezahlter Buchungen ist erreicht. Neue kostenpflichtige Buchungen werden vorerst abgelehnt.
+ton-health-other = Die Zahlungsüberwachung hat ein Problem gemeldet. Prüfe das Serverprotokoll.
+
+# TON follow-ups: releases, refunds, contact, resend
+ton-resend-submit = Links per E-Mail schicken
+ton-resend-title = Sieh in dein Postfach
+ton-resend-done = Falls es für diese E-Mail-Adresse eine unbezahlte Buchung gibt, haben wir ihre Zahlungs- und Stornolinks dorthin geschickt.
+ton-pay-state-taken = Dieser Termin wurde vergeben, bevor die Buchung bezahlt war, deshalb wurde sie freigegeben. Es ist nichts zu zahlen. Bitte wähle einen anderen Termin.
+ton-pay-state-refund = Diese Buchung wurde ohne Bestätigung beendet. Die bezahlten { $paid } TON werden erstattet; der Gastgeber meldet sich bei dir.
+ton-pay-contact = Fragen? Schreib an { $host }: { $email }.
+ton-pay-copy-address = Adresse kopieren
+ton-pay-copy-comment = Kommentar kopieren
+ton-pay-copy-manual = Kopieren hat nicht geklappt. Der Text ist markiert: Kopiere ihn von Hand.
+ton-email-row-pay-by = Zahlen bis:
+ton-email-taken-message = Der Termin, den du für { $event } gewählt hast, wurde vergeben, bevor die Buchung bezahlt war, deshalb wurde sie freigegeben. Es ist nichts zu zahlen. Du kannst gern einen anderen Termin wählen.
+ton-email-refund-message = Wir haben deine Zahlung für { $event } erhalten, aber der Termin konnte nicht bestätigt werden, deshalb wurde die Buchung freigegeben. { $host } erstattet die Zahlung und meldet sich bei dir.
+ton-problem-host-busy-unpaid = Der Termin dieser unbezahlten Buchung wurde vergeben (eine Anfrage wurde darüber bestätigt, oder ein Kalendertermin kam hinzu), deshalb wurde die Buchung vor der Zahlung freigegeben. Falls schon etwas eingegangen ist, erstatte es.
+ton-problem-confirm-failed = Der Gast hat bezahlt, aber die Buchung konnte nach mehreren Versuchen nicht automatisch bestätigt werden (ein Fehler, kein belegter Gastgeber: siehe Serverprotokoll). Der Termin bleibt bis zum Beginn reserviert. Bestätige die Buchung von Hand oder lehne sie ab und erstatte die Zahlung.
+ton-health-capacity-near = Eine neue bezahlte Buchung hat den letzten offenen Platz oder das letzte Kontingent des Tages belegt. Weitere werden abgelehnt, bis Buchungen bezahlt oder freigegeben sind. Wenn das keine echte Nachfrage ist, blockiert womöglich jemand Termine, ohne zu zahlen.
+ton-health-payment-alerts-held = Weitere Überweisungen sind für Buchungen eingegangen, zu denen du in der letzten Stunde schon eine E-Mail bekommen hast. Sie sind ohne eigene E-Mail erfasst: Prüfe die Zahlungsdaten.
+ton-waive-body-partial = Diese Buchung ist nur teilweise bezahlt ({ $paid } von { $amount } TON erhalten, fällig bis { $time }). Wenn du sie bestätigst, bekommt der Gast den Termin, ohne die restlichen { $rest } TON zu zahlen. Erstatte den erhaltenen Betrag, sofern nichts anderes vereinbart ist.

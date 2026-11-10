@@ -1666,3 +1666,182 @@ directory-manual-copy = Kopeeri see link käsitsi:
 directory-empty = Kohtumisi ei leitud. Proovi teist otsingut.
 directory-favorites-empty = Lemmikuid ei leitud. Lisa kohtumised kataloogist lemmikutesse, et neid siin näha.
 directory-with-hosts = Kellega: { $names }
+
+## ilia fork: TON payments (docs/ton.md)
+
+# Price on the slot and booking pages
+ton-slots-price = Hind: { $usd } $
+ton-slots-price-approx = (≈ { $ton } TON)
+ton-slots-price-note = makstakse TON-is pärast aja valimist
+
+# Event type form
+ton-etf-section = Makse TON-is
+ton-etf-off-note = TON-makseid pole selles serveris seadistatud. Tasulist kohtumise tüüpi ei saa broneerida enne, kui need on seadistatud.
+ton-etf-enabled = Tasuline broneering
+ton-etf-enabled-help = Külalised maksavad TON-is kohe pärast aja valimist. Maksmise ajaks hoitakse aeg nende jaoks kinni ning tasumata broneering vabastatakse automaatselt.
+ton-etf-price = Hind (USD)
+ton-etf-price-help = 1 $ kuni 10000 $. Summa TON-is arvutatakse broneerimise hetke vahetuskursiga.
+ton-etf-window = Maksmiseks aega (minutit)
+ton-etf-window-help = 10 kuni 240. Jäta tühjaks, et kasutada serveri vaikeväärtust ({ $minutes } min).
+ton-form-error-price = Sisesta hind USA dollarites vahemikus 1 kuni 10000, kõige rohkem kahe komakohaga.
+ton-form-error-window = Maksmiseks antav aeg peab olema 10 kuni 240 minutit.
+ton-form-error-team = Meeskonna kohtumise tüübid ei saa olla tasulised.
+
+# Booking error pages
+ton-bae-title-unavailable = Seda aega ei saa broneerida
+ton-bae-body-unavailable = Maksmine pole ajutiselt võimalik, seega seda aega praegu broneerida ei saa. Proovi mõne minuti pärast uuesti.
+ton-bae-body-too-late = Selle kohtumiseni on maksmiseks liiga vähe aega jäänud. Vali hilisem aeg.
+ton-bae-body-already-open = Sul on selle e-posti aadressiga juba tasumata broneering. Saame saata sulle selle lingid: seal saad selle ära maksta või tühistada, et aeg vabastada, ja siis uuesti broneerida.
+ton-bae-body-personal-only = Seda kohtumist saab broneerida ainult korraldaja enda lehel.
+ton-bae-title-unpaid = Broneering on tasumata
+ton-bae-body-unpaid = See broneering on tasumata, seega seda ei saa kinnitada. Tasuta kinnitamiseks kasuta oma töölaua broneeringute lehel valikut „Kinnita ilma makseta”.
+ton-bae-body-reschedule-unpaid = See broneering on tasumata, seega seda ei saa ümber tõsta. Maksa see ära või tühista ja broneeri teine aeg.
+ton-bae-body-pay-link-invalid = See makselink ei kehti.
+
+# Payment page
+ton-pay-page-title = Makse: { $title }
+ton-pay-held-until = Aeg on sinu jaoks kinni kuni { $time } ({ $zone }).
+ton-pay-left = jäänud %1
+ton-pay-amount-label = Makstav summa
+ton-pay-rate = ≈ { $usd } $ · 1 TON = { $rate } $ ({ $sources }, { $time } UTC)
+ton-pay-open-wallet = Ava rahakott
+ton-pay-open-tonkeeper = Ava Tonkeeperis
+ton-pay-qr-alt = Makseandmetega QR-kood
+ton-pay-scan = Või skanni see kood oma rahakoti rakendusega.
+ton-pay-address = Aadress
+ton-pay-comment = Kommentaar
+ton-pay-copy = Kopeeri
+ton-pay-copied = Kopeeritud
+ton-pay-warn-comment = Kommentaar on kohustuslik: selle järgi tunneme sinu makse ära.
+ton-pay-warn-encrypt = Ära krüpteeri kommentaari.
+ton-pay-warn-token = Maksa TON-is, mitte tokenitega.
+ton-pay-warn-exchange = Maksad börsilt? Kirjuta ülal olev kood memo (kommentaari) välja.
+ton-pay-warn-deadline = Saada makse enne { $time }. Hiljem saadetud makset ei pruugita arvesse võtta.
+ton-pay-check = Maksin ära, kontrolli
+ton-pay-email = Saada see link mulle e-postiga
+ton-pay-emailed = Saatsime selle lingi broneeringus märgitud e-posti aadressile.
+ton-pay-email-unavailable = Linki ei õnnestunud saata. Hoia see leht lahti või salvesta selle aadress.
+ton-pay-checking-now = Kontrollime sinu makset. See leht uueneb ise.
+ton-pay-state-waiting = Ootame sinu makset.
+ton-pay-state-seen = Sinu makse on võrgus näha. Ootame, kuni see muutub lõplikuks, tavaliselt võtab see mõne sekundi.
+ton-pay-state-partial = Saime { $paid } TON. Maksa ülejäänud { $rest } TON sama kommentaariga.
+ton-pay-state-checking = Maksmiseks antud aeg on läbi. Kui sa juba saatsid makse, kontrollime seda. See leht uueneb ise.
+ton-pay-state-paid = Makse kätte saadud. Kinnitame broneeringut…
+ton-pay-state-confirmed = Makstud. Sinu broneering on kinnitatud ja kinnituskiri on teel.
+ton-pay-state-waived = See broneering ei vaja makset. Korraldaja kinnitab selle.
+ton-pay-state-busy = Makse kätte saadud, kuid see aeg pole enam vaba. Võtame sinuga ühendust.
+ton-pay-state-expired = Maksmiseks antud aeg on läbi ja aeg vabastati. Kui saatsid makse siiski, kirjuta meile broneeringus märgitud e-posti aadressilt ja maksame raha tagasi.
+ton-pay-state-late = Sinu makse jõudis pärast tähtaega, seega broneeringut ei kinnitatud. Võtame tagasimakse asjus ühendust. Võid meile kirjutada ka broneeringus märgitud e-posti aadressilt.
+ton-pay-state-closed = See broneering pole enam aktiivne.
+ton-pay-state-revoked = Seda makseaadressi enam ei kasutata. Ära saada sinna midagi ja broneeri uuesti.
+ton-pay-rebook = Broneeri teine aeg
+
+# Leaving the embedded widget
+ton-exit-title = Aeg on kinni
+ton-exit-body = Aeg on sinu jaoks kinni kuni { $time } ({ $zone }). Broneeringu kinnitamiseks vii makse lõpule.
+ton-exit-go = Mine maksma
+
+# Dashboard
+ton-dash-badge-awaiting = ootab makset · { $amount } TON · kuni { $time }
+ton-dash-badge-partial = osaliselt makstud · { $paid } / { $amount } TON · kuni { $time }
+ton-dash-badge-paid = makstud · { $amount } TON
+ton-dash-badge-overpaid = makstud · üle { $excess } TON
+ton-dash-badge-busy = makstud, aeg pole enam vaba
+ton-dash-badge-confirm-failed = makstud, kinnitamata · kinnita käsitsi
+ton-dash-badge-refund = makstud { $amount } TON · vaja tagasi maksta
+ton-dash-badge-waived = kinnitatud ilma makseta
+ton-dash-badge-unpaid = tasumata
+ton-dash-waive = Kinnita ilma makseta
+ton-dash-error-unpaid = See broneering on tasumata, seega seda ei saa kinnitada ega ümber tõsta. Kasuta tasuta kinnitamiseks valikut „Kinnita ilma makseta” või lükka see tagasi.
+ton-dash-error-waive-failed = Broneeringut ei õnnestunud ilma makseta kinnitada: see ei oota enam makset.
+ton-waive-page-title = Kinnita ilma makseta
+ton-waive-heading = Kas kinnitada see broneering ilma makseta?
+ton-waive-body = See broneering on TASUMATA ({ $amount } TON, tähtaeg { $time }). Kui selle kinnitad, saab külaline kohtumise tasuta ja hiljem saabuv makse tuleb käsitsi tagasi maksta.
+ton-waive-submit = Kinnita tasuta
+ton-waive-back = Tagasi broneeringute juurde
+
+# Guest emails
+ton-email-link-subject = Vii broneering lõpule: { $event }
+ton-email-link-message = Alustasid kohtumise { $event } broneerimist (korraldaja { $host }). Vii broneering allpool oleval lehel lõpule, enne kui aeg saab otsa.
+ton-email-link-action = Vii broneering lõpule
+ton-email-link-line = Vii broneering lõpule: { $url }
+ton-email-expired-subject = Broneerimata: { $event }, { $date }
+ton-email-expired-message = Makse kohtumise { $event } eest ei jõudnud õigeks ajaks kohale, seega aeg vabastati. Võid valida teise aja.
+ton-email-expired-partial = Saime osa maksest kätte. Võtame tagasimakse asjus ühendust.
+ton-email-rebook-line = Vali teine aeg: { $url }
+
+# Owner emails
+ton-email-row-amount = Summa:
+ton-email-row-paid = Saadud:
+ton-email-row-excess = Ülemakse:
+ton-email-row-transfer = Ülekanne:
+ton-email-row-sender = Saatja:
+ton-email-row-tx = Tehing:
+ton-email-row-detail = Üksikasjad:
+ton-email-amount-value = { $amount } TON ≈ { $usd } $ (1 TON = { $rate } $)
+ton-email-sender-wallet = { $address } (rahakott)
+ton-email-sender-other = { $address } (mitte rahakott: börs või leping)
+ton-email-dashboard-line = Broneeringud: { $url }
+ton-email-dashboard-action = Ava broneeringud
+ton-email-refund-rule = Tagasimaksed tehakse käsitsi sinu rahakotist: saatja aadressile, kui see on rahakott; muul juhul ainult aadressile, mida külaline küsib broneeringus märgitud e-posti aadressilt kirjas, milles on tema makse- või tühistamislink. Broneeringu kood, summa ja tehing on avalikud ega tõesta midagi.
+ton-email-received-subject = Makse kätte saadud: { $event }, { $guest } ({ $date })
+ton-email-received-heading = Makse kätte saadud
+ton-email-received-message = { $guest } maksis { $amount } TON. Broneering on kinnitatud.
+ton-email-alert-subject = TON-makse vajab tähelepanu: { $what }
+ton-email-alert-heading = Makse vajab sinu tähelepanu
+ton-alert-partial = osaline makse
+ton-alert-partial-body = Saabus osa tasumisele kuuluvast summast. Broneering jääb kinnitamata, kuni ülejäänu saabub; kui ei saabu, vabastatakse see tähtajal ja saadud summa tuleb tagasi maksta.
+ton-alert-overpaid = ülemakse
+ton-alert-overpaid-body = Saabus makse juba makstud broneeringu eest. Maksa see tagasi, kui see on seda väärt.
+ton-alert-late = hiline makse
+ton-alert-late-body = Makse saabus pärast tähtaega. Broneering oli juba vabastatud ja seda ei saa enam kinnitada. Maksa raha tagasi või palu külalisel uuesti broneerida ja kinnita uus broneering ilma makseta.
+ton-alert-unmatched = tundmatu makse
+ton-alert-unmatched-body = Saabus makse ilma teadaoleva broneeringu koodita. Leia broneering, kuhu see kuulub, või maksa see tagasi.
+ton-alert-failed = ebaõnnestunud ülekanne
+ton-alert-failed-body = Ülekanne makseaadressile ebaõnnestus võrgus. Raha võib olla endiselt sinu rahakotis: kontrolli tehingut uurijas.
+ton-alert-not-text = loetava kommentaarita ülekanne
+ton-alert-not-text-body = Saabus krüpteeritud kommentaari, tokeni või muu sisuga ülekanne. Seda ei arvestata kunagi automaatselt: kontrolli seda käsitsi.
+ton-alert-other = ebatavaline ülekanne
+ton-alert-other-body = Ülekannet ei õnnestunud automaatselt töödelda. Kontrolli seda maksete kirjetes.
+ton-email-problem-subject = Probleem TON-maksega: { $event } ({ $date })
+ton-email-problem-urgent-subject = Kiire: makstud broneering vajab otsust: { $event } ({ $date })
+ton-email-problem-heading = Makstud broneering vajab sinu tähelepanu
+ton-problem-host-busy = Külaline maksis, kuid aeg pole enam vaba (kalendrisündmus või teine broneering). Aeg on kinni kuni kohtumise alguseni. Palu külaliselt uut aega, kinnita broneering käsitsi või lükka see tagasi ja maksa raha tagasi.
+ton-problem-partial = Makstud on ainult osa summast ning seejärel broneering aegus, tühistati või lükati tagasi või kinnitati ilma makseta. Maksa saadud summa tagasi, kui sa pole külalisega teisiti kokku leppinud.
+ton-problem-overpaid = Broneering on makstud ja kinnitatud, kuid makstud on rohkem kui vaja. Maksa ülejääk tagasi, kui see on seda väärt.
+ton-problem-refund-due = Broneering maksti ja seejärel tühistati või lükati tagasi. Maksa makse tagasi.
+ton-problem-confirmed-unpaid = Tasumata broneering osutus kinnitatuks. Seda ei tohiks kunagi juhtuda: kontrolli, kuidas see kinnitati.
+ton-problem-address-revoked = Selle broneeringu makseaadress tühistati ja broneering vabastatakse.
+ton-email-health-subject = TON-maksed vajavad tähelepanu ({ $kind })
+ton-email-health-heading = TON-maksed vajavad tähelepanu
+ton-health-indexer-down = Maksete jälgija ei saa indekseerijaga ühendust. Makseid ei kontrollita ja uued tasulised broneeringud lükatakse tagasi, kuni ühendus taastub.
+ton-health-auth-failed = Indekseerija lükkas API-võtme tagasi (vale või teise võrgu oma). Kontrolli CALRS_TON_API_KEY väärtust.
+ton-health-wrong-network = Indekseerija vastab teise võrgu kohta kui seadistatud. Kuni see on parandamata, ei arvestata ega aegu midagi.
+ton-health-wallet-inactive = Vastuvõtv rahakott pole aktiivne. Tasulised broneeringud lükatakse tagasi, kuni sellest on tehtud vähemalt üks väljaminev ülekanne.
+ton-health-lagging = Maksete jälgija jääb aadressile saabuvatest ülekannetest maha (võib-olla rämps). Tasumata broneeringud ei aegu enne, kui see järele jõuab.
+ton-health-stuck-finality = Üks ülekanne pole pikka aega lõplikuks muutunud. Jälgija ootab seda, enne kui edasi loeb.
+ton-health-watcher-crashed = Maksete jälgija on mitu korda kokku jooksnud ja käivitub pidevalt uuesti. Kontrolli serveri logi.
+ton-health-disabled-with-open = TON-maksed on välja lülitatud, kuigi tasumata broneeringud on avatud. Nende ajad vabastatakse tähtajal.
+ton-health-other-network-open = Avatud broneeringud on teises TON-võrgus kui seadistatud. Need vabastatakse tähtajal.
+ton-health-rate-unavailable = Sobivat TON-i vahetuskurssi pole (allikad puuduvad, lahknevad või on väljaspool sinu vahemikku). Tasulised broneeringud lükatakse tagasi, kuni kurss on olemas.
+ton-health-capacity = Avatud või päevaste tasumata broneeringute piir on täis. Uued tasulised broneeringud lükatakse praegu tagasi.
+ton-health-other = Maksete jälgija teatas probleemist. Kontrolli serveri logi.
+
+# TON follow-ups: releases, refunds, contact, resend
+ton-resend-submit = Saada mulle lingid
+ton-resend-title = Vaata oma postkasti
+ton-resend-done = Kui selle e-posti aadressiga on tasumata broneering, saatsime sinna selle makse- ja tühistuslingi.
+ton-pay-state-taken = See aeg võeti enne, kui broneering tasuti, seega broneering vabastati. Midagi ei ole vaja maksta. Palun vali teine aeg.
+ton-pay-state-refund = See broneering lõppes kinnitamata. Makstud { $paid } TON makstakse tagasi; korraldaja võtab sinuga ühendust.
+ton-pay-contact = Küsimusi? Kirjuta korraldajale ({ $host }): { $email }.
+ton-pay-copy-address = Kopeeri aadress
+ton-pay-copy-comment = Kopeeri kommentaar
+ton-pay-copy-manual = Kopeerimine ebaõnnestus. Tekst on valitud: kopeeri see käsitsi.
+ton-email-row-pay-by = Maksa hiljemalt:
+ton-email-taken-message = Aeg, mille valisid kohtumisele { $event }, võeti enne, kui broneering tasuti, seega broneering vabastati. Midagi ei ole vaja maksta. Võid valida teise aja.
+ton-email-refund-message = Saime sinu makse kohtumise { $event } eest, kuid aega ei õnnestunud kinnitada, seega broneering vabastati. { $host } maksab raha tagasi ja võtab sinuga ühendust.
+ton-problem-host-busy-unpaid = Selle tasumata broneeringu aeg võeti (selle peale kinnitati teine taotlus või kalendrisse ilmus sündmus), seega broneering vabastati enne makset. Kui midagi on juba laekunud, maksa see tagasi.
+ton-problem-confirm-failed = Külaline maksis, kuid broneeringut ei õnnestunud mitme katse järel automaatselt kinnitada (viga, mitte hõivatud korraldaja: vaata serveri logi). Aeg jääb kohtumise alguseni hoitud. Kinnita broneering käsitsi või lükka see tagasi ja maksa raha tagasi.
+ton-health-capacity-near = Uus tasuline broneering võttis viimase vaba koha avatud arvete seas või päeva viimase limiidi. Järgmised lükatakse tagasi, kuni broneeringud on tasutud või vabastatud. Kui see pole päris nõudlus, hoiab keegi ehk aegu kinni ilma maksmata.
+ton-health-payment-alerts-held = Saabus veel ülekandeid broneeringutele, mille kohta said viimase tunni jooksul juba kirja. Need on salvestatud ilma eraldi kirjata: kontrolli maksete kirjeid.
+ton-waive-body-partial = See broneering on ainult osaliselt tasutud ({ $paid } / { $amount } TON saadud, tähtaeg { $time }). Kui kinnitad selle, saab külaline kohtumise ilma ülejäänud { $rest } TON-i maksmata. Maksa saadud summa tagasi, kui pole teisiti kokku lepitud.

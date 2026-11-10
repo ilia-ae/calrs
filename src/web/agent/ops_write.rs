@@ -550,7 +550,7 @@ async fn slug_taken(
 }
 
 /// The version token of event type `et_id` now.
-async fn version_of(pool: &SqlitePool, et_id: &str) -> Result<String, ToolError> {
+pub(super) async fn version_of(pool: &SqlitePool, et_id: &str) -> Result<String, ToolError> {
     snapshot::snapshot(pool, et_id)
         .await
         .map_err(db("snapshot event type"))?
@@ -558,7 +558,7 @@ async fn version_of(pool: &SqlitePool, et_id: &str) -> Result<String, ToolError>
         .ok_or_else(|| ToolError::not_found("event type"))
 }
 
-fn stale_version() -> ToolError {
+pub(super) fn stale_version() -> ToolError {
     ToolError::invalid(
         "version",
         "the event type changed since it was read; call get_event_type again and use its version",
@@ -1506,7 +1506,7 @@ pub(crate) async fn remove_date_override(
 }
 
 /// The slug of event type `et_id`.
-async fn slug_of(pool: &SqlitePool, et_id: &str) -> Result<String, ToolError> {
+pub(super) async fn slug_of(pool: &SqlitePool, et_id: &str) -> Result<String, ToolError> {
     sqlx::query_scalar("SELECT slug FROM event_types WHERE id = ?")
         .bind(et_id)
         .fetch_optional(pool)

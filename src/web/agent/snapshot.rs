@@ -21,12 +21,19 @@ pub(crate) const CHILD_TABLES: &[&str] = &[
     "event_type_resources",
     "event_type_watchers",
     "event_type_member_weights",
+    // ilia fork: the price (docs/ton.md); setting it changes the version.
+    "ton_prices",
 ];
 
 /// Tables with an `event_type_id` column that are not configuration: what
 /// guests and users did with the event type.
-pub(crate) const NOT_CONFIG_TABLES: &[&str] =
-    &["bookings", "booking_invites", "event_type_favorites"];
+pub(crate) const NOT_CONFIG_TABLES: &[&str] = &[
+    "bookings",
+    "booking_invites",
+    "event_type_favorites",
+    // ilia fork: money records of bookings, not configuration.
+    "ton_invoices",
+];
 
 /// The configuration of one event type, as canonical text.
 #[derive(Clone, Debug, PartialEq, Eq)]

@@ -1666,3 +1666,182 @@ directory-manual-copy = Copiez ce lien manuellement :
 directory-empty = Aucun rendez-vous trouvé. Essayez une autre recherche.
 directory-favorites-empty = Aucun favori trouvé. Ajoutez des rendez-vous aux favoris depuis l’annuaire pour les retrouver ici.
 directory-with-hosts = Avec { $names }
+
+## ilia fork: TON payments (docs/ton.md)
+
+# Price on the slot and booking pages
+ton-slots-price = Prix : ${ $usd }
+ton-slots-price-approx = (≈ { $ton } TON)
+ton-slots-price-note = à payer en TON après le choix du créneau
+
+# Event type form
+ton-etf-section = Paiement en TON
+ton-etf-off-note = Les paiements en TON ne sont pas configurés sur ce serveur. Un type de rendez-vous payant ne peut pas être réservé tant qu’ils ne le sont pas.
+ton-etf-enabled = Réservation payante
+ton-etf-enabled-help = L’invité paie en TON juste après avoir choisi un créneau. Le créneau lui est réservé pendant le paiement, et une réservation impayée est libérée automatiquement.
+ton-etf-price = Prix (USD)
+ton-etf-price-help = De 1 $ à 10000 $. Le montant en TON est calculé au taux de change du moment de la réservation.
+ton-etf-window = Délai de paiement (minutes)
+ton-etf-window-help = De 10 à 240. Laissez vide pour la valeur du serveur ({ $minutes } min).
+ton-form-error-price = Saisissez un prix en dollars américains entre 1 et 10000, avec au plus deux décimales.
+ton-form-error-window = Le délai de paiement doit être compris entre 10 et 240 minutes.
+ton-form-error-team = Les types de rendez-vous d’équipe ne peuvent pas être payants.
+
+# Booking error pages
+ton-bae-title-unavailable = Ce créneau ne peut pas être réservé
+ton-bae-body-unavailable = Le paiement est momentanément indisponible, ce créneau ne peut donc pas être réservé pour l’instant. Veuillez réessayer dans quelques minutes.
+ton-bae-body-too-late = Il reste trop peu de temps avant ce rendez-vous pour le payer. Veuillez choisir un créneau plus tardif.
+ton-bae-body-already-open = Vous avez déjà une réservation impayée avec cette adresse e-mail. Nous pouvons vous envoyer ses liens : vous pourrez la payer, ou l’annuler pour libérer le créneau, puis réserver à nouveau.
+ton-bae-body-personal-only = Ce rendez-vous ne peut être réservé que sur la page de son organisateur.
+ton-bae-title-unpaid = Réservation impayée
+ton-bae-body-unpaid = Cette réservation n’est pas payée, elle ne peut donc pas être approuvée. Pour la confirmer gratuitement, utilisez « Confirmer sans paiement » sur la page des réservations de votre tableau de bord.
+ton-bae-body-reschedule-unpaid = Cette réservation n’est pas payée, elle ne peut donc pas être déplacée. Payez-la, ou annulez-la et réservez un autre créneau.
+ton-bae-body-pay-link-invalid = Ce lien de paiement n’est pas valide.
+
+# Payment page
+ton-pay-page-title = Paiement : { $title }
+ton-pay-held-until = Le créneau vous est réservé jusqu’à { $time } ({ $zone }).
+ton-pay-left = encore %1
+ton-pay-amount-label = Montant à payer
+ton-pay-rate = ≈ { $usd } $ · 1 TON = { $rate } $ ({ $sources }, { $time } UTC)
+ton-pay-open-wallet = Ouvrir le portefeuille
+ton-pay-open-tonkeeper = Ouvrir dans Tonkeeper
+ton-pay-qr-alt = QR code contenant les informations de paiement
+ton-pay-scan = Ou scannez ce code avec l’application de votre portefeuille.
+ton-pay-address = Adresse
+ton-pay-comment = Commentaire
+ton-pay-copy = Copier
+ton-pay-copied = Copié
+ton-pay-warn-comment = Le commentaire est obligatoire : c’est grâce à lui que nous reconnaissons votre paiement.
+ton-pay-warn-encrypt = Ne chiffrez pas le commentaire.
+ton-pay-warn-token = Payez en TON, pas en jetons.
+ton-pay-warn-exchange = Vous payez depuis une plateforme d’échange ? Indiquez le code ci-dessus dans le champ « mémo » (commentaire).
+ton-pay-warn-deadline = Envoyez le paiement avant { $time }. Un paiement envoyé plus tard risque de ne pas être pris en compte.
+ton-pay-check = J’ai payé, vérifier
+ton-pay-email = M’envoyer ce lien par e-mail
+ton-pay-emailed = Nous avons envoyé ce lien à l’adresse e-mail indiquée lors de la réservation.
+ton-pay-email-unavailable = Le lien n’a pas pu être envoyé. Gardez cette page ouverte ou enregistrez son adresse.
+ton-pay-checking-now = Nous vérifions votre paiement. Cette page se met à jour automatiquement.
+ton-pay-state-waiting = En attente de votre paiement.
+ton-pay-state-seen = Votre paiement est visible sur le réseau. Nous attendons qu’il soit définitif, ce qui prend généralement quelques secondes.
+ton-pay-state-partial = Nous avons reçu { $paid } TON. Veuillez payer les { $rest } TON restants avec le même commentaire.
+ton-pay-state-checking = Le délai de paiement est écoulé. Si vous avez déjà envoyé le paiement, nous le vérifions. Cette page se met à jour automatiquement.
+ton-pay-state-paid = Paiement reçu. Confirmation de votre réservation…
+ton-pay-state-confirmed = Payé. Votre réservation est confirmée et l’e-mail de confirmation est en route.
+ton-pay-state-waived = Aucun paiement n’est nécessaire pour cette réservation. L’organisateur la confirme.
+ton-pay-state-busy = Paiement reçu, mais ce créneau n’est plus libre. Nous vous contacterons.
+ton-pay-state-expired = Le délai de paiement est écoulé et le créneau a été libéré. Si vous avez tout de même envoyé un paiement, écrivez-nous depuis l’adresse e-mail de votre réservation et nous vous le rembourserons.
+ton-pay-state-late = Votre paiement est arrivé après le délai, la réservation n’a donc pas été confirmée. Nous vous contacterons pour le remboursement. Vous pouvez aussi nous écrire depuis l’adresse e-mail de votre réservation.
+ton-pay-state-closed = Cette réservation n’est plus active.
+ton-pay-state-revoked = Cette adresse de paiement n’est plus utilisée. N’y envoyez rien et réservez à nouveau.
+ton-pay-rebook = Réserver un autre créneau
+
+# Leaving the embedded widget
+ton-exit-title = Créneau réservé
+ton-exit-body = Le créneau vous est réservé jusqu’à { $time } ({ $zone }). Effectuez le paiement pour confirmer votre réservation.
+ton-exit-go = Aller au paiement
+
+# Dashboard
+ton-dash-badge-awaiting = en attente de paiement · { $amount } TON · jusqu’à { $time }
+ton-dash-badge-partial = payé en partie · { $paid } sur { $amount } TON · jusqu’à { $time }
+ton-dash-badge-paid = payé · { $amount } TON
+ton-dash-badge-overpaid = payé · trop-perçu de { $excess } TON
+ton-dash-badge-busy = payé, créneau plus libre
+ton-dash-badge-confirm-failed = payée, non confirmée · à confirmer à la main
+ton-dash-badge-refund = payé { $amount } TON · remboursement dû
+ton-dash-badge-waived = confirmé sans paiement
+ton-dash-badge-unpaid = impayé
+ton-dash-waive = Confirmer sans paiement
+ton-dash-error-unpaid = Cette réservation n’est pas payée, elle ne peut donc être ni confirmée ni déplacée. Utilisez « Confirmer sans paiement » pour la confirmer gratuitement, ou refusez-la.
+ton-dash-error-waive-failed = La réservation n’a pas pu être confirmée sans paiement : elle n’est plus en attente de paiement.
+ton-waive-page-title = Confirmer sans paiement
+ton-waive-heading = Confirmer cette réservation sans paiement ?
+ton-waive-body = Cette réservation n’est PAS payée ({ $amount } TON, à régler avant { $time }). Si vous la confirmez, l’invité obtient le rendez-vous gratuitement, et un paiement arrivant plus tard devra être remboursé à la main.
+ton-waive-submit = Confirmer gratuitement
+ton-waive-back = Retour aux réservations
+
+# Guest emails
+ton-email-link-subject = Finalisez votre réservation : { $event }
+ton-email-link-message = Vous avez commencé à réserver { $event } avec { $host }. Finalisez votre réservation sur la page ci-dessous avant la fin du délai.
+ton-email-link-action = Finaliser la réservation
+ton-email-link-line = Finalisez votre réservation : { $url }
+ton-email-expired-subject = Non réservé : { $event }, { $date }
+ton-email-expired-message = Le paiement pour { $event } n’est pas arrivé à temps, le créneau a donc été libéré. Vous pouvez choisir un autre créneau.
+ton-email-expired-partial = Nous avons reçu une partie du paiement. Nous vous contacterons pour le remboursement.
+ton-email-rebook-line = Choisir un autre créneau : { $url }
+
+# Owner emails
+ton-email-row-amount = Montant :
+ton-email-row-paid = Reçu :
+ton-email-row-excess = Trop-perçu :
+ton-email-row-transfer = Transfert :
+ton-email-row-sender = Expéditeur :
+ton-email-row-tx = Transaction :
+ton-email-row-detail = Détails :
+ton-email-amount-value = { $amount } TON ≈ { $usd } $ (1 TON = { $rate } $)
+ton-email-sender-wallet = { $address } (un portefeuille)
+ton-email-sender-other = { $address } (pas un portefeuille : une plateforme d’échange ou un contrat)
+ton-email-dashboard-line = Réservations : { $url }
+ton-email-dashboard-action = Ouvrir les réservations
+ton-email-refund-rule = Les remboursements se font à la main depuis votre portefeuille : vers l’adresse de l’expéditeur si c’est un portefeuille ; sinon uniquement vers une adresse que l’invité demande depuis l’adresse e-mail de sa réservation, dans un message contenant son lien de paiement ou d’annulation. Le code de réservation, le montant et la transaction sont publics et ne prouvent rien.
+ton-email-received-subject = Paiement reçu : { $event }, { $guest } ({ $date })
+ton-email-received-heading = Paiement reçu
+ton-email-received-message = { $guest } a payé { $amount } TON. La réservation est confirmée.
+ton-email-alert-subject = Un paiement en TON demande votre attention : { $what }
+ton-email-alert-heading = Un paiement demande votre attention
+ton-alert-partial = paiement partiel
+ton-alert-partial-body = Une partie du montant dû est arrivée. La réservation reste non confirmée jusqu’à l’arrivée du reste ; sinon, elle est libérée à l’échéance et le montant reçu doit être remboursé.
+ton-alert-overpaid = trop-perçu
+ton-alert-overpaid-body = Un paiement est arrivé pour une réservation déjà payée. Remboursez-le si cela en vaut la peine.
+ton-alert-late = paiement tardif
+ton-alert-late-body = Un paiement est arrivé après son échéance. La réservation était déjà libérée et ne peut plus être confirmée. Remboursez le paiement, ou demandez à l’invité de réserver à nouveau et confirmez la nouvelle réservation sans paiement.
+ton-alert-unmatched = paiement non reconnu
+ton-alert-unmatched-body = Un paiement est arrivé sans code de réservation connu. Retrouvez la réservation à laquelle il correspond, ou remboursez-le.
+ton-alert-failed = transfert échoué
+ton-alert-failed-body = Un transfert vers l’adresse de paiement a échoué sur le réseau. Les fonds sont peut-être encore sur votre portefeuille : vérifiez la transaction dans l’explorateur.
+ton-alert-not-text = transfert sans commentaire lisible
+ton-alert-not-text-body = Un transfert avec un commentaire chiffré, un jeton ou un autre contenu est arrivé. Il n’est jamais pris en compte automatiquement : vérifiez-le à la main.
+ton-alert-other = transfert inhabituel
+ton-alert-other-body = Un transfert n’a pas pu être traité automatiquement. Vérifiez-le dans le journal des paiements.
+ton-email-problem-subject = Problème de paiement en TON : { $event } ({ $date })
+ton-email-problem-urgent-subject = Urgent : une réservation payée attend votre décision : { $event } ({ $date })
+ton-email-problem-heading = Une réservation payée demande votre attention
+ton-problem-host-busy = L’invité a payé, mais le créneau n’est plus libre (un événement du calendrier ou une autre réservation). Le créneau reste réservé jusqu’au début du rendez-vous. Demandez à l’invité un nouveau créneau, confirmez la réservation à la main, ou refusez-la et remboursez le paiement.
+ton-problem-partial = Seule une partie du montant a été payée, puis la réservation a expiré, a été annulée ou refusée, ou a été confirmée sans paiement. Remboursez le montant reçu, sauf accord contraire avec l’invité.
+ton-problem-overpaid = La réservation est payée et confirmée avec plus que le montant dû. Remboursez l’excédent si cela en vaut la peine.
+ton-problem-refund-due = La réservation a été payée, puis annulée ou refusée. Remboursez le paiement.
+ton-problem-confirmed-unpaid = Une réservation impayée a été trouvée confirmée. Cela ne devrait jamais arriver : vérifiez comment elle a été confirmée.
+ton-problem-address-revoked = L’adresse de paiement de cette réservation a été révoquée, et la réservation sera libérée.
+ton-email-health-subject = Les paiements en TON demandent votre attention ({ $kind })
+ton-email-health-heading = Les paiements en TON demandent votre attention
+ton-health-indexer-down = Le suivi des paiements ne parvient pas à joindre l’indexeur. Les paiements ne sont pas vérifiés et les nouvelles réservations payantes sont refusées jusqu’au rétablissement.
+ton-health-auth-failed = L’indexeur a refusé la clé d’API (incorrecte, ou destinée à l’autre réseau). Vérifiez CALRS_TON_API_KEY.
+ton-health-wrong-network = L’indexeur répond pour un autre réseau que celui configuré. Rien n’est crédité ni expiré tant que ce n’est pas corrigé.
+ton-health-wallet-inactive = Le portefeuille de réception n’est pas actif. Les réservations payantes sont refusées tant qu’il n’a pas fait au moins un transfert sortant.
+ton-health-lagging = Le suivi des paiements prend du retard sur les transferts reçus à l’adresse (peut-être du spam). Les réservations impayées n’expirent pas tant qu’il n’a pas rattrapé son retard.
+ton-health-stuck-finality = Un transfert n’est pas devenu définitif depuis longtemps. Le suivi l’attend avant de lire la suite.
+ton-health-watcher-crashed = Le suivi des paiements a planté plusieurs fois et redémarre sans cesse. Consultez le journal du serveur.
+ton-health-disabled-with-open = Les paiements en TON sont désactivés alors que des réservations impayées sont ouvertes. Leurs créneaux seront libérés à leur échéance.
+ton-health-other-network-open = Des réservations sont ouvertes sur un autre réseau TON que celui configuré. Elles seront libérées à leur échéance.
+ton-health-rate-unavailable = Aucun taux de change TON acceptable n’est disponible (sources absentes, divergentes ou hors de votre fourchette). Les réservations payantes sont refusées jusqu’à ce qu’il y en ait un.
+ton-health-capacity = La limite de réservations impayées ouvertes ou quotidiennes est atteinte. Les nouvelles réservations payantes sont refusées pour l’instant.
+ton-health-other = Le suivi des paiements a signalé un problème. Consultez le journal du serveur.
+
+# TON follow-ups: releases, refunds, contact, resend
+ton-resend-submit = M’envoyer les liens
+ton-resend-title = Consultez vos e-mails
+ton-resend-done = S’il existe une réservation impayée pour cette adresse e-mail, nous y avons envoyé ses liens de paiement et d’annulation.
+ton-pay-state-taken = Ce créneau a été pris avant que la réservation soit payée ; elle a donc été libérée. Vous n’avez rien à payer. Veuillez choisir un autre créneau.
+ton-pay-state-refund = Cette réservation s’est terminée sans être confirmée. Les { $paid } TON payés vous seront remboursés ; l’hôte vous contactera.
+ton-pay-contact = Des questions ? Écrivez à { $host } : { $email }.
+ton-pay-copy-address = Copier l’adresse
+ton-pay-copy-comment = Copier le commentaire
+ton-pay-copy-manual = La copie n’a pas fonctionné. Le texte est sélectionné : copiez-le à la main.
+ton-email-row-pay-by = À payer avant :
+ton-email-taken-message = Le créneau choisi pour { $event } a été pris avant que la réservation soit payée ; elle a donc été libérée. Vous n’avez rien à payer. N’hésitez pas à choisir un autre créneau.
+ton-email-refund-message = Nous avons bien reçu votre paiement pour { $event }, mais le créneau n’a pas pu être confirmé ; la réservation a donc été libérée. { $host } vous remboursera et vous contactera.
+ton-problem-host-busy-unpaid = Le créneau de cette réservation impayée a été pris (une demande a été approuvée par-dessus, ou un événement est apparu dans le calendrier) ; la réservation a donc été libérée avant le paiement. Si quelque chose a été reçu, remboursez-le.
+ton-problem-confirm-failed = L’invité a payé, mais la réservation n’a pas pu être confirmée automatiquement après plusieurs tentatives (une erreur, pas un hôte occupé : voir le journal du serveur). Le créneau reste réservé jusqu’au début du rendez-vous. Confirmez la réservation à la main, ou refusez-la et remboursez le paiement.
+ton-health-capacity-near = Une nouvelle réservation payante a pris la dernière place ouverte ou le dernier quota du jour. Les suivantes seront refusées jusqu’à ce que des réservations soient payées ou libérées. S’il ne s’agit pas d’une vraie demande, quelqu’un bloque peut-être des créneaux sans payer.
+ton-health-payment-alerts-held = D’autres virements sont arrivés pour des réservations au sujet desquelles vous avez déjà reçu un e-mail dans l’heure. Ils sont enregistrés sans e-mail individuel : consultez le journal des paiements.
+ton-waive-body-partial = Cette réservation n’est payée qu’en partie ({ $paid } sur { $amount } TON reçus, à régler avant { $time }). Si vous la confirmez, l’invité obtient le rendez-vous sans payer les { $rest } TON restants. Remboursez le montant reçu, sauf accord contraire.

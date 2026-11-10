@@ -760,6 +760,7 @@
     </div>
     {% endif %}
     <h1>{{ event_type.title }}</h1>
+    {% include "partials/ton_price.html" %}
     {% if event_type.description is defined and event_type.description %}
       <p class="subtitle">{{ event_type.description|safe }}</p>
     {% endif %}

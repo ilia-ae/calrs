@@ -310,14 +310,29 @@ pub(crate) async fn list_event_types(
     me: &User,
     page: PageReq,
 ) -> Result<Page<EventTypeSummary>, ToolError> {
-    let rows: Vec<(String, String, i64, i64, i64, String, String, i64)> = sqlx::query_as(
+    #[allow(clippy::type_complexity)]
+    let rows: Vec<(
+        String,
+        String,
+        i64,
+        i64,
+        i64,
+        String,
+        String,
+        i64,
+        Option<i64>,
+        Option<i64>,
+        Option<i64>,
+    )> = sqlx::query_as(
         "SELECT et.slug, et.title, et.enabled, et.duration_min, et.requires_confirmation,
                 et.visibility, COALESCE(NULLIF(et.timezone, ''), u.timezone),
                 (SELECT COUNT(*) FROM bookings b
-                 WHERE b.event_type_id = et.id AND b.status IN ('confirmed', 'pending'))
+                 WHERE b.event_type_id = et.id AND b.status IN ('confirmed', 'pending')),
+                p.price_usd_cents, p.window_min, p.enabled
          FROM event_types et
          JOIN accounts a ON a.id = et.account_id
          JOIN users u ON u.id = a.user_id
+         LEFT JOIN ton_prices p ON p.event_type_id = et.id
          WHERE a.user_id = ? AND et.team_id IS NULL
          ORDER BY et.created_at, et.id
          LIMIT ? OFFSET ?",
@@ -331,7 +346,19 @@ pub(crate) async fn list_event_types(
     Ok(page.page(
         rows.into_iter()
             .map(
-                |(slug, title, enabled, duration, confirm, visibility, timezone, active)| {
+                |(
+                    slug,
+                    title,
+                    enabled,
+                    duration,
+                    confirm,
+                    visibility,
+                    timezone,
+                    active,
+                    cents,
+                    window,
+                    priced,
+                )| {
                     EventTypeSummary {
                         slug,
                         title: owner_text(&title, OWNER_TEXT_MAX).0,
@@ -341,6 +368,7 @@ pub(crate) async fn list_event_types(
                         visibility,
                         timezone,
                         active_bookings: active,
+                        price: super::ops_ton::price_out(cents, window, priced),
                     }
                 },
             )
@@ -452,6 +480,7 @@ pub(crate) async fn get_event_type(
         })
         .collect();
 
+    let price = super::ops_ton::price_of(pool, &et_id).await?;
     let description: Option<String> = col(&row, "description")?;
     let (description, description_truncated) = match description {
         Some(text) => {
@@ -520,6 +549,7 @@ pub(crate) async fn get_event_type(
                 per_member: per_member != 0,
             })
             .collect(),
+        price,
         warnings,
     })
 }
@@ -937,6 +967,7 @@ pub(crate) fn summary_from(row: SummaryRow, tz: Tz) -> BookingSummary {
         has_notes: has_notes != 0,
         awaiting_reschedule: reschedule != 0,
         writeback_failed: writeback_failed != 0,
+        payment: None,
         guest_supplied: GuestSupplied {
             name: untrusted_text(&guest_name, GUEST_NAME_MAX),
             email_masked: mask_email(&guest_email),
@@ -962,6 +993,11 @@ pub(crate) async fn list_bookings(
              AND datetime(b.start_at) >= datetime('now', '-90 days')",
             "datetime(b.start_at) DESC, b.id DESC",
         ),
+        BookingFilter::AwaitingPayment => (
+            "b.status = 'pending' AND EXISTS (SELECT 1 FROM ton_invoices ti \
+             WHERE ti.booking_id = b.id AND ti.status = 'open')",
+            "datetime(b.start_at), b.id",
+        ),
     };
     let rows: Vec<SummaryRow> = sqlx::query_as(&format!(
         "SELECT {}
@@ -978,7 +1014,13 @@ pub(crate) async fn list_bookings(
     .map_err(db("list bookings"))?;
 
     let tz = user_tz(me);
-    Ok(page.page(rows.into_iter().map(|row| summary_from(row, tz)).collect()))
+    let mut page = page.page(rows.into_iter().map(|row| summary_from(row, tz)).collect());
+    let ids: Vec<String> = page.items.iter().map(|b| b.id.clone()).collect();
+    let mut payments = super::ops_ton::payments_for(pool, &ids, tz).await?;
+    for booking in &mut page.items {
+        booking.payment = payments.remove(&booking.id);
+    }
+    Ok(page)
 }
 
 #[cfg(test)]

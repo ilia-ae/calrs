@@ -12,11 +12,14 @@ use sqlx::SqlitePool;
 mod guest;
 mod host;
 mod render;
+// ilia fork: TON payment emails (ilia-booking docs/ton.md).
+mod ton;
 mod transport;
 
 pub use guest::*;
 pub use host::*;
 pub use render::*;
+pub use ton::*;
 pub use transport::*;
 
 /// Translate a Fluent message id with no arguments. Local helper so call

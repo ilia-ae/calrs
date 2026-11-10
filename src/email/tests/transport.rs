@@ -289,6 +289,8 @@ fn guest_emails_use_the_host_sender_and_host_emails_do_not() {
         include_str!("../host.rs"),
         include_str!("../render.rs"),
         include_str!("../transport.rs"),
+        // ilia fork: TON payment emails.
+        include_str!("../ton.rs"),
     ];
     let (mut seen_guest, mut seen_senders) = (0, 0);
     for (name, body) in files.iter().flat_map(|src| async_fns(src)) {

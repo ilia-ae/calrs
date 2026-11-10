@@ -1,0 +1,21 @@
+{% extends "dashboard_base.html" %}
+{#- ilia fork: the only way to confirm an unpaid priced booking (docs/ton.md). -#}
+{% block title %}{{ t("ton-waive-page-title") }}{% endblock %}
+{% block dashboard_content %}
+<div class="card" style="border-color: var(--error-text);">
+  <h1 style="margin-bottom: 0.75rem;">{{ t("ton-waive-heading") }}</h1>
+  <div style="margin-top: 1rem; padding: 1rem; background: var(--surface-hover); border-radius: var(--radius); border: 1px solid var(--border);">
+    <div class="detail"><strong>{{ t("confirmed-detail-event") }}</strong> {{ event_title }}</div>
+    <div class="detail"><strong>{{ t("common-detail-guest") }}</strong> {{ guest_name }}</div>
+  </div>
+  {% if paid %}
+  <p style="margin-top: 1rem; color: var(--error-text);"><strong>{{ t("ton-waive-body-partial", paid=paid, amount=amount, rest=rest, time=until) }}</strong></p>
+  {% else %}
+  <p style="margin-top: 1rem; color: var(--error-text);"><strong>{{ t("ton-waive-body", amount=amount, time=until) }}</strong></p>
+  {% endif %}
+  <form method="post" action="/dashboard/ton/waive/{{ booking_id }}" style="margin-top: 1.25rem;">
+    <button type="submit" class="btn" style="background: var(--error-text);">{{ t("ton-waive-submit") }}</button>
+    <a href="/dashboard/bookings" style="display: inline-block; margin-left: 0.75rem; color: var(--text-muted); text-decoration: none; font-size: 0.9rem;">{{ t("ton-waive-back") }}</a>
+  </form>
+</div>
+{% endblock %}

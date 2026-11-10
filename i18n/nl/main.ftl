@@ -1668,3 +1668,182 @@ directory-manual-copy = Kopieer deze link handmatig:
 directory-empty = Geen afspraken gevonden. Probeer een andere zoekopdracht.
 directory-favorites-empty = Geen favorieten gevonden. Voeg afspraken uit de gids toe aan je favorieten om ze hier te zien.
 directory-with-hosts = Met { $names }
+
+## ilia fork: TON payments (docs/ton.md)
+
+# Price on the slot and booking pages
+ton-slots-price = Prijs: $ { $usd }
+ton-slots-price-approx = (≈ { $ton } TON)
+ton-slots-price-note = betalen in TON na het kiezen van een tijd
+
+# Event type form
+ton-etf-section = Betaling in TON
+ton-etf-off-note = TON-betalingen zijn niet ingesteld op deze server. Een betaald afspraaktype kan pas geboekt worden als ze zijn ingesteld.
+ton-etf-enabled = Betaalde boeking
+ton-etf-enabled-help = Gasten betalen in TON direct na het kiezen van een tijd. De tijd blijft voor hen vastgehouden tijdens het betalen, en een onbetaalde boeking wordt automatisch vrijgegeven.
+ton-etf-price = Prijs (USD)
+ton-etf-price-help = Van $ 1 tot $ 10000. Het bedrag in TON wordt berekend met de wisselkoers op het moment van boeken.
+ton-etf-window = Betaaltermijn (minuten)
+ton-etf-window-help = Van 10 tot 240. Laat leeg voor de standaardwaarde van de server ({ $minutes } min).
+ton-form-error-price = Vul een prijs in Amerikaanse dollars in van 1 tot 10000, met hoogstens twee decimalen.
+ton-form-error-window = De betaaltermijn moet tussen 10 en 240 minuten liggen.
+ton-form-error-team = Team-afspraaktypes kunnen niet betaald zijn.
+
+# Booking error pages
+ton-bae-title-unavailable = Deze tijd kan niet geboekt worden
+ton-bae-body-unavailable = Betalen is tijdelijk niet mogelijk, dus deze tijd kan nu niet geboekt worden. Probeer het over een paar minuten opnieuw.
+ton-bae-body-too-late = Er is te weinig tijd over tot deze afspraak om ervoor te betalen. Kies een latere tijd.
+ton-bae-body-already-open = Je hebt met dit e-mailadres al een onbetaalde boeking. We kunnen je de links ervan mailen: daar kun je haar betalen of annuleren om de tijd vrij te geven, en daarna opnieuw boeken.
+ton-bae-body-personal-only = Deze afspraak kan alleen op de eigen pagina van de host geboekt worden.
+ton-bae-title-unpaid = Boeking niet betaald
+ton-bae-body-unpaid = Deze boeking is niet betaald en kan dus niet goedgekeurd worden. Gebruik “Bevestigen zonder betaling” op de boekingenpagina van je dashboard om haar kosteloos te bevestigen.
+ton-bae-body-reschedule-unpaid = Deze boeking is niet betaald en kan dus niet verplaatst worden. Betaal haar, of annuleer haar en boek een andere tijd.
+ton-bae-body-pay-link-invalid = Deze betaallink is ongeldig.
+
+# Payment page
+ton-pay-page-title = Betaling: { $title }
+ton-pay-held-until = De tijd wordt voor je vastgehouden tot { $time } ({ $zone }).
+ton-pay-left = nog %1
+ton-pay-amount-label = Te betalen bedrag
+ton-pay-rate = ≈ $ { $usd } · 1 TON = $ { $rate } ({ $sources }, { $time } UTC)
+ton-pay-open-wallet = Wallet openen
+ton-pay-open-tonkeeper = Openen in Tonkeeper
+ton-pay-qr-alt = QR-code met de betaalgegevens
+ton-pay-scan = Of scan deze code met de app van je wallet.
+ton-pay-address = Adres
+ton-pay-comment = Opmerking
+ton-pay-copy = Kopiëren
+ton-pay-copied = Gekopieerd
+ton-pay-warn-comment = De opmerking is verplicht: daaraan herkennen we je betaling.
+ton-pay-warn-encrypt = Versleutel de opmerking niet.
+ton-pay-warn-token = Betaal in TON, niet met tokens.
+ton-pay-warn-exchange = Betaal je vanaf een exchange? Zet de code hierboven in het memoveld (opmerking).
+ton-pay-warn-deadline = Verstuur de betaling vóór { $time }. Een later verstuurde betaling telt misschien niet mee.
+ton-pay-check = Ik heb betaald, nu controleren
+ton-pay-email = Stuur me deze link per e-mail
+ton-pay-emailed = We hebben deze link naar het e-mailadres van je boeking gestuurd.
+ton-pay-email-unavailable = De link kon niet verstuurd worden. Houd deze pagina open of bewaar het adres ervan.
+ton-pay-checking-now = We controleren je betaling. Deze pagina werkt zichzelf bij.
+ton-pay-state-waiting = We wachten op je betaling.
+ton-pay-state-seen = Je betaling is zichtbaar op het netwerk. We wachten tot ze definitief is, wat meestal een paar seconden duurt.
+ton-pay-state-partial = We hebben { $paid } TON ontvangen. Betaal de resterende { $rest } TON met dezelfde opmerking.
+ton-pay-state-checking = De betaaltermijn is verstreken. Als je de betaling al hebt verstuurd, controleren we die. Deze pagina werkt zichzelf bij.
+ton-pay-state-paid = Betaling ontvangen. Je boeking wordt bevestigd…
+ton-pay-state-confirmed = Betaald. Je boeking is bevestigd en de bevestigingsmail is onderweg.
+ton-pay-state-waived = Voor deze boeking is geen betaling nodig. De host bevestigt haar.
+ton-pay-state-busy = Betaling ontvangen, maar deze tijd is niet meer vrij. We nemen contact met je op.
+ton-pay-state-expired = De betaaltermijn is verstreken en de tijd is vrijgegeven. Heb je toch betaald, schrijf ons dan vanaf het e-mailadres van je boeking en we betalen het terug.
+ton-pay-state-late = Je betaling kwam na de termijn binnen, dus de boeking is niet bevestigd. We nemen contact op over de terugbetaling. Je kunt ons ook schrijven vanaf het e-mailadres van je boeking.
+ton-pay-state-closed = Deze boeking is niet meer actief.
+ton-pay-state-revoked = Dit betaaladres wordt niet meer gebruikt. Stuur er niets naartoe en boek opnieuw.
+ton-pay-rebook = Een andere tijd boeken
+
+# Leaving the embedded widget
+ton-exit-title = Tijd vastgehouden
+ton-exit-body = De tijd wordt voor je vastgehouden tot { $time } ({ $zone }). Rond de betaling af om je boeking te bevestigen.
+ton-exit-go = Naar de betaling
+
+# Dashboard
+ton-dash-badge-awaiting = wacht op betaling · { $amount } TON · tot { $time }
+ton-dash-badge-partial = deels betaald · { $paid } van { $amount } TON · tot { $time }
+ton-dash-badge-paid = betaald · { $amount } TON
+ton-dash-badge-overpaid = betaald · { $excess } TON te veel
+ton-dash-badge-busy = betaald, tijd niet meer vrij
+ton-dash-badge-confirm-failed = betaald, niet bevestigd · bevestig met de hand
+ton-dash-badge-refund = { $amount } TON betaald · terugbetaling nodig
+ton-dash-badge-waived = bevestigd zonder betaling
+ton-dash-badge-unpaid = niet betaald
+ton-dash-waive = Bevestigen zonder betaling
+ton-dash-error-unpaid = Deze boeking is niet betaald en kan dus niet bevestigd of verplaatst worden. Gebruik “Bevestigen zonder betaling” om haar kosteloos te bevestigen, of wijs haar af.
+ton-dash-error-waive-failed = De boeking kon niet zonder betaling bevestigd worden: ze wacht niet meer op betaling.
+ton-waive-page-title = Bevestigen zonder betaling
+ton-waive-heading = Deze boeking bevestigen zonder betaling?
+ton-waive-body = Deze boeking is NIET betaald ({ $amount } TON, te betalen vóór { $time }). Als je haar bevestigt, krijgt de gast de afspraak gratis, en een betaling die later binnenkomt moet je met de hand terugbetalen.
+ton-waive-submit = Kosteloos bevestigen
+ton-waive-back = Terug naar boekingen
+
+# Guest emails
+ton-email-link-subject = Rond je boeking af: { $event }
+ton-email-link-message = Je bent begonnen met het boeken van { $event } met { $host }. Rond je boeking af op de pagina hieronder voordat de tijd om is.
+ton-email-link-action = Boeking afronden
+ton-email-link-line = Rond je boeking af: { $url }
+ton-email-expired-subject = Niet geboekt: { $event }, { $date }
+ton-email-expired-message = De betaling voor { $event } is niet op tijd binnengekomen, dus de tijd is vrijgegeven. Je kunt gerust een andere tijd kiezen.
+ton-email-expired-partial = We hebben een deel van de betaling ontvangen. We nemen contact op over de terugbetaling.
+ton-email-rebook-line = Kies een andere tijd: { $url }
+
+# Owner emails
+ton-email-row-amount = Bedrag:
+ton-email-row-paid = Ontvangen:
+ton-email-row-excess = Te veel betaald:
+ton-email-row-transfer = Overboeking:
+ton-email-row-sender = Afzender:
+ton-email-row-tx = Transactie:
+ton-email-row-detail = Details:
+ton-email-amount-value = { $amount } TON ≈ $ { $usd } (1 TON = $ { $rate })
+ton-email-sender-wallet = { $address } (een wallet)
+ton-email-sender-other = { $address } (geen wallet: een exchange of een contract)
+ton-email-dashboard-line = Boekingen: { $url }
+ton-email-dashboard-action = Boekingen openen
+ton-email-refund-rule = Terugbetalingen doe je met de hand vanuit je wallet: naar het adres van de afzender als dat een wallet is; anders alleen naar een adres waar de gast om vraagt vanaf het e-mailadres van de boeking, in een bericht met diens betaal- of annuleerlink. De boekingscode, het bedrag en de transactie zijn openbaar en bewijzen niets.
+ton-email-received-subject = Betaling ontvangen: { $event }, { $guest } ({ $date })
+ton-email-received-heading = Betaling ontvangen
+ton-email-received-message = { $guest } heeft { $amount } TON betaald. De boeking is bevestigd.
+ton-email-alert-subject = TON-betaling vraagt aandacht: { $what }
+ton-email-alert-heading = Een betaling vraagt je aandacht
+ton-alert-partial = gedeeltelijke betaling
+ton-alert-partial-body = Een deel van het verschuldigde bedrag is binnengekomen. De boeking blijft onbevestigd tot de rest binnenkomt; anders wordt ze op de termijn vrijgegeven en moet het ontvangen bedrag terugbetaald worden.
+ton-alert-overpaid = te veel betaald
+ton-alert-overpaid-body = Er is een betaling binnengekomen voor een boeking die al betaald is. Betaal haar terug als dat de moeite waard is.
+ton-alert-late = late betaling
+ton-alert-late-body = Er kwam een betaling binnen na de termijn. De boeking was al vrijgegeven en kan niet meer worden bevestigd. Betaal het bedrag terug, of vraag de gast opnieuw te boeken en bevestig de nieuwe boeking zonder betaling.
+ton-alert-unmatched = onbekende betaling
+ton-alert-unmatched-body = Er is een betaling binnengekomen zonder bekende boekingscode. Zoek de bijbehorende boeking, of betaal haar terug.
+ton-alert-failed = mislukte overboeking
+ton-alert-failed-body = Een overboeking naar het betaaladres is op het netwerk mislukt. Het geld staat misschien nog in je wallet: controleer de transactie in de explorer.
+ton-alert-not-text = overboeking zonder leesbare opmerking
+ton-alert-not-text-body = Er is een overboeking binnengekomen met een versleutelde opmerking, een token of andere inhoud. Die telt nooit automatisch mee: controleer haar met de hand.
+ton-alert-other = ongebruikelijke overboeking
+ton-alert-other-body = Een overboeking kon niet automatisch verwerkt worden. Controleer haar in het betaaloverzicht.
+ton-email-problem-subject = Probleem met TON-betaling: { $event } ({ $date })
+ton-email-problem-urgent-subject = Dringend: een betaalde boeking vraagt een beslissing: { $event } ({ $date })
+ton-email-problem-heading = Een betaalde boeking vraagt je aandacht
+ton-problem-host-busy = De gast heeft betaald, maar de tijd is niet meer vrij (een agenda-item of een andere boeking). De tijd blijft vastgehouden tot de afspraak begint. Vraag de gast om een nieuwe tijd, bevestig de boeking met de hand, of wijs haar af en betaal terug.
+ton-problem-partial = Er is maar een deel van het bedrag betaald, en daarna is de boeking verlopen, geannuleerd of afgewezen, of zonder betaling bevestigd. Betaal het ontvangen bedrag terug, tenzij je iets anders met de gast hebt afgesproken.
+ton-problem-overpaid = De boeking is betaald en bevestigd met meer dan het verschuldigde bedrag. Betaal het teveel terug als dat de moeite waard is.
+ton-problem-refund-due = De boeking is betaald en daarna geannuleerd of afgewezen. Betaal terug.
+ton-problem-confirmed-unpaid = Een onbetaalde boeking blijkt bevestigd. Dat mag nooit gebeuren: controleer hoe ze bevestigd is.
+ton-problem-address-revoked = Het betaaladres van deze boeking is ingetrokken, en de boeking wordt vrijgegeven.
+ton-email-health-subject = TON-betalingen vragen aandacht ({ $kind })
+ton-email-health-heading = TON-betalingen vragen aandacht
+ton-health-indexer-down = De betalingsbewaking kan de indexer niet bereiken. Betalingen worden niet gecontroleerd en nieuwe betaalde boekingen worden geweigerd tot hij weer bereikbaar is.
+ton-health-auth-failed = De indexer heeft de API-sleutel geweigerd (fout, of voor het andere netwerk). Controleer CALRS_TON_API_KEY.
+ton-health-wrong-network = De indexer antwoordt voor een ander netwerk dan het ingestelde. Tot dit opgelost is, wordt niets bijgeschreven en verloopt niets.
+ton-health-wallet-inactive = De ontvangende wallet is niet actief. Betaalde boekingen worden geweigerd tot er minstens één uitgaande overboeking vanaf is gedaan.
+ton-health-lagging = De betalingsbewaking loopt achter op de overboekingen naar het adres (misschien spam). Onbetaalde boekingen verlopen pas als ze is bijgewerkt.
+ton-health-stuck-finality = Een overboeking is al lang niet definitief. De bewaking wacht erop voordat ze verder leest.
+ton-health-watcher-crashed = De betalingsbewaking is meerdere keren gecrasht en start steeds opnieuw. Controleer het serverlogboek.
+ton-health-disabled-with-open = TON-betalingen staan uit terwijl er onbetaalde boekingen open staan. Hun tijden worden op hun termijn vrijgegeven.
+ton-health-other-network-open = Er staan boekingen open op een ander TON-netwerk dan het ingestelde. Ze worden op hun termijn vrijgegeven.
+ton-health-rate-unavailable = Er is geen bruikbare TON-wisselkoers (bronnen ontbreken, wijken af of vallen buiten je bandbreedte). Betaalde boekingen worden geweigerd tot er een is.
+ton-health-capacity = De limiet van open of dagelijkse onbetaalde boekingen is bereikt. Nieuwe betaalde boekingen worden voorlopig geweigerd.
+ton-health-other = De betalingsbewaking heeft een probleem gemeld. Controleer het serverlogboek.
+
+# TON follow-ups: releases, refunds, contact, resend
+ton-resend-submit = Mail mij de links
+ton-resend-title = Kijk in je mailbox
+ton-resend-done = Als er een onbetaalde boeking voor dit e-mailadres is, hebben we de betaal- en annuleerlinks ernaartoe gestuurd.
+ton-pay-state-taken = Deze tijd werd bezet voordat de boeking was betaald, dus de boeking is vrijgegeven. Er hoeft niets betaald te worden. Kies een andere tijd.
+ton-pay-state-refund = Deze boeking is beëindigd zonder bevestiging. De { $paid } TON die je betaalde wordt terugbetaald; de host neemt contact met je op.
+ton-pay-contact = Vragen? Schrijf naar { $host }: { $email }.
+ton-pay-copy-address = Adres kopiëren
+ton-pay-copy-comment = Opmerking kopiëren
+ton-pay-copy-manual = Kopiëren lukte niet. De tekst is geselecteerd: kopieer hem met de hand.
+ton-email-row-pay-by = Betalen vóór:
+ton-email-taken-message = De tijd die je voor { $event } koos werd bezet voordat de boeking was betaald, dus de boeking is vrijgegeven. Er hoeft niets betaald te worden. Je kunt gerust een andere tijd kiezen.
+ton-email-refund-message = We hebben je betaling voor { $event } ontvangen, maar de tijd kon niet worden bevestigd, dus de boeking is vrijgegeven. { $host } betaalt het bedrag terug en neemt contact met je op.
+ton-problem-host-busy-unpaid = De tijd van deze onbetaalde boeking werd bezet (er is een aanvraag overheen goedgekeurd, of er kwam een agenda-item bij), dus de boeking is vóór de betaling vrijgegeven. Als er al iets is ontvangen, betaal het terug.
+ton-problem-confirm-failed = De gast heeft betaald, maar de boeking kon na meerdere pogingen niet automatisch worden bevestigd (een fout, geen bezette host: zie het serverlog). De tijd blijft vastgehouden tot de afspraak begint. Bevestig de boeking met de hand, of wijs haar af en betaal de betaling terug.
+ton-health-capacity-near = Een nieuwe betaalde boeking nam de laatste open plek of het laatste dagbudget in. Volgende worden geweigerd tot boekingen betaald of vrijgegeven zijn. Als dit geen echte vraag is, houdt iemand misschien tijden vast zonder te betalen.
+ton-health-payment-alerts-held = Er zijn meer overboekingen binnengekomen voor boekingen waarover je het afgelopen uur al een e-mail kreeg. Ze zijn vastgelegd zonder aparte e-mail: bekijk het betaaloverzicht.
+ton-waive-body-partial = Deze boeking is maar deels betaald ({ $paid } van { $amount } TON ontvangen, te betalen vóór { $time }). Als je haar bevestigt, krijgt de gast de afspraak zonder de resterende { $rest } TON te betalen. Betaal het ontvangen bedrag terug, tenzij anders afgesproken.

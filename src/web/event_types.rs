@@ -278,6 +278,11 @@ pub(super) struct EventTypeForm {
     // "never" or a number of hours from PENDING_EXPIRY_CHOICES. Its presence
     // is also the marker that the form carried the section at all.
     pub(super) pending_expiry_hours: Option<String>,
+    // ilia fork: the TON price of a personal type (docs/ton.md). The price
+    // field's presence marks the section; the checkbox is "on" or absent.
+    pub(super) ton_price_enabled: Option<String>,
+    pub(super) ton_price_usd: Option<String>,
+    pub(super) ton_window_min: Option<String>,
 }
 
 /// Longest event type title accepted, the same limit as team names.
@@ -333,6 +338,12 @@ pub(super) fn validate_event_type_form(form: &EventTypeForm) -> Result<String, &
     ) {
         return Err("form-error-event-type-horizon");
     }
+    crate::web::ton_pay::validate_price_form(
+        form.ton_price_enabled.as_deref(),
+        form.ton_price_usd.as_deref(),
+        form.ton_window_min.as_deref(),
+        form.team_id.as_deref(),
+    )?;
 
     let slug = form.slug.trim().to_lowercase().replace(' ', "-");
     if slug.is_empty() {
@@ -613,6 +624,7 @@ pub(super) async fn new_event_type_form(
             form_reschedule_notice_unit => "minutes",
             form_booking_horizon_days => "",
             form_pending => PendingSettings::DEFAULT.context(),
+            ton_price => ton_pay::price_form_ctx(&state, None).await,
             tz_options => timezone_options(&user.timezone, auth_user.lang),
             error => "",
         })
@@ -819,6 +831,7 @@ pub(super) async fn create_event_type(
             .await;
     }
     save_pending_settings(&state.pool, &et_id, &form, true).await;
+    save_ton_price(&state, &et_id, &form).await;
 
     tracing::info!(slug = %slug, user = %auth_user.user.email, "event type created");
 
@@ -1199,6 +1212,7 @@ pub(super) async fn edit_event_type_form(
             form_reschedule_notice_unit => form_reschedule_notice_unit,
             form_booking_horizon_days => form_booking_horizon_days,
             form_pending => form_pending,
+            ton_price => ton_pay::price_form_ctx(&state, Some(&et_id)).await,
             form_bookable_from => format_optional_date(booking_window.bookable_from),
             form_bookable_until => format_optional_date(booking_window.bookable_until),
             booking_window_warnings => booking_window_warnings,
@@ -1447,6 +1461,7 @@ pub(super) async fn update_event_type(
         .await;
     }
     save_pending_settings(&state.pool, &et_id, &form, false).await;
+    save_ton_price(&state, &et_id, &form).await;
 
     // Update availability rules: delete old, insert new. Pass the user's
     // profile-default schedule as a fallback so an empty submission falls back
@@ -2202,6 +2217,7 @@ async fn render_event_type_form_error(
             form_pending => PendingSettings::from_form(form)
                 .unwrap_or(PendingSettings::DEFAULT)
                 .context(),
+            ton_price => ton_pay::price_form_from_post(state, form.ton_price_enabled.as_deref(), form.ton_price_usd.as_deref(), form.ton_window_min.as_deref(), !is_group),
             form_reminder_minutes => parse_int_field(&form.reminder_minutes, 0),
             form_max_additional_guests => parse_int_field(&form.max_additional_guests, 0),
             form_scheduling_mode => scheduling_mode,
@@ -3756,6 +3772,8 @@ async fn duplicate_event_type_once(
     copy_event_type_children(&mut tx, et_id, &new_id)
         .await
         .ok()?;
+    // ilia fork: a personal type's TON price comes along (docs/ton.md).
+    ton_pay::copy_price(&mut tx, et_id, &new_id).await.ok()?;
     tx.commit().await.ok()?;
     Some(new_slug)
 }
@@ -3824,4 +3842,17 @@ async fn copy_event_type_children(tx: &mut Tx<'_>, from: &str, to: &str) -> sqlx
         .await?;
     }
     Ok(())
+}
+
+/// ilia fork: store the price section of a personal event type's form
+/// (`ton_pay::save_price_form`; team types are never priced).
+async fn save_ton_price(state: &AppState, et_id: &str, form: &EventTypeForm) {
+    ton_pay::save_price_form(
+        state,
+        et_id,
+        form.ton_price_enabled.as_deref(),
+        form.ton_price_usd.as_deref(),
+        form.ton_window_min.as_deref(),
+    )
+    .await;
 }

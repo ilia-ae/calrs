@@ -99,6 +99,10 @@ pub(super) async fn approve_booking_form(
 ) -> impl IntoResponse {
     // The host's saved language, as their approval email (#209).
     let lang = host_token_page_lang(&state.pool, &token, &headers).await;
+    // ilia fork: an unpaid priced booking is not approved (docs/ton.md).
+    if let Some(refused) = ton_pay::approval_refused_for_token(&state, &token, lang).await {
+        return refused;
+    }
     // Look up pending booking by confirm_token
     let booking: Option<(String, String, String, String, String)> = sqlx::query_as(
         "SELECT b.guest_name, b.guest_email, CASE b.time_version WHEN 1 THEN b.start_at ELSE rtrim(b.start_at, 'Z') END AS start_at, CASE b.time_version WHEN 1 THEN b.end_at ELSE rtrim(b.end_at, 'Z') END AS end_at, et.title
@@ -199,6 +203,10 @@ pub(super) async fn approve_booking_by_token(
             return render_token_error(&state, lang, already);
         }
     };
+    // ilia fork: an unpaid priced booking is not approved (docs/ton.md).
+    if let Some(refused) = ton_pay::approval_refused_page(&state, &bid, lang).await {
+        return refused;
+    }
 
     // Fetched separately: sqlx tuple FromRow only goes to 16 columns.
     let assigned_user_id: Option<String> =
@@ -257,12 +265,13 @@ pub(super) async fn approve_booking_by_token(
     };
     if !hosts_free {
         tracing::warn!(booking_id = %bid, "approval refused: host no longer free");
-        return render_booking_action_error_keys_in(
+        // ilia fork: marked, so a paid booking is held, not retried.
+        return ton_pay::mark_busy(render_booking_action_error_keys_in(
             &state,
             lang,
             "bae-title-cannot-approve",
             "bae-body-host-busy",
-        );
+        ));
     }
 
     if has_resources {
@@ -282,12 +291,13 @@ pub(super) async fn approve_booking_by_token(
             {
                 Ok(crate::resources::ResourceCheck::Busy) => {
                     tracing::warn!(booking_id = %bid, "approval refused: required resource no longer available");
-                    return render_booking_action_error_keys_in(
+                    // ilia fork: marked, so a paid booking is held, not retried.
+                    return ton_pay::mark_busy(render_booking_action_error_keys_in(
                         &state,
                         lang,
                         "bae-title-cannot-approve",
                         "bae-body-resource-gone",
-                    );
+                    ));
                 }
                 Ok(crate::resources::ResourceCheck::Free { assigned }) => {
                     let _ =
@@ -1157,6 +1167,8 @@ pub(super) async fn guest_cancel_booking(
         }
     }
 
+    // ilia fork: cancelling an unpaid booking tells nobody (docs/ton.md).
+    let ton_quiet = ton_pay::cancel_is_quiet(&state.pool, &bid).await;
     // Cancel the booking. Guarded so a double submit, or a host decline or
     // cancel in between, does not notify everyone twice.
     let prev_status = match cancel_from_status(&state.pool, &bid, &observed_status).await {
@@ -1180,6 +1192,7 @@ pub(super) async fn guest_cancel_booking(
     };
 
     tracing::info!(booking_id = %bid, "booking cancelled by guest");
+    ton_pay::booking_ended(&state.pool, &bid).await;
 
     // Find the host user_id for CalDAV delete
     let host_user_id: Option<String> = sqlx::query_scalar(
@@ -1236,9 +1249,10 @@ pub(super) async fn guest_cancel_booking(
     let details = with_invite_holders(&state.pool, details, prev_status == "pending").await;
 
     // Send cancellation emails
-    if let Ok(Some(smtp_config)) =
-        crate::email::load_smtp_config(&state.pool, &state.secret_key).await
-    {
+    if let (false, Ok(Some(smtp_config))) = (
+        ton_quiet,
+        crate::email::load_smtp_config(&state.pool, &state.secret_key).await,
+    ) {
         let details = details.clone();
         // The host notice goes to whoever hosts the booking, each in their
         // own language: the assigned member, every eligible member of a
@@ -1298,7 +1312,9 @@ pub(super) async fn guest_cancel_booking(
         &details,
         guest_phone.as_deref(),
         crate::sms::collects_phone(&sms_phone_mode),
-    ) {
+    )
+    .filter(|_| !ton_quiet)
+    {
         crate::sms::notify_guest(
             &state.pool,
             &state.secret_key,
@@ -1384,6 +1400,10 @@ pub(super) async fn guest_reschedule_slots(
         };
 
     let lang = token_page_lang(booking_language.as_deref(), visitor);
+    // ilia fork: an unpaid priced booking cannot be moved (docs/ton.md).
+    if let Some(refused) = ton_pay::guest_reschedule_refused(&state, &booking_id, lang).await {
+        return refused;
+    }
 
     // Block the slot picker before any costly work (CalDAV sync, slot
     // computation, template render) if the booking falls inside the host's
@@ -1783,6 +1803,10 @@ pub(super) async fn guest_reschedule_booking(
         stored_language.as_deref(),
         crate::i18n::detect_from_headers(&headers),
     );
+    // ilia fork: an unpaid priced booking cannot be moved (docs/ton.md).
+    if let Some(refused) = ton_pay::guest_reschedule_refused(&state, &booking_id, lang).await {
+        return refused;
+    }
 
     // Defensive notice-window check on POST too: the GET may have been
     // cached, or the cutoff may have rolled over between page load and
@@ -2010,7 +2034,10 @@ pub(super) async fn guest_reschedule_booking(
     // - Guest-initiated + requires_confirmation → pending (needs host approval)
     // - Guest-initiated + no confirmation needed → confirmed (auto-approved)
     let host_initiated = reschedule_by_host != 0;
-    let needs_approval = !host_initiated && requires_confirmation != 0;
+    // ilia fork: a paid (or waived) booking moved by its guest stays confirmed.
+    let needs_approval = !host_initiated
+        && requires_confirmation != 0
+        && !ton_pay::settled(&state.pool, &booking_id).await;
     let new_status = if needs_approval {
         "pending"
     } else {
@@ -2504,6 +2531,10 @@ pub(super) async fn host_reschedule_slots(
         Some(b) => b,
         None => return Redirect::to("/dashboard/bookings").into_response(),
     };
+    // ilia fork: decline an unpaid priced booking or wait for its payment.
+    if ton_pay::unpaid(&state.pool, &bid).await {
+        return Redirect::to("/dashboard/bookings?error=unpaid").into_response();
+    }
 
     let (start_at, end_at) = crate::booking_time::wall_strings(
         &start_at,
@@ -2577,6 +2608,10 @@ pub(super) async fn host_reschedule_booking(
             Some(b) => b,
             None => return Redirect::to("/dashboard/bookings").into_response(),
         };
+    // ilia fork: decline an unpaid priced booking or wait for its payment.
+    if ton_pay::unpaid(&state.pool, &bid).await {
+        return Redirect::to("/dashboard/bookings?error=unpaid").into_response();
+    }
 
     // The guest picks the new time on the event type's slot page. With no
     // bookable day left (the date range ended, or opens past the horizon),

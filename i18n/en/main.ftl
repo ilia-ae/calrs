@@ -1668,3 +1668,182 @@ directory-manual-copy = Copy this link manually:
 directory-empty = No meetings found. Try another search.
 directory-favorites-empty = No favorites found. Star meetings in the directory to see them here.
 directory-with-hosts = With { $names }
+
+## ilia fork: TON payments (docs/ton.md)
+
+# Price on the slot and booking pages
+ton-slots-price = Price: ${ $usd }
+ton-slots-price-approx = (≈ { $ton } TON)
+ton-slots-price-note = paid in TON after you pick a time
+
+# Event type form
+ton-etf-section = Payment in TON
+ton-etf-off-note = TON payments are not set up on this server. A paid event type cannot be booked until they are.
+ton-etf-enabled = Paid booking
+ton-etf-enabled-help = Guests pay in TON right after picking a time. The time is held while they pay, and an unpaid booking is released automatically.
+ton-etf-price = Price (USD)
+ton-etf-price-help = From $1 to $10000. The amount in TON is computed from the exchange rate when the guest books.
+ton-etf-window = Time to pay (minutes)
+ton-etf-window-help = From 10 to 240. Leave blank for the server default ({ $minutes } min).
+ton-form-error-price = Enter a price in US dollars from 1 to 10000, with at most two decimals.
+ton-form-error-window = The time to pay must be from 10 to 240 minutes.
+ton-form-error-team = Team event types cannot be paid.
+
+# Booking error pages
+ton-bae-title-unavailable = This time cannot be booked
+ton-bae-body-unavailable = Payment is temporarily unavailable, so this time cannot be booked right now. Please try again in a few minutes.
+ton-bae-body-too-late = There is too little time left before this meeting to pay for it. Please pick a later time.
+ton-bae-body-already-open = You already have an unpaid booking with this email address. We can email you its links: pay for it there, or cancel it to free the time, then book again.
+ton-bae-body-personal-only = This meeting can only be booked on its host's own page.
+ton-bae-title-unpaid = Booking not paid
+ton-bae-body-unpaid = This booking has not been paid, so it cannot be approved. To confirm it free of charge, use "Confirm without payment" on the bookings page of your dashboard.
+ton-bae-body-reschedule-unpaid = This booking has not been paid, so it cannot be moved. Pay for it, or cancel it and book another time.
+ton-bae-body-pay-link-invalid = This payment link is not valid.
+
+# Payment page
+ton-pay-page-title = Payment: { $title }
+ton-pay-held-until = The time is held for you until { $time } ({ $zone }).
+ton-pay-left = %1 left
+ton-pay-amount-label = Amount to pay
+ton-pay-rate = ≈ ${ $usd } · 1 TON = ${ $rate } ({ $sources }, { $time } UTC)
+ton-pay-open-wallet = Open wallet
+ton-pay-open-tonkeeper = Open in Tonkeeper
+ton-pay-qr-alt = QR code with the payment details
+ton-pay-scan = Or scan this code with your wallet app.
+ton-pay-address = Address
+ton-pay-comment = Comment
+ton-pay-copy = Copy
+ton-pay-copied = Copied
+ton-pay-warn-comment = The comment is required: it is how we recognise your payment.
+ton-pay-warn-encrypt = Do not encrypt the comment.
+ton-pay-warn-token = Pay in TON, not in tokens.
+ton-pay-warn-exchange = Paying from an exchange? Put the code above in the memo (comment) field.
+ton-pay-warn-deadline = Send the payment before { $time }. A payment sent later may not be counted.
+ton-pay-check = I have paid, check now
+ton-pay-email = Email me this link
+ton-pay-emailed = We have sent this link to the email address you booked with.
+ton-pay-email-unavailable = The link could not be emailed. Keep this page open or save its address.
+ton-pay-checking-now = Checking for your payment. This page updates by itself.
+ton-pay-state-waiting = Waiting for your payment.
+ton-pay-state-seen = Your payment is visible on the network. Waiting for it to become final, which usually takes a few seconds.
+ton-pay-state-partial = We received { $paid } TON. Please pay the remaining { $rest } TON with the same comment.
+ton-pay-state-checking = The time to pay has run out. If you have already sent the payment, we are checking it. This page updates by itself.
+ton-pay-state-paid = Payment received. Confirming your booking…
+ton-pay-state-confirmed = Paid. Your booking is confirmed, and the confirmation email is on its way.
+ton-pay-state-waived = No payment is needed for this booking. The host is confirming it.
+ton-pay-state-busy = Payment received, but this time is no longer free. We will contact you.
+ton-pay-state-expired = The time to pay has run out and the time was released. If you sent a payment anyway, write to us from the email address you booked with and we will refund it.
+ton-pay-state-late = Your payment arrived after the deadline, so the booking was not confirmed. We will contact you about a refund. You can also write to us from the email address you booked with.
+ton-pay-state-closed = This booking is no longer active.
+ton-pay-state-revoked = This payment address is no longer in use. Do not send anything to it, and please book again.
+ton-pay-rebook = Book another time
+
+# Leaving the embedded widget
+ton-exit-title = Time held
+ton-exit-body = The time is held for you until { $time } ({ $zone }). Complete the payment to confirm your booking.
+ton-exit-go = Go to payment
+
+# Dashboard
+ton-dash-badge-awaiting = awaiting payment · { $amount } TON · until { $time }
+ton-dash-badge-partial = partly paid · { $paid } of { $amount } TON · until { $time }
+ton-dash-badge-paid = paid · { $amount } TON
+ton-dash-badge-overpaid = paid · overpaid by { $excess } TON
+ton-dash-badge-busy = paid, time no longer free
+ton-dash-badge-confirm-failed = paid, not confirmed · confirm it by hand
+ton-dash-badge-refund = paid { $amount } TON · refund due
+ton-dash-badge-waived = confirmed without payment
+ton-dash-badge-unpaid = not paid
+ton-dash-waive = Confirm without payment
+ton-dash-error-unpaid = This booking has not been paid, so it cannot be confirmed or moved. Use "Confirm without payment" to confirm it free of charge, or decline it.
+ton-dash-error-waive-failed = The booking could not be confirmed without payment: it is no longer awaiting payment.
+ton-waive-page-title = Confirm without payment
+ton-waive-heading = Confirm this booking without payment?
+ton-waive-body = This booking is NOT paid ({ $amount } TON, due by { $time }). If you confirm it, the guest gets the meeting free of charge, and a payment that arrives later has to be refunded by hand.
+ton-waive-submit = Confirm free of charge
+ton-waive-back = Back to bookings
+
+# Guest emails
+ton-email-link-subject = Complete your booking: { $event }
+ton-email-link-message = You started booking { $event } with { $host }. Complete your booking on the page below before the time runs out.
+ton-email-link-action = Complete booking
+ton-email-link-line = Complete your booking: { $url }
+ton-email-expired-subject = Not booked: { $event }, { $date }
+ton-email-expired-message = The payment for { $event } did not arrive in time, so the time was released. You are welcome to pick another time.
+ton-email-expired-partial = We received part of the payment. We will contact you about a refund.
+ton-email-rebook-line = Pick another time: { $url }
+
+# Owner emails
+ton-email-row-amount = Amount:
+ton-email-row-paid = Received:
+ton-email-row-excess = Overpaid:
+ton-email-row-transfer = Transfer:
+ton-email-row-sender = Sender:
+ton-email-row-tx = Transaction:
+ton-email-row-detail = Details:
+ton-email-amount-value = { $amount } TON ≈ ${ $usd } (1 TON = ${ $rate })
+ton-email-sender-wallet = { $address } (a wallet)
+ton-email-sender-other = { $address } (not a wallet: an exchange or a contract)
+ton-email-dashboard-line = Bookings: { $url }
+ton-email-dashboard-action = Open bookings
+ton-email-refund-rule = Refunds are made by hand from your wallet: to the sender's address when it is a wallet; otherwise only to an address the guest asks for from the email address they booked with, in a message that includes their payment or cancel link. The booking code, amount and transaction are public and prove nothing.
+ton-email-received-subject = Payment received: { $event }, { $guest } ({ $date })
+ton-email-received-heading = Payment received
+ton-email-received-message = { $guest } paid { $amount } TON. The booking is confirmed.
+ton-email-alert-subject = TON payment needs attention: { $what }
+ton-email-alert-heading = A payment needs your attention
+ton-alert-partial = partial payment
+ton-alert-partial-body = Part of the amount due arrived. The booking stays unconfirmed until the rest arrives; if it does not, the booking is released at the deadline and the amount received has to be refunded.
+ton-alert-overpaid = overpayment
+ton-alert-overpaid-body = A payment arrived for a booking that is already paid. Refund it if it is worth it.
+ton-alert-late = late payment
+ton-alert-late-body = A payment arrived after its deadline. The booking was already released and can no longer be confirmed. Refund the payment, or ask the guest to book again and confirm the new booking without payment.
+ton-alert-unmatched = unrecognised payment
+ton-alert-unmatched-body = A payment arrived without a known booking code. Find the booking it belongs to, or refund it.
+ton-alert-failed = failed transfer
+ton-alert-failed-body = A transfer to the payment address failed on the network. The funds may still be on your wallet: check the transaction in the explorer.
+ton-alert-not-text = transfer without a readable comment
+ton-alert-not-text-body = A transfer with an encrypted comment, a token or another payload arrived. It is never counted automatically: check it by hand.
+ton-alert-other = unusual transfer
+ton-alert-other-body = A transfer could not be processed automatically. Check it in the payment records.
+ton-email-problem-subject = TON payment problem: { $event } ({ $date })
+ton-email-problem-urgent-subject = Urgent: a paid booking needs a decision: { $event } ({ $date })
+ton-email-problem-heading = A paid booking needs your attention
+ton-problem-host-busy = The guest paid, but the time is no longer free (a calendar event or another booking). The time stays held until the meeting starts. Ask the guest for a new time, confirm the booking by hand, or decline it and refund the payment.
+ton-problem-partial = Only part of the amount was paid, and the booking then expired, was cancelled or declined, or was confirmed without payment. Refund the amount received unless you agreed otherwise with the guest.
+ton-problem-overpaid = The booking is paid and confirmed with more than the amount due. Refund the excess if it is worth it.
+ton-problem-refund-due = The booking was paid, then cancelled or declined. Refund the payment.
+ton-problem-confirmed-unpaid = An unpaid booking was found confirmed. This should never happen: check how it was confirmed.
+ton-problem-address-revoked = The payment address of this booking was revoked, and the booking will be released.
+ton-email-health-subject = TON payments need attention ({ $kind })
+ton-email-health-heading = TON payments need attention
+ton-health-indexer-down = The payment watcher cannot reach the indexer. Payments are not being checked, and new paid bookings are refused until it recovers.
+ton-health-auth-failed = The indexer refused the API key (it may be wrong, or for the other network). Check CALRS_TON_API_KEY.
+ton-health-wrong-network = The indexer answers for another network than the one configured. Nothing is credited or expired until this is fixed.
+ton-health-wallet-inactive = The receiving wallet is not active. Paid bookings are refused until it has made at least one outgoing transfer.
+ton-health-lagging = The payment watcher is falling behind the transfers arriving at the address (possibly spam). Unpaid bookings do not expire until it catches up.
+ton-health-stuck-finality = A transfer has not become final for a long time. The watcher waits for it before reading further.
+ton-health-watcher-crashed = The payment watcher crashed several times and keeps restarting. Check the server log.
+ton-health-disabled-with-open = TON payments are switched off while unpaid bookings are open. Their times are released at their deadlines.
+ton-health-other-network-open = There are open bookings on another TON network than the one configured. They are released at their deadlines.
+ton-health-rate-unavailable = No acceptable TON exchange rate is available (sources missing, disagreeing or outside your corridor). Paid bookings are refused until there is one.
+ton-health-capacity = The limit of open or daily unpaid bookings was reached. New paid bookings are refused for now.
+ton-health-other = The payment watcher reported a problem. Check the server log.
+
+# TON follow-ups: releases, refunds, contact, resend
+ton-resend-submit = Email me the links
+ton-resend-title = Check your email
+ton-resend-done = If there is an unpaid booking for this email address, we have sent its payment and cancel links to it.
+ton-pay-state-taken = This time was taken before the booking was paid, so the booking was released. Nothing is due. Please pick another time.
+ton-pay-state-refund = This booking ended without being confirmed. The { $paid } TON you paid will be refunded; the host will contact you.
+ton-pay-contact = Questions? Write to { $host } at { $email }.
+ton-pay-copy-address = Copy the address
+ton-pay-copy-comment = Copy the comment
+ton-pay-copy-manual = Copying did not work. The text is selected: copy it by hand.
+ton-email-row-pay-by = Pay by:
+ton-email-taken-message = The time you picked for { $event } was taken before the booking was paid, so the booking was released. Nothing is due. You are welcome to pick another time.
+ton-email-refund-message = We received your payment for { $event }, but the time could not be confirmed, so the booking was released. { $host } will refund the payment and contact you.
+ton-problem-host-busy-unpaid = The time of this unpaid booking was taken (a request was approved over it, or a calendar event appeared), so the booking was released before the guest paid. If anything was received, refund it.
+ton-problem-confirm-failed = The guest paid, but the booking could not be confirmed automatically after several attempts (an error, not a busy host: see the server log). The time stays held until the meeting starts. Confirm the booking by hand, or decline it and refund the payment.
+ton-health-capacity-near = A new paid booking took the last open place or the last of today's budget. The next ones are refused until bookings are paid or released. If this is not real demand, someone may be holding times without paying.
+ton-health-payment-alerts-held = More transfers arrived for bookings you were already emailed about within the hour. They are recorded without an email each: check the payment records.
+ton-waive-body-partial = This booking is only partly paid ({ $paid } of { $amount } TON received, due by { $time }). If you confirm it, the guest gets the meeting without paying the remaining { $rest } TON. Refund the amount received unless you agreed otherwise.

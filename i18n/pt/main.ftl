@@ -1666,3 +1666,182 @@ directory-manual-copy = Copie este link manualmente:
 directory-empty = Nenhuma reunião encontrada. Tente outra busca.
 directory-favorites-empty = Nenhum favorito encontrado. Adicione reuniões aos favoritos no diretório para vê-las aqui.
 directory-with-hosts = Com { $names }
+
+## ilia fork: TON payments (docs/ton.md)
+
+# Price on the slot and booking pages
+ton-slots-price = Preço: US$ { $usd }
+ton-slots-price-approx = (≈ { $ton } TON)
+ton-slots-price-note = pago em TON depois de escolher o horário
+
+# Event type form
+ton-etf-section = Pagamento em TON
+ton-etf-off-note = Os pagamentos em TON não estão configurados neste servidor. Um tipo de evento pago não pode ser agendado até que estejam.
+ton-etf-enabled = Agendamento pago
+ton-etf-enabled-help = Os convidados pagam em TON logo depois de escolher um horário. O horário fica reservado enquanto pagam, e um agendamento não pago é liberado automaticamente.
+ton-etf-price = Preço (USD)
+ton-etf-price-help = De US$ 1 a US$ 10000. O valor em TON é calculado pela cotação no momento do agendamento.
+ton-etf-window = Prazo para pagar (minutos)
+ton-etf-window-help = De 10 a 240. Deixe em branco para usar o padrão do servidor ({ $minutes } min).
+ton-form-error-price = Informe um preço em dólares americanos de 1 a 10000, com no máximo duas casas decimais.
+ton-form-error-window = O prazo para pagar deve ser de 10 a 240 minutos.
+ton-form-error-team = Tipos de evento de equipe não podem ser pagos.
+
+# Booking error pages
+ton-bae-title-unavailable = Não é possível agendar este horário
+ton-bae-body-unavailable = O pagamento está temporariamente indisponível, então este horário não pode ser agendado agora. Tente de novo em alguns minutos.
+ton-bae-body-too-late = Falta pouco tempo para esta reunião para conseguir pagá-la. Escolha um horário mais tarde.
+ton-bae-body-already-open = Você já tem um agendamento não pago com este e-mail. Podemos enviar os links dele para você: lá você pode pagá-lo ou cancelá-lo para liberar o horário, e depois agendar de novo.
+ton-bae-body-personal-only = Esta reunião só pode ser agendada na página do próprio anfitrião.
+ton-bae-title-unpaid = Agendamento não pago
+ton-bae-body-unpaid = Este agendamento não foi pago, então não pode ser aprovado. Para confirmá-lo sem custo, use “Confirmar sem pagamento” na página de agendamentos do seu painel.
+ton-bae-body-reschedule-unpaid = Este agendamento não foi pago, então não pode ser remarcado. Pague-o, ou cancele-o e agende outro horário.
+ton-bae-body-pay-link-invalid = Este link de pagamento não é válido.
+
+# Payment page
+ton-pay-page-title = Pagamento: { $title }
+ton-pay-held-until = O horário está reservado para você até { $time } ({ $zone }).
+ton-pay-left = faltam %1
+ton-pay-amount-label = Valor a pagar
+ton-pay-rate = ≈ US$ { $usd } · 1 TON = US$ { $rate } ({ $sources }, { $time } UTC)
+ton-pay-open-wallet = Abrir carteira
+ton-pay-open-tonkeeper = Abrir no Tonkeeper
+ton-pay-qr-alt = Código QR com os dados do pagamento
+ton-pay-scan = Ou escaneie este código com o app da sua carteira.
+ton-pay-address = Endereço
+ton-pay-comment = Comentário
+ton-pay-copy = Copiar
+ton-pay-copied = Copiado
+ton-pay-warn-comment = O comentário é obrigatório: é por ele que reconhecemos seu pagamento.
+ton-pay-warn-encrypt = Não criptografe o comentário.
+ton-pay-warn-token = Pague em TON, não com tokens.
+ton-pay-warn-exchange = Pagando a partir de uma corretora? Coloque o código acima no campo memo (comentário).
+ton-pay-warn-deadline = Envie o pagamento antes de { $time }. Um pagamento enviado depois pode não ser considerado.
+ton-pay-check = Já paguei, verificar
+ton-pay-email = Enviar este link por e-mail
+ton-pay-emailed = Enviamos este link para o e-mail usado no agendamento.
+ton-pay-email-unavailable = Não foi possível enviar o link. Mantenha esta página aberta ou salve o endereço dela.
+ton-pay-checking-now = Estamos verificando seu pagamento. Esta página se atualiza sozinha.
+ton-pay-state-waiting = Aguardando seu pagamento.
+ton-pay-state-seen = Seu pagamento já aparece na rede. Aguardando que se torne definitivo, o que costuma levar alguns segundos.
+ton-pay-state-partial = Recebemos { $paid } TON. Pague os { $rest } TON restantes com o mesmo comentário.
+ton-pay-state-checking = O prazo para pagar terminou. Se você já enviou o pagamento, estamos verificando. Esta página se atualiza sozinha.
+ton-pay-state-paid = Pagamento recebido. Confirmando seu agendamento…
+ton-pay-state-confirmed = Pago. Seu agendamento está confirmado e o e-mail de confirmação está a caminho.
+ton-pay-state-waived = Este agendamento não precisa de pagamento. O anfitrião está confirmando.
+ton-pay-state-busy = Pagamento recebido, mas este horário não está mais livre. Vamos entrar em contato com você.
+ton-pay-state-expired = O prazo para pagar terminou e o horário foi liberado. Se mesmo assim você enviou um pagamento, escreva para nós a partir do e-mail usado no agendamento e faremos o reembolso.
+ton-pay-state-late = Seu pagamento chegou depois do prazo, então o agendamento não foi confirmado. Vamos entrar em contato sobre o reembolso. Você também pode escrever para nós a partir do e-mail usado no agendamento.
+ton-pay-state-closed = Este agendamento não está mais ativo.
+ton-pay-state-revoked = Este endereço de pagamento não é mais usado. Não envie nada para ele e agende de novo.
+ton-pay-rebook = Agendar outro horário
+
+# Leaving the embedded widget
+ton-exit-title = Horário reservado
+ton-exit-body = O horário está reservado para você até { $time } ({ $zone }). Conclua o pagamento para confirmar seu agendamento.
+ton-exit-go = Ir para o pagamento
+
+# Dashboard
+ton-dash-badge-awaiting = aguardando pagamento · { $amount } TON · até { $time }
+ton-dash-badge-partial = pago em parte · { $paid } de { $amount } TON · até { $time }
+ton-dash-badge-paid = pago · { $amount } TON
+ton-dash-badge-overpaid = pago · { $excess } TON a mais
+ton-dash-badge-busy = pago, horário ocupado
+ton-dash-badge-confirm-failed = pago, não confirmado · confirme manualmente
+ton-dash-badge-refund = { $amount } TON pagos · reembolso devido
+ton-dash-badge-waived = confirmado sem pagamento
+ton-dash-badge-unpaid = não pago
+ton-dash-waive = Confirmar sem pagamento
+ton-dash-error-unpaid = Este agendamento não foi pago, então não pode ser confirmado nem remarcado. Use “Confirmar sem pagamento” para confirmá-lo sem custo, ou recuse-o.
+ton-dash-error-waive-failed = Não foi possível confirmar o agendamento sem pagamento: ele não está mais aguardando pagamento.
+ton-waive-page-title = Confirmar sem pagamento
+ton-waive-heading = Confirmar este agendamento sem pagamento?
+ton-waive-body = Este agendamento NÃO foi pago ({ $amount } TON, com prazo até { $time }). Se você confirmar, o convidado recebe a reunião de graça, e um pagamento que chegar depois terá de ser reembolsado manualmente.
+ton-waive-submit = Confirmar sem custo
+ton-waive-back = Voltar aos agendamentos
+
+# Guest emails
+ton-email-link-subject = Conclua seu agendamento: { $event }
+ton-email-link-message = Você começou a agendar { $event } com { $host }. Conclua seu agendamento na página abaixo antes que o tempo acabe.
+ton-email-link-action = Concluir agendamento
+ton-email-link-line = Conclua seu agendamento: { $url }
+ton-email-expired-subject = Não agendado: { $event }, { $date }
+ton-email-expired-message = O pagamento de { $event } não chegou a tempo, então o horário foi liberado. Fique à vontade para escolher outro horário.
+ton-email-expired-partial = Recebemos parte do pagamento. Vamos entrar em contato sobre o reembolso.
+ton-email-rebook-line = Escolher outro horário: { $url }
+
+# Owner emails
+ton-email-row-amount = Valor:
+ton-email-row-paid = Recebido:
+ton-email-row-excess = Pago a mais:
+ton-email-row-transfer = Transferência:
+ton-email-row-sender = Remetente:
+ton-email-row-tx = Transação:
+ton-email-row-detail = Detalhes:
+ton-email-amount-value = { $amount } TON ≈ US$ { $usd } (1 TON = US$ { $rate })
+ton-email-sender-wallet = { $address } (uma carteira)
+ton-email-sender-other = { $address } (não é carteira: uma corretora ou um contrato)
+ton-email-dashboard-line = Agendamentos: { $url }
+ton-email-dashboard-action = Abrir agendamentos
+ton-email-refund-rule = Reembolsos são feitos manualmente a partir da sua carteira: para o endereço do remetente, se for uma carteira; caso contrário, só para um endereço que o convidado pedir a partir do e-mail usado no agendamento, numa mensagem com o link de pagamento ou de cancelamento dele. O código do agendamento, o valor e a transação são públicos e não provam nada.
+ton-email-received-subject = Pagamento recebido: { $event }, { $guest } ({ $date })
+ton-email-received-heading = Pagamento recebido
+ton-email-received-message = { $guest } pagou { $amount } TON. O agendamento está confirmado.
+ton-email-alert-subject = Pagamento em TON precisa de atenção: { $what }
+ton-email-alert-heading = Um pagamento precisa da sua atenção
+ton-alert-partial = pagamento parcial
+ton-alert-partial-body = Chegou parte do valor devido. O agendamento continua sem confirmação até o restante chegar; se não chegar, ele é liberado no prazo e o valor recebido precisa ser reembolsado.
+ton-alert-overpaid = pagamento a mais
+ton-alert-overpaid-body = Chegou um pagamento para um agendamento já pago. Reembolse se valer a pena.
+ton-alert-late = pagamento atrasado
+ton-alert-late-body = Um pagamento chegou depois do prazo. O agendamento já tinha sido liberado e não pode mais ser confirmado. Reembolse o pagamento, ou peça ao convidado que agende de novo e confirme o novo agendamento sem pagamento.
+ton-alert-unmatched = pagamento não reconhecido
+ton-alert-unmatched-body = Chegou um pagamento sem um código de agendamento conhecido. Encontre o agendamento a que ele pertence, ou reembolse.
+ton-alert-failed = transferência com falha
+ton-alert-failed-body = Uma transferência para o endereço de pagamento falhou na rede. Os fundos podem ainda estar na sua carteira: confira a transação no explorador.
+ton-alert-not-text = transferência sem comentário legível
+ton-alert-not-text-body = Chegou uma transferência com comentário criptografado, um token ou outro conteúdo. Ela nunca é contada automaticamente: confira manualmente.
+ton-alert-other = transferência incomum
+ton-alert-other-body = Uma transferência não pôde ser processada automaticamente. Confira no registro de pagamentos.
+ton-email-problem-subject = Problema com pagamento em TON: { $event } ({ $date })
+ton-email-problem-urgent-subject = Urgente: um agendamento pago precisa de uma decisão: { $event } ({ $date })
+ton-email-problem-heading = Um agendamento pago precisa da sua atenção
+ton-problem-host-busy = O convidado pagou, mas o horário não está mais livre (um evento da agenda ou outro agendamento). O horário fica reservado até o início da reunião. Peça ao convidado um novo horário, confirme o agendamento manualmente, ou recuse-o e reembolse o pagamento.
+ton-problem-partial = Só uma parte do valor foi paga, e depois o agendamento expirou, foi cancelado ou recusado, ou foi confirmado sem pagamento. Reembolse o valor recebido, a menos que tenha combinado outra coisa com o convidado.
+ton-problem-overpaid = O agendamento está pago e confirmado com mais do que o valor devido. Reembolse o excedente se valer a pena.
+ton-problem-refund-due = O agendamento foi pago e depois cancelado ou recusado. Reembolse o pagamento.
+ton-problem-confirmed-unpaid = Um agendamento não pago foi encontrado confirmado. Isso nunca deveria acontecer: verifique como foi confirmado.
+ton-problem-address-revoked = O endereço de pagamento deste agendamento foi revogado, e o agendamento será liberado.
+ton-email-health-subject = Os pagamentos em TON precisam de atenção ({ $kind })
+ton-email-health-heading = Os pagamentos em TON precisam de atenção
+ton-health-indexer-down = O monitor de pagamentos não consegue acessar o indexador. Os pagamentos não estão sendo verificados, e novos agendamentos pagos são recusados até ele voltar.
+ton-health-auth-failed = O indexador recusou a chave de API (errada ou da outra rede). Verifique CALRS_TON_API_KEY.
+ton-health-wrong-network = O indexador responde por uma rede diferente da configurada. Nada é creditado nem expira até isso ser corrigido.
+ton-health-wallet-inactive = A carteira de recebimento não está ativa. Agendamentos pagos são recusados até ela fazer pelo menos uma transferência de saída.
+ton-health-lagging = O monitor de pagamentos está ficando para trás das transferências que chegam ao endereço (talvez spam). Agendamentos não pagos não expiram até ele se atualizar.
+ton-health-stuck-finality = Uma transferência está há muito tempo sem se tornar definitiva. O monitor espera por ela antes de continuar lendo.
+ton-health-watcher-crashed = O monitor de pagamentos travou várias vezes e continua reiniciando. Verifique o log do servidor.
+ton-health-disabled-with-open = Os pagamentos em TON estão desligados enquanto há agendamentos não pagos abertos. Os horários deles serão liberados nos prazos.
+ton-health-other-network-open = Há agendamentos abertos em uma rede TON diferente da configurada. Eles serão liberados nos prazos.
+ton-health-rate-unavailable = Não há cotação de TON aceitável (fontes ausentes, divergentes ou fora da sua faixa). Agendamentos pagos são recusados até haver uma.
+ton-health-capacity = O limite de agendamentos não pagos abertos ou diários foi atingido. Novos agendamentos pagos estão sendo recusados por enquanto.
+ton-health-other = O monitor de pagamentos relatou um problema. Verifique o log do servidor.
+
+# TON follow-ups: releases, refunds, contact, resend
+ton-resend-submit = Enviar os links por e-mail
+ton-resend-title = Confira seu e-mail
+ton-resend-done = Se houver um agendamento não pago com este e-mail, enviamos para ele os links de pagamento e de cancelamento.
+ton-pay-state-taken = Este horário foi ocupado antes de o agendamento ser pago, por isso o agendamento foi liberado. Não há nada a pagar. Escolha outro horário, por favor.
+ton-pay-state-refund = Este agendamento terminou sem ser confirmado. Os { $paid } TON que você pagou serão reembolsados; o anfitrião vai entrar em contato.
+ton-pay-contact = Dúvidas? Escreva para { $host }: { $email }.
+ton-pay-copy-address = Copiar o endereço
+ton-pay-copy-comment = Copiar o comentário
+ton-pay-copy-manual = Não foi possível copiar. O texto está selecionado: copie-o manualmente.
+ton-email-row-pay-by = Pagar até:
+ton-email-taken-message = O horário que você escolheu para { $event } foi ocupado antes de o agendamento ser pago, por isso o agendamento foi liberado. Não há nada a pagar. Fique à vontade para escolher outro horário.
+ton-email-refund-message = Recebemos seu pagamento de { $event }, mas não foi possível confirmar o horário, por isso o agendamento foi liberado. { $host } vai reembolsar o pagamento e entrar em contato.
+ton-problem-host-busy-unpaid = O horário deste agendamento não pago foi ocupado (outro pedido foi aprovado por cima dele ou surgiu um evento na agenda), por isso o agendamento foi liberado antes do pagamento. Se algo foi recebido, reembolse.
+ton-problem-confirm-failed = O convidado pagou, mas o agendamento não pôde ser confirmado automaticamente após várias tentativas (um erro, não um anfitrião ocupado: veja o log do servidor). O horário continua reservado até o início da reunião. Confirme o agendamento manualmente, ou recuse-o e reembolse o pagamento.
+ton-health-capacity-near = Um novo agendamento pago ocupou a última vaga aberta ou a última cota do dia. Os próximos serão recusados até que agendamentos sejam pagos ou liberados. Se não for procura real, alguém pode estar segurando horários sem pagar.
+ton-health-payment-alerts-held = Chegaram mais transferências para agendamentos sobre os quais você já recebeu um e-mail na última hora. Elas foram registradas sem um e-mail cada: confira o registro de pagamentos.
+ton-waive-body-partial = Este agendamento está pago só em parte ({ $paid } de { $amount } TON recebidos, prazo até { $time }). Se você confirmá-lo, o convidado terá a reunião sem pagar os { $rest } TON restantes. Reembolse o valor recebido, a menos que tenham combinado outra coisa.

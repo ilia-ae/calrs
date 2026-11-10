@@ -81,6 +81,8 @@ totp-rs = { version = "6", default-features = false, features = ["std", "qr", "z
 openidconnect = { version = "4.0.1", default-features = false, features = ["reqwest", "rustls-tls"] }
 iana-time-zone = "0.1.65"
 urlencoding = "2"
+# ilia fork: QR code of the TON payment link (already in Cargo.lock via totp-rs).
+qrcodegen = "=1.8.0"
 
 # Markdown (bio rendering)
 pulldown-cmark = { version = "0.12", default-features = false, features = ["html"] }

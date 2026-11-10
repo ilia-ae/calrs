@@ -404,6 +404,11 @@ pub(super) async fn dashboard_bookings(
         Some("no-bookable-dates") => {
             crate::i18n::translate(auth_user.lang, "bookings-error-no-bookable-dates", None)
         }
+        // ilia fork: TON payments (docs/ton.md).
+        Some("unpaid") => crate::i18n::translate(auth_user.lang, "ton-dash-error-unpaid", None),
+        Some("waive-failed") => {
+            crate::i18n::translate(auth_user.lang, "ton-dash-error-waive-failed", None)
+        }
         Some(_) => crate::i18n::translate(auth_user.lang, "bookings-error-generic", None),
         None => String::new(),
     };
@@ -602,6 +607,7 @@ pub(super) async fn dashboard_bookings(
             pending_bookings => pending_ctx,
             claimable_bookings => claimable_ctx,
             bookings => bookings_ctx,
+            ton => ton_pay::dashboard_badges(&state.pool, &user.id, &user.timezone, auth_user.lang).await,
             impersonating => impersonating,
             impersonating_name => impersonating_name,
         })
@@ -1307,6 +1313,8 @@ pub(super) async fn cancel_booking(
     }
 
     tracing::info!(booking_id = %bid, status = new_status, "booking {}", new_status);
+    // ilia fork: close its invoice, or flag a paid one for a refund.
+    ton_pay::booking_ended(&state.pool, &bid).await;
 
     if !was_pending {
         caldav_delete_booking(&state.pool, &state.secret_key, &user.id, &uid).await;
@@ -1485,6 +1493,10 @@ pub(super) async fn confirm_booking(
         Some(b) => b,
         None => return Redirect::to("/dashboard/bookings").into_response(),
     };
+    // ilia fork: an unpaid priced booking is confirmed only by a waive.
+    if ton_pay::approval_refused(&state.pool, &bid).await {
+        return Redirect::to("/dashboard/bookings?error=unpaid").into_response();
+    }
     // Read before the status flip below, which stamps it. A booking that was
     // confirmed before is a guest reschedule awaiting approval: its guest is
     // texted "moved", not "confirmed", and its attendees were already told

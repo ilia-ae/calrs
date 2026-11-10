@@ -19,6 +19,8 @@ mod pending;
 mod public_pages;
 mod sources;
 mod teams;
+// ilia fork: TON payments (ilia-booking docs/ton.md).
+pub(crate) mod ton_pay;
 mod week_start;
 pub(crate) mod writeback;
 
@@ -162,6 +164,8 @@ pub struct AppState {
     /// than "du" (`auth_config.german_formal`). Applied to each request by
     /// `german_formal_middleware`; updated on admin save.
     pub german_formal: std::sync::atomic::AtomicBool,
+    /// ilia fork: TON payments, `None` inside when not configured.
+    pub(crate) ton: ton_pay::TonSlot,
 }
 
 // --- CSRF protection (double-submit cookie pattern) ---
@@ -742,6 +746,7 @@ pub(crate) async fn build_state(
         csp: tokio::sync::RwLock::new(initial_csp),
         csp_baseline: build_csp(&None),
         german_formal: std::sync::atomic::AtomicBool::new(initial_german_formal),
+        ton: ton_pay::TonSlot::from_env(),
     })
 }
 
@@ -750,6 +755,8 @@ pub(crate) fn router(state: Arc<AppState>) -> Router {
     Router::new()
         .merge(crate::auth::auth_router())
         .merge(crate::mfa::router())
+        // ilia fork: the TON payment page and the dashboard waive.
+        .merge(ton_pay::router())
         .route("/", get(root_redirect))
         .route("/dashboard", get(dashboard))
         .route("/dashboard/event-types", get(dashboard_event_types))

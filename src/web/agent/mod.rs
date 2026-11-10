@@ -41,6 +41,7 @@ pub(super) mod listener;
 pub(super) mod ops_bookings;
 pub(super) mod ops_read;
 pub(super) mod ops_sources;
+pub(super) mod ops_ton;
 pub(super) mod ops_write;
 pub(super) mod sanitize;
 pub(super) mod server;
@@ -48,6 +49,7 @@ pub(super) mod snapshot;
 mod tools_bookings;
 mod tools_read;
 mod tools_sources;
+mod tools_ton;
 mod tools_write;
 pub(super) mod transport;
 

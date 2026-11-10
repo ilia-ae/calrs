@@ -1,0 +1,7 @@
+{#- ilia fork: an unpaid booking cannot be confirmed or moved, only waived or declined (docs/ton.md). -#}
+{% if pay.waivable %}
+<a href="{{ pay.waive_url }}" class="slot-btn" style="font-size: 0.8rem; text-decoration: none; color: var(--success); border-color: var(--success); cursor: pointer;">{{ t("ton-dash-waive") }}</a>
+{% endif %}
+<form method="post" action="/dashboard/bookings/{{ b.id }}/cancel" style="margin: 0;">
+  <button type="submit" class="slot-btn" style="font-size: 0.8rem; cursor: pointer; color: var(--error-text);">{{ t("bookings-decline") }}</button>
+</form>

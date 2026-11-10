@@ -610,6 +610,8 @@
   </div>
 </details>
 
+{% if ton_price is defined and ton_price %}{% include "partials/ton_price_form.html" %}{% endif %}
+
 <!-- Collapsible: Access & notifications -->
 <details class="card collapsible-section" style="margin-top: 1rem;"{% if editing and ((form_visibility is defined and form_visibility and form_visibility != "public") or (form_reminder_minutes is defined and form_reminder_minutes and form_reminder_minutes != 0)) %} open{% endif %}>
   <summary class="collapsible-header">

@@ -20,6 +20,7 @@
 
 <div class="card">
   <h1>{{ event_type.title }}</h1>
+  {% include "partials/ton_price.html" %}
   <div class="meta">
     <span>{{ event_type.duration_min }} min</span>
     <span>{{ host_name }}</span>

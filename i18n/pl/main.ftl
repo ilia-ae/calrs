@@ -1719,3 +1719,182 @@ directory-manual-copy = Skopiuj ten link ręcznie:
 directory-empty = Nie znaleziono spotkań. Spróbuj innego wyszukiwania.
 directory-favorites-empty = Nie znaleziono ulubionych. Dodaj spotkania do ulubionych w katalogu, aby zobaczyć je tutaj.
 directory-with-hosts = Prowadzący: { $names }
+
+## ilia fork: TON payments (docs/ton.md)
+
+# Price on the slot and booking pages
+ton-slots-price = Cena: { $usd } $
+ton-slots-price-approx = (≈ { $ton } TON)
+ton-slots-price-note = płatność w TON po wybraniu terminu
+
+# Event type form
+ton-etf-section = Płatność w TON
+ton-etf-off-note = Płatności w TON nie są skonfigurowane na tym serwerze. Płatnego typu wydarzenia nie da się zarezerwować, dopóki nie zostaną skonfigurowane.
+ton-etf-enabled = Płatna rezerwacja
+ton-etf-enabled-help = Goście płacą w TON zaraz po wybraniu terminu. Termin jest dla nich zarezerwowany w trakcie płatności, a nieopłacona rezerwacja zostaje automatycznie zwolniona.
+ton-etf-price = Cena (USD)
+ton-etf-price-help = Od 1 $ do 10000 $. Kwota w TON jest liczona według kursu z chwili rezerwacji.
+ton-etf-window = Czas na płatność (minuty)
+ton-etf-window-help = Od 10 do 240. Zostaw puste, aby użyć wartości serwera ({ $minutes } min).
+ton-form-error-price = Podaj cenę w dolarach amerykańskich od 1 do 10000, z najwyżej dwoma miejscami po przecinku.
+ton-form-error-window = Czas na płatność musi wynosić od 10 do 240 minut.
+ton-form-error-team = Typy wydarzeń zespołu nie mogą być płatne.
+
+# Booking error pages
+ton-bae-title-unavailable = Nie można zarezerwować tego terminu
+ton-bae-body-unavailable = Płatność jest chwilowo niedostępna, więc tego terminu nie można teraz zarezerwować. Spróbuj ponownie za kilka minut.
+ton-bae-body-too-late = Do tego spotkania zostało za mało czasu, aby je opłacić. Wybierz późniejszy termin.
+ton-bae-body-already-open = Masz już nieopłaconą rezerwację na ten adres e-mail. Możemy wysłać Ci jej linki: tam możesz ją opłacić albo anulować, aby zwolnić termin, a potem zarezerwować ponownie.
+ton-bae-body-personal-only = To spotkanie można zarezerwować tylko na własnej stronie gospodarza.
+ton-bae-title-unpaid = Rezerwacja nieopłacona
+ton-bae-body-unpaid = Ta rezerwacja nie jest opłacona, więc nie można jej zatwierdzić. Aby potwierdzić ją bezpłatnie, użyj opcji „Potwierdź bez płatności” na stronie rezerwacji w panelu.
+ton-bae-body-reschedule-unpaid = Ta rezerwacja nie jest opłacona, więc nie można jej przenieść. Opłać ją albo anuluj i zarezerwuj inny termin.
+ton-bae-body-pay-link-invalid = Ten link do płatności jest nieprawidłowy.
+
+# Payment page
+ton-pay-page-title = Płatność: { $title }
+ton-pay-held-until = Termin jest dla ciebie zarezerwowany do { $time } ({ $zone }).
+ton-pay-left = zostało %1
+ton-pay-amount-label = Kwota do zapłaty
+ton-pay-rate = ≈ { $usd } $ · 1 TON = { $rate } $ ({ $sources }, { $time } UTC)
+ton-pay-open-wallet = Otwórz portfel
+ton-pay-open-tonkeeper = Otwórz w Tonkeeper
+ton-pay-qr-alt = Kod QR z danymi płatności
+ton-pay-scan = Albo zeskanuj ten kod aplikacją portfela.
+ton-pay-address = Adres
+ton-pay-comment = Komentarz
+ton-pay-copy = Kopiuj
+ton-pay-copied = Skopiowano
+ton-pay-warn-comment = Komentarz jest wymagany: po nim rozpoznajemy twoją płatność.
+ton-pay-warn-encrypt = Nie szyfruj komentarza.
+ton-pay-warn-token = Płać w TON, nie tokenami.
+ton-pay-warn-exchange = Płacisz z giełdy? Wpisz powyższy kod w pole memo (komentarz).
+ton-pay-warn-deadline = Wyślij płatność przed { $time }. Płatność wysłana później może nie zostać uwzględniona.
+ton-pay-check = Zapłacono, sprawdź
+ton-pay-email = Wyślij mi ten link e-mailem
+ton-pay-emailed = Wysłaliśmy ten link na adres e-mail podany przy rezerwacji.
+ton-pay-email-unavailable = Nie udało się wysłać linku. Nie zamykaj tej strony albo zapisz jej adres.
+ton-pay-checking-now = Sprawdzamy twoją płatność. Ta strona odświeża się sama.
+ton-pay-state-waiting = Czekamy na twoją płatność.
+ton-pay-state-seen = Twoja płatność jest widoczna w sieci. Czekamy, aż stanie się ostateczna, co zwykle trwa kilka sekund.
+ton-pay-state-partial = Otrzymaliśmy { $paid } TON. Dopłać pozostałe { $rest } TON z tym samym komentarzem.
+ton-pay-state-checking = Czas na płatność minął. Jeśli płatność została już wysłana, sprawdzamy ją. Ta strona odświeża się sama.
+ton-pay-state-paid = Płatność otrzymana. Potwierdzamy rezerwację…
+ton-pay-state-confirmed = Opłacono. Rezerwacja jest potwierdzona, e-mail z potwierdzeniem jest w drodze.
+ton-pay-state-waived = Ta rezerwacja nie wymaga płatności. Gospodarz ją potwierdza.
+ton-pay-state-busy = Płatność otrzymana, ale ten termin nie jest już wolny. Skontaktujemy się z tobą.
+ton-pay-state-expired = Czas na płatność minął i termin został zwolniony. Jeśli mimo to wysłano płatność, napisz do nas z adresu e-mail podanego przy rezerwacji, a zwrócimy pieniądze.
+ton-pay-state-late = Twoja płatność dotarła po terminie, więc rezerwacja nie została potwierdzona. Skontaktujemy się w sprawie zwrotu. Możesz też napisać do nas z adresu e-mail podanego przy rezerwacji.
+ton-pay-state-closed = Ta rezerwacja nie jest już aktywna.
+ton-pay-state-revoked = Ten adres płatności nie jest już używany. Nie wysyłaj na niego niczego i zarezerwuj ponownie.
+ton-pay-rebook = Zarezerwuj inny termin
+
+# Leaving the embedded widget
+ton-exit-title = Termin zarezerwowany
+ton-exit-body = Termin jest dla ciebie zarezerwowany do { $time } ({ $zone }). Dokończ płatność, aby potwierdzić rezerwację.
+ton-exit-go = Przejdź do płatności
+
+# Dashboard
+ton-dash-badge-awaiting = czeka na płatność · { $amount } TON · do { $time }
+ton-dash-badge-partial = opłacona częściowo · { $paid } z { $amount } TON · do { $time }
+ton-dash-badge-paid = opłacona · { $amount } TON
+ton-dash-badge-overpaid = opłacona · nadpłata { $excess } TON
+ton-dash-badge-busy = opłacona, termin zajęty
+ton-dash-badge-confirm-failed = opłacona, niepotwierdzona · potwierdź ręcznie
+ton-dash-badge-refund = opłacono { $amount } TON · należy się zwrot
+ton-dash-badge-waived = potwierdzona bez płatności
+ton-dash-badge-unpaid = nieopłacona
+ton-dash-waive = Potwierdź bez płatności
+ton-dash-error-unpaid = Ta rezerwacja nie jest opłacona, więc nie można jej potwierdzić ani przenieść. Użyj opcji „Potwierdź bez płatności”, aby potwierdzić ją bezpłatnie, albo ją odrzuć.
+ton-dash-error-waive-failed = Nie udało się potwierdzić rezerwacji bez płatności: nie czeka już na płatność.
+ton-waive-page-title = Potwierdź bez płatności
+ton-waive-heading = Potwierdzić tę rezerwację bez płatności?
+ton-waive-body = Ta rezerwacja NIE jest opłacona ({ $amount } TON, termin płatności do { $time }). Jeśli ją potwierdzisz, gość dostanie spotkanie bezpłatnie, a płatność, która dotrze później, trzeba będzie zwrócić ręcznie.
+ton-waive-submit = Potwierdź bezpłatnie
+ton-waive-back = Wróć do rezerwacji
+
+# Guest emails
+ton-email-link-subject = Dokończ rezerwację: { $event }
+ton-email-link-message = Rozpoczęto rezerwację: { $event }, gospodarz: { $host }. Dokończ ją na stronie poniżej, zanim minie czas.
+ton-email-link-action = Dokończ rezerwację
+ton-email-link-line = Dokończ rezerwację: { $url }
+ton-email-expired-subject = Bez rezerwacji: { $event }, { $date }
+ton-email-expired-message = Płatność za { $event } nie dotarła na czas, więc termin został zwolniony. Możesz wybrać inny termin.
+ton-email-expired-partial = Otrzymaliśmy część płatności. Skontaktujemy się w sprawie zwrotu.
+ton-email-rebook-line = Wybierz inny termin: { $url }
+
+# Owner emails
+ton-email-row-amount = Kwota:
+ton-email-row-paid = Otrzymano:
+ton-email-row-excess = Nadpłata:
+ton-email-row-transfer = Przelew:
+ton-email-row-sender = Nadawca:
+ton-email-row-tx = Transakcja:
+ton-email-row-detail = Szczegóły:
+ton-email-amount-value = { $amount } TON ≈ { $usd } $ (1 TON = { $rate } $)
+ton-email-sender-wallet = { $address } (portfel)
+ton-email-sender-other = { $address } (nie portfel: giełda lub kontrakt)
+ton-email-dashboard-line = Rezerwacje: { $url }
+ton-email-dashboard-action = Otwórz rezerwacje
+ton-email-refund-rule = Zwroty robisz ręcznie ze swojego portfela: na adres nadawcy, jeśli to portfel; w przeciwnym razie tylko na adres, o który gość poprosi z adresu e-mail podanego przy rezerwacji, w wiadomości zawierającej jego link do płatności lub anulowania. Kod rezerwacji, kwota i transakcja są publiczne i niczego nie dowodzą.
+ton-email-received-subject = Płatność otrzymana: { $event }, { $guest } ({ $date })
+ton-email-received-heading = Płatność otrzymana
+ton-email-received-message = Zapłacono { $amount } TON. Gość: { $guest }. Rezerwacja jest potwierdzona.
+ton-email-alert-subject = Płatność w TON wymaga uwagi: { $what }
+ton-email-alert-heading = Płatność wymaga twojej uwagi
+ton-alert-partial = płatność częściowa
+ton-alert-partial-body = Dotarła część należnej kwoty. Rezerwacja pozostaje niepotwierdzona, dopóki nie dotrze reszta; w przeciwnym razie zostanie zwolniona w terminie, a otrzymaną kwotę trzeba będzie zwrócić.
+ton-alert-overpaid = nadpłata
+ton-alert-overpaid-body = Dotarła płatność za już opłaconą rezerwację. Zwróć ją, jeśli warto.
+ton-alert-late = spóźniona płatność
+ton-alert-late-body = Płatność wpłynęła po terminie. Rezerwacja była już zwolniona i nie można jej już potwierdzić. Zwróć płatność albo poproś gościa o ponowną rezerwację i potwierdź nową rezerwację bez płatności.
+ton-alert-unmatched = nierozpoznana płatność
+ton-alert-unmatched-body = Dotarła płatność bez znanego kodu rezerwacji. Znajdź rezerwację, do której należy, albo ją zwróć.
+ton-alert-failed = nieudany przelew
+ton-alert-failed-body = Przelew na adres płatności nie powiódł się w sieci. Środki mogą wciąż być w twoim portfelu: sprawdź transakcję w eksploratorze.
+ton-alert-not-text = przelew bez czytelnego komentarza
+ton-alert-not-text-body = Dotarł przelew z zaszyfrowanym komentarzem, tokenem lub inną zawartością. Nigdy nie jest zaliczany automatycznie: sprawdź go ręcznie.
+ton-alert-other = nietypowy przelew
+ton-alert-other-body = Przelewu nie udało się przetworzyć automatycznie. Sprawdź go w rejestrze płatności.
+ton-email-problem-subject = Problem z płatnością w TON: { $event } ({ $date })
+ton-email-problem-urgent-subject = Pilne: opłacona rezerwacja wymaga decyzji: { $event } ({ $date })
+ton-email-problem-heading = Opłacona rezerwacja wymaga twojej uwagi
+ton-problem-host-busy = Gość zapłacił, ale termin nie jest już wolny (wydarzenie w kalendarzu lub inna rezerwacja). Termin pozostaje zarezerwowany do rozpoczęcia spotkania. Poproś gościa o nowy termin, potwierdź rezerwację ręcznie albo ją odrzuć i zwróć płatność.
+ton-problem-partial = Opłacono tylko część kwoty, a potem rezerwacja wygasła, została anulowana lub odrzucona albo potwierdzona bez płatności. Zwróć otrzymaną kwotę, chyba że ustalono z gościem inaczej.
+ton-problem-overpaid = Rezerwacja jest opłacona i potwierdzona, ale wpłacono więcej, niż należało. Zwróć nadwyżkę, jeśli warto.
+ton-problem-refund-due = Rezerwacja została opłacona, a potem anulowana lub odrzucona. Zwróć płatność.
+ton-problem-confirmed-unpaid = Nieopłacona rezerwacja okazała się potwierdzona. To nie powinno się zdarzyć: sprawdź, jak została potwierdzona.
+ton-problem-address-revoked = Adres płatności tej rezerwacji został unieważniony, a rezerwacja zostanie zwolniona.
+ton-email-health-subject = Płatności w TON wymagają uwagi ({ $kind })
+ton-email-health-heading = Płatności w TON wymagają uwagi
+ton-health-indexer-down = Monitor płatności nie może połączyć się z indekserem. Płatności nie są sprawdzane, a nowe płatne rezerwacje są odrzucane, dopóki połączenie nie wróci.
+ton-health-auth-failed = Indekser odrzucił klucz API (błędny lub dla innej sieci). Sprawdź CALRS_TON_API_KEY.
+ton-health-wrong-network = Indekser odpowiada dla innej sieci niż skonfigurowana. Do czasu poprawki nic nie jest zaliczane ani nie wygasa.
+ton-health-wallet-inactive = Portfel odbiorczy nie jest aktywny. Płatne rezerwacje są odrzucane, dopóki nie wykona co najmniej jednego przelewu wychodzącego.
+ton-health-lagging = Monitor płatności nie nadąża za przelewami na adres (być może spam). Nieopłacone rezerwacje nie wygasają, dopóki nie nadrobi zaległości.
+ton-health-stuck-finality = Jeden przelew od dawna nie stał się ostateczny. Monitor czeka na niego, zanim przeczyta dalej.
+ton-health-watcher-crashed = Monitor płatności kilka razy uległ awarii i wciąż się restartuje. Sprawdź dziennik serwera.
+ton-health-disabled-with-open = Płatności w TON są wyłączone, a nieopłacone rezerwacje są otwarte. Ich terminy zostaną zwolnione w terminie.
+ton-health-other-network-open = Są otwarte rezerwacje w innej sieci TON niż skonfigurowana. Zostaną zwolnione w terminie.
+ton-health-rate-unavailable = Brak akceptowalnego kursu TON (źródła niedostępne, rozbieżne lub poza twoim przedziałem). Płatne rezerwacje są odrzucane, dopóki kurs się nie pojawi.
+ton-health-capacity = Osiągnięto limit otwartych lub dziennych nieopłaconych rezerwacji. Nowe płatne rezerwacje są na razie odrzucane.
+ton-health-other = Monitor płatności zgłosił problem. Sprawdź dziennik serwera.
+
+# TON follow-ups: releases, refunds, contact, resend
+ton-resend-submit = Wyślij mi linki
+ton-resend-title = Sprawdź pocztę
+ton-resend-done = Jeśli na ten adres e-mail jest nieopłacona rezerwacja, wysłaliśmy na niego jej linki do płatności i anulowania.
+ton-pay-state-taken = Ten termin został zajęty, zanim rezerwacja została opłacona, więc rezerwację zwolniono. Nie trzeba nic płacić. Wybierz inny termin.
+ton-pay-state-refund = Ta rezerwacja zakończyła się bez potwierdzenia. Zapłacone { $paid } TON zostaną zwrócone; organizator skontaktuje się z Tobą.
+ton-pay-contact = Pytania? Napisz do organizatora ({ $host }): { $email }.
+ton-pay-copy-address = Kopiuj adres
+ton-pay-copy-comment = Kopiuj komentarz
+ton-pay-copy-manual = Nie udało się skopiować. Tekst jest zaznaczony: skopiuj go ręcznie.
+ton-email-row-pay-by = Zapłać do:
+ton-email-taken-message = Termin wybrany na { $event } został zajęty, zanim rezerwacja została opłacona, więc rezerwację zwolniono. Nie trzeba nic płacić. Możesz wybrać inny termin.
+ton-email-refund-message = Otrzymaliśmy Twoją płatność za { $event }, ale nie udało się potwierdzić terminu, więc rezerwację zwolniono. { $host } zwróci płatność i skontaktuje się z Tobą.
+ton-problem-host-busy-unpaid = Termin tej nieopłaconej rezerwacji został zajęty (zatwierdzono na nim inną prośbę albo w kalendarzu pojawiło się wydarzenie), więc rezerwację zwolniono przed płatnością. Jeśli coś już wpłynęło, zwróć to.
+ton-problem-confirm-failed = Gość zapłacił, ale rezerwacji nie udało się automatycznie potwierdzić po kilku próbach (to błąd, a nie zajęty organizator: zobacz dziennik serwera). Termin pozostaje zarezerwowany do początku spotkania. Potwierdź rezerwację ręcznie albo ją odrzuć i zwróć płatność.
+ton-health-capacity-near = Nowa płatna rezerwacja zajęła ostatnie wolne miejsce lub ostatni dzienny limit. Kolejne będą odrzucane, dopóki rezerwacje nie zostaną opłacone lub zwolnione. Jeśli to nie jest prawdziwy popyt, ktoś może blokować terminy bez płacenia.
+ton-health-payment-alerts-held = Wpłynęły kolejne przelewy do rezerwacji, o których w ciągu ostatniej godziny otrzymano już e-mail. Zapisano je bez osobnych e-maili: sprawdź rejestr płatności.
+ton-waive-body-partial = Ta rezerwacja jest opłacona tylko częściowo (otrzymano { $paid } z { $amount } TON, termin do { $time }). Jeśli ją potwierdzisz, gość otrzyma spotkanie bez dopłaty pozostałych { $rest } TON. Zwróć otrzymaną kwotę, chyba że ustalono inaczej.

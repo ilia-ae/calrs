@@ -28,6 +28,8 @@ mod settings;
 mod sms;
 #[cfg(test)]
 mod test_support;
+// ilia fork: TON payments (ilia-booking docs/ton.md).
+mod ton;
 mod trusted_proxies;
 mod tzid;
 mod utils;
@@ -197,7 +199,8 @@ async fn main() -> Result<()> {
 
             let state = web::build_state(pool, data_dir, secret_key).await;
             let (stop_tx, stop_rx) = tokio::sync::watch::channel(false);
-            let agent = web::agent::spawn(state.clone(), stop_rx);
+            let agent = web::agent::spawn(state.clone(), stop_rx.clone());
+            let ton = web::ton_pay::spawn(state.clone(), stop_rx);
             let router = web::router(state);
             let addr = std::net::SocketAddr::from((host, port));
             tracing::info!("calrs server listening on {}", addr);
@@ -228,6 +231,7 @@ async fn main() -> Result<()> {
             .with_graceful_shutdown(shutdown)
             .await?;
             agent.finish(std::time::Duration::from_secs(20)).await;
+            ton.finish(std::time::Duration::from_secs(20)).await;
             // Booking emails are sent in the background after the response;
             // let the ones still in flight finish before the runtime stops.
             web::drain_emails(std::time::Duration::from_secs(30)).await;
