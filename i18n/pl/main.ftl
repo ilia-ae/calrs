@@ -2051,7 +2051,7 @@ msg-guest = Gość: { $guest }
 msg-sent = Wiadomość wysłana.
 msg-empty = Nie ma jeszcze wiadomości.
 msg-label = Wiadomość do gościa
-msg-help-email = Gość otrzyma ją e-mailem, a odpowiedzi trafią na Twój adres.
+msg-help-email = Gość otrzyma ją e-mailem z adresu systemu; jego odpowiedzi pojawią się tutaj i w Twoim Telegramie.
 msg-help-no-email = Na tym serwerze nie skonfigurowano poczty e-mail.
 msg-help-telegram = Gość połączył Telegram i otrzyma ją także tam.
 msg-help-no-telegram = Gość nie połączył Telegrama.
@@ -2061,6 +2061,8 @@ msg-link = Wiadomości
 msg-link-count = Wiadomości ({ $count })
 msg-from-host = Gospodarz
 msg-from-guest = Gość
+msg-from-attendee = Uczestnik: { $address }
+msg-from-other = Inny adres, nie gościa: { $address }
 msg-via-dashboard = panel
 msg-via-mcp = agent
 msg-via-telegram = Telegram
@@ -2098,3 +2100,21 @@ tg-bot-message-sent-shortened = Twoja wiadomość została przekazana gospodarzo
 tg-bot-reply-too-long = Odpowiedź nie została wysłana: wiadomość może mieć najwyżej { $max } znaków.
 tg-bot-reply-empty = Odpowiedź nie została wysłana: nie zawiera widocznego tekstu.
 tg-bot-reply-failed = Nie udało się zapisać odpowiedzi, więc nie została wysłana. Spróbuj ponownie.
+troubleshoot-not-synced = Kalendarze są odczytywane tylko od { $from } do { $until }; wydarzenia spoza tych dni nie są wczytywane, więc nie ma ich tutaj.
+event-type-form-horizon-capped =
+    { $days ->
+        [one] Ten serwer udostępnia terminy najwyżej { $days } dzień naprzód, niezależnie od horyzontu rezerwacji.
+        [few] Ten serwer udostępnia terminy najwyżej { $days } dni naprzód, niezależnie od horyzontu rezerwacji.
+        [many] Ten serwer udostępnia terminy najwyżej { $days } dni naprzód, niezależnie od horyzontu rezerwacji.
+       *[other] Ten serwer udostępnia terminy najwyżej { $days } dni naprzód, niezależnie od horyzontu rezerwacji.
+    }
+
+## ilia fork: the system mailbox (src/inbox)
+msg-help-email-no-inbox = Gość otrzyma ją e-mailem z adresu systemu. Odpowiedzi e-mailem nie są na tym serwerze czytane.
+msg-via-email = e-mail
+msg-email-footer-no-reply = Tę wiadomość wysłał system rezerwacji w imieniu: { $host }; odpowiedzi na nią nie są czytane.
+tg-host-guest-email = E-mail od { $guest } ({ $email }) w sprawie { $event }, { $when }:
+tg-host-attendee-email = E-mail od { $sender }, dodatkowego uczestnika rezerwacji gościa { $guest } ({ $email }), w sprawie { $event }, { $when }:
+tg-host-other-email = E-mail z innego adresu, nie gościa: { $sender }, w wątku rezerwacji gościa { $guest } ({ $email }) w sprawie { $event }, { $when }:
+booking-blocked-body-system = Gospodarz wymaga co najmniej { $minutes } minut wyprzedzenia. Jeśli nie możesz się pojawić, napisz na <a href="{ $href }">{ $address }</a>.
+booking-blocked-body-no-reply = Gospodarz wymaga co najmniej { $minutes } minut wyprzedzenia. Jeśli nie możesz się pojawić, daj znać gospodarzowi w inny sposób.

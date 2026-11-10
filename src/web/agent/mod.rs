@@ -39,7 +39,7 @@ pub(super) mod error;
 pub(super) mod limit;
 pub(super) mod listener;
 pub(super) mod ops_bookings;
-pub(super) mod ops_messages;
+pub(crate) mod ops_messages;
 pub(super) mod ops_read;
 pub(super) mod ops_sources;
 pub(super) mod ops_ton;

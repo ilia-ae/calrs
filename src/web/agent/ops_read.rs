@@ -17,7 +17,7 @@ use super::{
     ENDINGS_PER_HOUR, GUEST_NAME_MAX, MAX_CONNECTIONS, MAX_FRAME_BYTES, OWNER_TEXT_MAX,
     PAGE_DEFAULT, PAGE_MAX, SYNC_COOLDOWN_SECS, WRITES_PER_HOUR,
 };
-use crate::booking_window::{today_in, MAX_DAYS_AHEAD};
+use crate::booking_window::today_in;
 use crate::models::User;
 use crate::web::availability::{
     booking_window_warnings, compute_slots_read, get_booking_window, get_host_tz, server_tz,
@@ -523,6 +523,10 @@ pub(crate) async fn get_event_type(
         timezone_stored: timezone_stored.filter(|tz| !tz.is_empty()),
         timezone_effective: get_host_tz(pool, &et_id).await.name().to_string(),
         booking_horizon_days: col(&row, "booking_horizon_days")?,
+        effective_horizon_days: col::<Option<i64>>(&row, "booking_horizon_days")?
+            .map_or(crate::horizon::max_days_ahead(), |days| {
+                days.clamp(0, crate::horizon::max_days_ahead())
+            }),
         bookable_from: col(&row, "bookable_from")?,
         bookable_until: col(&row, "bookable_until")?,
         reminder_minutes: col(&row, "reminder_minutes")?,
@@ -700,8 +704,10 @@ pub(crate) async fn get_slots(
     let today = today_in(host_tz);
     let from = requested_from.unwrap_or(today);
     let ahead = (from - today).num_days();
-    if !(0..=MAX_DAYS_AHEAD).contains(&ahead) {
-        let last = today + chrono::Duration::days(MAX_DAYS_AHEAD);
+    // The fork-wide horizon (`CALRS_MAX_HORIZON_DAYS`) bounds it too.
+    let max_ahead = crate::horizon::max_days_ahead();
+    if !(0..=max_ahead).contains(&ahead) {
+        let last = today + chrono::Duration::days(max_ahead);
         return Err(ToolError::invalid(
             "from",
             format!("must be from {today} to {last}"),

@@ -8,12 +8,12 @@ use super::*;
 use crate::telegram::commands::handle_update;
 use crate::telegram::fake::{self, Installed};
 
-const GUEST_CHAT: i64 = 987650001;
-const HOST_CHAT: i64 = 555000222;
+pub(super) const GUEST_CHAT: i64 = 987650001;
+pub(super) const HOST_CHAT: i64 = 555000222;
 const CSRF: &str = "msg-csrf";
 
 /// A version 1 booking `hours` from now, in English, for guest@test.com.
-async fn booking(pool: &SqlitePool, et_id: &str, hours: i64, status: &str) -> String {
+pub(super) async fn booking(pool: &SqlitePool, et_id: &str, hours: i64, status: &str) -> String {
     insert_v1_booking(
         pool,
         et_id,
@@ -27,7 +27,7 @@ async fn booking(pool: &SqlitePool, et_id: &str, hours: i64, status: &str) -> St
 }
 
 /// Link `chat` to the booking as its guest's chat.
-async fn link_guest(pool: &SqlitePool, booking_id: &str, chat: i64) {
+pub(super) async fn link_guest(pool: &SqlitePool, booking_id: &str, chat: i64) {
     let end: String = sqlx::query_scalar("SELECT end_at FROM bookings WHERE id = ?")
         .bind(booking_id)
         .fetch_one(pool)
@@ -51,7 +51,7 @@ async fn link_guest(pool: &SqlitePool, booking_id: &str, chat: i64) {
 }
 
 /// The seeded admin's host chat.
-async fn link_host(pool: &SqlitePool) {
+pub(super) async fn link_host(pool: &SqlitePool) {
     sqlx::query(
         "INSERT INTO telegram_user_chats (user_id, chat_id, telegram_username)
          SELECT id, ?, 'host_tg' FROM users WHERE email = 'test@example.com'",
@@ -80,7 +80,7 @@ fn location(response: &axum::http::Response<Body>) -> String {
         .to_string()
 }
 
-fn texts(tg: &Installed, chat: i64) -> Vec<String> {
+pub(super) fn texts(tg: &Installed, chat: i64) -> Vec<String> {
     tg.sent()
         .into_iter()
         .filter(|(c, _)| *c == chat)
@@ -89,7 +89,7 @@ fn texts(tg: &Installed, chat: i64) -> Vec<String> {
 }
 
 /// A text from `chat`, optionally replying to bot message `reply_to`.
-async fn write(
+pub(super) async fn write(
     tg: &Installed,
     pool: &SqlitePool,
     update: i64,
@@ -102,7 +102,7 @@ async fn write(
     tg.flush(pool).await;
 }
 
-async fn thread_rows(
+pub(super) async fn thread_rows(
     pool: &SqlitePool,
     booking_id: &str,
 ) -> Vec<(String, String, String, String, String)> {
@@ -117,7 +117,7 @@ async fn thread_rows(
 }
 
 /// An open TON invoice for a booking: it awaits its payment.
-async fn open_invoice(pool: &SqlitePool, booking_id: &str, et_id: &str) {
+pub(super) async fn open_invoice(pool: &SqlitePool, booking_id: &str, et_id: &str) {
     let now = Utc::now();
     let stamp = |t: chrono::DateTime<Utc>| crate::web::ton_pay::stamp(t);
     sqlx::query(
@@ -918,10 +918,10 @@ async fn recent_meetings_keep_their_thread_reachable() {
 
 /// Every log event's fields, as text.
 #[derive(Clone, Default)]
-struct LogCapture(Arc<std::sync::Mutex<Vec<String>>>);
+pub(super) struct LogCapture(Arc<std::sync::Mutex<Vec<String>>>);
 
 impl LogCapture {
-    fn install(&self) -> tracing::subscriber::DefaultGuard {
+    pub(super) fn install(&self) -> tracing::subscriber::DefaultGuard {
         use tracing_subscriber::layer::SubscriberExt;
         let guard =
             tracing::subscriber::set_default(tracing_subscriber::registry().with(self.clone()));
@@ -929,7 +929,7 @@ impl LogCapture {
         guard
     }
 
-    fn all(&self) -> String {
+    pub(super) fn all(&self) -> String {
         self.0.lock().unwrap().join("\n")
     }
 }

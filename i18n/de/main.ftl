@@ -1992,7 +1992,7 @@ msg-guest = Gast: { $guest }
 msg-sent = Nachricht gesendet.
 msg-empty = Noch keine Nachrichten.
 msg-label = Nachricht an den Gast
-msg-help-email = Der Gast erhält sie per E-Mail; Antworten gehen an die eigene Adresse.
+msg-help-email = Der Gast erhält sie per E-Mail von der Systemadresse; seine Antworten erscheinen hier und im Telegram-Chat.
 msg-help-no-email = Auf diesem Server ist keine E-Mail eingerichtet.
 msg-help-telegram = Der Gast hat Telegram verbunden und erhält sie auch dort.
 msg-help-no-telegram = Der Gast hat Telegram nicht verbunden.
@@ -2002,6 +2002,8 @@ msg-link = Nachrichten
 msg-link-count = Nachrichten ({ $count })
 msg-from-host = Gastgeber
 msg-from-guest = Gast
+msg-from-attendee = Teilnehmer: { $address }
+msg-from-other = Andere Adresse, nicht die des Gastes: { $address }
 msg-via-dashboard = Dashboard
 msg-via-mcp = Agent
 msg-via-telegram = Telegram
@@ -2039,3 +2041,19 @@ tg-bot-message-sent-shortened = Die Nachricht wurde an den Gastgeber weitergegeb
 tg-bot-reply-too-long = Die Antwort wurde nicht gesendet: Eine Nachricht darf höchstens { $max } Zeichen haben.
 tg-bot-reply-empty = Die Antwort wurde nicht gesendet: Sie enthält keinen sichtbaren Text.
 tg-bot-reply-failed = Die Antwort konnte nicht gespeichert werden und wurde daher nicht gesendet. Bitte erneut versuchen.
+troubleshoot-not-synced = Kalender werden nur vom { $from } bis { $until } gelesen; Termine außerhalb dieser Tage werden nicht geladen und hier nicht angezeigt.
+event-type-form-horizon-capped =
+    { $days ->
+        [one] Dieser Server bietet Termine höchstens { $days } Tag im Voraus an, unabhängig vom Buchungshorizont.
+       *[other] Dieser Server bietet Termine höchstens { $days } Tage im Voraus an, unabhängig vom Buchungshorizont.
+    }
+
+## ilia fork: the system mailbox (src/inbox)
+msg-help-email-no-inbox = Der Gast erhält sie per E-Mail von der Systemadresse. Antworten per E-Mail werden auf diesem Server nicht gelesen.
+msg-via-email = E-Mail
+msg-email-footer-no-reply = Diese Nachricht hat das Buchungssystem im Namen von { $host } gesendet; Antworten darauf werden nicht gelesen.
+tg-host-guest-email = E-Mail von { $guest } ({ $email }) zu { $event }, { $when }:
+tg-host-attendee-email = E-Mail von { $sender }, weiterer Teilnehmer der Buchung von { $guest } ({ $email }), zu { $event }, { $when }:
+tg-host-other-email = E-Mail von einer anderen Adresse, nicht der des Gastes: { $sender }, im Verlauf der Buchung von { $guest } ({ $email }) zu { $event }, { $when }:
+booking-blocked-body-system = Der Gastgeber verlangt mindestens { $minutes } Minuten Vorlaufzeit. Falls du nicht teilnehmen kannst, schreib bitte an <a href="{ $href }">{ $address }</a>.
+booking-blocked-body-no-reply = Der Gastgeber verlangt mindestens { $minutes } Minuten Vorlaufzeit. Falls du nicht teilnehmen kannst, gib dem Gastgeber bitte auf anderem Weg Bescheid.

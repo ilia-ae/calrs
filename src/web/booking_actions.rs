@@ -796,7 +796,7 @@ async fn fetch_notice_min_and_host_email(
         "cancel_token" | "reschedule_token"
     ));
     let sql = format!(
-        "SELECT et.{notice}, COALESCE(u.booking_email, u.email) \
+        "SELECT et.{notice}, COALESCE(u.booking_email, u.email), b.uid \
          FROM bookings b \
          JOIN event_types et ON et.id = b.event_type_id \
          JOIN accounts a ON a.id = et.account_id \
@@ -805,11 +805,17 @@ async fn fetch_notice_min_and_host_email(
         notice = notice_column,
         tok = booking_token_column
     );
-    sqlx::query_as::<_, (Option<i32>, String)>(&sql)
+    // ilia fork (`crate::inbox`): in relay mode the contact is the
+    // booking's `mailto:` to the system mailbox (empty when none is read),
+    // never the host's own address.
+    sqlx::query_as::<_, (Option<i32>, String, String)>(&sql)
         .bind(token)
         .fetch_optional(pool)
         .await
         .unwrap_or(None)
+        .map(|(notice, host_email, uid)| {
+            (notice, crate::web::ilia::blocked_contact(&uid, host_email))
+        })
 }
 
 /// If `notice_min` is set and the booking starts inside the notice window,
@@ -850,7 +856,9 @@ fn check_notice_window(
     let rendered = tmpl
         .render(context! {
             notice_min => n,
-            host_email => host_email,
+            host_email => crate::web::ilia::blocked_contact_shown(host_email),
+            contact_href => host_email,
+            relay => crate::inbox::relay(),
             action => action,
             lang => lang,
         })

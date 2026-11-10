@@ -590,12 +590,37 @@ pub(crate) fn host(event: &TelegramEvent, v: &HostView, lang: &str) -> Option<Ou
         }
         // ilia fork (messages): the guest wrote it, so it is cleaned to one
         // line and defanged like their name.
-        GuestMessage { text: body, .. } => format!(
-            "{}\n\n{}\n\n{}",
-            ta(lang, "tg-host-guest-message", &args),
-            text::defang(&text::clean(body, text::GUEST_TEXT_MAX)),
-            ta(lang, "tg-host-reply-hint", &[]),
-        ),
+        // ilia fork (inbox): an email names who sent it. Only the guest's
+        // own address reads as the guest; an attendee or another address
+        // (a forward, a CC) is said to be one, with the address it gave.
+        GuestMessage {
+            text: body, email, ..
+        } => {
+            use crate::inbox::matcher::Sender;
+            let head = match email {
+                None => ta(lang, "tg-host-guest-message", &args),
+                Some(from) if from.sender == Sender::Guest => {
+                    ta(lang, "tg-host-guest-email", &args)
+                }
+                Some(from) => {
+                    let sender = text::guest_email(&from.address);
+                    let mut with_sender = args.to_vec();
+                    with_sender.push(("sender", sender.as_str()));
+                    let key = if from.sender == Sender::Attendee {
+                        "tg-host-attendee-email"
+                    } else {
+                        "tg-host-other-email"
+                    };
+                    ta(lang, key, &with_sender)
+                }
+            };
+            format!(
+                "{}\n\n{}\n\n{}",
+                head,
+                text::defang(&text::clean(body, text::GUEST_TEXT_MAX)),
+                ta(lang, "tg-host-reply-hint", &[]),
+            )
+        }
         Cancelled { by_host: true, .. }
         | HostMessage { .. }
         | Approved { .. }

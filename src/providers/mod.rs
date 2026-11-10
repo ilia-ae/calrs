@@ -81,6 +81,18 @@ pub trait CalendarProvider: Send + Sync {
     async fn fetch_events_since(&self, calendar_id: &str, since_utc: &str)
         -> Result<Vec<RawEvent>>;
 
+    /// ilia fork: events overlapping `[since_utc, until_utc)` (RFC 3339), for
+    /// the windowed sync. Providers that cannot bound the end read from
+    /// `since_utc` on, and the sync prunes what lies beyond.
+    async fn fetch_events_window(
+        &self,
+        calendar_id: &str,
+        since_utc: &str,
+        _until_utc: &str,
+    ) -> Result<Vec<RawEvent>> {
+        self.fetch_events_since(calendar_id, since_utc).await
+    }
+
     /// Incremental sync from a previous sync state.
     ///
     /// `sync_state = None` means **seed the cursor**: callers use this to

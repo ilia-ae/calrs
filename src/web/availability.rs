@@ -713,6 +713,12 @@ pub(super) async fn try_fetch_busy_times_for_user_opts(
     .await
 }
 
+/// ilia fork: a recurring row's `raw_ical`, followed by a `RECURRENCE-ID`
+/// line for each sibling row of its UID (a moved instance Kerio stores as a
+/// resource of its own), with the TZID it was written under: the master may
+/// be in another zone, and a bare value would be read in the master's.
+const SIBLING_EXCLUSIONS: &str = "(COALESCE(e.raw_ical, '') || COALESCE((SELECT group_concat(char(13, 10) || 'RECURRENCE-ID' || CASE WHEN o.recurrence_tzid IS NOT NULL AND o.recurrence_tzid != '' THEN ';TZID=\"' || replace(o.recurrence_tzid, '\"', '') || '\"' ELSE '' END || ':' || o.recurrence_id, '') FROM events o WHERE o.calendar_id = e.calendar_id AND o.uid = e.uid AND o.id != e.id AND o.recurrence_id IS NOT NULL AND o.recurrence_id != ''), ''))";
+
 /// The busy-time reader behind the lenient and strict wrappers above.
 #[allow(clippy::too_many_arguments)]
 pub(super) async fn busy_times_for_user(
@@ -780,9 +786,12 @@ pub(super) async fn busy_times_for_user(
         })
         .collect();
 
+    // ilia fork: a moved instance stored as a resource of its own (Kerio)
+    // carries the master's UID and a RECURRENCE-ID; its row's RECURRENCE-ID
+    // joins the master's exclusions, or the original slot would block too.
     let end_compact_rrule = window_end.format("%Y%m%dT235959").to_string();
-    let recurring: Vec<(String, String, String, Option<String>, Option<String>)> = read_or_default(sqlx::query_as(
-        "SELECT e.start_at, e.end_at, e.rrule, e.raw_ical, e.timezone FROM events e
+    let recurring_sql = format!(
+        "SELECT e.start_at, e.end_at, e.rrule, {SIBLING_EXCLUSIONS}, e.timezone FROM events e
          JOIN calendars c ON c.id = e.calendar_id
          JOIN caldav_sources cs ON cs.id = c.source_id
          JOIN accounts a ON a.id = cs.account_id
@@ -793,16 +802,21 @@ pub(super) async fn busy_times_for_user(
            AND (e.transp IS NULL OR e.transp != 'TRANSPARENT')
            AND (? = '' OR e.uid != ?)
            AND e.rrule IS NOT NULL AND e.rrule != '' AND (e.start_at <= ? OR e.start_at <= ?)",
-    )
-    .bind(user_id)
-    .bind(et_id_for_filter)
-    .bind(et_id_for_filter)
-    .bind(exclude_uid)
-    .bind(exclude_uid)
-    .bind(&end_iso)
-    .bind(&end_compact_rrule)
-    .fetch_all(pool)
-    .await, strict, "recurring calendar events")?;
+    );
+    let recurring: Vec<(String, String, String, Option<String>, Option<String>)> = read_or_default(
+        sqlx::query_as(&recurring_sql)
+            .bind(user_id)
+            .bind(et_id_for_filter)
+            .bind(et_id_for_filter)
+            .bind(exclude_uid)
+            .bind(exclude_uid)
+            .bind(&end_iso)
+            .bind(&end_compact_rrule)
+            .fetch_all(pool)
+            .await,
+        strict,
+        "recurring calendar events",
+    )?;
 
     busy.extend(expand_recurring_into_busy(
         &recurring,
@@ -1969,7 +1983,33 @@ pub(super) fn format_optional_date(date: Option<NaiveDate>) -> String {
 /// the range has already ended, the booking horizon ends before the range
 /// starts, or existing bookings fall outside the range. Changing the range
 /// never touches existing bookings, so the host is told instead.
+///
+/// ilia fork: first, when the fork-wide horizon caps this event type's own,
+/// a notice saying so. It is information only, so it does not send a save
+/// back to the form ([`after_event_type_save`] reads the date-range notices).
 pub(super) async fn booking_window_warnings(
+    pool: &SqlitePool,
+    et_id: &str,
+    window: &BookingWindow,
+    lang: &str,
+) -> Vec<minijinja::Value> {
+    let mut warnings = Vec::new();
+    if let Some(cap) = crate::horizon::limit() {
+        if window.horizon_days.is_none_or(|days| i64::from(days) > cap) {
+            let mut args = fluent_bundle::FluentArgs::new();
+            args.set("days", cap);
+            warnings.push(context! {
+                text => crate::i18n::translate(lang, "event-type-form-horizon-capped", Some(&args)),
+                link => "",
+            });
+        }
+    }
+    warnings.extend(date_range_warnings(pool, et_id, window, lang).await);
+    warnings
+}
+
+/// The date-range notices of [`booking_window_warnings`].
+async fn date_range_warnings(
     pool: &SqlitePool,
     et_id: &str,
     window: &BookingWindow,
@@ -2148,7 +2188,7 @@ pub(super) async fn after_event_type_save(
     lang: &str,
 ) -> Response {
     let window = get_booking_window(pool, et_id).await;
-    if booking_window_warnings(pool, et_id, &window, lang)
+    if date_range_warnings(pool, et_id, &window, lang)
         .await
         .is_empty()
     {
@@ -2710,8 +2750,8 @@ pub(super) async fn troubleshoot(
         Option<String>,
         Option<String>,
         Option<String>,
-    )> = sqlx::query_as(
-        "SELECT e.start_at, e.end_at, e.rrule, e.raw_ical, e.summary, c.display_name, e.timezone
+    )> = sqlx::query_as(&format!(
+        "SELECT e.start_at, e.end_at, e.rrule, {SIBLING_EXCLUSIONS}, e.summary, c.display_name, e.timezone
          FROM events e
          JOIN calendars c ON c.id = e.calendar_id
          JOIN caldav_sources cs ON cs.id = c.source_id
@@ -2722,8 +2762,8 @@ pub(super) async fn troubleshoot(
            AND (e.status IS NULL OR e.status != 'CANCELLED')
            AND (e.transp IS NULL OR e.transp != 'TRANSPARENT')
            AND e.rrule IS NOT NULL AND e.rrule != ''
-           AND (e.start_at <= ? OR e.start_at <= ?)",
-    )
+           AND (e.start_at <= ? OR e.start_at <= ?)"
+    ))
     .bind(&user.id)
     .bind(&et_id)
     .bind(&et_id)
@@ -2822,7 +2862,7 @@ pub(super) async fn troubleshoot(
     // whole target date is either inside it or outside it.
     let beyond_horizon = horizon_last_date(now_host, booking_window.horizon_days)
         .is_some_and(|last| target_date > last)
-        || target_date > now_host.date() + Duration::days(MAX_DAYS_AHEAD);
+        || target_date > now_host.date() + Duration::days(crate::horizon::max_days_ahead());
     let outside_date_range = booking_window
         .bookable_from
         .is_some_and(|from| target_date < from)
@@ -2959,10 +2999,13 @@ pub(super) async fn troubleshoot(
                     "troubleshoot-label-beyond-horizon",
                     "days",
                     // The event type's horizon, or the 366 days every
-                    // booking page stops at when it has none (or a longer one).
+                    // booking page stops at when it has none (or a longer one;
+                    // ilia fork: the fork-wide horizon, when lower).
                     &booking_window
                         .horizon_days
-                        .map_or(MAX_DAYS_AHEAD, |days| (days as i64).min(MAX_DAYS_AHEAD))
+                        .map_or(crate::horizon::max_days_ahead(), |days| {
+                            (days as i64).min(crate::horizon::max_days_ahead())
+                        })
                         .to_string(),
                 ),
                 detail: String::new(),
@@ -3210,10 +3253,29 @@ pub(super) async fn troubleshoot(
         Err(e) => return internal_error_html("template render", &e),
     };
 
+    // ilia fork: calendars are read only inside the sync window, so a day
+    // outside it shows no calendar events whatever the host's calendar holds.
+    let not_synced_note = match crate::horizon::sync_window(&state.pool).await {
+        Some(w) => {
+            let from = w.since.with_timezone(&host_tz).date_naive();
+            let until = w.until.with_timezone(&host_tz).date_naive();
+            if target_date < from || target_date >= until {
+                let mut args = fluent_bundle::FluentArgs::new();
+                args.set("from", crate::i18n::format_date(from, lang));
+                args.set("until", crate::i18n::format_date(until, lang));
+                crate::i18n::translate(lang, "troubleshoot-not-synced", Some(&args))
+            } else {
+                String::new()
+            }
+        }
+        None => String::new(),
+    };
+
     let (impersonating, impersonating_name, _impersonating_admin) = impersonation_ctx(&auth_user);
     Html(
         tmpl.render(context! {
             user_name => &user.name,
+            not_synced_note => not_synced_note,
             no_event_types => false,
             event_types => et_options,
             selected_slug => et_slug,

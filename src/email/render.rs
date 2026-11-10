@@ -391,8 +391,29 @@ pub(super) fn first_name(full_name: &str) -> &str {
     full_name.split_whitespace().next().unwrap_or(full_name)
 }
 
+/// The guest-facing invite (email attachments, the ICS download). ilia
+/// fork: in relay mode its ORGANIZER is the system (`crate::inbox`).
 pub fn generate_ics(details: &BookingDetails, method: &str) -> String {
-    generate_ics_impl(details, method, false)
+    generate_ics_impl(details, method, false, false)
+}
+
+/// ilia fork: the host's own copy (host emails), which names the host as
+/// ORGANIZER like the calendar write-back.
+pub(super) fn generate_host_ics(details: &BookingDetails, method: &str) -> String {
+    generate_ics_impl(details, method, false, true)
+}
+
+/// ilia fork: the ORGANIZER address of an invite. The host's own copies
+/// keep the host, and so do the guest's for a booking whose first invite
+/// named the host (`inbox::organizer`: an update must name the organizer
+/// the guest's calendar holds). Otherwise a guest's names the system in
+/// relay mode, and leaves the line out when no system address is known.
+fn organizer_email(host_copy: bool, uid: &str, host_email: &str) -> Option<String> {
+    if host_copy || !crate::inbox::relay() || crate::inbox::organizer::names_host(uid) {
+        Some(host_email.to_string())
+    } else {
+        crate::inbox::reply::guest_organizer(uid)
+    }
 }
 
 /// ICS for CalDAV write-back (RFC 4791: no METHOD). ATTENDEE lines carry
@@ -402,13 +423,14 @@ pub fn generate_ics(details: &BookingDetails, method: &str) -> String {
 /// (in UTC) for every written booking. Email .ics attachments keep plain
 /// ATTENDEE;RSVP=TRUE so mail clients still offer "Add to calendar".
 pub fn generate_ics_caldav(details: &BookingDetails) -> String {
-    generate_ics_impl(details, "", true)
+    generate_ics_impl(details, "", true, true)
 }
 
 fn generate_ics_impl(
     details: &BookingDetails,
     method: &str,
     schedule_agent_client: bool,
+    host_copy: bool,
 ) -> String {
     let guest_first = first_name(&details.guest_name);
     let host_first = first_name(&details.host_name);
@@ -419,7 +441,14 @@ fn generate_ics_impl(
     // CN= is a parameter, not a TEXT value: it needs quoting, not backslashes.
     let host_name = sanitize_ics_param(&details.host_name);
     let guest_name = sanitize_ics_param(&details.guest_name);
-    let host_email = sanitize_ics(&details.host_email);
+    let organizer_line = organizer_email(host_copy, &details.uid, &details.host_email)
+        .map(|email| {
+            format!(
+                "ORGANIZER;CN={host_name}:mailto:{}\r\n",
+                sanitize_ics(&email)
+            )
+        })
+        .unwrap_or_default();
     let guest_email = sanitize_ics(&details.guest_email);
     let location_line = details
         .location
@@ -498,7 +527,7 @@ fn generate_ics_impl(
          SUMMARY:{summary}\r\n\
          {description_line}\
          {location_line}\
-         ORGANIZER;CN={host_name}:mailto:{host_email}\r\n\
+         {organizer_line}\
          ATTENDEE{sa};CN={guest_name};RSVP=TRUE:mailto:{guest_email}\r\n\
          {additional_attendee_lines}\
          STATUS:CONFIRMED\r\n\
@@ -518,16 +547,26 @@ fn generate_ics_impl(
         summary = summary,
         description_line = description_line,
         location_line = location_line,
-        host_name = host_name,
-        host_email = host_email,
+        organizer_line = organizer_line,
         guest_name = guest_name,
         guest_email = guest_email,
         additional_attendee_lines = additional_attendee_lines,
     ))
 }
 
-/// Generate an .ics VCALENDAR for cancellation (METHOD:CANCEL)
+/// Generate an .ics VCALENDAR for cancellation (METHOD:CANCEL), for the
+/// guest (ilia fork: the system as ORGANIZER in relay mode, as in the invite
+/// it ends).
 pub(super) fn generate_cancel_ics(details: &CancellationDetails) -> String {
+    generate_cancel_ics_impl(details, false)
+}
+
+/// ilia fork: the host's own CANCEL, naming the host as ORGANIZER.
+pub(super) fn generate_host_cancel_ics(details: &CancellationDetails) -> String {
+    generate_cancel_ics_impl(details, true)
+}
+
+fn generate_cancel_ics_impl(details: &CancellationDetails, host_copy: bool) -> String {
     let guest_first = first_name(&details.guest_name);
     let host_first = first_name(&details.host_name);
     let summary = sanitize_ics(&format!(
@@ -537,7 +576,14 @@ pub(super) fn generate_cancel_ics(details: &CancellationDetails) -> String {
     // CN= is a parameter, not a TEXT value: it needs quoting, not backslashes.
     let host_name = sanitize_ics_param(&details.host_name);
     let guest_name = sanitize_ics_param(&details.guest_name);
-    let host_email = sanitize_ics(&details.host_email);
+    let organizer_line = organizer_email(host_copy, &details.uid, &details.host_email)
+        .map(|email| {
+            format!(
+                "ORGANIZER;CN={host_name}:mailto:{}\r\n",
+                sanitize_ics(&email)
+            )
+        })
+        .unwrap_or_default();
     let guest_email = sanitize_ics(&details.guest_email);
     // RFC 5546 3.2.5: a CANCEL names the attendees it removes the event for,
     // here everyone the invite listed (#267).
@@ -567,7 +613,7 @@ pub(super) fn generate_cancel_ics(details: &CancellationDetails) -> String {
          DTSTART:{dtstart}\r\n\
          DTEND:{dtend}\r\n\
          SUMMARY:{summary}\r\n\
-         ORGANIZER;CN={host_name}:mailto:{host_email}\r\n\
+         {organizer_line}\
          ATTENDEE;CN={guest_name}:mailto:{guest_email}\r\n\
          {additional_attendee_lines}\
          STATUS:CANCELLED\r\n\
@@ -579,8 +625,7 @@ pub(super) fn generate_cancel_ics(details: &CancellationDetails) -> String {
         dtstart = dtstart,
         dtend = dtend,
         summary = summary,
-        host_name = host_name,
-        host_email = host_email,
+        organizer_line = organizer_line,
         guest_name = guest_name,
         guest_email = guest_email,
         additional_attendee_lines = additional_attendee_lines,

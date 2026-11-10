@@ -1992,7 +1992,7 @@ msg-guest = Invitado: { $guest }
 msg-sent = Mensaje enviado.
 msg-empty = Todavía no hay mensajes.
 msg-label = Mensaje para el invitado
-msg-help-email = El invitado lo recibe por correo, y las respuestas llegan a tu dirección.
+msg-help-email = El invitado lo recibe por correo desde la dirección del sistema; sus respuestas aparecen aquí y en tu Telegram.
 msg-help-no-email = El correo no está configurado en este servidor.
 msg-help-telegram = El invitado vinculó Telegram y también lo recibe allí.
 msg-help-no-telegram = El invitado no vinculó Telegram.
@@ -2002,6 +2002,8 @@ msg-link = Mensajes
 msg-link-count = Mensajes ({ $count })
 msg-from-host = Anfitrión
 msg-from-guest = Invitado
+msg-from-attendee = Asistente: { $address }
+msg-from-other = Otra dirección, no la del invitado: { $address }
 msg-via-dashboard = panel
 msg-via-mcp = agente
 msg-via-telegram = Telegram
@@ -2039,3 +2041,19 @@ tg-bot-message-sent-shortened = Tu mensaje se ha pasado al anfitrión, acortado 
 tg-bot-reply-too-long = La respuesta no se envió: un mensaje puede tener como máximo { $max } caracteres.
 tg-bot-reply-empty = La respuesta no se envió: no tiene texto visible.
 tg-bot-reply-failed = No se pudo guardar la respuesta, así que no se envió. Inténtalo de nuevo.
+troubleshoot-not-synced = Los calendarios solo se leen del { $from } al { $until }; los eventos fuera de esos días no se cargan, por eso aquí no aparece ninguno.
+event-type-form-horizon-capped =
+    { $days ->
+        [one] Este servidor ofrece horarios con { $days } día de antelación como máximo, sea cual sea el horizonte de reserva.
+       *[other] Este servidor ofrece horarios con { $days } días de antelación como máximo, sea cual sea el horizonte de reserva.
+    }
+
+## ilia fork: the system mailbox (src/inbox)
+msg-help-email-no-inbox = El invitado lo recibe por correo desde la dirección del sistema. Las respuestas por correo no se leen en este servidor.
+msg-via-email = correo
+msg-email-footer-no-reply = El sistema de reservas envió este mensaje en nombre de { $host }; las respuestas no se leen.
+tg-host-guest-email = Correo de { $guest } ({ $email }) sobre { $event }, { $when }:
+tg-host-attendee-email = Correo de { $sender }, asistente adicional de la reserva de { $guest } ({ $email }), sobre { $event }, { $when }:
+tg-host-other-email = Correo de otra dirección, no la del invitado: { $sender }, en la conversación de la reserva de { $guest } ({ $email }) sobre { $event }, { $when }:
+booking-blocked-body-system = El anfitrión exige al menos { $minutes } minutos de antelación. Si no puedes asistir, escribe a <a href="{ $href }">{ $address }</a>.
+booking-blocked-body-no-reply = El anfitrión exige al menos { $minutes } minutos de antelación. Si no puedes asistir, avisa al anfitrión por otro medio.

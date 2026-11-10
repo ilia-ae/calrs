@@ -75,7 +75,22 @@ pub(crate) enum TelegramEvent {
     /// ilia fork (messages): the guest wrote in their linked chat (row
     /// `id`). Hosts: the text, cleaned and defanged when composed, with a
     /// "reply to answer" line. `text` is guest-written: never logged.
-    GuestMessage { id: String, text: String },
+    /// `email`: it came as an email reply to the system mailbox
+    /// (`crate::inbox`), not in the guest's chat, and who sent it.
+    GuestMessage {
+        id: String,
+        text: String,
+        email: Option<MailFrom>,
+    },
+}
+
+/// ilia fork (inbox): who sent an email reply. `address` is the From of an
+/// attendee or another sender (unverified, shown to hosts only, never
+/// logged); empty for the guest.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct MailFrom {
+    pub(crate) sender: crate::inbox::matcher::Sender,
+    pub(crate) address: String,
 }
 
 /// Why the expiry sweep released a priced booking.
@@ -217,7 +232,7 @@ impl TelegramEvent {
         ]
     }
 
-    /// The two message events, for tests.
+    /// The message events (a guest text by Telegram and by email), for tests.
     #[cfg(test)]
     pub(crate) fn message_samples() -> Vec<TelegramEvent> {
         vec![
@@ -228,6 +243,31 @@ impl TelegramEvent {
             TelegramEvent::GuestMessage {
                 id: "m2".into(),
                 text: "Can we talk about pricing?".into(),
+                email: None,
+            },
+            TelegramEvent::GuestMessage {
+                id: "m3".into(),
+                text: "Can we talk about pricing?".into(),
+                email: Some(MailFrom {
+                    sender: crate::inbox::matcher::Sender::Guest,
+                    address: String::new(),
+                }),
+            },
+            TelegramEvent::GuestMessage {
+                id: "m4".into(),
+                text: "Can we talk about pricing?".into(),
+                email: Some(MailFrom {
+                    sender: crate::inbox::matcher::Sender::Attendee,
+                    address: "friend@example.test".into(),
+                }),
+            },
+            TelegramEvent::GuestMessage {
+                id: "m5".into(),
+                text: "Can we talk about pricing?".into(),
+                email: Some(MailFrom {
+                    sender: crate::inbox::matcher::Sender::Other,
+                    address: "colleague@example.test".into(),
+                }),
             },
         ]
     }

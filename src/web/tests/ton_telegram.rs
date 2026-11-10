@@ -602,6 +602,11 @@ async fn a_guest_cancel_after_an_unpaid_expiry_tells_no_host_on_any_channel() {
     let (bid, pay_token) = t.book("11:00").await;
     t.start(&link_token(&[0u8; 32], &pay_token)).await;
     let inv = e.inv(&bid).await;
+    // Past this invoice's own deadline too: the chain height left by the
+    // first case is a second short of it whenever the second booking was
+    // made in a later second than the first.
+    e.chain
+        .height((inv.settle_by + Duration::minutes(3)).timestamp() as u64);
     e.pay(AMOUNT / 2, &code(&inv.reference));
     t.step(e.now).await;
     assert!(!invoice::cancel_is_quiet(&e.pool, &bid).await);

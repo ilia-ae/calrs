@@ -1923,6 +1923,7 @@ fn exact_english_and_russian_thread_messages() {
     let guest = TelegramEvent::GuestMessage {
         id: "m".into(),
         text: "Hi".into(),
+        email: None,
     };
     let en = message::guest(&host, &guest_view("en", "Product demo"), "en").unwrap();
     assert_eq!(
@@ -1951,6 +1952,7 @@ fn a_guest_text_is_one_defanged_line_in_the_hosts_chat() {
     let event = TelegramEvent::GuestMessage {
         id: "m".into(),
         text: "Visit https://pay.example/login\n\u{202E}now /start @bot".into(),
+        email: None,
     };
     let msg = message::host(&event, &host_view("en"), "en").unwrap();
     assert!(

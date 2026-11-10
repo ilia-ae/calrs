@@ -2005,6 +2005,16 @@ pub(super) fn build_month_params(
     // bookable day, today or the start of the bookable date range.
     // The window is in host-local days, the calendar in the guest's dates.
     let (first_bookable, last_bookable) = window.effective_date_bounds(now_host.date());
+    // ilia fork: under the fork-wide horizon, compute (and read busy times,
+    // expand recurrences, read resources) no further than the last bookable
+    // day plus the grid's buffer day: every caller derives its window end
+    // from these offsets.
+    let days_ahead = if crate::horizon::limit().is_some() {
+        let cap = (last_bookable - now_host.date()).num_days() as i32 + 2;
+        days_ahead.min(cap - start_offset).max(1)
+    } else {
+        days_ahead
+    };
     let earliest = if first_bookable > now_host.date() {
         day_start_in(first_bookable, host_tz, guest_tz)
     } else {

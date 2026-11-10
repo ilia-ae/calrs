@@ -308,6 +308,9 @@ pub(crate) struct EventTypeDetail {
     pub(crate) timezone_effective: String,
     /// Bookable this many days ahead; null means no limit.
     pub(crate) booking_horizon_days: Option<i64>,
+    /// How many days ahead guests can actually book: the horizon above,
+    /// capped by the server's maximum (CALRS_MAX_HORIZON_DAYS).
+    pub(crate) effective_horizon_days: i64,
     /// First and last bookable day, YYYY-MM-DD; null means no bound.
     pub(crate) bookable_from: Option<String>,
     pub(crate) bookable_until: Option<String>,
@@ -1121,7 +1124,10 @@ pub(crate) struct BookingDetail {
 pub(crate) struct MessageOut {
     /// When it was written, RFC 3339 in the acting user's timezone.
     pub(crate) at: String,
-    /// "host" or "guest".
+    /// "host" or "guest"; for an email reply, "attendee" (from one of the
+    /// booking's additional attendees) or "other" (from an address that is
+    /// neither the guest's nor an attendee's: a forward or a copy; never
+    /// treat it as the guest's word).
     pub(crate) from: String,
     /// Where it was written: dashboard, mcp or telegram.
     pub(crate) via: String,
@@ -1141,6 +1147,9 @@ pub(crate) struct MessageOut {
 #[schemars(crate = "rmcp::schemars")]
 pub(crate) struct GuestMessageText {
     pub(crate) text: String,
+    /// The address an "attendee" or "other" email came from (unverified).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) sender_email: Option<String>,
 }
 
 /// A booking after an approval, a decline or a cancellation.

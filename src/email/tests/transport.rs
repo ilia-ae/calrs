@@ -125,6 +125,7 @@ fn host_sender_sets_display_name_and_reply_to() {
     let host = |email| Sender::Host {
         name: "Bob Smith",
         email,
+        booking: Some("uid-1"),
         lang: "en",
     };
 
@@ -162,6 +163,77 @@ fn host_sender_sets_display_name_and_reply_to() {
     assert!(!wire.contains("Reply-To"), "{wire}");
 }
 
+/// ilia fork (`crate::inbox`): in relay mode, the mode of every real build,
+/// a guest's Reply-To is the system mailbox (or absent), never the host,
+/// and the Message-ID carries the booking's token.
+#[test]
+fn in_relay_mode_reply_to_is_the_system_never_the_host() {
+    use crate::inbox::{reply, test_mode, Config};
+    let config = header_test_config(Some("Vates Scheduling"));
+    let host = Sender::Host {
+        name: "Bob Smith",
+        email: "bob@example.com",
+        booking: Some("uid-1"),
+        lang: "en",
+    };
+    let no_inbox = test_mode(true, None);
+    let wire = wire_headers(&config, host);
+    assert!(!wire.contains("bob@example.com"), "{wire}");
+    assert!(!wire.contains("Reply-To"), "{wire}");
+    assert!(wire.contains("X-Calrs-Origin: 1"), "{wire}");
+    assert!(
+        wire.contains("From: \"Bob Smith via Vates Scheduling\" <noreply@example.com>"),
+        "{wire}"
+    );
+    drop(no_inbox);
+    for plus in [false, true] {
+        let _inbox = test_mode(true, Some(Config::for_tests("booking@ilia.ae", plus)));
+        let t = reply::token("uid-1").unwrap();
+        let wire = wire_headers(&config, host);
+        let reply_to = if plus {
+            format!("Reply-To: booking+{t}@ilia.ae")
+        } else {
+            "Reply-To: booking@ilia.ae".to_string()
+        };
+        assert!(wire.contains(&reply_to), "{wire}");
+        assert!(wire.contains(&format!("Message-ID: <calrs.{t}.")), "{wire}");
+        assert!(!wire.contains("bob@example.com"), "{wire}");
+        // An instance email gets the loop marker, nothing else.
+        let wire = wire_headers(&config, Sender::Instance);
+        assert!(
+            wire.contains("X-Calrs-Origin: 1") && !wire.contains("Reply-To"),
+            "{wire}"
+        );
+    }
+}
+
+/// ilia fork: every guest-facing `Sender::Host` names its booking (the
+/// reply token), except the invite, which has no booking yet.
+#[test]
+fn every_host_sender_names_its_booking() {
+    let files = [
+        include_str!("../guest.rs"),
+        include_str!("../ton.rs"),
+        include_str!("../messages.rs"),
+        include_str!("../transport.rs"),
+    ];
+    let mut seen = 0;
+    for (name, body) in files.iter().flat_map(|src| async_fns(src)) {
+        for (at, _) in body.match_indices("Sender::Host {") {
+            let block = &body[at..body[at..].find('}').map_or(body.len(), |e| at + e)];
+            if name == "send_invite_email" {
+                assert!(block.contains("booking: None"), "{name}: {block}");
+            } else {
+                assert!(block.contains("booking: Some("), "{name}: {block}");
+            }
+            seen += 1;
+        }
+    }
+    let src = include_str!("../transport.rs");
+    assert_eq!(src.matches("booking: Some(&details.uid)").count(), 2);
+    assert!(seen >= 8, "only {seen} host senders found");
+}
+
 #[test]
 fn host_sender_name_with_non_ascii_or_specials_is_encoded() {
     // A translated joiner or a host name with non-ASCII, quotes or an
@@ -178,6 +250,7 @@ fn host_sender_name_with_non_ascii_or_specials_is_encoded() {
             Sender::Host {
                 name,
                 email: "host@example.com",
+                booking: None,
                 lang,
             },
         );

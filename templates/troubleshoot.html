@@ -29,6 +29,12 @@
   <div id="troubleshoot-content">
   <p style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem;">{{ date_label }}</p>
 
+  {% if not_synced_note %}
+  <div class="troubleshoot-not-synced" style="padding: 0.5rem 0.75rem; background: rgba(148,163,184,0.12); border: 1px solid rgba(148,163,184,0.4); border-radius: var(--radius); margin-bottom: 0.75rem; font-size: 0.85rem;">
+    {{ not_synced_note }}
+  </div>
+  {% endif %}
+
   {% if date_is_blocked is defined and date_is_blocked %}
   <div style="padding: 0.5rem 0.75rem; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); border-radius: var(--radius); margin-bottom: 0.75rem; font-size: 0.85rem; color: #ef4444;">
     {{ t("troubleshoot-blocked-override") }}

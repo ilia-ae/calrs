@@ -5,12 +5,13 @@
 //! A host writes to the guest of one booking, from the booking in the
 //! dashboard (`/dashboard/bookings/{id}/messages`), through the MCP agent
 //! (`send_guest_message`) or by replying in Telegram (`telegram::relay`).
-//! The guest gets it by email, under the host's name with Reply-To the
-//! host's address (`email::send_guest_host_message`), and in the Telegram
-//! chat linked to the booking. A Telegram reply goes to Telegram only. The
-//! guest's texts in their linked chat are stored here too and relayed to
-//! the hosts' chats; a guest's email reply reaches the host's inbox, not
-//! the thread (calrs reads no mail).
+//! The guest gets it by email from the system address under the host's
+//! name, Reply-To the system mailbox (`email::send_guest_host_message`,
+//! `crate::inbox`), and in the Telegram chat linked to the booking. A
+//! Telegram reply goes by email too when the guest has no linked chat or
+//! last wrote by email. The guest's texts in their linked chat, and their
+//! email replies read from the system mailbox (`via = 'email'`), are stored
+//! here and relayed to the hosts' chats.
 //!
 //! No bulk messaging: one booking per call, no list or broadcast endpoint,
 //! and persistent limits counted from the thread itself: 20 host messages
@@ -194,8 +195,9 @@ fn open(booking: &BookingRow, now: DateTime<Utc>) -> bool {
 }
 
 /// Store a host message about `booking_id` and hand it to email and the
-/// guest's Telegram chat. `smtp`: the mail server, when one is set up
-/// (`None` for a Telegram reply, which goes to Telegram only).
+/// guest's Telegram chat. `smtp`: the mail server, when one is set up and
+/// the message should go by email (a Telegram reply passes it only when the
+/// guest has no linked chat or last wrote by email, `telegram::relay`).
 pub(crate) async fn send_host_message(
     pool: &SqlitePool,
     smtp: Option<crate::email::SmtpConfig>,
@@ -222,7 +224,6 @@ pub(crate) async fn send_host_message(
     if !open(&booking, now) {
         return Err(Refusal::Closed);
     }
-    let smtp = smtp.filter(|_| via != Via::Telegram);
     let telegram = crate::telegram::enabled()
         && tg_store::linked_guest_chat(pool, booking_id)
             .await
@@ -354,26 +355,48 @@ fn host_message_mail(
         guest_email: booking.guest_email.clone(),
         host_name: author.name.clone(),
         host_email: author.email.clone(),
+        booking_uid: booking.uid.clone(),
         event_title: booking.title.clone(),
         body: body.to_string(),
     }
 }
 
-/// Store a guest's text from Telegram (already cleaned), unless the booking
-/// has had `GUEST_PER_BOOKING_DAY` of them in the last day. `relayed`: it
-/// is queued for a host chat. Returns the row id.
+/// ilia fork (inbox): what an email reply adds to a guest-side row.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct FromEmail<'a> {
+    /// The Message-ID hash, so a message polled twice is stored once.
+    pub(crate) hash: &'a str,
+    pub(crate) sender: crate::inbox::matcher::Sender,
+    /// The From address; stored only for an attendee or another sender.
+    pub(crate) address: &'a str,
+}
+
+/// Store a guest-side text (already cleaned), unless the booking has had
+/// `GUEST_PER_BOOKING_DAY` of them in the last day. `relayed`: it is queued
+/// for a host chat; `email`: it came by email (`via = 'email'`, with who
+/// sent it), else by the guest's Telegram chat. Returns the row id; `None`
+/// over the limit, for a duplicate email, or on a database error.
 pub(crate) async fn store_guest_message(
     pool: &SqlitePool,
     booking_id: &str,
     body: &str,
     relayed: bool,
+    email: Option<FromEmail<'_>>,
 ) -> Option<String> {
+    use crate::inbox::matcher::Sender;
     let id = uuid::Uuid::new_v4().to_string();
     let now = Utc::now();
+    let via = if email.is_some() { "email" } else { "telegram" };
+    let sender_email = email
+        .filter(|e| e.sender != Sender::Guest)
+        .map(|e| crate::telegram::text::clean(e.address, crate::telegram::text::EMAIL_MAX))
+        .filter(|a| !a.is_empty());
     sqlx::query_scalar(
-        "INSERT INTO booking_messages
-                (id, booking_id, direction, via, body, telegram_status, created_at)
-         SELECT ?1, ?2, 'guest', 'telegram', ?3, CASE WHEN ?4 THEN 'queued' ELSE 'none' END, ?5
+        "INSERT OR IGNORE INTO booking_messages
+                (id, booking_id, direction, via, body, telegram_status, created_at, inbound_hash,
+                 sender, sender_email)
+         SELECT ?1, ?2, 'guest', ?8, ?3, CASE WHEN ?4 THEN 'queued' ELSE 'none' END, ?5, ?9,
+                ?10, ?11
           WHERE (SELECT COUNT(*) FROM booking_messages
                   WHERE booking_id = ?2 AND direction = 'guest' AND created_at > ?6) < ?7
          RETURNING id",
@@ -385,12 +408,31 @@ pub(crate) async fn store_guest_message(
     .bind(sql_time(now))
     .bind(sql_time(now - Duration::days(1)))
     .bind(GUEST_PER_BOOKING_DAY)
+    .bind(via)
+    .bind(email.map(|e| e.hash))
+    .bind(email.map(|e| e.sender.as_str()))
+    .bind(sender_email)
     .fetch_optional(pool)
     .await
     .unwrap_or_else(|e| {
         tracing::warn!(error = %e, booking_id, "could not store a guest message");
         None
     })
+}
+
+/// The guest's latest message on `booking_id` came by email (a Telegram
+/// reply of the host then goes by email too).
+pub(crate) async fn guest_wrote_last_by_email(pool: &SqlitePool, booking_id: &str) -> bool {
+    sqlx::query_scalar::<_, String>(
+        "SELECT via FROM booking_messages WHERE booking_id = ? AND direction = 'guest'
+          ORDER BY created_at DESC, rowid DESC LIMIT 1",
+    )
+    .bind(booking_id)
+    .fetch_optional(pool)
+    .await
+    .ok()
+    .flatten()
+    .is_some_and(|via| via == "email")
 }
 
 /// A host already wrote to the guest of `booking_id` (the guest of an
@@ -416,6 +458,23 @@ pub(crate) struct StoredMessage {
     pub(crate) email_status: String,
     pub(crate) telegram_status: String,
     pub(crate) created_at: String,
+    /// ilia fork (inbox): an email's sender kind (`guest`, `attendee`,
+    /// `other`) and, for the last two, the address it came from.
+    pub(crate) sender: Option<String>,
+    pub(crate) sender_email: Option<String>,
+}
+
+impl StoredMessage {
+    /// Who wrote it: `host`, `guest`, `attendee` (an additional attendee's
+    /// email) or `other` (an email from an address that is neither).
+    pub(crate) fn author(&self) -> &str {
+        match (self.direction.as_str(), self.sender.as_deref()) {
+            ("host", _) => "host",
+            (_, Some("attendee")) => "attendee",
+            (_, Some("other")) => "other",
+            _ => "guest",
+        }
+    }
 }
 
 /// The newest `THREAD_MAX` messages of a booking, oldest first.
@@ -424,7 +483,8 @@ pub(crate) async fn thread(
     booking_id: &str,
 ) -> Result<Vec<StoredMessage>, sqlx::Error> {
     let mut rows: Vec<StoredMessage> = sqlx::query_as(
-        "SELECT id, direction, via, body, email_status, telegram_status, created_at
+        "SELECT id, direction, via, body, email_status, telegram_status, created_at,
+                sender, sender_email
            FROM booking_messages WHERE booking_id = ?
           ORDER BY created_at DESC, rowid DESC LIMIT ?",
     )
@@ -565,6 +625,21 @@ fn written_at(lang: &str, tz: chrono_tz::Tz, at: DateTime<Utc>) -> String {
     )
 }
 
+/// The author line of a thread message: the host, the guest, or, for an
+/// email from another address, that address and what it is.
+fn who(lang: &str, m: &StoredMessage) -> String {
+    let address = crate::telegram::text::guest_email(m.sender_email.as_deref().unwrap_or(""));
+    let key = match m.author() {
+        "host" => "msg-from-host",
+        "attendee" => "msg-from-attendee",
+        "other" => "msg-from-other",
+        _ => "msg-from-guest",
+    };
+    let mut args = fluent_bundle::FluentArgs::new();
+    args.set("address", address);
+    crate::i18n::translate(lang, key, Some(&args))
+}
+
 fn status_label(lang: &str, channel: &str, status: &str) -> Option<String> {
     matches!(status, "queued" | "sent" | "failed")
         .then(|| crate::i18n::translate(lang, &format!("msg-status-{channel}-{status}"), None))
@@ -618,7 +693,10 @@ async fn render_thread(
             let from_host = m.direction == "host";
             context! {
                 from_host => from_host,
-                who => crate::i18n::translate(lang, if from_host { "msg-from-host" } else { "msg-from-guest" }, None),
+                who => who(lang, m),
+                // ilia fork (inbox): an email from someone other than the
+                // guest is marked, so a forward is never read as the guest.
+                not_guest => matches!(m.author(), "attendee" | "other"),
                 via => crate::i18n::translate(lang, &format!("msg-via-{}", m.via), None),
                 at => tg_store::parse_sql_time(&m.created_at)
                     .map(|at| written_at(lang, tz, at))
@@ -660,6 +738,7 @@ async fn render_thread(
         error => error,
         draft => draft,
         email_on => email_on,
+        inbox_on => crate::inbox::enabled(),
         telegram_on => telegram_on,
         telegram_linked => telegram_linked,
         max_chars => HOST_TEXT_MAX,

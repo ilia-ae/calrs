@@ -11,7 +11,10 @@ mod availability;
 mod booking;
 mod booking_actions;
 mod booking_time;
+mod boundaries;
+// ilia fork: the system mailbox (src/inbox).
 mod branding;
+mod inbox;
 // ilia fork: busy-only calendar storage.
 mod busy_only;
 mod calendar_week_start;

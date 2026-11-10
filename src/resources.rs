@@ -186,6 +186,14 @@ pub(crate) async fn store_feed(pool: &SqlitePool, resource_id: &str, body: &str)
     } else {
         Vec::new()
     };
+    // ilia fork: a feed cannot be asked for a time range, so its one-off
+    // events outside the sync window are dropped here, before the cap (the
+    // vanished-event pass below then prunes them from the cache). Recurring
+    // ones are kept: their occurrences are expanded per window.
+    if let Some(window) = crate::horizon::sync_window(pool).await {
+        let (since, until) = (window.since_prefix(), window.until_prefix());
+        vevents.retain(|vevent| crate::horizon::vevent_in_window(vevent, &since, &until));
+    }
     // A hostile or broken feed must not grow the cache without bound.
     const MAX_FEED_EVENTS: usize = 10_000;
     if vevents.len() > MAX_FEED_EVENTS {

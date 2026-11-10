@@ -106,14 +106,27 @@ impl SmtpConfig {
     /// `sender` calls for. The address is always the configured one, so
     /// SPF/DKIM/DMARC keep aligning with the instance domain; a host sender
     /// only changes the display name and the reply target (#221).
+    ///
+    /// ilia fork (`crate::inbox`): in relay mode (always, in a real build) a
+    /// guest's Reply-To is the system mailbox, never the host, and the
+    /// Message-ID carries the booking's token.
     pub(super) fn message_from(&self, sender: Sender<'_>) -> Result<MessageBuilder> {
         match sender {
-            Sender::Instance => Ok(Message::builder().from(self.mailbox_from()?)),
-            Sender::Host { name, email, lang } => {
+            Sender::Instance => Ok(crate::inbox::reply::mark(
+                Message::builder().from(self.mailbox_from()?),
+            )),
+            Sender::Host {
+                name,
+                email,
+                booking,
+                lang,
+            } => {
                 let display = guest_sender_name(lang, name, self.from_name.as_deref());
                 let mut builder =
                     Message::builder().from(Mailbox::new(display, self.from_email.parse()?));
-                if let Some(reply_to) = host_reply_to(email) {
+                if crate::inbox::relay() {
+                    builder = crate::inbox::reply::stamp(builder, booking, &self.from_email);
+                } else if let Some(reply_to) = host_reply_to(email) {
                     builder = builder.reply_to(reply_to);
                 }
                 Ok(builder)
@@ -133,9 +146,12 @@ pub(super) enum Sender<'a> {
     /// email's own language, for the translated "via". For multi-host
     /// bookings `name` is the joined roster and `email` the ICS organizer,
     /// so replies reach the person the guest's calendar names as organizer.
+    /// ilia fork: `booking` is the booking's uid (its reply token); in
+    /// relay mode `email` is never used and replies go to the system.
     Host {
         name: &'a str,
         email: &'a str,
+        booking: Option<&'a str>,
         lang: &'a str,
     },
 }
@@ -146,6 +162,7 @@ impl<'a> Sender<'a> {
         Sender::Host {
             name: &details.host_name,
             email: &details.host_email,
+            booking: Some(&details.uid),
             lang: guest_lang(details),
         }
     }
@@ -156,6 +173,7 @@ impl<'a> Sender<'a> {
         Sender::Host {
             name: &details.host_name,
             email: &details.host_email,
+            booking: Some(&details.uid),
             lang: lang_or_en(details.guest_language.as_deref()),
         }
     }
@@ -401,6 +419,7 @@ pub async fn load_smtp_config(pool: &SqlitePool, key: &[u8; 32]) -> Result<Optio
             warn_if_env_shadows_db_credentials(pool).await;
         }
         warn_if_auth_without_password(&config);
+        crate::inbox::reply::note_system_from(&config.from_email);
         return Ok(Some(config));
     }
 
@@ -426,6 +445,7 @@ pub async fn load_smtp_config(pool: &SqlitePool, key: &[u8; 32]) -> Result<Optio
                 tls_mode,
             };
             warn_if_auth_without_password(&config);
+            crate::inbox::reply::note_system_from(&config.from_email);
             Ok(Some(config))
         }
         None => Ok(None),

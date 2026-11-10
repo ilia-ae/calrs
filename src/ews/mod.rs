@@ -119,6 +119,26 @@ impl CalendarProvider for EwsProvider {
         Ok(synth_raw_events(items))
     }
 
+    async fn fetch_events_window(
+        &self,
+        calendar_id: &str,
+        since_utc: &str,
+        until_utc: &str,
+    ) -> Result<Vec<RawEvent>> {
+        // ilia fork: the windowed sync's own end, not two years.
+        let (start, end) = window_bounds(since_utc, until_utc);
+        let items = operations::list_all_items_in_window(
+            &self.endpoint,
+            &self.username,
+            &self.password,
+            calendar_id,
+            start,
+            end,
+        )
+        .await?;
+        Ok(synth_raw_events(items))
+    }
+
     async fn sync_delta(&self, calendar_id: &str, sync_state: Option<&str>) -> Result<DeltaResult> {
         // Cursor-seeding mode (see trait docs): the caller has already
         // populated the local cache via `fetch_events` and only wants a
@@ -282,9 +302,31 @@ fn calendar_view_window(
     (start, start + Duration::days(SYNC_WINDOW_DAYS))
 }
 
+/// ilia fork: the `CalendarView` window `[since, until)` of the windowed
+/// sync. An unparseable end falls back to upstream's two years.
+fn window_bounds(
+    since_utc: &str,
+    until_utc: &str,
+) -> (chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>) {
+    let (start, fallback_end) = calendar_view_window(since_utc);
+    let end = chrono::DateTime::parse_from_rfc3339(until_utc)
+        .map(|d| d.with_timezone(&chrono::Utc))
+        .unwrap_or(fallback_end);
+    (start, end.max(start))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn window_bounds_take_the_sync_window_end() {
+        let (start, end) = window_bounds("2026-11-08T12:00:00Z", "2026-11-27T12:00:00Z");
+        assert_eq!(start.to_rfc3339(), "2026-11-08T12:00:00+00:00");
+        assert_eq!(end.to_rfc3339(), "2026-11-27T12:00:00+00:00");
+        let (start, end) = window_bounds("2026-11-08T12:00:00Z", "garbage");
+        assert_eq!(end - start, chrono::Duration::days(SYNC_WINDOW_DAYS));
+    }
 
     #[test]
     fn calendar_view_window_extends_two_years() {

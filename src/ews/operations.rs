@@ -212,31 +212,7 @@ async fn list_items_window(
             )
         };
 
-        let body = format!(
-            r#"    <m:FindItem Traversal="Shallow">
-      <m:ItemShape>
-        <t:BaseShape>IdOnly</t:BaseShape>
-        <t:AdditionalProperties>
-          <t:FieldURI FieldURI="item:Subject" />
-          <t:FieldURI FieldURI="calendar:Start" />
-          <t:FieldURI FieldURI="calendar:End" />
-          <t:FieldURI FieldURI="calendar:Location" />
-          <t:FieldURI FieldURI="calendar:UID" />
-          <t:FieldURI FieldURI="calendar:LegacyFreeBusyStatus" />
-          <t:FieldURI FieldURI="calendar:IsAllDayEvent" />
-          <t:FieldURI FieldURI="calendar:IsCancelled" />
-          <t:FieldURI FieldURI="calendar:Recurrence" />
-          <t:FieldURI FieldURI="calendar:CalendarItemType" />
-        </t:AdditionalProperties>
-      </m:ItemShape>
-      {view}
-      <m:ParentFolderIds>
-        <t:FolderId Id="{folder}" />
-      </m:ParentFolderIds>
-    </m:FindItem>
-"#,
-            folder = escape(folder_id),
-        );
+        let body = find_item_body(&view, folder_id);
         let resp = match post_soap(endpoint, username, password, &body, true).await {
             // A server whose find limit is below what was asked may refuse a
             // busy window outright instead of cutting it short: that window
@@ -274,6 +250,36 @@ async fn list_items_window(
     }
     tracing::debug!(folder = %folder_id, count = all.len(), "EWS FindItem complete");
     Ok((all, true))
+}
+
+/// The `FindItem` of [`list_items_window`]. ilia fork: only what availability
+/// reads (start, end, UID, free/busy status, all-day, cancelled, item type
+/// for RECURRENCE-ID); no subject, location or recurrence blob. CalendarView
+/// expands recurrences server-side, and Exchange omits `Recurrence` on the
+/// occurrences anyway.
+fn find_item_body(view: &str, folder_id: &str) -> String {
+    format!(
+        r#"    <m:FindItem Traversal="Shallow">
+  <m:ItemShape>
+    <t:BaseShape>IdOnly</t:BaseShape>
+    <t:AdditionalProperties>
+      <t:FieldURI FieldURI="calendar:Start" />
+      <t:FieldURI FieldURI="calendar:End" />
+      <t:FieldURI FieldURI="calendar:UID" />
+      <t:FieldURI FieldURI="calendar:LegacyFreeBusyStatus" />
+      <t:FieldURI FieldURI="calendar:IsAllDayEvent" />
+      <t:FieldURI FieldURI="calendar:IsCancelled" />
+      <t:FieldURI FieldURI="calendar:CalendarItemType" />
+    </t:AdditionalProperties>
+  </m:ItemShape>
+  {view}
+  <m:ParentFolderIds>
+    <t:FolderId Id="{folder}" />
+  </m:ParentFolderIds>
+</m:FindItem>
+"#,
+        folder = escape(folder_id),
+    )
 }
 
 /// A refusal meaning "this window holds more items than the server will
@@ -460,9 +466,12 @@ fn is_unsupported_restriction_fault(message: &str) -> bool {
 /// event that left a snapshot is really gone, and a miss outside the scan
 /// would read as "deleted". One day of slack at each end covers the day
 /// granularity of the sweep's lower bound and the time spent syncing.
-const UID_SCAN_PAST_DAYS: i64 = crate::commands::sync::FULL_FETCH_LOOKBACK_DAYS + 1;
-const UID_SCAN_FUTURE_DAYS: i64 =
-    super::SYNC_WINDOW_DAYS - crate::commands::sync::FULL_FETCH_LOOKBACK_DAYS + 1;
+///
+/// ilia fork: literal, no longer derived from the sync window, which is now
+/// the horizon's: the scan serves `event_exists` for any booking, which may
+/// lie beyond it.
+const UID_SCAN_PAST_DAYS: i64 = 91;
+const UID_SCAN_FUTURE_DAYS: i64 = 641;
 /// Width of one CalendarView request. A CalendarView returns at most 1000
 /// entries, so the window is split to keep each request well under that on a
 /// busy calendar.
@@ -667,6 +676,33 @@ pub async fn sync_folder_items(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// ilia fork: the CalendarView asks for the boundaries only.
+    #[test]
+    fn find_item_asks_for_the_boundaries_only() {
+        let body = find_item_body(r#"<m:CalendarView StartDate="a" EndDate="b" />"#, "f<1>");
+        for wanted in [
+            "calendar:Start",
+            "calendar:End",
+            "calendar:UID",
+            "calendar:LegacyFreeBusyStatus",
+            "calendar:IsAllDayEvent",
+            "calendar:IsCancelled",
+            "calendar:CalendarItemType",
+        ] {
+            assert!(body.contains(wanted), "{wanted}");
+        }
+        for content in [
+            "item:Subject",
+            "calendar:Location",
+            "calendar:Recurrence",
+            "item:Body",
+        ] {
+            assert!(!body.contains(content), "{content}");
+        }
+        assert!(body.contains(r#"EndDate="b""#));
+        assert!(body.contains(r#"Id="f&lt;1&gt;""#));
+    }
     use crate::ews::soap::{extract_soap_fault, SOAP_FAULT_PREFIX};
 
     /// The response from #179, trimmed to the parts `post_soap` reads.

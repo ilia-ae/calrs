@@ -18,7 +18,10 @@ mod db;
 mod email;
 mod ews;
 mod google_meet;
+mod horizon;
 mod i18n;
+// ilia fork: the system mailbox and guest mail through the system.
+mod inbox;
 mod mfa;
 mod models;
 mod net_guard;
@@ -157,6 +160,10 @@ async fn main() -> Result<()> {
     let pool = db::connect(&data_dir).await?;
     db::migrate(&pool).await?;
     let secret_key = crypto::load_or_create_key(&data_dir)?;
+    // ilia fork: reply tokens of guest mail (every command can send one),
+    // and the bookings whose guest invites keep naming the host.
+    inbox::init_key(&secret_key);
+    inbox::organizer::load(&pool).await;
     db::migrate_passwords(&pool, &secret_key).await?;
     // Every command, not only `serve`: outbound calendar clients read the
     // private-host allowlist at connection time (#363), so `calrs sync` and
@@ -202,7 +209,9 @@ async fn main() -> Result<()> {
 
             let state = web::build_state(pool, data_dir, secret_key).await;
             let (stop_tx, stop_rx) = tokio::sync::watch::channel(false);
-            let telegram = telegram::spawn(state.pool.clone(), stop_rx.clone()).await;
+            let telegram =
+                telegram::spawn(state.pool.clone(), state.secret_key, stop_rx.clone()).await;
+            let inbox = inbox::spawn(state.pool.clone(), state.secret_key, stop_rx.clone()).await;
             let agent = web::agent::spawn(state.clone(), stop_rx.clone());
             let ton = web::ton_pay::spawn(state.clone(), stop_rx);
             let router = web::router(state);
@@ -238,6 +247,7 @@ async fn main() -> Result<()> {
             tokio::join!(
                 agent.finish(std::time::Duration::from_secs(20)),
                 ton.finish(std::time::Duration::from_secs(20)),
+                inbox.finish(std::time::Duration::from_secs(20)),
             );
             // Last: the web server, the agent and the watcher may still have
             // queued notifications (a payment confirmed while stopping).

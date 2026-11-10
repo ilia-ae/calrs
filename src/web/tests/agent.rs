@@ -4983,3 +4983,38 @@ async fn agent_send_guest_message_reaches_the_guest_and_audits_no_text() {
     assert!(!lines.contains("SECRET-WORDS"), "{lines}");
     drop(tg);
 }
+
+/// ilia fork: the fork-wide horizon bounds `get_slots`, and
+/// `get_event_type` says how far guests can actually book.
+#[tokio::test]
+async fn get_slots_and_get_event_type_follow_the_fork_horizon() {
+    let _cap = crate::horizon::test_limit(14);
+    let fx = Fixture::new().await;
+    let mut client = fx.session(Role::ReadOnly).await;
+    let today = Utc::now().date_naive();
+    let far = (today + Duration::days(20)).format("%Y-%m-%d").to_string();
+    let refused = failure(
+        &client
+            .call("get_slots", json!({"slug": "test-meeting", "from": far}))
+            .await,
+    );
+    let last = (today + Duration::days(14)).format("%Y-%m-%d").to_string();
+    assert!(refused.contains(&last), "{refused}");
+    let near = (today + Duration::days(13)).format("%Y-%m-%d").to_string();
+    let slots = client
+        .call(
+            "get_slots",
+            json!({"slug": "test-meeting", "from": near, "days": 7}),
+        )
+        .await;
+    for day in ok(&slots)["days"].as_array().unwrap() {
+        if !day["times"].as_array().unwrap().is_empty() {
+            assert!(day["date"].as_str().unwrap() <= last.as_str(), "{day}");
+        }
+    }
+    let et = client
+        .call("get_event_type", json!({"slug": "test-meeting"}))
+        .await;
+    assert_eq!(ok(&et)["effective_horizon_days"], json!(14));
+    assert_eq!(ok(&et)["booking_horizon_days"], json!(null));
+}

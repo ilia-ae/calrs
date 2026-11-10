@@ -25,6 +25,8 @@ pub struct TonGuestMail {
     pub guest_email: String,
     pub host_name: String,
     pub host_email: String,
+    /// The booking's uid (its reply token, `crate::inbox`).
+    pub booking_uid: String,
     pub event_title: String,
     /// The long date ("Tuesday, November 17, 2026").
     pub date: String,
@@ -104,6 +106,7 @@ pub async fn send_guest_ton_pay_link(
     let sender = Sender::Host {
         name: &mail.host_name,
         email: &mail.host_email,
+        booking: Some(&mail.booking_uid),
         lang,
     };
     let composed = compose_guest_ton_pay_link(mail, pay_url, cancel_url, telegram_link);
@@ -196,6 +199,7 @@ pub async fn send_guest_ton_renewed(
     let sender = Sender::Host {
         name: &mail.host_name,
         email: &mail.host_email,
+        booking: Some(&mail.booking_uid),
         lang,
     };
     let composed = compose_guest_ton_renewed(mail, pay_url, cancel_url, telegram_link);
@@ -240,6 +244,7 @@ pub async fn send_guest_ton_released(
     let sender = Sender::Host {
         name: &mail.host_name,
         email: &mail.host_email,
+        booking: Some(&mail.booking_uid),
         lang,
     };
     let composed = compose_guest_ton_released(mail, reason, rebook_url, partial);
@@ -655,6 +660,7 @@ mod tests {
             guest_email: "ann@example.com".into(),
             host_name: "Ilia".into(),
             host_email: "ilia@example.com".into(),
+            booking_uid: "uid-ton-1".into(),
             event_title: "Consultation".into(),
             date: "Tuesday, November 17, 2026".into(),
             time: "14:00 (Asia/Dubai)".into(),

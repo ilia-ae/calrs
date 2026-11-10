@@ -16,7 +16,8 @@ impl AgentServer {
     #[tool(
         title = "Send guest message",
         description = "Write to the guest of one booking, in the owner's name: by email \
-                       (replies go to the owner's address) and in the Telegram chat the guest \
+                       from the system address (the guest's replies come back to the thread, \
+                       never to the owner's own address) and in the Telegram chat the guest \
                        linked to the booking. Only pending or confirmed bookings, up to a week \
                        after the meeting. The text is plain, line breaks allowed, at most 2000 \
                        characters; write it in the guest's language (get_booking). Never \

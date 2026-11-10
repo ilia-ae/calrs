@@ -57,6 +57,7 @@ Every user-facing string goes through Fluent (`i18n/`).
 | `src/booking_time.rs` | How booking times are stored (legacy wall clock vs UTC instant) |
 | `src/rrule.rs` | RRULE expansion for recurring events |
 | `src/busy_only.rs` | ilia fork: busy-only calendar storage. `CALRS_BUSY_ONLY` (on by default), `keep()` for the content fields, `reduce()`/`StoredIcal` (the `raw_ical` of a recurring row keeps only its EXDATEs and RECURRENCE-IDs), `scrub_stored()` at startup (from `db::migrate`), see CLAUDE.md "Busy-only calendar storage" |
+| `src/horizon.rs` | ilia fork: the fork-wide maximum horizon (`CALRS_MAX_HORIZON_DAYS`, 14, 1–31): `limit()`, `max_days_ahead()`, the sync window (`sync_window`, `SyncWindow`, `covers_horizon`, `vevent_in_window`); `None` in tests unless `test_limit`, see CLAUDE.md "Horizon and boundaries" |
 | `src/utils.rs` | iCal helpers (`split_vevents`, `parse_content_line`, `extract_vevent_field`, `extract_vevent_tzid`, datetime and timezone parsing) |
 | `src/tzid.rs` | Resolving an event's TZID to an IANA zone: by name (IANA, Windows, vendor prefix, display name), else by matching the resource's `VTIMEZONE`, else a display name's fixed offset (`event_timezone` at sync, `resolve_or_offset` when reading stored events) |
 | `src/windows_zones.rs` | Windows timezone names (`Eastern Standard Time`) mapped to IANA ids, from CLDR's `windowsZones.xml` |
@@ -65,13 +66,15 @@ Every user-facing string goes through Fluent (`i18n/`).
 | `src/google_meet.rs` | Google Meet links through the Google Calendar API |
 | `src/oauth2_caldav.rs` | Google OAuth2 tokens for CalDAV access |
 | `src/caldav/mod.rs` | CalDAV client: discovery, fetch, sync-collection, PUT/DELETE |
+| `src/caldav/partial.rs` | ilia fork: boundaries-only requests: partial retrieval bodies, etag listings, `calendar-multiget`, etag-only `sync-collection`, the "partial refused/ignored" memory, the Kerio fixture; `mock_dav.rs` (tests only) is a Kerio-style mock server that honours them and counts bytes |
 | `src/ews/` | Exchange Web Services client (SOAP, autodiscover, parsing) |
 | `src/providers/` | `CalendarProvider` trait (`mod.rs`), CalDAV adapter, dispatch in `src/providers/factory.rs` |
 | `src/sms/` | `SmsProvider` trait, gateway adapters, phone normalisation, message bodies |
+| `src/inbox/` | ilia fork: guest mail through the system. `reply.rs` (outgoing: reply tokens, Reply-To, Message-ID, the subject tag, the guest `.ics` ORGANIZER and page contact, `X-Calrs-Origin`), `config.rs` (`CALRS_INBOX_*`), `imap.rs` (our minimal IMAP client with size caps), `tls.rs` (IMAPS, webpki roots plus the CA file, or a certificate pin), `mime.rs` (mail-parser), `filter.rs` (autoreplies, bounces, lists, iTIP, loops), `matcher.rs` (token → booking, and who sent it), `clean.rs` (quotes, signatures, cap), `store.rs` (folder state, dedupe), `poller.rs` (one session, bounded searches, back-off), `organizer.rs` (bookings whose guest invites keep the host as ORGANIZER), `mod.rs` (`init_key`, `relay()`, `spawn`); `fake.rs` (tests) is an in-process IMAP server with a test CA; see CLAUDE.md "Inbox (ilia fork)" |
 | `src/telegram/` | ilia fork: Telegram notifications. Bot API client and parsing (`api.rs`), token redaction (`config.rs`), long polling (`poller.rs`), commands (`commands.rs`), guest texts and host replies (`relay.rs`), the outbox (`worker.rs`), message bodies (`message.rs`), SQL (`store.rs`), deep-link tokens, usernames, `TelegramEvent` and the `notify` seam (`mod.rs`) |
 | `src/email/` | Every email calrs sends (see below) |
 | `src/web/` | The web server (see below) |
-| `src/commands/` | One file per CLI subcommand; `src/commands/sync.rs` is also used by the web server |
+| `src/commands/` | One file per CLI subcommand; `src/commands/sync.rs` is also used by the web server; `sync_window.rs` (ilia fork) is its windowed full fetch (etags first), etag delta, prune and `synced_until` |
 | `src/test_support.rs` | `ENV_LOCK` / `EnvGuard` for tests touching `CALRS_*` variables |
 
 ### `src/web/`
@@ -212,11 +215,26 @@ Call sites use `crate::email::name` whatever file `name` lives in.
   dashboard page, the agent's `send_guest_message` (`src/web/agent/
   {tools,ops}_messages.rs`) and `src/telegram/relay.rs` all go through
   `send_host_message`; email through `src/email/messages.rs`, Telegram
-  through `TelegramEvent::{HostMessage, GuestMessage}`.
+  through `TelegramEvent::{HostMessage, GuestMessage}`. Guest email
+  replies come in through `src/inbox/` (`poller::handle` stores them with
+  `store_guest_message(.., "email", ..)` and relays them with
+  `telegram::relay::relay_guest_email`).
+- **Inbox** (ilia fork, `src/inbox/`, see CLAUDE.md "Inbox (ilia fork)"):
+  `Sender::Host { booking, .. }` in `src/email/transport.rs` calls
+  `inbox::reply::stamp`; `src/email/render.rs` asks `inbox::reply` for a
+  guest `.ics` ORGANIZER; `serve` starts `inbox::spawn`; tests in
+  `src/inbox/tests.rs` (protocol, TLS, the bytes measurement, `#[ignore]`)
+  and `src/web/tests/inbox.rs` (the poller against a database).
 - **Busy-only storage** (ilia fork, `src/busy_only.rs`): the sync upserts
   in `src/commands/sync.rs` and the feed upsert in `src/resources.rs` bind
   through it; the troubleshoot view and the CLI label an untitled event
   "Busy".
+- **Horizon and boundaries** (ilia fork, `src/horizon.rs`,
+  `src/caldav/partial.rs`, `src/commands/sync_window.rs`, see CLAUDE.md
+  "Horizon and boundaries"): `booking_window::effective_date_bounds` caps
+  every window, `sync.rs` calls into `sync_window` when there is a
+  window; tests in `src/web/tests/boundaries.rs` (the bytes measurement in
+  `boundaries_bytes.rs`, `#[ignore]`).
 - **Optimize** (ilia fork, see CLAUDE.md "Optimize (ilia fork)"): the
   release profile in `.cargo/config.toml`, the watcher's on-demand
   heartbeat (`TonRuntime::{wake_if_idle, step_now, ready_on_demand}`,

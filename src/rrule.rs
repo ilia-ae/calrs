@@ -32,6 +32,39 @@ pub fn expand_rrule(
     window_start: NaiveDateTime,
     window_end: NaiveDateTime,
 ) -> Vec<(NaiveDateTime, NaiveDateTime)> {
+    expand_rrule_from(
+        event_start,
+        event_end,
+        rrule_str,
+        exdates,
+        window_start,
+        window_end,
+        true,
+    )
+}
+
+/// How many periods (days, weeks or months, a multiple of `interval` so the
+/// rule keeps its phase) can be skipped when `elapsed` of them lie between
+/// DTSTART and the window (ilia fork fast-forward): one interval short, so
+/// the first period that reaches the window is still walked.
+fn periods_to_skip(elapsed: i64, interval: u32) -> i64 {
+    let interval = i64::from(interval.max(1));
+    (elapsed / interval - 1).max(0) * interval
+}
+
+/// [`expand_rrule`]; `fast_forward` (ilia fork) starts a rule without COUNT
+/// at the last period before the window instead of at DTSTART, which is the
+/// same result (no COUNT to keep) in O(window) steps, and keeps a master
+/// older than the 2000-step cap from expanding to nothing.
+fn expand_rrule_from(
+    event_start: NaiveDateTime,
+    event_end: NaiveDateTime,
+    rrule_str: &str,
+    exdates: &[NaiveDateTime],
+    window_start: NaiveDateTime,
+    window_end: NaiveDateTime,
+    fast_forward: bool,
+) -> Vec<(NaiveDateTime, NaiveDateTime)> {
     let rrule = match parse_rrule(rrule_str) {
         Some(r) => r,
         None => return vec![],
@@ -41,10 +74,20 @@ pub fn expand_rrule(
     let mut results = Vec::new();
     let max_iter = 2000; // safety cap
     let mut iter_count = 0;
+    // The earliest start whose occurrence can still reach the window.
+    let reach = window_start
+        .checked_sub_signed(event_duration)
+        .unwrap_or(window_start)
+        .date();
+    let skip = fast_forward && rrule.count.is_none() && reach > event_start.date();
 
     match rrule.freq {
         Freq::Daily => {
             let mut current_date = event_start.date();
+            if skip {
+                let days = periods_to_skip((reach - current_date).num_days(), rrule.interval);
+                current_date += Duration::days(days);
+            }
             let mut count_total = 0u32;
             loop {
                 if iter_count >= max_iter {
@@ -92,6 +135,13 @@ pub fn expand_rrule(
             // Start from the week of the event, iterate by interval weeks
             let event_week_start = week_start(event_start.date());
             let mut current_week = event_week_start;
+            if skip {
+                let weeks = periods_to_skip(
+                    (week_start(reach) - event_week_start).num_days() / 7,
+                    rrule.interval,
+                );
+                current_week += Duration::weeks(weeks);
+            }
 
             loop {
                 if iter_count >= max_iter {
@@ -134,6 +184,13 @@ pub fn expand_rrule(
         Freq::Monthly => {
             let mut year = event_start.year();
             let mut month = event_start.month();
+            if skip {
+                let months =
+                    (reach.year() - year) as i64 * 12 + reach.month() as i64 - month as i64;
+                let total = (month as i64 - 1) + periods_to_skip(months, rrule.interval);
+                year += (total / 12) as i32;
+                month = (total % 12) as u32 + 1;
+            }
             let mut count_total = 0u32;
 
             loop {
@@ -921,5 +978,89 @@ mod tests {
             week_start(wed),
             NaiveDate::from_ymd_opt(2026, 3, 9).unwrap()
         );
+    }
+
+    // --- ilia fork: fast-forward to the window ---
+
+    #[test]
+    fn a_daily_master_from_2019_is_busy_today() {
+        let start = dt(2019, 1, 7, 9, 0);
+        let end = dt(2019, 1, 7, 9, 30);
+        let occ = expand_rrule(
+            start,
+            end,
+            "FREQ=DAILY",
+            &[],
+            dt(2026, 11, 10, 0, 0),
+            dt(2026, 11, 11, 0, 0),
+        );
+        assert_eq!(occ, vec![(dt(2026, 11, 10, 9, 0), dt(2026, 11, 10, 9, 30))]);
+        // The full walk stops at its 2000-step cap, years earlier.
+        let walked = expand_rrule_from(
+            start,
+            end,
+            "FREQ=DAILY",
+            &[],
+            dt(2026, 11, 10, 0, 0),
+            dt(2026, 11, 11, 0, 0),
+            false,
+        );
+        assert!(walked.is_empty());
+    }
+
+    #[test]
+    fn a_fortnightly_rule_keeps_its_phase_after_the_jump() {
+        // Every other Tuesday from 2024-01-02.
+        let occ = expand_rrule(
+            dt(2024, 1, 2, 14, 0),
+            dt(2024, 1, 2, 15, 0),
+            "FREQ=WEEKLY;INTERVAL=2;BYDAY=TU",
+            &[],
+            dt(2026, 11, 2, 0, 0),
+            dt(2026, 11, 30, 0, 0),
+        );
+        let days: Vec<u32> = occ.iter().map(|(s, _)| s.day()).collect();
+        // 2024-01-02 + 148 weeks = 2026-11-03 (an even count), then 11-17;
+        // 2026-11-10 is week 149, off phase.
+        assert_eq!(days, vec![3, 17]);
+    }
+
+    /// Property: inside any window the fast-forward gives exactly what the
+    /// full walk from DTSTART gives, for every rule shape the parser reads.
+    #[test]
+    fn fast_forward_equals_the_full_walk() {
+        let rules = [
+            "FREQ=DAILY",
+            "FREQ=DAILY;INTERVAL=3",
+            "FREQ=DAILY;UNTIL=20270101T000000Z",
+            "FREQ=DAILY;COUNT=400",
+            "FREQ=WEEKLY",
+            "FREQ=WEEKLY;BYDAY=MO,WE,FR",
+            "FREQ=WEEKLY;INTERVAL=2;BYDAY=TU,TH",
+            "FREQ=WEEKLY;INTERVAL=3",
+            "FREQ=WEEKLY;COUNT=50;BYDAY=MO",
+            "FREQ=MONTHLY",
+            "FREQ=MONTHLY;INTERVAL=2",
+            "FREQ=MONTHLY;BYDAY=2TU",
+            "FREQ=MONTHLY;INTERVAL=5;BYDAY=-1FR",
+            "FREQ=MONTHLY;UNTIL=20280101",
+        ];
+        let starts = [
+            (dt(2024, 1, 31, 23, 30), Duration::minutes(90)),
+            (dt(2025, 6, 15, 9, 0), Duration::minutes(30)),
+            (dt(2026, 2, 28, 0, 0), Duration::days(3)),
+        ];
+        let exdates = [dt(2026, 11, 11, 9, 0), dt(2026, 11, 13, 23, 30)];
+        for rule in rules {
+            for (start, len) in starts {
+                for offset in [0, 1, 17, 200, 400, 700] {
+                    let ws = dt(2026, 1, 1, 0, 0) + Duration::days(offset);
+                    let we = ws + Duration::days(19);
+                    let fast = expand_rrule_from(start, start + len, rule, &exdates, ws, we, true);
+                    let walk = expand_rrule_from(start, start + len, rule, &exdates, ws, we, false);
+                    assert_eq!(fast, walk, "{rule} from {start} window {ws}");
+                }
+            }
+        }
     }
 }

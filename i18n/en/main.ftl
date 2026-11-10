@@ -1994,7 +1994,7 @@ msg-guest = Guest: { $guest }
 msg-sent = Message sent.
 msg-empty = No messages yet.
 msg-label = Message to the guest
-msg-help-email = The guest receives it by email, and replies come to your address.
+msg-help-email = The guest receives it by email from the system address; their replies appear here and in your Telegram.
 msg-help-no-email = Email is not set up on this server.
 msg-help-telegram = The guest has linked Telegram and receives it there too.
 msg-help-no-telegram = The guest has not linked Telegram.
@@ -2004,6 +2004,8 @@ msg-link = Messages
 msg-link-count = Messages ({ $count })
 msg-from-host = Host
 msg-from-guest = Guest
+msg-from-attendee = Attendee: { $address }
+msg-from-other = Another address, not the guest's: { $address }
 msg-via-dashboard = dashboard
 msg-via-mcp = agent
 msg-via-telegram = Telegram
@@ -2041,3 +2043,19 @@ tg-bot-message-sent-shortened = Your message has been passed on to the host, sho
 tg-bot-reply-too-long = The reply was not sent: a message can have at most { $max } characters.
 tg-bot-reply-empty = The reply was not sent: it has no visible text.
 tg-bot-reply-failed = The reply could not be saved, so it was not sent. Please try again.
+troubleshoot-not-synced = Calendars are read only from { $from } to { $until }; events outside these days are not loaded, so none are shown here.
+event-type-form-horizon-capped =
+    { $days ->
+        [one] This server offers slots at most { $days } day ahead, whatever the booking horizon says.
+       *[other] This server offers slots at most { $days } days ahead, whatever the booking horizon says.
+    }
+
+## ilia fork: the system mailbox (src/inbox)
+msg-help-email-no-inbox = The guest receives it by email from the system address. Email replies are not read on this server.
+msg-via-email = email
+msg-email-footer-no-reply = The booking system sent this message on behalf of { $host }; replies to it are not read.
+tg-host-guest-email = Email from { $guest } ({ $email }) about { $event }, { $when }:
+tg-host-attendee-email = Email from { $sender }, an additional attendee of the booking with { $guest } ({ $email }), about { $event }, { $when }:
+tg-host-other-email = Email from another address, not the guest's: { $sender }, in the thread of the booking with { $guest } ({ $email }) about { $event }, { $when }:
+booking-blocked-body-system = The host requires at least { $minutes } minutes of notice. If you cannot attend, please write to <a href="{ $href }">{ $address }</a>.
+booking-blocked-body-no-reply = The host requires at least { $minutes } minutes of notice. If you cannot attend, please let the host know another way.

@@ -8,6 +8,10 @@ use std::time::Duration;
 /// enough for the standard discovery to work, and the URL pattern is fixed.
 const GOOGLE_CALDAV_HOST: &str = "apidata.googleusercontent.com";
 
+/// ilia fork: boundaries-only requests (partial retrieval, etag listings,
+/// calendar-multiget) for the windowed sync.
+pub(crate) mod partial;
+
 pub enum CaldavAuth {
     Basic { username: String, password: String },
     Bearer { access_token: String },
@@ -630,6 +634,8 @@ pub struct SyncResult {
 pub struct RawEvent {
     pub href: String,
     pub ical_data: String,
+    /// ilia fork: the resource's `getetag`, when the server sent one.
+    pub etag: Option<String>,
 }
 
 /// Detect a `calendar` resourcetype element with any (or no) namespace prefix.
@@ -748,7 +754,12 @@ fn parse_sync_response(xml: &str) -> SyncResult {
             .map(|s| crate::utils::normalize_line_endings(&s).into_owned())
             .unwrap_or_default();
         if !ical_data.is_empty() {
-            changed.push(RawEvent { href, ical_data });
+            let etag = extract_tag(response_block, "d:getetag");
+            changed.push(RawEvent {
+                href,
+                ical_data,
+                etag,
+            });
         }
     }
 
@@ -934,7 +945,12 @@ fn parse_event_responses(xml: &str) -> Vec<RawEvent> {
             .map(|s| crate::utils::normalize_line_endings(&s).into_owned())
             .unwrap_or_default();
         if !ical_data.is_empty() {
-            events.push(RawEvent { href, ical_data });
+            let etag = extract_tag(response_block, "d:getetag");
+            events.push(RawEvent {
+                href,
+                ical_data,
+                etag,
+            });
         }
     }
     events

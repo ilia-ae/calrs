@@ -62,7 +62,7 @@ use sqlx::SqlitePool;
 use tokio::sync::{mpsc, watch};
 use tokio::task::JoinHandle;
 
-pub(crate) use events::{PaymentRelease, TelegramEvent};
+pub(crate) use events::{MailFrom, PaymentRelease, TelegramEvent};
 
 use api::BotApi;
 use worker::Job;
@@ -75,6 +75,9 @@ pub(crate) struct Runtime {
     outbox: mpsc::Sender<Job>,
     pub(crate) limits: commands::Limits,
     pub(crate) retry: worker::RetryPolicy,
+    /// ilia fork (inbox): the server's secret key, to read the SMTP
+    /// configuration when a host's Telegram reply goes to the guest by email.
+    pub(crate) secret_key: std::sync::OnceLock<[u8; 32]>,
 }
 
 impl Runtime {
@@ -91,6 +94,7 @@ impl Runtime {
             outbox,
             limits: commands::Limits::default(),
             retry,
+            secret_key: std::sync::OnceLock::new(),
         });
         (rt, rx)
     }
@@ -346,7 +350,11 @@ impl TelegramHandle {
 /// Start the bot when `CALRS_TELEGRAM_BOT_TOKEN` is set (`calrs serve` only).
 /// The retention purge runs either way: what was stored while Telegram was
 /// on is forgotten on schedule after it is switched off.
-pub(crate) async fn spawn(pool: SqlitePool, stop: watch::Receiver<bool>) -> TelegramHandle {
+pub(crate) async fn spawn(
+    pool: SqlitePool,
+    secret_key: [u8; 32],
+    stop: watch::Receiver<bool>,
+) -> TelegramHandle {
     let purge = tokio::spawn(worker::purge_loop(pool.clone(), stop.clone()));
     let Some(config) = config::from_env() else {
         let mut off = TelegramHandle::off();
@@ -361,6 +369,7 @@ pub(crate) async fn spawn(pool: SqlitePool, stop: watch::Receiver<bool>) -> Tele
     let cached = store::cached_bot_username(&pool).await;
     let api: Arc<dyn BotApi> = Arc::new(api::HttpApi::new(config));
     let (rt, rx) = Runtime::new(api, cached, worker::RetryPolicy::default());
+    let _ = rt.secret_key.set(secret_key);
     install(Some(rt.clone()));
     tracing::info!(target: "calrs::telegram", "telegram notifications on");
     let worker = tokio::spawn(worker::run(rt.clone(), rx));

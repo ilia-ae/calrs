@@ -221,6 +221,9 @@ async fn sync_caldav_calendars(
     let principal = client.discover_principal().await?;
     let calendar_home = client.discover_calendar_home(&principal).await?;
     let calendars = client.list_calendars(&calendar_home).await?;
+    // ilia fork: the time range calendars are read for (always in a real
+    // build; `None` keeps upstream's flow, see `sync_window`).
+    let window = crate::horizon::sync_window(pool).await;
 
     let mut did_full_sync = false;
 
@@ -241,8 +244,21 @@ async fn sync_caldav_calendars(
             continue;
         }
 
+        // ilia fork: the cache must cover the horizon. Events sliding into it
+        // are only read by a full fetch, so a calendar fetched too long ago
+        // skips both the ctag shortcut and the delta.
+        let covered = match &window {
+            Some(_) => crate::horizon::covers_horizon(
+                crate::commands::sync_window::synced_until(pool, &cal_id)
+                    .await
+                    .as_deref(),
+                Utc::now(),
+            ),
+            None => true,
+        };
+
         // ctag comparison: skip if unchanged
-        if let (Some(remote), Some(local)) = (&cal_info.ctag, &stored_ctag) {
+        if let (true, Some(remote), Some(local)) = (covered, &cal_info.ctag, &stored_ctag) {
             if remote == local {
                 tracing::debug!(calendar = %cal_label, "ctag unchanged, skipping");
                 println!("  {} {} — unchanged", "✓".green(), cal_label);
@@ -251,13 +267,33 @@ async fn sync_caldav_calendars(
         }
 
         // Try sync-token delta if we have one stored
-        let delta_ok = if let Some(token) = &stored_sync_token {
-            match client.sync_collection(&cal_info.href, Some(token)).await {
-                Ok(result) => {
+        let delta_ok = if let (true, Some(token)) = (covered, &stored_sync_token) {
+            let delta = match &window {
+                Some(w) => {
+                    crate::commands::sync_window::delta(
+                        pool,
+                        client,
+                        &cal_id,
+                        &cal_info.href,
+                        token,
+                        w,
+                    )
+                    .await
+                }
+                None => client
+                    .sync_collection(&cal_info.href, Some(token))
+                    .await
+                    .map(|r| {
+                        let reported = !r.changed.is_empty() || !r.deleted_hrefs.is_empty();
+                        (r, reported)
+                    }),
+            };
+            match delta {
+                Ok((result, reported)) => {
                     // If ctag changed but sync-collection reports nothing, the server's
                     // sync-token implementation is incomplete (e.g. BlueMind doesn't report
                     // deletions). Fall through to full sync to catch the changes.
-                    if result.changed.is_empty() && result.deleted_hrefs.is_empty() {
+                    if !reported {
                         tracing::info!(
                             calendar = %cal_label,
                             "ctag changed but sync-collection returned empty delta, falling back to full sync"
@@ -274,6 +310,9 @@ async fn sync_caldav_calendars(
                             &result.deleted_hrefs,
                         )
                         .await;
+                        if let Some(w) = &window {
+                            crate::commands::sync_window::prune(pool, &cal_id, w).await;
+                        }
 
                         // Store new sync-token and ctag
                         update_calendar_sync_state(
@@ -324,9 +363,38 @@ async fn sync_caldav_calendars(
             let since_dt = Utc::now() - chrono::Duration::days(FULL_FETCH_LOOKBACK_DAYS);
             let since_iso = since_dt.format("%Y%m%dT%H%M%SZ").to_string();
             let since_prefix = since_dt.format("%Y%m%d").to_string();
-            match client.fetch_events_since(&cal_info.href, &since_iso).await {
-                Ok(raw_events) => {
-                    let count = upsert_raw_events(pool, &cal_id, &raw_events).await;
+            // ilia fork: inside the window, boundaries only, etags first.
+            let fetched = match &window {
+                Some(w) => {
+                    crate::commands::sync_window::full_fetch(
+                        pool,
+                        client,
+                        &cal_id,
+                        &cal_info.href,
+                        w,
+                    )
+                    .await
+                }
+                None => client
+                    .fetch_events_since(&cal_info.href, &since_iso)
+                    .await
+                    .map(|events| crate::commands::sync_window::Fetched {
+                        listed: events.len(),
+                        events,
+                        unchanged: Vec::new(),
+                    }),
+            };
+            let (since_prefix, until_prefix) = match &window {
+                Some(w) => w.orphan_scope(),
+                None => (since_prefix, String::new()),
+            };
+            match fetched {
+                Ok(fetched) => {
+                    let raw_events = &fetched.events;
+                    let count = upsert_raw_events(pool, &cal_id, raw_events).await;
+                    if let Some(w) = &window {
+                        crate::commands::sync_window::prune(pool, &cal_id, w).await;
+                    }
 
                     // Remove events that no longer exist on the server, but only
                     // within the fetched window. Older events weren't in the
@@ -337,8 +405,10 @@ async fn sync_caldav_calendars(
                         Some(client),
                         source_id,
                         &cal_id,
-                        &raw_events,
+                        raw_events,
+                        &fetched.unchanged,
                         &since_prefix,
+                        &until_prefix,
                     )
                     .await;
                     if deleted > 0 {
@@ -352,6 +422,14 @@ async fn sync_caldav_calendars(
                     // Store sync-token from PROPFIND (if server provided one) or try to get one
                     let new_token = if cal_info.sync_token.is_some() {
                         cal_info.sync_token.clone()
+                    } else if window.is_some() {
+                        // ilia fork: an empty token answers with every
+                        // member; asked for etags only, never their data.
+                        client
+                            .initial_sync_token(&cal_info.href)
+                            .await
+                            .ok()
+                            .flatten()
                     } else {
                         // Try an empty sync-collection to get initial token
                         client
@@ -368,6 +446,18 @@ async fn sync_caldav_calendars(
                         &new_token,
                     )
                     .await;
+                    if let Some(w) = &window {
+                        crate::commands::sync_window::set_synced_until(
+                            pool, &cal_id, generation, w,
+                        )
+                        .await;
+                    }
+                    tracing::debug!(
+                        calendar = %cal_label,
+                        listed = fetched.listed,
+                        fetched = raw_events.len(),
+                        "full fetch completed"
+                    );
 
                     println!(
                         "  {} {} — {} event(s) synced{}",
@@ -395,7 +485,7 @@ async fn sync_caldav_calendars(
     // A write calendar the owner does not sync (#324) holds no cached
     // events, which must not read as "every booking was deleted": the sweep
     // skips it.
-    cancel_orphaned_bookings(pool, key, Some(client), source_id).await;
+    cancel_orphaned_bookings(pool, key, Some(client), source_id, window.as_ref()).await;
 
     // Update last_synced (and last_full_sync if we did a full fetch)
     if did_full_sync {
@@ -629,6 +719,12 @@ async fn sync_ews_calendars(
     let since_dt = Utc::now() - chrono::Duration::days(FULL_FETCH_LOOKBACK_DAYS);
     let since_iso = since_dt.to_rfc3339();
     let since_prefix = since_dt.format("%Y%m%d").to_string();
+    // ilia fork: the CalendarView spans the sync window, not two years.
+    let window = crate::horizon::sync_window(pool).await;
+    let (since_prefix, until_prefix) = match &window {
+        Some(w) => w.orphan_scope(),
+        None => (since_prefix, String::new()),
+    };
 
     for cal_info in &calendars {
         let (cal_id, _stored_change_marker, _stored_sync_state, sync_enabled) =
@@ -641,9 +737,20 @@ async fn sync_ews_calendars(
             continue;
         }
 
-        match provider.fetch_events_since(&cal_info.id, &since_iso).await {
+        let fetched = match &window {
+            Some(w) => {
+                provider
+                    .fetch_events_window(&cal_info.id, &w.since.to_rfc3339(), &w.until.to_rfc3339())
+                    .await
+            }
+            None => provider.fetch_events_since(&cal_info.id, &since_iso).await,
+        };
+        match fetched {
             Ok(raw_events) => {
                 let count = upsert_provider_events(pool, &cal_id, &raw_events).await;
+                if let Some(w) = &window {
+                    crate::commands::sync_window::prune(pool, &cal_id, w).await;
+                }
                 let deleted = remove_orphaned_ews_events(
                     pool,
                     key,
@@ -652,6 +759,7 @@ async fn sync_ews_calendars(
                     &cal_id,
                     &raw_events,
                     &since_prefix,
+                    &until_prefix,
                 )
                 .await;
                 if deleted > 0 {
@@ -827,6 +935,7 @@ async fn remove_orphaned_ews_events(
     cal_id: &str,
     raw_events: &[ProviderRawEvent],
     since_prefix: &str,
+    until_prefix: &str,
 ) -> u32 {
     let mut seen_uids: Vec<(String, String)> = Vec::new();
     for raw in raw_events {
@@ -845,17 +954,23 @@ async fn remove_orphaned_ews_events(
     // Same window-scoping trick as the CalDAV path: compact ("YYYYMMDDTHHMMSS")
     // and all-day ("YYYYMMDD") start_at values both sort against a YYYYMMDD
     // lower bound.
-    let local_events: Vec<(String, String, Option<String>)> = sqlx::query_as(
+    // ilia fork: with a window (`until_prefix` set) the rows the
+    // CalendarView returns, by overlap (`SyncWindow::orphan_scope`).
+    let sql = format!(
         "SELECT id, uid, recurrence_id FROM events
-         WHERE calendar_id = ?
-           AND (? = '' OR start_at >= ?)",
-    )
-    .bind(cal_id)
-    .bind(since_prefix)
-    .bind(since_prefix)
-    .fetch_all(pool)
-    .await
-    .unwrap_or_default();
+         WHERE calendar_id = ?1
+           AND (CASE WHEN ?3 = '' THEN (?2 = '' OR start_at >= ?2)
+                     ELSE ({end} >= ?2 AND {start} < ?3) END)",
+        end = crate::commands::sync_window::END_COMPACT,
+        start = crate::commands::sync_window::START_COMPACT,
+    );
+    let local_events: Vec<(String, String, Option<String>)> = sqlx::query_as(&sql)
+        .bind(cal_id)
+        .bind(since_prefix)
+        .bind(until_prefix)
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
 
     let mut deleted = 0u32;
     for (event_id, uid, recurrence_id) in &local_events {
@@ -938,6 +1053,9 @@ pub(crate) async fn upsert_raw_events(
         let vevent_blocks = split_vevents(&raw.ical_data);
         let mut zones = crate::tzid::ResourceZones::new(&raw.ical_data);
         let stored_ical = crate::busy_only::StoredIcal::new(&raw.ical_data);
+        // ilia fork: the resource each row came from, and its etag.
+        let href = Some(raw.href.as_str()).filter(|h| !h.is_empty());
+        let mut present: Vec<(String, String)> = Vec::new();
         for vevent in &vevent_blocks {
             // Unfolded once for the field reads below (#267).
             let fields = crate::utils::unfold_ical(vevent);
@@ -950,6 +1068,12 @@ pub(crate) async fn upsert_raw_events(
             let status = extract_vevent_field(&fields, "STATUS");
             let rrule = extract_vevent_field(&fields, "RRULE");
             let recurrence_id = extract_vevent_field(&fields, "RECURRENCE-ID");
+            // ilia fork: the RECURRENCE-ID's zone, which the bare value loses.
+            let recurrence_tzid = fields.lines().find_map(|line| {
+                crate::utils::parse_content_line(line.trim())
+                    .filter(|p| p.name.eq_ignore_ascii_case("RECURRENCE-ID"))
+                    .and_then(|p| p.param("TZID").map(|tz| tz.trim_matches('"').to_string()))
+            });
             let transp = extract_vevent_field(&fields, "TRANSP");
             let timezone = zones.event_timezone(&fields);
             let end_at = crate::utils::extract_vevent_end(
@@ -960,8 +1084,8 @@ pub(crate) async fn upsert_raw_events(
 
             let event_id = Uuid::new_v4().to_string();
             let _ = sqlx::query(
-                "INSERT INTO events (id, calendar_id, uid, summary, start_at, end_at, location, description, status, rrule, raw_ical, recurrence_id, timezone, transp)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                "INSERT INTO events (id, calendar_id, uid, summary, start_at, end_at, location, description, status, rrule, raw_ical, recurrence_id, timezone, transp, href, etag, recurrence_tzid)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                  ON CONFLICT(calendar_id, uid, COALESCE(recurrence_id, '')) DO UPDATE SET
                    summary = excluded.summary,
                    start_at = excluded.start_at,
@@ -974,6 +1098,9 @@ pub(crate) async fn upsert_raw_events(
                    recurrence_id = excluded.recurrence_id,
                    timezone = excluded.timezone,
                    transp = excluded.transp,
+                   href = excluded.href,
+                   etag = excluded.etag,
+                   recurrence_tzid = excluded.recurrence_tzid,
                    synced_at = datetime('now')",
             )
             .bind(&event_id)
@@ -990,13 +1117,49 @@ pub(crate) async fn upsert_raw_events(
             .bind(&recurrence_id)
             .bind(&timezone)
             .bind(&transp)
+            .bind(href)
+            .bind(&raw.etag)
+            .bind(&recurrence_tzid)
             .execute(pool)
             .await;
 
+            present.push((uid, recurrence_id.unwrap_or_default()));
             count += 1;
+        }
+        // ilia fork: an instance the resource no longer holds (a removed
+        // override) goes with it, instead of waiting for the daily orphan
+        // pass. Plain delete: it is no booking's own event.
+        if let Some(href) = href {
+            forget_removed_instances(pool, cal_id, href, &present).await;
         }
     }
     count
+}
+
+/// Rows of resource `href` whose `(uid, recurrence_id)` is not in `present`.
+async fn forget_removed_instances(
+    pool: &SqlitePool,
+    cal_id: &str,
+    href: &str,
+    present: &[(String, String)],
+) {
+    let rows: Vec<(String, String, Option<String>)> = sqlx::query_as(
+        "SELECT id, uid, recurrence_id FROM events WHERE calendar_id = ? AND href = ?",
+    )
+    .bind(cal_id)
+    .bind(href)
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default();
+    for (id, uid, rid) in rows {
+        let key = (uid, rid.unwrap_or_default());
+        if !present.contains(&key) {
+            let _ = sqlx::query("DELETE FROM events WHERE id = ?")
+                .bind(&id)
+                .execute(pool)
+                .await;
+        }
+    }
 }
 
 /// Delete events by their CalDAV href (used for sync-collection 404 deletions).
@@ -1018,6 +1181,30 @@ async fn delete_events_by_href(
 ) -> u32 {
     let mut deleted = 0u32;
     for href in hrefs {
+        // ilia fork: rows synced since ilia_008 carry their resource's href,
+        // so the deletion matches whatever the server names its resources
+        // (Kerio: `<uuid>-00000001.eml`, not `{uid}.ics`). Older rows fall
+        // back to the UID taken from the href.
+        let by_href: Vec<String> = sqlx::query_scalar(
+            "DELETE FROM events WHERE calendar_id = ? AND href = ? RETURNING uid",
+        )
+        .bind(cal_id)
+        .bind(href)
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
+        if !by_href.is_empty() {
+            deleted += by_href.len() as u32;
+            let mut uids = by_href;
+            uids.sort();
+            uids.dedup();
+            for uid in &uids {
+                let _ =
+                    cancel_orphaned_booking(pool, key, OrphanCheck::Caldav(client), source_id, uid)
+                        .await;
+            }
+            continue;
+        }
         // Extract UID from href: /calendars/alice/default/abc123.ics -> abc123
         let uid = href
             .rsplit('/')
@@ -1027,13 +1214,15 @@ async fn delete_events_by_href(
         if uid.is_empty() {
             continue;
         }
-        let rows = sqlx::query("DELETE FROM events WHERE calendar_id = ? AND uid = ?")
-            .bind(cal_id)
-            .bind(uid)
-            .execute(pool)
-            .await
-            .map(|r| r.rows_affected())
-            .unwrap_or(0);
+        let rows = sqlx::query(
+            "DELETE FROM events WHERE calendar_id = ? AND uid = ? AND (href IS NULL OR href = '')",
+        )
+        .bind(cal_id)
+        .bind(uid)
+        .execute(pool)
+        .await
+        .map(|r| r.rows_affected())
+        .unwrap_or(0);
         if rows > 0 {
             deleted += rows as u32;
             // Cancel any matching booking that was deleted on the CalDAV server.
@@ -1068,6 +1257,14 @@ async fn delete_events_by_href(
 /// `since_prefix` bounds the orphan check to events whose start_at falls inside
 /// the fetched window. Older events weren't in the response and must not be
 /// deleted as orphans. Pass an empty string to consider all local events.
+///
+/// ilia fork: `unchanged` are the rows of resources listed with an unchanged
+/// etag (present, not refetched). A non-empty `until_prefix` is the end of a
+/// time-range fetch: rows starting at or past it are out of scope, and a
+/// recurring row the fetch did not return, whatever its start, no longer
+/// overlaps the window (or is gone); it is deleted plainly, since no
+/// booking's event is recurring.
+#[allow(clippy::too_many_arguments)]
 async fn remove_orphaned_events(
     pool: &SqlitePool,
     key: &[u8; 32],
@@ -1075,10 +1272,12 @@ async fn remove_orphaned_events(
     source_id: &str,
     cal_id: &str,
     raw_events: &[RawEvent],
+    unchanged: &[(String, String)],
     since_prefix: &str,
+    until_prefix: &str,
 ) -> u32 {
     // Build set of seen (uid, recurrence_id) pairs
-    let mut seen_uids: Vec<(String, String)> = Vec::new();
+    let mut seen_uids: Vec<(String, String)> = unchanged.to_vec();
     for raw in raw_events {
         let vevent_blocks = split_vevents(&raw.ical_data);
         for vevent in &vevent_blocks {
@@ -1097,17 +1296,26 @@ async fn remove_orphaned_events(
     // Scope the orphan check to events whose start_at falls inside the fetched
     // window. Both compact ("YYYYMMDDTHHMMSS") and all-day ("YYYYMMDD")
     // encodings sort correctly against an 8-char "YYYYMMDD" lower bound.
-    let local_events: Vec<(String, String, Option<String>)> = sqlx::query_as(
-        "SELECT id, uid, recurrence_id FROM events
-         WHERE calendar_id = ?
-           AND (? = '' OR start_at >= ?)",
-    )
-    .bind(cal_id)
-    .bind(since_prefix)
-    .bind(since_prefix)
-    .fetch_all(pool)
-    .await
-    .unwrap_or_default();
+    // ilia fork: with a window, one-off rows by overlap, the set the
+    // time-range query returns (`SyncWindow::orphan_scope`): a running
+    // multi-day event that started before the window is in scope, so its
+    // deletion on the server is seen.
+    let sql = format!(
+        "SELECT id, uid, recurrence_id, (rrule IS NOT NULL AND rrule != '') FROM events
+         WHERE calendar_id = ?1
+           AND (CASE WHEN ?3 = '' THEN (?2 = '' OR start_at >= ?2)
+                     ELSE ((rrule IS NOT NULL AND rrule != '')
+                           OR ({end} >= ?2 AND {start} < ?3)) END)",
+        end = crate::commands::sync_window::END_COMPACT,
+        start = crate::commands::sync_window::START_COMPACT,
+    );
+    let local_events: Vec<(String, String, Option<String>, bool)> = sqlx::query_as(&sql)
+        .bind(cal_id)
+        .bind(since_prefix)
+        .bind(until_prefix)
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
 
     tracing::debug!(
         calendar_id = %cal_id,
@@ -1117,7 +1325,7 @@ async fn remove_orphaned_events(
     );
 
     let mut deleted = 0u32;
-    for (event_id, uid, recurrence_id) in &local_events {
+    for (event_id, uid, recurrence_id, recurring) in &local_events {
         let rec_id = recurrence_id.clone().unwrap_or_default();
         if !seen_uids.iter().any(|(u, r)| u == uid && r == &rec_id) {
             tracing::info!(uid = %uid, recurrence_id = %rec_id, "removing orphaned event (no longer on server)");
@@ -1125,8 +1333,11 @@ async fn remove_orphaned_events(
                 .bind(event_id)
                 .execute(pool)
                 .await;
-            let _ = cancel_orphaned_booking(pool, key, OrphanCheck::Caldav(client), source_id, uid)
-                .await;
+            if !(*recurring && !until_prefix.is_empty()) {
+                let _ =
+                    cancel_orphaned_booking(pool, key, OrphanCheck::Caldav(client), source_id, uid)
+                        .await;
+            }
             deleted += 1;
         }
     }
@@ -1418,11 +1629,16 @@ fn extract_time(dt_str: &str) -> String {
 /// not be auto-cancelled by sync — a guest-initiated reschedule that requires approval
 /// deletes the prior CalDAV event on purpose, and the orphan sweep would otherwise race
 /// the approval flow and cancel the booking before the host clicks approve.
+///
+/// ilia fork: with a sync `window`, only bookings inside it (ending after its
+/// start, starting a day before its end) are swept: the cache holds nothing
+/// beyond it, which says nothing about a booking's event there.
 async fn cancel_orphaned_bookings(
     pool: &SqlitePool,
     key: &[u8; 32],
     client: Option<&CaldavClient>,
     source_id: &str,
+    window: Option<&crate::horizon::SyncWindow>,
 ) {
     // Scope by the calendar the event was actually pushed to, not by the
     // event type owner's account: team bookings are written to the
@@ -1448,9 +1664,13 @@ async fn cancel_orphaned_bookings(
                            WHERE wc.source_id = cs.id
                              AND wc.href = cs.write_calendar_href
                              AND wc.sync_enabled = 0)
-           AND b.uid NOT IN (SELECT uid FROM events)",
+           AND b.uid NOT IN (SELECT uid FROM events)
+           AND (?2 = '' OR (CASE b.time_version WHEN 1 THEN b.end_at ELSE rtrim(b.end_at, 'Z') END >= ?2
+                            AND CASE b.time_version WHEN 1 THEN b.start_at ELSE rtrim(b.start_at, 'Z') END < ?3))",
     )
     .bind(source_id)
+    .bind(window.map(|w| w.since_iso()).unwrap_or_default())
+    .bind(window.map(|w| w.sweep_until_iso()).unwrap_or_default())
     .fetch_all(pool)
     .await
     .unwrap_or_default();
@@ -1711,6 +1931,7 @@ mod tests {
         let raw = vec![RawEvent {
             href: "/c/fastmail-1.ics".to_string(),
             ical_data: ical.to_string(),
+            etag: None,
         }];
         assert_eq!(upsert_raw_events(&pool, &cal_id, &raw).await, 1);
 
@@ -1827,6 +2048,7 @@ mod tests {
                 &cal_id,
                 &other_event_snapshot(),
                 "",
+                "",
             )
             .await;
             assert_eq!(
@@ -1861,6 +2083,7 @@ mod tests {
             &source_id,
             &cal_id,
             &other_event_snapshot(),
+            "",
             "",
         )
         .await;
@@ -1911,6 +2134,7 @@ mod tests {
             &cal_id,
             &other_event_snapshot(),
             "",
+            "",
         )
         .await;
         assert_eq!(booking_status(&pool, &other_booking).await, "confirmed");
@@ -1946,7 +2170,7 @@ mod tests {
         .unwrap();
         // Note: no matching row in `events` — the CalDAV event was deleted during reschedule.
 
-        cancel_orphaned_bookings(&pool, &key, None, &source_id).await;
+        cancel_orphaned_bookings(&pool, &key, None, &source_id, None).await;
 
         let status: String = sqlx::query_scalar("SELECT status FROM bookings WHERE id = ?")
             .bind(&booking_id)
@@ -2183,7 +2407,7 @@ mod tests {
         .await
         .unwrap();
 
-        cancel_orphaned_bookings(&pool, &key, None, &source_id).await;
+        cancel_orphaned_bookings(&pool, &key, None, &source_id, None).await;
 
         let status: String = sqlx::query_scalar("SELECT status FROM bookings WHERE id = ?")
             .bind(&booking_id)
@@ -2760,7 +2984,7 @@ mod tests {
         .await
         .unwrap();
 
-        cancel_orphaned_bookings(&pool, &key, None, &source_id).await;
+        cancel_orphaned_bookings(&pool, &key, None, &source_id, None).await;
 
         let status: String = sqlx::query_scalar("SELECT status FROM bookings WHERE id = ?")
             .bind(&booking_id)

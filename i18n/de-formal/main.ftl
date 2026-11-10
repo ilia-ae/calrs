@@ -510,3 +510,7 @@ tg-guest-payment-due-ton = Ihre Buchung wartet auf die Zahlung: { $event }, { $w
 ton-email-renewed-subject = Ihr Termin ist noch reserviert: { $event }
 ton-email-renewed-message = Die Zahlung für { $event } mit { $host } ist noch nicht bei uns eingegangen, daher bleibt Ihr Termin bis { $deadline } reserviert. Wenn Sie schon bezahlt haben, ist nichts weiter zu tun: Die Zahlung wird angerechnet. Andernfalls bezahlen Sie bis dahin auf der Seite unten oder stornieren Sie die Buchung, wenn sich Ihre Pläne geändert haben.
 tg-guest-payment-renewed = Die Zahlung für { $event }, { $when } ist noch nicht eingegangen, daher bleibt der Termin bis { $deadline } für Sie reserviert. Bezahlen Sie die noch offenen { $rest } TON bis dahin, sonst wird der Termin freigegeben. Wenn Sie schon bezahlt haben, ist nichts weiter zu tun: Die Zahlung wird angerechnet.
+
+## ilia fork: the system mailbox (src/inbox)
+booking-blocked-body-system = Der Gastgeber verlangt mindestens { $minutes } Minuten Vorlaufzeit. Falls Sie nicht teilnehmen können, schreiben Sie bitte an <a href="{ $href }">{ $address }</a>.
+booking-blocked-body-no-reply = Der Gastgeber verlangt mindestens { $minutes } Minuten Vorlaufzeit. Falls Sie nicht teilnehmen können, geben Sie dem Gastgeber bitte auf anderem Weg Bescheid.

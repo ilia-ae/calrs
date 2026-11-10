@@ -72,11 +72,13 @@ fn resources() -> Vec<RawEvent> {
         ical_data: shift(&format!(
             "BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:{uid}\r\n{body}END:VEVENT\r\nEND:VCALENDAR\r\n"
         )),
+        etag: None,
     };
     vec![
         RawEvent {
             href: "/cal/weekly-1.ics".into(),
             ical_data: shift(BLUEMIND_FIXTURE),
+            etag: None,
         },
         ics(
             "transparent-1",
@@ -485,6 +487,7 @@ async fn the_scrub_leaves_no_content_in_the_file() {
             ical_data: format!(
                 "BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:e{n}\r\nDTSTART:20300107T100000Z\r\nDTEND:20300107T110000Z\r\nSUMMARY:ZZSECRETTITLE{n}\r\nDESCRIPTION:{filler}\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
             ),
+            etag: None,
         })
         .collect();
     crate::commands::sync::upsert_raw_events(&pool, &cal_id, &raw).await;

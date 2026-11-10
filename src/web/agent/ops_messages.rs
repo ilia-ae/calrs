@@ -136,13 +136,19 @@ pub(crate) async fn thread_of(
                 at: crate::telegram::store::parse_sql_time(&m.created_at)
                     .map(|at| at.with_timezone(&tz).to_rfc3339())
                     .unwrap_or_default(),
-                from: if from_host { "host" } else { "guest" }.to_string(),
+                // ilia fork (inbox): an email from an attendee or another
+                // address is never labelled the guest's.
+                from: m.author().to_string(),
                 via: m.via,
                 email: m.email_status,
                 telegram: m.telegram_status,
                 text: from_host.then(|| owner_text(&m.body, HOST_TEXT_MAX).0),
                 guest_supplied: (!from_host).then(|| GuestMessageText {
                     text: untrusted_text(&m.body, GUEST_TEXT_MAX),
+                    sender_email: m
+                        .sender_email
+                        .as_deref()
+                        .map(|a| untrusted_text(a, crate::telegram::text::EMAIL_MAX)),
                 }),
             }
         })

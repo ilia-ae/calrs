@@ -34,6 +34,26 @@ pub(crate) fn register(env: &mut Environment<'static>, source_url: Option<&str>)
     env.add_function("telegram_enabled", crate::telegram::enabled);
 }
 
+/// ilia fork (`crate::inbox`): what the "too late to cancel or reschedule"
+/// page offers as a contact. In relay mode a `mailto:` to the booking's
+/// system reply address (with the `[#token]` subject in bare mode), or
+/// nothing when no mailbox is read; otherwise upstream's host address.
+pub(crate) fn blocked_contact(uid: &str, host_email: String) -> String {
+    if crate::inbox::relay() {
+        crate::inbox::reply::guest_mailto(uid)
+            .map(|(href, _)| href)
+            .unwrap_or_default()
+    } else {
+        host_email
+    }
+}
+
+/// The address shown for [`blocked_contact`]'s value.
+pub(crate) fn blocked_contact_shown(contact: &str) -> &str {
+    let bare = contact.strip_prefix("mailto:").unwrap_or(contact);
+    bare.split('?').next().unwrap_or(bare)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

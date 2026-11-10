@@ -1218,7 +1218,7 @@ async fn links_are_purged_even_with_telegram_off() {
         .unwrap();
     }
     let (stop_tx, stop_rx) = tokio::sync::watch::channel(false);
-    let handle = crate::telegram::spawn(pool.clone(), stop_rx).await;
+    let handle = crate::telegram::spawn(pool.clone(), [0u8; 32], stop_rx).await;
     assert!(!crate::telegram::enabled());
     let mut left: Vec<(String, Option<String>)> = Vec::new();
     for _ in 0..200 {

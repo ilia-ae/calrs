@@ -6,6 +6,13 @@
 <div class="card" style="text-align: center;">
   <div class="check" style="background: var(--text-muted);">!</div>
   <h1>{% if action == "reschedule" %}{{ t("booking-blocked-title-reschedule") }}{% else %}{{ t("booking-blocked-title-cancel") }}{% endif %}</h1>
+  {# ilia fork: in relay mode the contact is the system mailbox, never the host. #}
+  {% if not relay %}
   <p class="subtitle">{{ t("booking-blocked-body", minutes=notice_min | escape, host_email=host_email | escape) | safe }}</p>
+  {% elif contact_href %}
+  <p class="subtitle">{{ t("booking-blocked-body-system", minutes=notice_min | escape, href=contact_href | escape, address=host_email | escape) | safe }}</p>
+  {% else %}
+  <p class="subtitle">{{ t("booking-blocked-body-no-reply", minutes=notice_min) }}</p>
+  {% endif %}
 </div>
 {% endblock %}

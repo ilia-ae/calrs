@@ -1992,7 +1992,7 @@ msg-guest = Külaline: { $guest }
 msg-sent = Sõnum saadetud.
 msg-empty = Sõnumeid veel pole.
 msg-label = Sõnum külalisele
-msg-help-email = Külaline saab selle e-kirjaga ja vastused tulevad sinu aadressile.
+msg-help-email = Külaline saab selle e-kirjaga süsteemi aadressilt; tema vastused ilmuvad siia ja sinu Telegrami.
 msg-help-no-email = Selles serveris pole e-post seadistatud.
 msg-help-telegram = Külaline on Telegrami ühendanud ja saab selle ka sinna.
 msg-help-no-telegram = Külaline pole Telegrami ühendanud.
@@ -2002,6 +2002,8 @@ msg-link = Sõnumid
 msg-link-count = Sõnumid ({ $count })
 msg-from-host = Korraldaja
 msg-from-guest = Külaline
+msg-from-attendee = Osaleja: { $address }
+msg-from-other = Teine aadress, mitte külalise oma: { $address }
 msg-via-dashboard = töölaud
 msg-via-mcp = agent
 msg-via-telegram = Telegram
@@ -2039,3 +2041,19 @@ tg-bot-message-sent-shortened = Sinu sõnum on korraldajale edastatud, lühendat
 tg-bot-reply-too-long = Vastust ei saadetud: sõnumis võib olla kuni { $max } märki.
 tg-bot-reply-empty = Vastust ei saadetud: selles pole nähtavat teksti.
 tg-bot-reply-failed = Vastust ei õnnestunud salvestada, seega seda ei saadetud. Proovi uuesti.
+troubleshoot-not-synced = Kalendreid loetakse ainult vahemikus { $from } kuni { $until }; väljaspool neid päevi sündmusi ei laadita, seega siin neid ei näidata.
+event-type-form-horizon-capped =
+    { $days ->
+        [one] See server pakub aegu kõige rohkem { $days } päev ette, olenemata broneerimishorisondist.
+       *[other] See server pakub aegu kõige rohkem { $days } päeva ette, olenemata broneerimishorisondist.
+    }
+
+## ilia fork: the system mailbox (src/inbox)
+msg-help-email-no-inbox = Külaline saab selle e-kirjaga süsteemi aadressilt. E-kirjaga vastuseid selles serveris ei loeta.
+msg-via-email = e-post
+msg-email-footer-no-reply = Selle kirja saatis broneerimissüsteem korraldaja { $host } nimel; vastuseid sellele ei loeta.
+tg-host-guest-email = E-kiri külaliselt { $guest } ({ $email }) kohtumise { $event } kohta, { $when }:
+tg-host-attendee-email = E-kiri osalejalt { $sender } külalise { $guest } ({ $email }) broneeringus, kohtumise { $event } kohta, { $when }:
+tg-host-other-email = E-kiri teiselt aadressilt, mitte külaliselt: { $sender }, külalise { $guest } ({ $email }) broneeringu vestluses, kohtumise { $event } kohta, { $when }:
+booking-blocked-body-system = Korraldaja nõuab vähemalt { $minutes } minutit etteteatamist. Kui sa ei saa osaleda, kirjuta aadressil <a href="{ $href }">{ $address }</a>.
+booking-blocked-body-no-reply = Korraldaja nõuab vähemalt { $minutes } minutit etteteatamist. Kui sa ei saa osaleda, anna korraldajale muul viisil teada.

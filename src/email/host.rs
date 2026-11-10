@@ -5,7 +5,7 @@ use super::*;
 /// Send booking notification to the host
 pub async fn send_host_notification(config: &SmtpConfig, details: &BookingDetails) -> Result<()> {
     let to = named_mailbox(&details.host_name, &details.host_email)?;
-    let ics = generate_ics(details, "REQUEST");
+    let ics = generate_host_ics(details, "REQUEST");
     send_composed(
         config,
         Sender::Instance,
@@ -447,7 +447,7 @@ pub async fn send_host_cancellation(
     details: &CancellationDetails,
 ) -> Result<()> {
     let to = named_mailbox(&details.host_name, &details.host_email)?;
-    let ics = generate_cancel_ics(details);
+    let ics = generate_host_cancel_ics(details);
     send_composed(
         config,
         Sender::Instance,

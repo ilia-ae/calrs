@@ -1992,7 +1992,7 @@ msg-guest = Ospite: { $guest }
 msg-sent = Messaggio inviato.
 msg-empty = Ancora nessun messaggio.
 msg-label = Messaggio all’ospite
-msg-help-email = L’ospite lo riceve via email e le risposte arrivano al tuo indirizzo.
+msg-help-email = L’ospite lo riceve via email dall’indirizzo del sistema; le sue risposte compaiono qui e nel tuo Telegram.
 msg-help-no-email = Su questo server l’email non è configurata.
 msg-help-telegram = L’ospite ha collegato Telegram e lo riceve anche lì.
 msg-help-no-telegram = L’ospite non ha collegato Telegram.
@@ -2002,6 +2002,8 @@ msg-link = Messaggi
 msg-link-count = Messaggi ({ $count })
 msg-from-host = Organizzatore
 msg-from-guest = Ospite
+msg-from-attendee = Partecipante: { $address }
+msg-from-other = Un altro indirizzo, non quello dell'ospite: { $address }
 msg-via-dashboard = dashboard
 msg-via-mcp = agente
 msg-via-telegram = Telegram
@@ -2039,3 +2041,19 @@ tg-bot-message-sent-shortened = Il tuo messaggio è stato inoltrato all’organi
 tg-bot-reply-too-long = Risposta non inviata: un messaggio può avere al massimo { $max } caratteri.
 tg-bot-reply-empty = Risposta non inviata: non contiene testo visibile.
 tg-bot-reply-failed = Non è stato possibile salvare la risposta, quindi non è stata inviata. Riprova.
+troubleshoot-not-synced = I calendari vengono letti solo dal { $from } al { $until }; gli eventi fuori da questi giorni non vengono caricati, quindi qui non ne compare nessuno.
+event-type-form-horizon-capped =
+    { $days ->
+        [one] Questo server offre fasce orarie al massimo { $days } giorno in anticipo, qualunque sia l'orizzonte di prenotazione.
+       *[other] Questo server offre fasce orarie al massimo { $days } giorni in anticipo, qualunque sia l'orizzonte di prenotazione.
+    }
+
+## ilia fork: the system mailbox (src/inbox)
+msg-help-email-no-inbox = L’ospite lo riceve via email dall’indirizzo del sistema. Le risposte via email non vengono lette su questo server.
+msg-via-email = email
+msg-email-footer-no-reply = Questo messaggio è stato inviato dal sistema di prenotazione per conto di { $host }; le risposte non vengono lette.
+tg-host-guest-email = Email da { $guest } ({ $email }) su { $event }, { $when }:
+tg-host-attendee-email = Email da { $sender }, partecipante aggiuntivo della prenotazione di { $guest } ({ $email }), su { $event }, { $when }:
+tg-host-other-email = Email da un altro indirizzo, non quello dell'ospite: { $sender }, nella conversazione della prenotazione di { $guest } ({ $email }) su { $event }, { $when }:
+booking-blocked-body-system = L'organizzatore richiede almeno { $minutes } minuti di preavviso. Se non puoi partecipare, scrivi a <a href="{ $href }">{ $address }</a>.
+booking-blocked-body-no-reply = L'organizzatore richiede almeno { $minutes } minuti di preavviso. Se non puoi partecipare, avvisa l'organizzatore in un altro modo.

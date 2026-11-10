@@ -1994,7 +1994,7 @@ msg-guest = Gast: { $guest }
 msg-sent = Bericht verzonden.
 msg-empty = Nog geen berichten.
 msg-label = Bericht aan de gast
-msg-help-email = De gast krijgt het per e-mail, en antwoorden komen op je eigen adres.
+msg-help-email = De gast krijgt het per e-mail van het systeemadres; zijn antwoorden verschijnen hier en in je Telegram.
 msg-help-no-email = E-mail is op deze server niet ingesteld.
 msg-help-telegram = De gast heeft Telegram gekoppeld en krijgt het daar ook.
 msg-help-no-telegram = De gast heeft Telegram niet gekoppeld.
@@ -2004,6 +2004,8 @@ msg-link = Berichten
 msg-link-count = Berichten ({ $count })
 msg-from-host = Gastheer
 msg-from-guest = Gast
+msg-from-attendee = Deelnemer: { $address }
+msg-from-other = Ander adres, niet dat van de gast: { $address }
 msg-via-dashboard = dashboard
 msg-via-mcp = agent
 msg-via-telegram = Telegram
@@ -2041,3 +2043,19 @@ tg-bot-message-sent-shortened = Je bericht is doorgegeven aan de gastheer, ingek
 tg-bot-reply-too-long = Antwoord niet verzonden: een bericht mag hoogstens { $max } tekens hebben.
 tg-bot-reply-empty = Antwoord niet verzonden: er staat geen zichtbare tekst in.
 tg-bot-reply-failed = Het antwoord kon niet worden opgeslagen en is dus niet verzonden. Probeer het opnieuw.
+troubleshoot-not-synced = Agenda's worden alleen gelezen van { $from } tot { $until }; afspraken buiten deze dagen worden niet geladen en zijn hier dus niet te zien.
+event-type-form-horizon-capped =
+    { $days ->
+        [one] Deze server biedt tijden aan tot hoogstens { $days } dag vooruit, ongeacht de boekingshorizon.
+       *[other] Deze server biedt tijden aan tot hoogstens { $days } dagen vooruit, ongeacht de boekingshorizon.
+    }
+
+## ilia fork: the system mailbox (src/inbox)
+msg-help-email-no-inbox = De gast krijgt het per e-mail van het systeemadres. Antwoorden per e-mail worden op deze server niet gelezen.
+msg-via-email = e-mail
+msg-email-footer-no-reply = Het boekingssysteem stuurde dit bericht namens { $host }; antwoorden worden niet gelezen.
+tg-host-guest-email = E-mail van { $guest } ({ $email }) over { $event }, { $when }:
+tg-host-attendee-email = E-mail van { $sender }, extra deelnemer aan de boeking van { $guest } ({ $email }), over { $event }, { $when }:
+tg-host-other-email = E-mail van een ander adres, niet dat van de gast: { $sender }, in het gesprek over de boeking van { $guest } ({ $email }) over { $event }, { $when }:
+booking-blocked-body-system = De organisator vraagt minstens { $minutes } minuten van tevoren bericht. Kun je niet aanwezig zijn? Schrijf dan naar <a href="{ $href }">{ $address }</a>.
+booking-blocked-body-no-reply = De organisator vraagt minstens { $minutes } minuten van tevoren bericht. Kun je niet aanwezig zijn? Laat het de organisator dan op een andere manier weten.

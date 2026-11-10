@@ -97,6 +97,18 @@ unic-langid = "0.9"
 # MCP server behind the admin socket (fork: src/web/agent)
 rmcp = { version = "=3.7.0", default-features = false, features = ["server", "macros"] }
 
+# ilia fork: the system mailbox (src/inbox). Our own minimal IMAP client runs
+# over the TLS stack lettre and reqwest already bring in (tokio-rustls 0.26
+# with ring, webpki-roots 1, rustls-pki-types 1: no new crate). The ring
+# provider is named explicitly: tokio-rustls 0.26 defaults to aws-lc-rs.
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }
+webpki-roots = "1"
+rustls-pki-types = { version = "1", features = ["std"] }
+# MIME parsing of the replies (Stalwart's fuzzed parser, HTML to text and the
+# Cyrillic charsets built in): adds mail-parser and hashify only. Pinned:
+# 1.0.0 adds four crates and needs Rust 1.98.
+mail-parser = "=0.11.9"
+
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"

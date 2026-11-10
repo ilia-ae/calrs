@@ -373,9 +373,11 @@ pub(crate) async fn pay_page(
         None
     };
     let (host_name, host_email) = match (pay_state.shows_contact(), row.booking_uid.as_deref()) {
+        // ilia fork (`crate::inbox`): the booking's system reply address,
+        // never the owner's own (none when no mailbox is read).
         (true, Some(uid)) => crate::web::booking_host_identity(&state.pool, uid)
             .await
-            .map(|(n, e, _)| (n, e))
+            .map(|(n, e, _)| (n, crate::inbox::reply::guest_contact(Some(uid), e)))
             .unwrap_or_default(),
         _ => Default::default(),
     };
@@ -546,6 +548,7 @@ pub(crate) async fn guest_mail(
             guest_email: email,
             host_name,
             host_email,
+            booking_uid: uid.clone(),
             event_title: title,
             date,
             time,

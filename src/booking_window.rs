@@ -30,8 +30,9 @@ impl BookingWindow {
     /// starts, or a range more than a year out).
     pub fn effective_date_bounds(&self, today: NaiveDate) -> (NaiveDate, NaiveDate) {
         let first = self.bookable_from.map_or(today, |from| from.max(today));
+        // ilia fork: capped by the fork-wide horizon (`CALRS_MAX_HORIZON_DAYS`).
         let mut last = today
-            .checked_add_signed(Duration::days(MAX_DAYS_AHEAD))
+            .checked_add_signed(Duration::days(crate::horizon::max_days_ahead()))
             .unwrap_or(NaiveDate::MAX);
         if let Some(horizon) = horizon_last_date(today.and_time(NaiveTime::MIN), self.horizon_days)
         {
@@ -59,7 +60,14 @@ impl BookingWindow {
         let within_horizon = horizon_last_date(today.and_time(NaiveTime::MIN), self.horizon_days)
             .is_none_or(|last| date <= last);
         let within_range = self.bookable_until.is_none_or(|until| date <= until);
-        date >= first && within_horizon && within_range
+        // ilia fork: not past the fork-wide horizon either, where the event
+        // cache is blind.
+        let within_cap = crate::horizon::limit().is_none_or(|_| {
+            today
+                .checked_add_signed(Duration::days(crate::horizon::max_days_ahead()))
+                .is_none_or(|last| date <= last)
+        });
+        date >= first && within_horizon && within_range && within_cap
     }
 
     /// The range has ended: `bookable_until` is set and already behind us.
@@ -329,5 +337,39 @@ mod tests {
         assert_eq!(parse_optional_date(Some("")), None);
         assert_eq!(parse_optional_date(Some("10.11.2026")), None);
         assert_eq!(parse_optional_date(None), None);
+    }
+
+    /// ilia fork: the fork-wide horizon caps every event type's last day,
+    /// whatever its own horizon, and the CLI's `allows` rule too.
+    #[test]
+    fn fork_horizon_caps_the_last_bookable_day() {
+        let _cap = crate::horizon::test_limit(14);
+        let last = d(TODAY) + Duration::days(14);
+        for horizon in [None, Some(30), Some(366)] {
+            let w = BookingWindow {
+                horizon_days: horizon,
+                ..Default::default()
+            };
+            assert_eq!(w.effective_date_bounds(d(TODAY)).1, last, "{horizon:?}");
+            assert!(w.contains(last, d(TODAY)));
+            assert!(!w.contains(last + Duration::days(1), d(TODAY)));
+            assert!(w.allows(last, d(TODAY)));
+            assert!(!w.allows(last + Duration::days(1), d(TODAY)));
+        }
+        // A shorter horizon of its own still wins.
+        let w = BookingWindow {
+            horizon_days: Some(7),
+            ..Default::default()
+        };
+        assert_eq!(
+            w.effective_date_bounds(d(TODAY)).1,
+            d(TODAY) + Duration::days(7)
+        );
+    }
+
+    #[test]
+    fn without_the_fork_horizon_allows_is_unbounded() {
+        let w = BookingWindow::default();
+        assert!(w.allows(d(TODAY) + Duration::days(400), d(TODAY)));
     }
 }

@@ -298,6 +298,7 @@ async fn send_guest_attendee_copies(
                     Sender::Host {
                         name: &details.host_name,
                         email: &details.host_email,
+                        booking: Some(&details.uid),
                         lang,
                     },
                     to,
@@ -695,6 +696,7 @@ pub async fn send_guest_attendee_cancellations(
                     Sender::Host {
                         name: &details.host_name,
                         email: &details.host_email,
+                        booking: Some(&details.uid),
                         lang,
                     },
                     to,
@@ -1263,9 +1265,12 @@ pub async fn send_invite_email(
         invite_url,
         expires_at,
     );
+    // ilia fork: an invite has no booking yet; in relay mode its reply
+    // goes to the bare system mailbox (or the system From).
     let sender = Sender::Host {
         name: host_name,
         email: host_email,
+        booking: None,
         lang,
     };
     send_composed(config, sender, to, mail, None).await
@@ -1430,6 +1435,7 @@ pub async fn send_guest_reschedule_notification(
     let sender = Sender::Host {
         name: &details.host_name,
         email: &details.host_email,
+        booking: Some(&details.uid),
         lang: lang_or_en(details.guest_language.as_deref()),
     };
     send_composed(
