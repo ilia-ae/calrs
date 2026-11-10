@@ -61,9 +61,9 @@ pub struct TonOwnerMail {
     pub guest_email: String,
     /// The invoice amount, "12.35".
     pub amount_ton: String,
-    /// The price, "40.00".
+    /// The price, "40.00"; empty for a price in TON.
     pub price_usd: String,
-    /// The invoice's rate, "3.2412".
+    /// The invoice's rate, "3.2412"; empty for a price in TON.
     pub rate_usd: String,
     /// Received in total, "12.35".
     pub paid_ton: String,
@@ -116,6 +116,17 @@ pub(super) fn compose_guest_ton_pay_link(
     cancel_url: Option<&str>,
     telegram_link: Option<&str>,
 ) -> ComposedEmail {
+    link_parts(mail, pay_url, cancel_url, telegram_link).compose()
+}
+
+/// The link email's parts: the payment page, then the Telegram link, then
+/// Cancel, and when the time stops being held.
+fn link_parts<'a>(
+    mail: &'a TonGuestMail,
+    pay_url: &str,
+    cancel_url: Option<&str>,
+    telegram_link: Option<&str>,
+) -> EmailParts<'a> {
     let lang = lang_or_en(Some(&mail.lang));
     let mut plain_lines = vec![ta(lang, "ton-email-link-line", [("url", pay_url)])];
     let mut actions = vec![EmailAction {
@@ -166,7 +177,54 @@ pub(super) fn compose_guest_ton_pay_link(
         footer_html: None,
         actions,
     }
-    .compose()
+}
+
+/// ilia fork: the payment window ended unpaid while the meeting is still
+/// far away, so the time stays held with a new deadline (`mail.pay_by`):
+/// the guest is asked to complete the booking. In the style of the link
+/// email: the payment page, the Telegram link, the cancel link; no amount,
+/// address or coin. Bounded by the invoice's renewals (at most 5).
+pub async fn send_guest_ton_renewed(
+    config: &SmtpConfig,
+    mail: &TonGuestMail,
+    pay_url: &str,
+    cancel_url: Option<&str>,
+    telegram_link: Option<&str>,
+) -> Result<()> {
+    let to = named_mailbox(&mail.guest_name, &mail.guest_email)?;
+    let lang = lang_or_en(Some(&mail.lang));
+    let sender = Sender::Host {
+        name: &mail.host_name,
+        email: &mail.host_email,
+        lang,
+    };
+    let composed = compose_guest_ton_renewed(mail, pay_url, cancel_url, telegram_link);
+    send_composed(config, sender, to, composed, None).await
+}
+
+pub(super) fn compose_guest_ton_renewed(
+    mail: &TonGuestMail,
+    pay_url: &str,
+    cancel_url: Option<&str>,
+    telegram_link: Option<&str>,
+) -> ComposedEmail {
+    let lang = lang_or_en(Some(&mail.lang));
+    let mut parts = link_parts(mail, pay_url, cancel_url, telegram_link);
+    parts.subject = ta(
+        lang,
+        "ton-email-renewed-subject",
+        [("event", &mail.event_title)],
+    );
+    parts.message = ta(
+        lang,
+        "ton-email-renewed-message",
+        [
+            ("event", &mail.event_title),
+            ("host", &mail.host_name),
+            ("deadline", &mail.pay_by),
+        ],
+    );
+    parts.compose()
 }
 
 /// The booking was released unconfirmed, for `reason`.
@@ -531,8 +589,16 @@ fn booking_rows(lang: &str, mail: &TonOwnerMail) -> Vec<EmailRow> {
     )
 }
 
-/// "12.35 TON ≈ $40.00 (1 TON = $3.2412)".
+/// "12.35 TON ≈ $40.00 (1 TON = $3.2412)", or "100.00 TON" for a price
+/// in TON.
 fn amount_value(lang: &str, mail: &TonOwnerMail) -> String {
+    if mail.price_usd.is_empty() {
+        return ta(
+            lang,
+            "ton-email-amount-value-ton",
+            [("amount", mail.amount_ton.as_str())],
+        );
+    }
     ta(
         lang,
         "ton-email-amount-value",
@@ -727,6 +793,41 @@ mod tests {
         );
         assert!(m.plain.contains("14:30 (Asia/Dubai)"), "{}", m.plain);
         assert!(m.plain.contains(&t("en", "ton-email-row-pay-by")));
+    }
+
+    /// ilia fork: a price in TON shows the amount alone, in every locale;
+    /// the renewal email is the link email's twin, with its own subject.
+    #[test]
+    fn ton_prices_and_renewals() {
+        for (lang, _) in crate::i18n::supported_with_labels() {
+            let mut mail = owner(lang);
+            mail.price_usd = String::new();
+            mail.rate_usd = String::new();
+            let m = compose_host_ton_payment_received(&mail);
+            assert!(!all_text(&m).contains('$'), "{lang}");
+            assert!(m.plain.contains("12.35 TON"), "{lang}");
+            let mut g = guest(lang);
+            g.pay_by = "Tuesday, November 17, 2026, 10:30 (Asia/Dubai)".into();
+            let m = compose_guest_ton_renewed(
+                &g,
+                "https://cal.example.com/booking/pay/x",
+                Some("https://cal.example.com/booking/cancel/y"),
+                None,
+            );
+            let text = all_text(&m);
+            assert!(m.subject.contains("Consultation"), "{lang}");
+            assert!(
+                text.contains("https://cal.example.com/booking/pay/x"),
+                "{lang}"
+            );
+            assert!(text.contains("10:30 (Asia/Dubai)"), "{lang}");
+            assert!(!text.contains("ton-email"), "{lang}");
+            assert!(!text.contains("TON"), "{lang}: no coin in a guest email");
+            assert_ne!(
+                m.subject,
+                compose_guest_ton_pay_link(&g, "https://x/p", None, None).subject
+            );
+        }
     }
 
     #[test]

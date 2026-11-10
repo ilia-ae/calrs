@@ -12,7 +12,10 @@ pub async fn connect(data_dir: &Path) -> Result<SqlitePool> {
 
     let options = SqliteConnectOptions::from_str(&db_url)?
         .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal)
-        .foreign_keys(true);
+        .foreign_keys(true)
+        // ilia fork: deleted and overwritten content is zeroed, not left in
+        // free pages (busy-only storage, src/busy_only.rs).
+        .pragma("secure_delete", "on");
 
     let pool = SqlitePoolOptions::new()
         .max_connections(5)
@@ -342,9 +345,31 @@ pub async fn migrate(pool: &SqlitePool) -> Result<()> {
             "ilia_002_telegram",
             include_str!("../migrations/ilia_002_telegram.sql"),
         ),
+        (
+            "ilia_003_busy_only",
+            include_str!("../migrations/ilia_003_busy_only.sql"),
+        ),
+        (
+            "ilia_004_ton_price_currency",
+            include_str!("../migrations/ilia_004_ton_price_currency.sql"),
+        ),
+        (
+            "ilia_005_ton_renewals",
+            include_str!("../migrations/ilia_005_ton_renewals.sql"),
+        ),
+        (
+            "ilia_006_booking_messages",
+            include_str!("../migrations/ilia_006_booking_messages.sql"),
+        ),
+        (
+            "ilia_007_optimize",
+            include_str!("../migrations/ilia_007_optimize.sql"),
+        ),
     ];
 
     let mut applied_count = 0u32;
+    // ilia fork: ilia_003 scrubbed event content in this run.
+    let mut busy_only_now = false;
     for (name, sql) in migrations {
         let applied: Option<(String,)> =
             sqlx::query_as("SELECT name FROM _migrations WHERE name = ?")
@@ -365,6 +390,7 @@ pub async fn migrate(pool: &SqlitePool) -> Result<()> {
             tx.commit().await?;
             tracing::info!(migration = %name, "database migration applied");
             applied_count += 1;
+            busy_only_now |= *name == "ilia_003_busy_only";
         }
     }
 
@@ -380,6 +406,14 @@ pub async fn migrate(pool: &SqlitePool) -> Result<()> {
 
     // Generate usernames for users that don't have one
     generate_missing_usernames(pool).await?;
+
+    // ilia fork: busy-only calendar storage (src/busy_only.rs).
+    if crate::busy_only::enabled() {
+        let changed = crate::busy_only::scrub_stored(pool).await?;
+        if changed > 0 || busy_only_now {
+            crate::busy_only::wipe_free_pages(pool).await?;
+        }
+    }
 
     Ok(())
 }
@@ -989,8 +1023,10 @@ mod tests {
             .fetch_one(&pool)
             .await
             .unwrap();
-        // 79 upstream + ilia_001_ton_payments + ilia_002_telegram.
-        assert_eq!(count.0, 81, "All 81 migrations should be tracked");
+        // 79 upstream + ilia_001_ton_payments + ilia_002_telegram + ilia_003_busy_only
+        // + ilia_004_ton_price_currency + ilia_005_ton_renewals + ilia_006_booking_messages
+        // + ilia_007_optimize.
+        assert_eq!(count.0, 86, "All 86 migrations should be tracked");
     }
 
     /// #324: calendars that existed before 079, and calendars discovered
@@ -1213,7 +1249,7 @@ mod tests {
             .fetch_one(&pool)
             .await
             .unwrap();
-        assert_eq!(count.0, 81, "Still 81 migrations after second run");
+        assert_eq!(count.0, 86, "Still 86 migrations after second run");
     }
 
     #[tokio::test]

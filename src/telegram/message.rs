@@ -62,8 +62,8 @@ pub(crate) struct GuestPayment {
     pub(crate) amount: String,
     pub(crate) paid: String,
     pub(crate) rest: String,
-    /// The price in USD ("40.00").
-    pub(crate) usd: String,
+    /// The price in USD ("40.00"); `None` for a price in TON.
+    pub(crate) usd: Option<String>,
     /// Until when the time is held, in the guest's zone and language.
     pub(crate) deadline: String,
     /// The invoice is open: the guest can still pay.
@@ -108,8 +108,8 @@ pub(crate) struct HostPayment {
     /// The invoice amount and what arrived, in TON ("12.35").
     pub(crate) amount: String,
     pub(crate) paid: String,
-    /// The price in USD ("40.00").
-    pub(crate) usd: String,
+    /// The price in USD ("40.00"); `None` for a price in TON.
+    pub(crate) usd: Option<String>,
 }
 
 /// "Monday, 17 August 2026, 14:00 (Europe/Paris)".
@@ -409,6 +409,39 @@ pub(crate) fn guest(event: &TelegramEvent, v: &GuestView, lang: &str) -> Option<
             Vec::new(),
         ),
         PaymentProblem { .. } => return None,
+        // ilia fork (messages): the host's text as written (cleaned when
+        // it was sent), then how to answer.
+        HostMessage { text, .. } => finish(
+            lang,
+            format!(
+                "{}\n\n{}\n\n{}",
+                ta(
+                    lang,
+                    "tg-guest-host-message",
+                    &[("host", &v.host), ("event", ev), ("when", wh)],
+                ),
+                text::clean_lines(text, text::HOST_TEXT_MAX),
+                ta(lang, "tg-guest-reply-hint", &[]),
+            ),
+            Vec::new(),
+        ),
+        GuestMessage { .. } => return None,
+        PaymentRenewed { .. } => {
+            // Paid or released meanwhile: nothing left to ask.
+            let p = v.payment.as_ref().filter(|p| p.open)?;
+            let text = ta(
+                lang,
+                "tg-guest-payment-renewed",
+                &[
+                    ("event", ev),
+                    ("when", wh),
+                    ("rest", &p.rest),
+                    ("deadline", &p.deadline),
+                ],
+            );
+            let pay = (ta(lang, "tg-button-pay", &[]), p.pay_url.as_ref());
+            finish(lang, text, vec![pay, cancel()])
+        }
     };
     Some(msg)
 }
@@ -428,7 +461,7 @@ fn payment_due(lang: &str, event: &str, when: &str, p: &GuestPayment) -> String 
                 ("deadline", &p.deadline),
             ],
         )
-    } else {
+    } else if let Some(usd) = &p.usd {
         ta(
             lang,
             "tg-guest-payment-due",
@@ -436,7 +469,18 @@ fn payment_due(lang: &str, event: &str, when: &str, p: &GuestPayment) -> String 
                 ("event", event),
                 ("when", when),
                 ("amount", &p.amount),
-                ("usd", &p.usd),
+                ("usd", usd),
+                ("deadline", &p.deadline),
+            ],
+        )
+    } else {
+        ta(
+            lang,
+            "tg-guest-payment-due-ton",
+            &[
+                ("event", event),
+                ("when", when),
+                ("amount", &p.amount),
                 ("deadline", &p.deadline),
             ],
         )
@@ -482,18 +526,21 @@ pub(crate) fn host(event: &TelegramEvent, v: &HostView, lang: &str) -> Option<Ou
         }
         PaymentReceived => {
             let p = v.payment.as_ref()?;
-            let mut text = ta(
-                lang,
-                "tg-host-payment-received",
-                &[
-                    ("event", v.event.as_str()),
-                    ("when", v.when.as_str()),
-                    ("guest", v.guest.as_str()),
-                    ("email", v.email.as_str()),
-                    ("paid", p.paid.as_str()),
-                    ("usd", p.usd.as_str()),
-                ],
-            );
+            let base = [
+                ("event", v.event.as_str()),
+                ("when", v.when.as_str()),
+                ("guest", v.guest.as_str()),
+                ("email", v.email.as_str()),
+                ("paid", p.paid.as_str()),
+            ];
+            let mut text = match &p.usd {
+                Some(usd) => {
+                    let mut args = base.to_vec();
+                    args.push(("usd", usd.as_str()));
+                    ta(lang, "tg-host-payment-received", &args)
+                }
+                None => ta(lang, "tg-host-payment-received-ton", &base),
+            };
             // A priced booking's hosts were not told when the guest linked
             // a chat (it awaited its payment): who holds the booking's
             // chat, and whether that is who the guest said, comes here.
@@ -541,7 +588,16 @@ pub(crate) fn host(event: &TelegramEvent, v: &HostView, lang: &str) -> Option<Ou
             ));
             text
         }
+        // ilia fork (messages): the guest wrote it, so it is cleaned to one
+        // line and defanged like their name.
+        GuestMessage { text: body, .. } => format!(
+            "{}\n\n{}\n\n{}",
+            ta(lang, "tg-host-guest-message", &args),
+            text::defang(&text::clean(body, text::GUEST_TEXT_MAX)),
+            ta(lang, "tg-host-reply-hint", &[]),
+        ),
         Cancelled { by_host: true, .. }
+        | HostMessage { .. }
         | Approved { .. }
         | Declined { .. }
         | RescheduleRequested
@@ -549,6 +605,7 @@ pub(crate) fn host(event: &TelegramEvent, v: &HostView, lang: &str) -> Option<Ou
         | Expired
         | PaymentDue
         | PaymentPartial
+        | PaymentRenewed { .. }
         | PaymentExpired { .. } => return None,
     };
     let bookings = ta(lang, "tg-button-bookings", &[]);
@@ -575,6 +632,30 @@ pub(crate) enum Reply {
     RateLimited,
     Stopped,
     NotLinked,
+    /// ilia fork (messages): a guest's text went to the host.
+    MessageSent,
+    /// As `MessageSent`, cut to `text::GUEST_TEXT_MAX` characters.
+    MessageSentShortened,
+    /// Several bookings are linked to this chat: reply to the right one.
+    MessagePickBooking,
+    /// The booking no longer takes messages.
+    MessageClosed,
+    /// An unpaid priced booking: messages open after payment.
+    MessageAfterPayment,
+    /// Too many messages from this chat, or for this booking.
+    MessageLimit,
+    /// A host's reply went to the guest's Telegram.
+    HostReplySent,
+    /// The guest has no linked chat: the host writes from the dashboard.
+    HostReplyNotLinked,
+    /// The booking is not this host's, or no longer takes messages.
+    HostReplyNotAllowed,
+    /// A host's reply over `text::HOST_TEXT_MAX` characters: not sent.
+    HostReplyTooLong,
+    /// A host's reply with nothing visible in it: not sent.
+    HostReplyEmpty,
+    /// A host's reply that could not be stored: not sent.
+    HostReplyFailed,
 }
 
 /// A bot reply in `lang`. `site` names this calrs (its host name).
@@ -588,6 +669,26 @@ pub(crate) fn bot_reply(reply: Reply, lang: &str, site: &str) -> Outgoing {
         Reply::RateLimited => ta(lang, "tg-bot-rate-limited", &[]),
         Reply::Stopped => ta(lang, "tg-bot-stopped", &[]),
         Reply::NotLinked => ta(lang, "tg-bot-not-linked", &[]),
+        Reply::MessageSent => ta(lang, "tg-bot-message-sent", &[]),
+        Reply::MessageSentShortened => ta(
+            lang,
+            "tg-bot-message-sent-shortened",
+            &[("max", &text::GUEST_TEXT_MAX.to_string())],
+        ),
+        Reply::MessagePickBooking => ta(lang, "tg-bot-message-pick-booking", &[]),
+        Reply::MessageClosed => ta(lang, "tg-bot-message-closed", &[]),
+        Reply::MessageAfterPayment => ta(lang, "tg-bot-message-after-payment", &[]),
+        Reply::MessageLimit => ta(lang, "tg-bot-message-limit", &[]),
+        Reply::HostReplySent => ta(lang, "tg-bot-reply-sent", &[]),
+        Reply::HostReplyNotLinked => ta(lang, "tg-bot-reply-not-linked", &[]),
+        Reply::HostReplyNotAllowed => ta(lang, "tg-bot-reply-not-allowed", &[]),
+        Reply::HostReplyTooLong => ta(
+            lang,
+            "tg-bot-reply-too-long",
+            &[("max", &text::HOST_TEXT_MAX.to_string())],
+        ),
+        Reply::HostReplyEmpty => ta(lang, "tg-bot-reply-empty", &[]),
+        Reply::HostReplyFailed => ta(lang, "tg-bot-reply-failed", &[]),
     };
     Outgoing {
         text,

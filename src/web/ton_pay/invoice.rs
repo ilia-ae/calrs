@@ -95,8 +95,10 @@ pub(crate) struct PreparedInvoice {
     pub(crate) start_utc: DateTime<Utc>,
     pub(crate) guest_email_norm: String,
     pub(crate) client_tag: String,
-    pub(crate) price_usd_cents: i64,
-    pub(crate) rate: AcceptedRate,
+    /// The price; a TON price is the amount itself.
+    pub(crate) price: store::Price,
+    /// The rate a USD price was converted at; `None` for a TON price.
+    pub(crate) rate: Option<AcceptedRate>,
     pub(crate) amount_nano: i64,
     pub(crate) tolerance_nano: i64,
     pub(crate) times: InvoiceTimes,
@@ -104,6 +106,8 @@ pub(crate) struct PreparedInvoice {
     pub(crate) address_raw: String,
     pub(crate) limits: Limits,
     pub(crate) created_at: DateTime<Utc>,
+    /// Renewals this invoice may have (`CALRS_TON_MAX_RENEWALS` now).
+    pub(crate) renewals_max: i64,
 }
 
 /// What the booking handler needs once the invoice is open.
@@ -187,13 +191,31 @@ pub(crate) async fn prepare_invoice(
     if price.is_team != 0 {
         return Err(Refusal::PersonalOnly);
     }
+    let Some(priced) = price.price() else {
+        tracing::error!(target: TARGET, event_type_id, "the price row cannot be read");
+        return Err(Refusal::Internal);
+    };
+    if matches!(priced, store::Price::Usd(_)) && rt.cfg.rate_policy.is_none() {
+        return Err(Refusal::Unavailable(RateRefusal::NoCorridor.to_string()));
+    }
     if let Err(e) = rt.ready(now) {
-        if e == super::NotReady::WatcherStale {
-            // An idle watcher may be in its long sleep (a price was just
-            // switched on): a step now makes the next try succeed.
-            rt.wake.notify_one();
+        // An idle watcher sleeps up to 15 minutes between steps (ilia fork,
+        // Optimize). Idle and well (its loop runs, its last step had no
+        // error, the wallet and network checks hold): taken at once, and
+        // the wake makes the next step pick the invoice up, however slow
+        // the indexer. A loop whose last step failed: wake it and wait for
+        // the step, then ask again. Without a running loop the wake is
+        // left for the next try.
+        let fresh = e == super::NotReady::WatcherStale
+            && if rt.ready_on_demand(now).is_ok() {
+                rt.wake.notify_one();
+                true
+            } else {
+                rt.step_now(super::STEP_WAIT).await && rt.ready(now).is_ok()
+            };
+        if !fresh {
+            return Err(Refusal::Unavailable(e.to_string()));
         }
-        return Err(Refusal::Unavailable(e.to_string()));
     }
     let times = deadlines::compute(
         now,
@@ -221,6 +243,7 @@ pub(crate) async fn prepare_invoice(
     })?;
     if let Err(refusal) = limits.check(counts) {
         if refusal == Refusal::Capacity {
+            rt.note_capacity_refusal(now);
             watcher::raise(
                 &rt,
                 &state.pool,
@@ -248,24 +271,31 @@ pub(crate) async fn prepare_invoice(
         )
         .await;
     }
-    let rate = match rt.rate(&state.pool, now).await {
-        Ok(r) => r,
-        Err(refusal) => {
-            watcher::raise(
-                &rt,
-                &state.pool,
-                "rate_unavailable",
-                &refusal.to_string(),
-                now,
-            )
-            .await;
-            return Err(Refusal::Rate(refusal));
+    // A TON price is the amount: no rate, no request. Only a USD price is
+    // converted (the one network call of a booking).
+    let (rate, amount_nano) = match priced {
+        store::Price::Ton(nano) => (None, amount::to_i64(nano).ok_or(Refusal::Internal)?),
+        store::Price::Usd(cents) => {
+            let rate = match rt.rate(&state.pool, now).await {
+                Ok(r) => r,
+                Err(refusal) => {
+                    watcher::raise(
+                        &rt,
+                        &state.pool,
+                        "rate_unavailable",
+                        &refusal.to_string(),
+                        now,
+                    )
+                    .await;
+                    return Err(Refusal::Rate(refusal));
+                }
+            };
+            let nano = amount::cents_to_nano(cents, rate.usd_micro)
+                .and_then(amount::to_i64)
+                .ok_or(Refusal::Internal)?;
+            (Some(rate), nano)
         }
     };
-    let cents = u64::try_from(price.price_usd_cents).map_err(|_| Refusal::Internal)?;
-    let amount_nano = amount::cents_to_nano(cents, rate.usd_micro)
-        .and_then(amount::to_i64)
-        .ok_or(Refusal::Internal)?;
     let tolerance_nano = amount::to_i64(rt.cfg.underpay_tolerance_nano).unwrap_or(0);
     Ok(Some(PreparedInvoice {
         event_type_id: event_type_id.to_string(),
@@ -273,7 +303,7 @@ pub(crate) async fn prepare_invoice(
         start_utc,
         guest_email_norm,
         client_tag: tag,
-        price_usd_cents: price.price_usd_cents,
+        price: priced,
         rate,
         amount_nano,
         tolerance_nano,
@@ -282,6 +312,7 @@ pub(crate) async fn prepare_invoice(
         address_raw: rt.cfg.address_raw.clone(),
         limits,
         created_at: now,
+        renewals_max: rt.cfg.max_renewals,
     }))
 }
 
@@ -306,6 +337,18 @@ pub(crate) async fn open_invoice(
         .map_err(|_| Refusal::Internal)?;
     p.limits.check(counts)?;
 
+    // A TON invoice has no rate: the neutral values nothing reads when
+    // currency = 'TON' (migration ilia_004).
+    let (cents, rate_micro, rate_sources, rate_at) = match (&p.price, &p.rate) {
+        (store::Price::Usd(c), Some(rate)) => (
+            i64::try_from(*c).map_err(|_| Refusal::Internal)?,
+            i64::try_from(rate.usd_micro).map_err(|_| Refusal::Internal)?,
+            rate.sources.as_str(),
+            stamp(rate.at),
+        ),
+        (store::Price::Ton(_), None) => (0, 1, "", stamp(p.created_at)),
+        _ => return Err(Refusal::Internal),
+    };
     let id = uuid::Uuid::new_v4().to_string();
     let mut attempt = 0;
     let (pay_token, code) = loop {
@@ -316,9 +359,10 @@ pub(crate) async fn open_invoice(
         let inserted = sqlx::query(
             "INSERT INTO ton_invoices (id, booking_id, event_type_id, pay_token, reference, network,
                  address_raw, event_title, start_at_utc, guest_email_norm, client_tag,
-                 price_usd_cents, rate_usd_micro, rate_sources, rate_at, amount_nano, tolerance_nano,
-                 status, created_at, expires_at, settle_by, hard_deadline)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?)",
+                 currency, price_usd_cents, rate_usd_micro, rate_sources, rate_at, amount_nano,
+                 tolerance_nano, status, created_at, expires_at, settle_by, hard_deadline,
+                 renewals_max)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?)",
         )
         .bind(&id)
         .bind(booking_id)
@@ -331,16 +375,18 @@ pub(crate) async fn open_invoice(
         .bind(stamp(p.start_utc))
         .bind(&p.guest_email_norm)
         .bind(&p.client_tag)
-        .bind(p.price_usd_cents)
-        .bind(i64::try_from(p.rate.usd_micro).map_err(|_| Refusal::Internal)?)
-        .bind(&p.rate.sources)
-        .bind(stamp(p.rate.at))
+        .bind(p.price.currency())
+        .bind(cents)
+        .bind(rate_micro)
+        .bind(rate_sources)
+        .bind(&rate_at)
         .bind(p.amount_nano)
         .bind(p.tolerance_nano)
         .bind(stamp(p.created_at))
         .bind(stamp(p.times.expires_at))
         .bind(stamp(p.times.settle_by))
         .bind(stamp(p.times.hard_deadline))
+        .bind(p.renewals_max)
         .execute(&mut *conn)
         .await;
         match inserted {

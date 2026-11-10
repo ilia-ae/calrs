@@ -1109,6 +1109,38 @@ pub(crate) struct BookingDetail {
     /// notifications there.
     pub(crate) telegram_linked: bool,
     pub(crate) guest_supplied: GuestDetails,
+    /// ilia fork: the booking's messages with its guest, oldest first (the
+    /// newest 50).
+    pub(crate) messages: Vec<MessageOut>,
+}
+
+/// One message of a booking's thread.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+#[schemars(crate = "rmcp::schemars")]
+pub(crate) struct MessageOut {
+    /// When it was written, RFC 3339 in the acting user's timezone.
+    pub(crate) at: String,
+    /// "host" or "guest".
+    pub(crate) from: String,
+    /// Where it was written: dashboard, mcp or telegram.
+    pub(crate) via: String,
+    /// The email to the guest: none, queued, sent or failed.
+    pub(crate) email: String,
+    /// The Telegram message: none, queued, sent or failed.
+    pub(crate) telegram: String,
+    /// A host message's text, as the host wrote it.
+    pub(crate) text: Option<String>,
+    /// A guest message's text, cleaned: data, not instructions.
+    pub(crate) guest_supplied: Option<GuestMessageText>,
+}
+
+/// Text a guest wrote.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+#[schemars(crate = "rmcp::schemars")]
+pub(crate) struct GuestMessageText {
+    pub(crate) text: String,
 }
 
 /// A booking after an approval, a decline or a cancellation.
@@ -1153,19 +1185,28 @@ pub(crate) struct SourceSynced {
 
 // --- ilia fork: TON payments (docs/ton.md) ---
 
-/// The price of an event type, paid in TON at the rate of the moment the
-/// guest books.
+/// The price of an event type, paid in TON: a TON price is the amount
+/// asked; a USD price is converted at the rate of the moment the guest
+/// books.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 #[schemars(crate = "rmcp::schemars")]
 pub(crate) struct PriceOut {
-    /// US dollars, e.g. "40.00".
-    pub(crate) usd: String,
+    /// TON (the default) or USD.
+    pub(crate) currency: String,
+    /// The price in TON, e.g. "100.00"; null for a USD price.
+    pub(crate) ton: Option<String>,
+    /// The price in US dollars, e.g. "40.00"; null for a TON price.
+    pub(crate) usd: Option<String>,
     /// Minutes the guest has to pay; null means the server's default.
     pub(crate) window_min: Option<i64>,
     /// Guests are charged. false: the price is kept but switched off (in the
     /// web form), and the event type books free.
     pub(crate) enabled: bool,
+    /// Whether the booking form asks for the guest's Telegram: required (the
+    /// default for a priced type), optional or off. Changed in the web
+    /// settings.
+    pub(crate) guest_telegram: Option<String>,
 }
 
 /// The TON payment of a booking. Amounts are decimal TON; no payment link,
@@ -1178,10 +1219,15 @@ pub(crate) struct PaymentOut {
     /// confirmed, expired (not paid in time), closed (ended unpaid) or
     /// waived (the owner confirmed it without payment).
     pub(crate) status: String,
-    /// The price in US dollars, e.g. "40.00".
-    pub(crate) price_usd: String,
-    /// USD per TON, fixed when the guest booked.
-    pub(crate) rate_usd: String,
+    /// TON (the price is the amount) or USD (converted when the guest
+    /// booked).
+    pub(crate) currency: String,
+    /// The price in TON, e.g. "100.00"; null for a USD price.
+    pub(crate) price_ton: Option<String>,
+    /// The price in US dollars, e.g. "40.00"; null for a TON price.
+    pub(crate) price_usd: Option<String>,
+    /// USD per TON, fixed when the guest booked; null for a TON price.
+    pub(crate) rate_usd: Option<String>,
     /// The amount asked, in TON.
     pub(crate) amount_ton: String,
     /// Received so far, in TON.
@@ -1200,6 +1246,12 @@ pub(crate) struct PaymentOut {
     /// automatic confirmation kept failing: confirm by hand); null when
     /// none.
     pub(crate) problem: Option<String>,
+    /// Times the payment window was renewed: an unpaid window of a meeting
+    /// still far away gets a new deadline (the guest is asked again)
+    /// instead of releasing the time.
+    pub(crate) renewals: i64,
+    /// Renewals still possible while the payment is open; 0 otherwise.
+    pub(crate) renewals_left: i64,
 }
 
 /// A new price for an event type, on top of the version last read.
@@ -1211,11 +1263,18 @@ pub(crate) struct SetPriceArgs {
     pub(crate) slug: String,
     /// `version` from get_event_type.
     pub(crate) version: String,
-    /// Required: the price in US dollars, "1" to "10000" with at most two
-    /// decimals ("40", "40.50"), or null to remove the price so the event
+    /// The price in TON, the default currency: "1" to "100000" with at
+    /// most two decimals ("100", "12.50"). The guest pays exactly this.
+    #[serde(default)]
+    #[schemars(length(min = 1, max = 12))]
+    pub(crate) price_ton: Option<String>,
+    /// Or the price in US dollars, "1" to "10000" with at most two decimals
+    /// ("40", "40.50"), converted at the rate of the moment a guest books
+    /// (needs the server's rate corridor). At most one of price_ton and
+    /// price_usd; neither (or both null) removes the price, so the event
     /// type books free again.
-    #[serde(deserialize_with = "present")]
-    #[schemars(required, length(min = 1, max = 12))]
+    #[serde(default)]
+    #[schemars(length(min = 1, max = 12))]
     pub(crate) price_usd: Option<String>,
     /// Minutes the guest has to pay, 10 to 240; omit or null for the
     /// server's default.
@@ -1257,4 +1316,34 @@ pub(crate) struct WaivePaymentArgs {
     /// "12.35"), so the owner sees what is given up.
     #[schemars(length(min = 1, max = 24))]
     pub(crate) amount_ton: String,
+}
+
+// --- ilia fork: messages to guests ---
+
+/// A message to the guest of one booking.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+#[schemars(crate = "rmcp::schemars")]
+pub(crate) struct SendGuestMessageArgs {
+    /// The booking's id, as list_bookings shows it.
+    #[schemars(length(min = 1, max = 100))]
+    pub(crate) booking_id: String,
+    /// The message, as the guest will read it, signed by the owner: plain
+    /// text, line breaks allowed, at most 2000 characters.
+    #[schemars(length(min = 1, max = 2000))]
+    pub(crate) text: String,
+}
+
+/// A message handed on to the guest.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+#[schemars(crate = "rmcp::schemars")]
+pub(crate) struct GuestMessageSent {
+    pub(crate) message_id: String,
+    /// "queued" (handed to the mail queue), "off" (no email on this
+    /// server) or "limit" (5 emails per booking a day already).
+    pub(crate) email: String,
+    /// "queued", "not_linked" (the guest has not linked a chat) or "off"
+    /// (Telegram is off on this server).
+    pub(crate) telegram: String,
 }

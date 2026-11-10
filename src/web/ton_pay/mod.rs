@@ -31,7 +31,7 @@ use crate::web::{AppState, RateLimiter};
 
 pub(crate) use admin::{
     copy_price, dashboard_badges, price_badge, price_form_ctx, price_form_from_post,
-    save_price_form, validate_price_form,
+    save_price_form, validate_price_form, PriceForm,
 };
 pub(in crate::web) use flow::{
     after_booking, approval_refused_for_token, approval_refused_page, booking_ended,
@@ -120,6 +120,9 @@ pub(crate) enum TonAlert {
     PaymentReceived { invoice_id: String },
     /// Watcher health, rate, capacity: at most once an hour per kind.
     Health { kind: String, detail: String },
+    /// ilia fork: an unpaid window was renewed; the guest is asked to pay
+    /// again by the new deadline (email and Telegram; not the owner).
+    Renewed { invoice_id: String },
 }
 
 /// Where alerts go. Without one, payment and invoice alerts stay unclaimed
@@ -161,11 +164,16 @@ impl std::fmt::Display for NotReady {
 }
 
 /// Rates are reused for this long.
-const RATE_CACHE: std::time::Duration = std::time::Duration::from_secs(300);
+pub(crate) const RATE_CACHE: std::time::Duration = std::time::Duration::from_secs(300);
 /// Upper bound of fetching both rate sources.
 const RATE_FETCH_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 /// The heartbeat a new invoice requires.
 const HEARTBEAT_MAX_AGE_SECS: i64 = 120;
+/// ilia fork (Optimize): a priced page wakes an idle watcher whose last
+/// step is older than this, so the guest's booking finds it fresh.
+const WAKE_AFTER_SECS: i64 = 60;
+/// How long a booking waits for the step its wake asked for.
+pub(crate) const STEP_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
 /// The wallet status a new invoice requires is at most this old.
 const ACCOUNT_CHECK_MAX_AGE_SECS: i64 = 2 * 3600;
 
@@ -186,6 +194,16 @@ pub(crate) struct TonRuntime {
     pub(crate) seen: std::sync::Mutex<HashMap<String, std::time::Instant>>,
     /// The configured address has its cursor row and is marked current.
     pub(crate) bootstrapped: std::sync::atomic::AtomicBool,
+    /// ilia fork (Optimize): finished steps, counted, so a booking that
+    /// woke an idle watcher can wait for its step.
+    pub(crate) steps: tokio::sync::watch::Sender<u64>,
+    /// The watcher's loop runs (`calrs serve`): a stale heartbeat is then
+    /// idleness, which a wake ends within a step.
+    pub(crate) looping: std::sync::atomic::AtomicBool,
+    /// ilia fork: the last capacity refusal (unix seconds, 0 never), at
+    /// every refusal: renewals pause for an hour after it. Kept in memory
+    /// (a restart forgets it, as it forgets the refused guests).
+    capacity_refused_at: std::sync::atomic::AtomicI64,
 }
 
 impl TonRuntime {
@@ -210,6 +228,9 @@ impl TonRuntime {
             anchor: std::sync::Mutex::new(None),
             seen: std::sync::Mutex::new(HashMap::new()),
             bootstrapped: std::sync::atomic::AtomicBool::new(false),
+            steps: tokio::sync::watch::channel(0).0,
+            looping: std::sync::atomic::AtomicBool::new(false),
+            capacity_refused_at: std::sync::atomic::AtomicI64::new(0),
         }
     }
 
@@ -258,6 +279,72 @@ impl TonRuntime {
         Ok(())
     }
 
+    /// As [`Self::ready`], for the owner's warnings: an idle watcher (its
+    /// loop running, its last step fine, at most one idle sleep ago) is
+    /// ready, since a booking wakes it and waits for the step.
+    pub(crate) fn ready_on_demand(&self, now: DateTime<Utc>) -> Result<(), NotReady> {
+        match self.ready(now) {
+            Err(NotReady::WatcherStale) if self.idle_but_well(now) => Ok(()),
+            other => other,
+        }
+    }
+
+    pub(crate) fn idle_but_well(&self, now: DateTime<Utc>) -> bool {
+        let h = self.health();
+        let max = i64::try_from(watcher::IDLE_PRICED.as_secs()).unwrap_or(i64::MAX) + 120;
+        self.looping.load(std::sync::atomic::Ordering::Acquire)
+            && h.last_error.is_none()
+            && h.last_ok.is_some_and(|t| (now - t).num_seconds() <= max)
+    }
+
+    /// A page of a priced type was shown: wake the watcher when its last
+    /// step is over a minute old, so the booking that may follow finds a
+    /// fresh heartbeat (at most one such step a minute, as the old idle
+    /// cadence). Only an idle watcher whose last step went well: a failing
+    /// indexer keeps its back-off, page views do not retry it.
+    pub(crate) fn wake_if_idle(&self, now: DateTime<Utc>) {
+        let h = self.health();
+        if h.last_error.is_some() || h.failures > 0 {
+            return;
+        }
+        if !h
+            .last_ok
+            .is_some_and(|t| (now - t).num_seconds() <= WAKE_AFTER_SECS)
+        {
+            self.wake.notify_one();
+        }
+    }
+
+    /// A booking was refused for capacity (any refusal, alerted or not).
+    pub(crate) fn note_capacity_refusal(&self, now: DateTime<Utc>) {
+        self.capacity_refused_at
+            .fetch_max(now.timestamp(), std::sync::atomic::Ordering::AcqRel);
+    }
+
+    /// A capacity refusal happened in the hour before `now`.
+    pub(crate) fn capacity_pressed(&self, now: DateTime<Utc>) -> bool {
+        let at = self
+            .capacity_refused_at
+            .load(std::sync::atomic::Ordering::Acquire);
+        at > 0 && now.timestamp() - at < 3600
+    }
+
+    /// Wake the watcher and wait (at most `wait`) for a step to finish.
+    /// False at once when no loop runs (tests, payments off): the wake is
+    /// still left for it.
+    pub(crate) async fn step_now(&self, wait: std::time::Duration) -> bool {
+        let mut steps = self.steps.subscribe();
+        steps.borrow_and_update();
+        self.wake.notify_one();
+        if !self.looping.load(std::sync::atomic::Ordering::Acquire) {
+            return false;
+        }
+        matches!(
+            tokio::time::timeout(wait, steps.changed()).await,
+            Ok(Ok(()))
+        )
+    }
+
     /// The rate for a new invoice: the cached one when younger than five
     /// minutes, else freshly decided from both sources (at most 5 s).
     pub(crate) async fn rate(
@@ -265,6 +352,10 @@ impl TonRuntime {
         pool: &sqlx::SqlitePool,
         now: DateTime<Utc>,
     ) -> Result<AcceptedRate, RateRefusal> {
+        // ilia fork: without a corridor nothing is fetched (TON prices).
+        let Some(policy) = self.cfg.rate_policy.as_ref() else {
+            return Err(RateRefusal::NoCorridor);
+        };
         let mut cache = self.rate_cache.lock().await;
         if let Some((rate, at)) = cache.as_ref() {
             if at.elapsed() < RATE_CACHE {
@@ -285,7 +376,7 @@ impl TonRuntime {
             Some(a) => Some(a),
             None => store::last_confirmed_rate(pool).await,
         };
-        let rate = crate::ton::rate::decide(&ok, &self.cfg.rate_policy, anchor, now)?;
+        let rate = crate::ton::rate::decide(&ok, policy, anchor, now)?;
         if rate.confirmed {
             if let Ok(mut a) = self.anchor.lock() {
                 *a = Some((rate.usd_micro, rate.at));

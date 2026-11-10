@@ -2841,12 +2841,13 @@ pub(super) async fn troubleshoot(
         .collect();
 
     // Parse busy events into (start_dt, end_dt, label, detail)
+    let busy_label = crate::i18n::translate(auth_user.lang, "troubleshoot-label-busy", None);
     let busy_parsed: Vec<(NaiveDateTime, NaiveDateTime, String, String)> = busy_events
         .iter()
         .filter_map(|(s, e, summary, cal)| {
             let start = parse_ical_datetime(s)?;
             let end = parse_ical_datetime(e)?;
-            let label = summary.clone().unwrap_or_else(|| "Busy".to_string());
+            let label = summary.clone().unwrap_or_else(|| busy_label.clone());
             let detail = cal.clone().unwrap_or_default();
             Some((start, end, label, detail))
         })

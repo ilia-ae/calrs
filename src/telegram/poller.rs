@@ -116,24 +116,33 @@ pub(crate) async fn run(
     // The command menu and the bot's description (the text above the Start
     // button of an empty chat), best-effort: the default in English, then
     // one per shipped language (Telegram takes two-letter codes, so
-    // de-formal is served by de).
-    let site = commands::site_name();
-    let mut langs: Vec<Option<&str>> = vec![None];
-    langs.extend(
-        crate::i18n::supported_with_labels()
-            .map(|(code, _)| code)
-            .filter(|code| code.len() == 2 && *code != "en")
-            .map(Some),
-    );
-    for lang in langs {
-        let text_lang = lang.unwrap_or("en");
-        let list = message::commands(text_lang);
-        if let Err(e) = rt.api.set_my_commands(&list, lang).await {
-            tracing::warn!(target: "calrs::telegram", kind = e.kind(), error = %e, "setMyCommands failed");
+    // de-formal is served by de). ilia fork (Optimize): sent only when the
+    // texts differ from the ones this bot last took in full
+    // (`telegram_state.commands_hash`), so a restart costs one getMe, not
+    // 1 + 30 calls.
+    let menus = menus();
+    let hash = menu_hash(&menus);
+    if store::menu_hash(&pool).await.as_deref() == Some(hash.as_str()) {
+        tracing::debug!(target: "calrs::telegram", "bot menu and description unchanged");
+    } else {
+        let mut all_taken = true;
+        for menu in &menus {
+            if let Err(e) = rt.api.set_my_commands(&menu.commands, menu.lang).await {
+                tracing::warn!(target: "calrs::telegram", kind = e.kind(), error = %e, "setMyCommands failed");
+                all_taken = false;
+            }
+            if let Err(e) = rt
+                .api
+                .set_my_description(&menu.description, &menu.short, menu.lang)
+                .await
+            {
+                tracing::warn!(target: "calrs::telegram", kind = e.kind(), error = %e, "setMyDescription failed");
+                all_taken = false;
+            }
         }
-        let (description, short) = message::description(text_lang, &site);
-        if let Err(e) = rt.api.set_my_description(&description, &short, lang).await {
-            tracing::warn!(target: "calrs::telegram", kind = e.kind(), error = %e, "setMyDescription failed");
+        // A failure leaves the old hash: the next start sends them again.
+        if all_taken {
+            store::save_menu_hash(&pool, &hash).await;
         }
     }
 
@@ -191,4 +200,59 @@ pub(crate) async fn run(
             return;
         }
     }
+}
+
+/// One language's command menu and description, as sent at startup.
+pub(crate) struct Menu {
+    pub(crate) lang: Option<&'static str>,
+    pub(crate) commands: Vec<(String, String)>,
+    pub(crate) description: String,
+    pub(crate) short: String,
+}
+
+/// The menus of every shipped two-letter language, the default first.
+pub(crate) fn menus() -> Vec<Menu> {
+    let site = commands::site_name();
+    let mut langs: Vec<Option<&'static str>> = vec![None];
+    langs.extend(
+        crate::i18n::supported_with_labels()
+            .map(|(code, _)| code)
+            .filter(|code| code.len() == 2 && *code != "en")
+            .map(Some),
+    );
+    langs
+        .into_iter()
+        .map(|lang| {
+            let text_lang = lang.unwrap_or("en");
+            let (description, short) = message::description(text_lang, &site);
+            Menu {
+                lang,
+                commands: message::commands(text_lang),
+                description,
+                short,
+            }
+        })
+        .collect()
+}
+
+/// SHA-256 over every menu, each field length-prefixed (so no two lists
+/// of texts hash alike), hex.
+pub(crate) fn menu_hash(menus: &[Menu]) -> String {
+    use sha2::{Digest, Sha256};
+    let mut h = Sha256::new();
+    let mut field = |s: &str| {
+        h.update((s.len() as u64).to_le_bytes());
+        h.update(s.as_bytes());
+    };
+    for m in menus {
+        field(m.lang.unwrap_or(""));
+        for (name, text) in &m.commands {
+            field(name);
+            field(text);
+        }
+        field("");
+        field(&m.description);
+        field(&m.short);
+    }
+    hex::encode(h.finalize())
 }

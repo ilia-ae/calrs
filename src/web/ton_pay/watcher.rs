@@ -67,6 +67,12 @@ pub(crate) const MAX_CONFIRM_ATTEMPTS: i64 = 5;
 const PAYMENT_ALERT_SPACING_MIN: i64 = 60;
 /// Steps woken early are at least this far apart.
 const MIN_SPACING: std::time::Duration = std::time::Duration::from_secs(2);
+/// ilia fork (Optimize): the sleep of a watcher with a price but no
+/// invoice in the last day. Its heartbeat is kept fresh on demand: a
+/// priced page wakes it ([`TonRuntime::wake_if_idle`]) and a booking that
+/// finds it stale wakes it and waits for the step
+/// ([`TonRuntime::step_now`]).
+pub(crate) const IDLE_PRICED: std::time::Duration = std::time::Duration::from_secs(15 * 60);
 const SUPERVISOR_BACKOFF: std::time::Duration = std::time::Duration::from_secs(10);
 const SUPERVISOR_BACKOFF_MAX: std::time::Duration = std::time::Duration::from_secs(300);
 
@@ -113,6 +119,8 @@ pub(crate) struct StepReport {
     pub(crate) expired: usize,
     /// Open invoices released because their host is no longer free.
     pub(crate) released: usize,
+    /// Unpaid windows renewed (ilia fork: the meeting is still far away).
+    pub(crate) renewed: usize,
 }
 
 /// A health alert, at most once an hour per kind (claimed in `ton_alerts`).
@@ -272,7 +280,20 @@ pub(crate) async fn supervise(
     }
 }
 
+/// Marks the loop as running for as long as it lives (a crash too).
+struct Looping<'a>(&'a TonRuntime);
+
+impl Drop for Looping<'_> {
+    fn drop(&mut self) {
+        self.0
+            .looping
+            .store(false, std::sync::atomic::Ordering::Release);
+    }
+}
+
 async fn run(state: Arc<AppState>, rt: Arc<TonRuntime>, mut stop: watch::Receiver<bool>) {
+    rt.looping.store(true, std::sync::atomic::Ordering::Release);
+    let _looping = Looping(&rt);
     loop {
         if *stop.borrow() {
             return;
@@ -320,9 +341,10 @@ pub(crate) async fn next_delay(
     if store::active_invoices(pool).await {
         return StdDuration::from_secs(rt.cfg.poll_secs);
     }
-    // While a price is enabled the heartbeat must stay fresh for new
-    // bookings; a day after the last invoice, late payments are still
-    // noticed every minute; after that, hourly.
+    // A day after the last invoice, late payments are still noticed every
+    // minute. With a price and no recent invoice, every 15 minutes: the
+    // heartbeat a new booking needs is made on demand (ilia fork,
+    // Optimize: `IDLE_PRICED`). No price at all: hourly.
     let recent: bool = sqlx::query_scalar::<_, i64>(
         "SELECT EXISTS (SELECT 1 FROM ton_invoices WHERE created_at >= ?)",
     )
@@ -331,10 +353,19 @@ pub(crate) async fn next_delay(
     .await
     .map(|v| v != 0)
     .unwrap_or(true);
+    if recent {
+        return StdDuration::from_secs(60);
+    }
+    // An enabled USD price: a step every rate-cache age, so the slot page's
+    // approximate amount and a booking find the rate warm (12 fetches an
+    // hour, as before the Optimize stage).
+    if rt.cfg.rate_policy.is_some() && store::any_enabled_usd_price(pool).await {
+        return super::RATE_CACHE;
+    }
     // Any price row, even switched off: switching it on (a form, the MCP
     // tool) wakes the watcher, and this bounds the wait if a wake is lost.
-    if recent || store::any_price(pool).await {
-        return StdDuration::from_secs(60);
+    if store::any_price(pool).await {
+        return IDLE_PRICED;
     }
     StdDuration::from_secs(3600)
 }
@@ -370,6 +401,10 @@ pub(crate) async fn step_until(
     if let Err(e) = reconcile(pool, now).await {
         tracing::error!(target: TARGET, error = %e, "ton reconcile failed");
     }
+    // Before any transfer is read: a transfer sent after the old settle_by
+    // but before the renewal is then judged against the new one (credited),
+    // never classified late (docs/ton.md «Срок»).
+    report.renewed = renew_due(pool, rt, now).await;
     if let Err(e) = store::purge_client_tags(pool, now).await {
         tracing::error!(target: TARGET, error = %e, "cannot forget old client networks");
     }
@@ -451,7 +486,7 @@ pub(crate) async fn step_until(
     }
     report.expired = expire_open(pool, rt, &caught, mc.gen_utime, now).await;
     deliver_alerts(pool, rt, now).await;
-    refresh_rate(pool, rt, now).await;
+    deliver_renewal_notices(pool, rt, &caught, mc.gen_utime).await;
     finish_step(
         pool,
         rt,
@@ -460,6 +495,9 @@ pub(crate) async fn step_until(
         now,
     )
     .await;
+    // After the heartbeat: a booking woken into this step never waits for
+    // the rate sources (only a USD price fetches at all).
+    refresh_rate(pool, rt, now).await;
     report
 }
 
@@ -552,6 +590,18 @@ async fn check_account(pool: &SqlitePool, rt: &TonRuntime, now: DateTime<Utc>) {
 }
 
 async fn finish_step(
+    pool: &SqlitePool,
+    rt: &TonRuntime,
+    report: &mut StepReport,
+    mc: Option<(u64, i64)>,
+    now: DateTime<Utc>,
+) {
+    record_outcome(pool, rt, report, mc, now).await;
+    // A booking waiting for this step reads the health just recorded.
+    rt.steps.send_modify(|n| *n = n.wrapping_add(1));
+}
+
+async fn record_outcome(
     pool: &SqlitePool,
     rt: &TonRuntime,
     report: &mut StepReport,
@@ -1251,6 +1301,168 @@ async fn release_one(
     Ok(n == 1)
 }
 
+/// ilia fork: open invoices whose payment window ended unpaid (or part
+/// paid) while their meeting is still far away get a new window instead of
+/// expiring ([`crate::ton::deadlines::renewal`]). Only the deadlines, the
+/// renewal count and the booking's hard deadline change: never the comment
+/// code, the payment link, the creation time, the amount or what was paid,
+/// so a transfer for any earlier window still counts. None under capacity
+/// pressure (a refusal in the last hour), nor for a type whose price is off.
+pub(crate) async fn renew_due(pool: &SqlitePool, rt: &TonRuntime, now: DateTime<Utc>) -> usize {
+    #[derive(sqlx::FromRow)]
+    struct Due {
+        id: String,
+        booking_id: String,
+        start_at_utc: String,
+        expires_at: String,
+        settle_by: String,
+        hard_deadline: String,
+        renewals: i64,
+        renewals_max: i64,
+        min_notice_min: i64,
+        window_min: Option<i64>,
+    }
+    let due: Vec<Due> = match sqlx::query_as(
+        "SELECT i.id, i.booking_id, i.start_at_utc, i.expires_at, i.settle_by, i.hard_deadline,
+                i.renewals, i.renewals_max, et.min_notice_min, p.window_min
+         FROM ton_invoices i
+         JOIN bookings b ON b.id = i.booking_id AND b.status = 'pending'
+         JOIN event_types et ON et.id = i.event_type_id
+         JOIN ton_prices p ON p.event_type_id = i.event_type_id AND p.enabled = 1
+         WHERE i.status = 'open' AND i.network = ? AND i.expires_at <= ?
+           AND i.renewals < i.renewals_max",
+    )
+    .bind(rt.cfg.network.as_str())
+    .bind(stamp(now))
+    .fetch_all(pool)
+    .await
+    {
+        Ok(rows) => rows,
+        Err(e) => {
+            tracing::error!(target: TARGET, error = %e, "cannot list invoices to renew");
+            return 0;
+        }
+    };
+    if due.is_empty() {
+        return 0;
+    }
+    // A capacity refusal in the last hour (every refusal counts, not only
+    // the hourly alert): other guests are waiting for places, so a window
+    // that ended is not held any longer.
+    if rt.capacity_pressed(now) {
+        return 0;
+    }
+    let renew = crate::ton::deadlines::RenewalRules {
+        min_lead_hours: rt.cfg.renew_min_lead_hours,
+        window_min: rt.cfg.renew_window_min,
+    };
+    let mut renewed = 0;
+    for d in due {
+        let (Some(start), Some(expires_at), Some(settle_by), Some(hard_deadline)) = (
+            parse_stamp(&d.start_at_utc),
+            parse_stamp(&d.expires_at),
+            parse_stamp(&d.settle_by),
+            parse_stamp(&d.hard_deadline),
+        ) else {
+            continue;
+        };
+        let old = crate::ton::deadlines::InvoiceTimes {
+            expires_at,
+            settle_by,
+            hard_deadline,
+        };
+        let Some(new) = crate::ton::deadlines::renewal(
+            now,
+            start,
+            d.min_notice_min,
+            old,
+            d.renewals,
+            d.renewals_max,
+            renew,
+            rt.cfg.window_rules(d.window_min),
+        ) else {
+            continue;
+        };
+        match renew_one(
+            pool,
+            &d.id,
+            &d.booking_id,
+            d.renewals,
+            &d.expires_at,
+            new,
+            now,
+        )
+        .await
+        {
+            Ok(true) => {
+                renewed += 1;
+                tracing::info!(
+                    target: TARGET,
+                    invoice = %d.id,
+                    booking_id = %d.booking_id,
+                    renewal = d.renewals + 1,
+                    of = d.renewals_max,
+                    "ton payment window renewed: the meeting is still far away"
+                );
+            }
+            Ok(false) => {}
+            Err(e) => {
+                tracing::error!(target: TARGET, error = %e, invoice = %d.id, "cannot renew an invoice")
+            }
+        }
+    }
+    renewed
+}
+
+/// The renewal's write: the invoice first (a deferred transaction takes
+/// the write lock with its first statement), guarded on what was read, then
+/// the booking's hard deadline. Neither or both.
+async fn renew_one(
+    pool: &SqlitePool,
+    invoice_id: &str,
+    booking_id: &str,
+    renewals: i64,
+    old_expires_at: &str,
+    new: crate::ton::deadlines::InvoiceTimes,
+    now: DateTime<Utc>,
+) -> Result<bool, sqlx::Error> {
+    let mut tx = pool.begin().await?;
+    let n = sqlx::query(
+        "UPDATE ton_invoices SET expires_at = ?, settle_by = ?, hard_deadline = ?,
+             renewals = renewals + 1, renewed_at = ?
+         WHERE id = ? AND status = 'open' AND renewals = ? AND expires_at = ?",
+    )
+    .bind(stamp(new.expires_at))
+    .bind(stamp(new.settle_by))
+    .bind(stamp(new.hard_deadline))
+    .bind(stamp(now))
+    .bind(invoice_id)
+    .bind(renewals)
+    .bind(old_expires_at)
+    .execute(&mut *tx)
+    .await?
+    .rows_affected();
+    if n != 1 {
+        tx.rollback().await?;
+        return Ok(false);
+    }
+    let held = sqlx::query(
+        "UPDATE bookings SET pending_expires_at = ? WHERE id = ? AND status = 'pending'",
+    )
+    .bind(stamp(new.hard_deadline))
+    .bind(booking_id)
+    .execute(&mut *tx)
+    .await?
+    .rows_affected();
+    if held != 1 {
+        // Declined (the sweep reached its deadline) or cancelled meanwhile.
+        tx.rollback().await?;
+        return Ok(false);
+    }
+    tx.commit().await?;
+    Ok(true)
+}
+
 /// Open invoices whose address was caught up in this step and whose
 /// `settle_by` plus the margin lies under the indexer's height: expired.
 pub(crate) async fn expire_open(
@@ -1330,12 +1542,16 @@ async fn expire_one(
     Ok(n == 1)
 }
 
-/// Keep the rate cache warm while a price is enabled, so pages can show an
-/// approximate amount without fetching on a GET. At most every 5 minutes
+/// Keep the rate cache warm while a USD price is enabled, so pages can show
+/// an approximate amount without fetching on a GET. At most every 5 minutes
 /// (the cache's age); a refusal is only logged here, a booking refuses on
-/// its own.
+/// its own. TON prices need no rate: without a USD price (or without a
+/// corridor) nothing is fetched at all.
 async fn refresh_rate(pool: &SqlitePool, rt: &TonRuntime, now: DateTime<Utc>) {
-    if rt.cached_rate().is_some() || !store::any_enabled_price(pool).await {
+    if rt.cfg.rate_policy.is_none()
+        || rt.cached_rate().is_some()
+        || !store::any_enabled_usd_price(pool).await
+    {
         return;
     }
     if let Err(refusal) = rt.rate(pool, now).await {
@@ -1404,6 +1620,51 @@ pub(crate) async fn deliver_alerts(pool: &SqlitePool, rt: &TonRuntime, now: Date
             if store::claim_received_notice(pool, &invoice_id, now).await {
                 sink.deliver(TonAlert::PaymentReceived { invoice_id }).await;
             }
+        }
+    }
+}
+
+/// ilia fork: "pay again by …", once per renewal, and only once every
+/// transfer sent before the renewal has been read: the invoice's address
+/// was caught up in this step and the indexer's height is past
+/// `renewed_at` plus the expiry margin (the window renews at once, the
+/// notice waits for a lagging indexer). An invoice paid meanwhile is no
+/// longer open, and one whose payment is visible but not final yet waits.
+/// Never called from a step whose indexer call failed.
+pub(crate) async fn deliver_renewal_notices(
+    pool: &SqlitePool,
+    rt: &TonRuntime,
+    caught: &HashSet<String>,
+    indexed_utime: u64,
+) {
+    let Some(sink) = rt.alerts.get() else {
+        return;
+    };
+    let Ok(rows) = store::due_renewal_notices(pool).await else {
+        return;
+    };
+    let margin = Duration::minutes(rt.cfg.expiry_margin_min);
+    let height = i64::try_from(indexed_utime).unwrap_or(0);
+    for (invoice_id, address_raw, renewed_at) in rows {
+        if !caught.contains(&address_raw) {
+            continue;
+        }
+        let Some(renewed_at) = renewed_at.as_deref().and_then(parse_stamp) else {
+            continue;
+        };
+        if height < (renewed_at + margin).timestamp() {
+            continue;
+        }
+        let unfinal = rt
+            .seen
+            .lock()
+            .map(|s| s.contains_key(&invoice_id))
+            .unwrap_or(true);
+        if unfinal {
+            continue;
+        }
+        if store::claim_renewal_notice(pool, &invoice_id).await {
+            sink.deliver(TonAlert::Renewed { invoice_id }).await;
         }
     }
 }

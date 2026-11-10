@@ -56,6 +56,7 @@ Every user-facing string goes through Fluent (`i18n/`).
 | `src/i18n.rs` | Fluent loader, language detection, the `t()` template global, i18n guard tests |
 | `src/booking_time.rs` | How booking times are stored (legacy wall clock vs UTC instant) |
 | `src/rrule.rs` | RRULE expansion for recurring events |
+| `src/busy_only.rs` | ilia fork: busy-only calendar storage. `CALRS_BUSY_ONLY` (on by default), `keep()` for the content fields, `reduce()`/`StoredIcal` (the `raw_ical` of a recurring row keeps only its EXDATEs and RECURRENCE-IDs), `scrub_stored()` at startup (from `db::migrate`), see CLAUDE.md "Busy-only calendar storage" |
 | `src/utils.rs` | iCal helpers (`split_vevents`, `parse_content_line`, `extract_vevent_field`, `extract_vevent_tzid`, datetime and timezone parsing) |
 | `src/tzid.rs` | Resolving an event's TZID to an IANA zone: by name (IANA, Windows, vendor prefix, display name), else by matching the resource's `VTIMEZONE`, else a display name's fixed offset (`event_timezone` at sync, `resolve_or_offset` when reading stored events) |
 | `src/windows_zones.rs` | Windows timezone names (`Eastern Standard Time`) mapped to IANA ids, from CLDR's `windowsZones.xml` |
@@ -67,7 +68,7 @@ Every user-facing string goes through Fluent (`i18n/`).
 | `src/ews/` | Exchange Web Services client (SOAP, autodiscover, parsing) |
 | `src/providers/` | `CalendarProvider` trait (`mod.rs`), CalDAV adapter, dispatch in `src/providers/factory.rs` |
 | `src/sms/` | `SmsProvider` trait, gateway adapters, phone normalisation, message bodies |
-| `src/telegram/` | ilia fork: Telegram notifications. Bot API client and parsing (`api.rs`), token redaction (`config.rs`), long polling (`poller.rs`), commands (`commands.rs`), the outbox (`worker.rs`), message bodies (`message.rs`), SQL (`store.rs`), deep-link tokens, usernames, `TelegramEvent` and the `notify` seam (`mod.rs`) |
+| `src/telegram/` | ilia fork: Telegram notifications. Bot API client and parsing (`api.rs`), token redaction (`config.rs`), long polling (`poller.rs`), commands (`commands.rs`), guest texts and host replies (`relay.rs`), the outbox (`worker.rs`), message bodies (`message.rs`), SQL (`store.rs`), deep-link tokens, usernames, `TelegramEvent` and the `notify` seam (`mod.rs`) |
 | `src/email/` | Every email calrs sends (see below) |
 | `src/web/` | The web server (see below) |
 | `src/commands/` | One file per CLI subcommand; `src/commands/sync.rs` is also used by the web server |
@@ -99,6 +100,7 @@ Every user-facing string goes through Fluent (`i18n/`).
 | `branding.rs` | Theme CSS, embed pages, static assets baked into the binary |
 | `format.rs` | Date and time labels for pages, emails and the dashboard |
 | `telegram.rs` | ilia fork: Profile & Settings → Telegram (host linking, guest field per event type), the booking form's Telegram helpers, dashboard labels |
+| `messages.rs` | ilia fork: host <-> guest messages, one thread per booking: `send_host_message` (the one path for the dashboard, the agent and Telegram replies, with the limits), guest texts, the thread page `/dashboard/bookings/{id}/messages`, see CLAUDE.md "Messages with guests" |
 | `week_start.rs` | Calendar display preference: event override → account owner's default → site default (Monday); named weekday keys, independent of availability's `0=Sunday` storage |
 | `tests/` | Web tests, one file per area (below) |
 
@@ -120,6 +122,8 @@ with `use super::*` and sees those fixtures and every item of `web`:
 | `render.rs` | HTML and plain-text layout, ICS generation, time conversion, `EmailParts` / `send_composed` |
 | `guest.rs` | Guest emails: confirmation, pending, decline, cancellation, reminder, reschedule, pick a new time, invite |
 | `host.rs` | Host, member, watcher and claimant emails |
+| `ton.rs` | ilia fork: TON payment emails |
+| `messages.rs` | ilia fork: a host's message to the guest (`send_guest_host_message`, Reply-To the host) |
 | `tests/` | `transport.rs`, `render.rs`, `messages.rs`, shared fixtures in `tests/mod.rs` |
 
 Call sites use `crate::email::name` whatever file `name` lives in.
@@ -202,7 +206,23 @@ Call sites use `crate::email::name` whatever file `name` lives in.
   notifications"): `crate::telegram::notify` from the same handlers, the
   poller and outbox started by `serve`, pages in `src/web/telegram.rs`.
   TON payment events reach it through `src/web/ton_pay/telegram.rs`
-  (the payment page's deep link, the alert sink, the expiry event).
+  (the payment page's deep link, the alert sink, the expiry event, the
+  renewal's "pay again").
+- **Messages with guests** (ilia fork, `src/web/messages.rs`): the
+  dashboard page, the agent's `send_guest_message` (`src/web/agent/
+  {tools,ops}_messages.rs`) and `src/telegram/relay.rs` all go through
+  `send_host_message`; email through `src/email/messages.rs`, Telegram
+  through `TelegramEvent::{HostMessage, GuestMessage}`.
+- **Busy-only storage** (ilia fork, `src/busy_only.rs`): the sync upserts
+  in `src/commands/sync.rs` and the feed upsert in `src/resources.rs` bind
+  through it; the troubleshoot view and the CLI label an untitled event
+  "Busy".
+- **Optimize** (ilia fork, see CLAUDE.md "Optimize (ilia fork)"): the
+  release profile in `.cargo/config.toml`, the watcher's on-demand
+  heartbeat (`TonRuntime::{wake_if_idle, step_now, ready_on_demand}`,
+  `watcher::IDLE_PRICED`), the Telegram menu hash (`poller::menu_hash`),
+  hot-path indexes in `migrations/ilia_007_optimize.sql`, and the
+  measurements in `src/web/tests/ton_perf.rs` (all `#[ignore]`).
 - **Captcha** (`src/web/captcha.rs`, CSP in `src/web/mod.rs`, widget in
   `templates/book.html`).
 - **Migrations** (`migrations/`, `src/db.rs`). A new file must also be added

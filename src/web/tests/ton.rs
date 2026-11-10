@@ -18,6 +18,15 @@ use std::collections::HashMap;
 // ilia fork integration: the payment events in Telegram.
 #[path = "ton_telegram.rs"]
 mod telegram;
+// Booking flow v2: TON prices, Telegram by default, renewals.
+#[path = "ton_flow2.rs"]
+mod flow2;
+// The Optimize stage: measurements on a seeded database (ignored tests).
+#[path = "ton_perf.rs"]
+mod perf;
+// The Optimize stage: the watcher's on-demand heartbeat.
+#[path = "ton_optimize.rs"]
+mod optimize;
 
 const OUR: &str = "0:83DFD552E63729B472FCBCC8C45EBCC6691702558B68EC7527E1BA403A0F31A8";
 const OTHER: &str = "0:077F69B02858C4A6BC33E5F052E64E5BAD13AB95DB61442CFE0958B97959BDE4";
@@ -37,6 +46,12 @@ struct Chain {
     fail_next: Vec<IndexerError>,
     panics_left: u32,
     pages_served: usize,
+    /// masterchainInfo and accountStates calls (the Optimize stage counts
+    /// requests per hour).
+    mc_calls: usize,
+    status_calls: usize,
+    /// Each masterchainInfo call takes this long (a slow indexer).
+    delay: Option<std::time::Duration>,
 }
 
 #[derive(Default)]
@@ -77,7 +92,11 @@ impl TonIndexer for FakeChain {
             p
         });
         assert!(!panic_now, "fake indexer panic");
+        if let Some(delay) = self.edit(|c| c.delay) {
+            tokio::time::sleep(delay).await;
+        }
         self.edit(|c| {
+            c.mc_calls += 1;
             if let Some(e) = c.fail_next.pop() {
                 return Err(e);
             }
@@ -127,15 +146,35 @@ impl TonIndexer for FakeChain {
         }))
     }
     async fn account_status(&self, _account_raw: &str) -> Result<Option<String>, IndexerError> {
-        Ok(self.edit(|c| c.status.clone()))
+        Ok(self.edit(|c| {
+            c.status_calls += 1;
+            c.status.clone()
+        }))
     }
 }
 
-struct FakeRates(std::sync::Mutex<Vec<(SourceKind, u64)>>);
+struct FakeRates(
+    std::sync::Mutex<Vec<(SourceKind, u64)>>,
+    /// Calls made: a TON price must make none.
+    std::sync::atomic::AtomicUsize,
+);
+
+impl FakeRates {
+    fn new(quotes: Vec<(SourceKind, u64)>) -> Self {
+        Self(
+            std::sync::Mutex::new(quotes),
+            std::sync::atomic::AtomicUsize::new(0),
+        )
+    }
+    fn calls(&self) -> usize {
+        self.1.load(std::sync::atomic::Ordering::SeqCst)
+    }
+}
 
 #[async_trait::async_trait]
 impl RateSource for FakeRates {
     async fn quotes(&self) -> Vec<Result<RateQuote, RateError>> {
+        self.1.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         let now = Utc::now();
         self.0
             .lock()
@@ -220,6 +259,9 @@ struct Env {
 
 fn vars(extra: &[(&'static str, &str)]) -> HashMap<&'static str, String> {
     let mut v = crate::ton::config::tests::base();
+    // Renewals off unless a test asks for them: the expiry tests keep the
+    // first deadline (renewals: tests below).
+    v.insert("CALRS_TON_MAX_RENEWALS", "0".to_string());
     for (k, val) in extra {
         v.insert(*k, val.to_string());
     }
@@ -239,7 +281,17 @@ fn runtime(
 }
 
 async fn env_with(extra: &[(&'static str, &str)]) -> Env {
-    let pool = setup_test_db().await;
+    env_priced(extra, None).await
+}
+
+/// As [`env_with`], priced at `ton` nanotons (in TON) instead of $40.
+async fn env_priced(extra: &[(&'static str, &str)], ton: Option<u128>) -> Env {
+    env_priced_in(extra, ton, setup_test_db().await).await
+}
+
+/// As [`env_priced`], on a migrated `pool` of the caller's (the Optimize
+/// stage's measurements write theirs to a file).
+async fn env_priced_in(extra: &[(&'static str, &str)], ton: Option<u128>, pool: SqlitePool) -> Env {
     let (_user_id, account_id, et_id) = seed_test_data(&pool).await;
     // The editable flags say "free and not held": payment must not care.
     sqlx::query(
@@ -249,15 +301,18 @@ async fn env_with(extra: &[(&'static str, &str)]) -> Env {
     .execute(&pool)
     .await
     .unwrap();
-    set_price(&pool, &et_id, 4000).await;
+    match ton {
+        None => set_price(&pool, &et_id, 4000).await,
+        Some(nano) => set_ton_price(&pool, &et_id, nano).await,
+    }
     let dir = TestDataDir::new();
     let state = build_state(pool.clone(), dir.to_path_buf(), [0u8; 32]).await;
     let now = Utc::now();
     let chain = FakeChain::new(now.timestamp() as u64);
-    let rates = Arc::new(FakeRates(std::sync::Mutex::new(vec![
+    let rates = Arc::new(FakeRates::new(vec![
         (SourceKind::CoinGecko, 2_000_000),
         (SourceKind::Binance, 2_000_000),
-    ])));
+    ]));
     let sink = Arc::new(CaptureSink::default());
     let rt = runtime(&vars(extra), chain.clone(), rates.clone(), sink.clone());
     state.ton.install(rt.clone());
@@ -286,10 +341,26 @@ async fn env() -> Env {
     env_with(&[]).await
 }
 
+/// A price in TON: the amount asked, no rate.
+async fn set_ton_price(pool: &SqlitePool, et_id: &str, nano: u128) {
+    sqlx::query(
+        "INSERT INTO ton_prices (event_type_id, currency, price_nano, updated_at) VALUES (?, 'TON', ?, '2026-11-09T00:00:00Z')
+         ON CONFLICT (event_type_id) DO UPDATE SET currency = 'TON', price_usd_cents = NULL,
+             price_nano = excluded.price_nano, enabled = 1",
+    )
+    .bind(et_id)
+    .bind(i64::try_from(nano).unwrap())
+    .execute(pool)
+    .await
+    .unwrap();
+}
+
+/// A price in USD (most tests: $40 at $2 per TON is 20 TON).
 async fn set_price(pool: &SqlitePool, et_id: &str, cents: i64) {
     sqlx::query(
-        "INSERT INTO ton_prices (event_type_id, price_usd_cents, updated_at) VALUES (?, ?, '2026-11-09T00:00:00Z')
-         ON CONFLICT (event_type_id) DO UPDATE SET price_usd_cents = excluded.price_usd_cents, enabled = 1",
+        "INSERT INTO ton_prices (event_type_id, currency, price_usd_cents, updated_at) VALUES (?, 'USD', ?, '2026-11-09T00:00:00Z')
+         ON CONFLICT (event_type_id) DO UPDATE SET currency = 'USD', price_nano = NULL,
+             price_usd_cents = excluded.price_usd_cents, enabled = 1",
     )
     .bind(et_id)
     .bind(cents)
@@ -1487,7 +1558,7 @@ async fn indexer_failures_back_off_and_keep_the_last_good_state() {
     assert_eq!(r.error, None);
     assert_eq!(booking_status(&e.pool, &bid).await, "confirmed");
     assert_eq!(e.rt.health().failures, 0);
-    // While invoices are open the poll is fast; idle with a price, a minute.
+    // While invoices are open the poll is fast; a day after one, a minute.
     assert_eq!(
         watcher::next_delay(&e.pool, &e.rt, &r, e.now).await,
         std::time::Duration::from_secs(60)
@@ -1795,7 +1866,7 @@ async fn a_paid_booking_goes_to_its_payment_page_and_holds_the_slot() {
     assert_eq!(v["state"], "waiting");
     assert_eq!(v["remaining_nano"], AMOUNT.to_string());
     let keys: Vec<&String> = v.as_object().unwrap().keys().collect();
-    assert_eq!(keys.len(), 6, "{keys:?}");
+    assert_eq!(keys.len(), 7, "{keys:?}");
     assert!(!json.contains("guest"));
 
     // The payment arrives: confirmed by the watcher, through the approval
@@ -2294,7 +2365,11 @@ async fn the_price_is_set_on_the_event_type_form() {
     let edit = "/dashboard/event-types/test-meeting/edit";
     let resp = e.app().oneshot(get_authed(edit, &session)).await.unwrap();
     let page = body_string(resp).await;
-    assert!(page.contains("name=\"ton_price_usd\""));
+    assert!(page.contains("name=\"ton_price_amount\""));
+    assert!(
+        page.contains("<option value=\"TON\" selected>"),
+        "TON is the default"
+    );
     let post = |extra: &str| {
         format!("_csrf={CSRF}&title=Test+Meeting&slug=test-meeting&duration_min=30&location_value=https%3A%2F%2Fmeet.example.com&avail_days=1,2,3,4,5&avail_start=09:00&avail_end=17:00{extra}")
     };
@@ -2305,7 +2380,7 @@ async fn the_price_is_set_on_the_event_type_form() {
             edit,
             &session,
             CSRF,
-            &post("&ton_price_enabled=on&ton_price_usd=0.5"),
+            &post("&ton_price_enabled=on&ton_price_currency=USD&ton_price_amount=0.5"),
         ))
         .await
         .unwrap();
@@ -2327,7 +2402,7 @@ async fn the_price_is_set_on_the_event_type_form() {
             edit,
             &session,
             CSRF,
-            &post("&ton_price_enabled=on&ton_price_usd=40.50&ton_window_min=20"),
+            &post("&ton_price_enabled=on&ton_price_currency=USD&ton_price_amount=40.50&ton_window_min=20"),
         ))
         .await
         .unwrap();
@@ -2354,7 +2429,7 @@ async fn the_price_is_set_on_the_event_type_form() {
             edit,
             &session,
             CSRF,
-            &post("&ton_price_usd=40.50"),
+            &post("&ton_price_currency=USD&ton_price_amount=40.50"),
         ))
         .await
         .unwrap();
@@ -2365,7 +2440,7 @@ async fn the_price_is_set_on_the_event_type_form() {
     assert_eq!(enabled, 0);
     assert!(!invoice::is_priced(&e.pool, &e.et_id).await);
     e.app()
-        .oneshot(post_form(edit, &session, CSRF, &post("&ton_price_usd=")))
+        .oneshot(post_form(edit, &session, CSRF, &post("&ton_price_amount=")))
         .await
         .unwrap();
     let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM ton_prices")
@@ -2817,7 +2892,13 @@ async fn switching_a_price_on_wakes_the_watcher() {
             tokio::time::timeout(std::time::Duration::from_millis(20), e.rt.wake.notified()).await;
     };
     drain().await;
-    crate::web::ton_pay::save_price_form(&e.state, &e.et_id, Some("on"), Some("50"), None).await;
+    let form = crate::web::ton_pay::PriceForm {
+        enabled: Some("on"),
+        amount: Some("50"),
+        currency: Some("USD"),
+        ..Default::default()
+    };
+    crate::web::ton_pay::save_price_form(&e.state, &e.et_id, &form).await;
     tokio::time::timeout(std::time::Duration::from_millis(200), e.rt.wake.notified())
         .await
         .expect("a saved price wakes the watcher");
@@ -2838,8 +2919,9 @@ async fn switching_a_price_on_wakes_the_watcher() {
     tokio::time::timeout(std::time::Duration::from_millis(200), e.rt.wake.notified())
         .await
         .expect("a stale-watcher refusal wakes the watcher");
-    // While any price row exists the idle watcher sleeps a minute, not an
-    // hour, even when the price is switched off.
+    // While any price row exists the idle watcher sleeps 15 minutes, not an
+    // hour, even when the price is switched off (ilia fork, Optimize: the
+    // heartbeat is made on demand, was a minute).
     let caught_up = watcher::StepReport {
         caught_up: true,
         ..Default::default()
@@ -2851,7 +2933,7 @@ async fn switching_a_price_on_wakes_the_watcher() {
     let in_two_days = e.now + Duration::days(2);
     assert_eq!(
         watcher::next_delay(&e.pool, &e.rt, &caught_up, in_two_days).await,
-        std::time::Duration::from_secs(60)
+        watcher::IDLE_PRICED
     );
     sqlx::query("DELETE FROM ton_prices")
         .execute(&e.pool)

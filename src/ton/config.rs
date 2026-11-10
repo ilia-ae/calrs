@@ -43,8 +43,19 @@ pub struct TonConfig {
     pub coingecko_key: Option<String>,
     pub binance_url: String,
     pub binance_symbol: String,
-    pub rate_policy: RatePolicy,
+    /// The owner's TON/USD corridor and rate rules: only USD prices need
+    /// them. `None` (neither corridor variable set): no rate is ever
+    /// fetched, and a USD price is not bookable.
+    pub rate_policy: Option<RatePolicy>,
     pub alert_email: Option<String>,
+    /// A payment window that ends unpaid while the meeting is at least this
+    /// many hours away is renewed instead of releasing the time.
+    pub renew_min_lead_hours: i64,
+    /// A renewed window's length in minutes (at most half the time left
+    /// before the meeting, at least the type's window).
+    pub renew_window_min: i64,
+    /// Renewals per invoice; 0 releases at the first deadline.
+    pub max_renewals: i64,
 }
 
 impl std::fmt::Debug for TonConfig {
@@ -107,6 +118,9 @@ pub const VARS: &[&str] = &[
     "CALRS_TON_RATE_MAX_AGE_MIN",
     "CALRS_TON_RATE_MAX_JUMP_PCT",
     "CALRS_TON_ALERT_EMAIL",
+    "CALRS_TON_RENEW_MIN_LEAD_HOURS",
+    "CALRS_TON_RENEW_WINDOW_MIN",
+    "CALRS_TON_MAX_RENEWALS",
 ];
 
 struct Vars<F: Fn(&str) -> Option<String>>(F);
@@ -281,26 +295,39 @@ impl TonConfig {
             allow_local,
         )?;
 
-        let corridor = |name: &str| -> Result<u64, ConfigError> {
-            let raw = v
-                .get(name)
-                .ok_or_else(|| err(format!("{name} is required: the owner's TON/USD corridor")))?;
-            parse_decimal_micro(&raw)
-                .ok_or_else(|| err(format!("{name} must be a positive decimal")))
+        // The corridor: both or neither. Only USD prices need it.
+        let corridor = |name: &str| -> Result<Option<u64>, ConfigError> {
+            v.get(name)
+                .map(|raw| {
+                    parse_decimal_micro(&raw)
+                        .ok_or_else(|| err(format!("{name} must be a positive decimal")))
+                })
+                .transpose()
         };
-        let min_usd_micro = corridor("CALRS_TON_RATE_MIN_USD")?;
-        let max_usd_micro = corridor("CALRS_TON_RATE_MAX_USD")?;
-        if min_usd_micro >= max_usd_micro {
-            return Err(err(
-                "CALRS_TON_RATE_MIN_USD must be below CALRS_TON_RATE_MAX_USD",
-            ));
-        }
-        let rate_policy = RatePolicy {
-            min_usd_micro,
-            max_usd_micro,
-            max_spread_bp: v.pct_bp("CALRS_TON_RATE_MAX_SPREAD_PCT", 300, 10, 2000)?,
-            max_age: Duration::minutes(v.int("CALRS_TON_RATE_MAX_AGE_MIN", 10, 1, 60)?),
-            max_jump_bp: v.pct_bp("CALRS_TON_RATE_MAX_JUMP_PCT", 1000, 100, 5000)?,
+        let rate_policy = match (
+            corridor("CALRS_TON_RATE_MIN_USD")?,
+            corridor("CALRS_TON_RATE_MAX_USD")?,
+        ) {
+            (None, None) => None,
+            (Some(min_usd_micro), Some(max_usd_micro)) => {
+                if min_usd_micro >= max_usd_micro {
+                    return Err(err(
+                        "CALRS_TON_RATE_MIN_USD must be below CALRS_TON_RATE_MAX_USD",
+                    ));
+                }
+                Some(RatePolicy {
+                    min_usd_micro,
+                    max_usd_micro,
+                    max_spread_bp: v.pct_bp("CALRS_TON_RATE_MAX_SPREAD_PCT", 300, 10, 2000)?,
+                    max_age: Duration::minutes(v.int("CALRS_TON_RATE_MAX_AGE_MIN", 10, 1, 60)?),
+                    max_jump_bp: v.pct_bp("CALRS_TON_RATE_MAX_JUMP_PCT", 1000, 100, 5000)?,
+                })
+            }
+            _ => {
+                return Err(err(
+                    "CALRS_TON_RATE_MIN_USD and CALRS_TON_RATE_MAX_USD go together: set both (USD prices) or neither",
+                ))
+            }
         };
 
         let alert_email = v.get("CALRS_TON_ALERT_EMAIL");
@@ -348,6 +375,9 @@ impl TonConfig {
             binance_symbol,
             rate_policy,
             alert_email,
+            renew_min_lead_hours: v.int("CALRS_TON_RENEW_MIN_LEAD_HOURS", 24, 1, 720)?,
+            renew_window_min: v.int("CALRS_TON_RENEW_WINDOW_MIN", 360, 10, 1440)?,
+            max_renewals: v.int("CALRS_TON_MAX_RENEWALS", 2, 0, 5)?,
         }))
     }
 
@@ -457,11 +487,16 @@ pub(crate) mod tests {
         );
         assert_eq!(c.binance_symbol, "GRAMUSDT");
         assert_eq!(c.coingecko_id, "the-open-network");
-        assert_eq!(c.rate_policy.max_spread_bp, 300);
-        assert_eq!(c.rate_policy.max_jump_bp, 1000);
-        assert_eq!(c.rate_policy.max_age, Duration::minutes(10));
-        assert_eq!(c.rate_policy.min_usd_micro, 500_000);
-        assert_eq!(c.rate_policy.max_usd_micro, 5_000_000);
+        let policy = c.rate_policy.as_ref().unwrap();
+        assert_eq!(policy.max_spread_bp, 300);
+        assert_eq!(policy.max_jump_bp, 1000);
+        assert_eq!(policy.max_age, Duration::minutes(10));
+        assert_eq!(policy.min_usd_micro, 500_000);
+        assert_eq!(policy.max_usd_micro, 5_000_000);
+        assert_eq!(
+            (c.renew_min_lead_hours, c.renew_window_min, c.max_renewals),
+            (24, 360, 2)
+        );
         assert_eq!(c.indexer_host(), "toncenter.com");
     }
 
@@ -523,6 +558,13 @@ pub(crate) mod tests {
             ("CALRS_TON_RATE_MAX_JUMP_PCT", "0.5"),
             ("CALRS_TON_ALLOW_LOCAL_ENDPOINTS", "maybe"),
             ("CALRS_TON_ALERT_EMAIL", "not-an-address"),
+            ("CALRS_TON_RENEW_MIN_LEAD_HOURS", "0"),
+            ("CALRS_TON_RENEW_MIN_LEAD_HOURS", "721"),
+            ("CALRS_TON_RENEW_WINDOW_MIN", "9"),
+            ("CALRS_TON_RENEW_WINDOW_MIN", "1441"),
+            ("CALRS_TON_RENEW_WINDOW_MIN", "6h"),
+            ("CALRS_TON_MAX_RENEWALS", "6"),
+            ("CALRS_TON_MAX_RENEWALS", "-1"),
             ("CALRS_TON_API_URL", "http://toncenter.com/api/v3"),
             ("CALRS_TON_API_URL", "ftp://toncenter.com"),
             ("CALRS_TON_API_URL", "toncenter.com"),
@@ -536,7 +578,7 @@ pub(crate) mod tests {
         ] {
             assert!(with(k, val).is_err(), "{k}={val}");
         }
-        // A missing address or corridor: error, not "off".
+        // A missing address, or half a corridor: error, not "off".
         for k in [
             "CALRS_TON_ADDRESS",
             "CALRS_TON_RATE_MIN_USD",
@@ -549,6 +591,20 @@ pub(crate) mod tests {
         }
     }
 
+    /// TON prices need no rate: without a corridor payments still work,
+    /// and no rate rule is read at all.
+    #[test]
+    fn no_corridor_means_no_rates() {
+        let mut vars = base();
+        vars.remove("CALRS_TON_RATE_MIN_USD");
+        vars.remove("CALRS_TON_RATE_MAX_USD");
+        vars.insert("CALRS_TON_RATE_MAX_SPREAD_PCT", "1".into());
+        let c = load(&vars).unwrap().unwrap();
+        assert!(c.rate_policy.is_none());
+        let c = with("CALRS_TON_MAX_RENEWALS", "0").unwrap().unwrap();
+        assert_eq!(c.max_renewals, 0);
+    }
+
     #[test]
     fn valid_overrides() {
         let c = with("CALRS_TON_RATE_SOURCES", " binance ")
@@ -558,7 +614,7 @@ pub(crate) mod tests {
         let c = with("CALRS_TON_RATE_MAX_SPREAD_PCT", "0.5")
             .unwrap()
             .unwrap();
-        assert_eq!(c.rate_policy.max_spread_bp, 50);
+        assert_eq!(c.rate_policy.unwrap().max_spread_bp, 50);
         let c = with("CALRS_TON_UNDERPAY_TOLERANCE_NANO", "10000000")
             .unwrap()
             .unwrap();

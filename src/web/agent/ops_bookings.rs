@@ -166,6 +166,7 @@ pub(crate) async fn get_booking(
     };
     let tz = user_tz(me);
     let payment = super::ops_ton::payment_of(pool, &id, tz).await?;
+    let messages = super::ops_messages::thread_of(pool, &id, tz).await?;
     Ok(BookingDetail {
         id,
         event_type: EventTypeRef {
@@ -199,6 +200,7 @@ pub(crate) async fn get_booking(
             telegram: at_name(tg_entered),
             telegram_linked_as: at_name(tg_actual.filter(|_| telegram_linked)),
         },
+        messages,
     })
 }
 

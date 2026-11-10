@@ -320,15 +320,18 @@ pub(crate) async fn list_event_types(
         String,
         String,
         i64,
+        Option<String>,
         Option<i64>,
         Option<i64>,
         Option<i64>,
-    )> = sqlx::query_as(
+        Option<i64>,
+        Option<String>,
+    )> = sqlx::query_as(&format!(
         "SELECT et.slug, et.title, et.enabled, et.duration_min, et.requires_confirmation,
                 et.visibility, COALESCE(NULLIF(et.timezone, ''), u.timezone),
                 (SELECT COUNT(*) FROM bookings b
                  WHERE b.event_type_id = et.id AND b.status IN ('confirmed', 'pending')),
-                p.price_usd_cents, p.window_min, p.enabled
+                {PRICE_COLS}
          FROM event_types et
          JOIN accounts a ON a.id = et.account_id
          JOIN users u ON u.id = a.user_id
@@ -336,7 +339,8 @@ pub(crate) async fn list_event_types(
          WHERE a.user_id = ? AND et.team_id IS NULL
          ORDER BY et.created_at, et.id
          LIMIT ? OFFSET ?",
-    )
+        PRICE_COLS = super::ops_ton::PRICE_COLS
+    ))
     .bind(&me.id)
     .bind(page.fetch())
     .bind(page.offset())
@@ -355,9 +359,12 @@ pub(crate) async fn list_event_types(
                     visibility,
                     timezone,
                     active,
+                    currency,
+                    nano,
                     cents,
                     window,
                     priced,
+                    guest_mode,
                 )| {
                     EventTypeSummary {
                         slug,
@@ -368,7 +375,9 @@ pub(crate) async fn list_event_types(
                         visibility,
                         timezone,
                         active_bookings: active,
-                        price: super::ops_ton::price_out(cents, window, priced),
+                        price: super::ops_ton::price_out((
+                            currency, nano, cents, window, priced, guest_mode,
+                        )),
                     }
                 },
             )

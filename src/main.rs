@@ -9,6 +9,8 @@
 mod auth;
 mod booking_time;
 mod booking_window;
+// ilia fork: busy-only calendar storage.
+mod busy_only;
 mod caldav;
 mod commands;
 mod crypto;

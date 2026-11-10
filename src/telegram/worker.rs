@@ -142,7 +142,11 @@ async fn process_event(rt: &Runtime, pool: &SqlitePool, booking_id: &str, event:
         other => other,
     };
     let mut audience = event.audience();
+    let mut delivered = false;
+    // A guest's text reaches the hosts only when the relay let it through
+    // (an unpaid booking's guest answering a host who wrote first).
     if !event.is_payment()
+        && !matches!(event, TelegramEvent::GuestMessage { .. })
         && payment
             .as_ref()
             .is_some_and(|p| p.hosts_unaware(&booking.status))
@@ -159,7 +163,17 @@ async fn process_event(rt: &Runtime, pool: &SqlitePool, booking_id: &str, event:
                 .as_ref()
                 .map(|p| guest_payment(p, &booking.guest_timezone, base.as_deref(), &lang));
             if let Some(msg) = message::guest(event, &view, &lang) {
-                deliver(rt, pool, chat_id, &msg, event.kind(), Some(booking_id), 3).await;
+                let sent = deliver_about(
+                    rt,
+                    pool,
+                    chat_id,
+                    &msg,
+                    event.kind(),
+                    booking_id,
+                    Side::Guest,
+                )
+                .await;
+                delivered |= sent;
             }
         }
     }
@@ -170,18 +184,24 @@ async fn process_event(rt: &Runtime, pool: &SqlitePool, booking_id: &str, event:
             let mut view = host_view(&booking, &host.timezone, base.as_deref(), &lang);
             view.payment = payment.as_ref().map(host_payment);
             if let Some(msg) = message::host(event, &view, &lang) {
-                deliver(
+                let sent = deliver_about(
                     rt,
                     pool,
                     host.chat_id,
                     &msg,
                     event.kind(),
-                    Some(booking_id),
-                    3,
+                    booking_id,
+                    Side::Host,
                 )
                 .await;
+                delivered |= sent;
             }
         }
+    }
+    // ilia fork (messages): the thread shows whether Telegram took it.
+    if let TelegramEvent::HostMessage { id, .. } | TelegramEvent::GuestMessage { id, .. } = event {
+        store::set_message_telegram_status(pool, id, if delivered { "sent" } else { "failed" })
+            .await;
     }
     if matches!(
         event,
@@ -322,6 +342,44 @@ fn host_view(booking: &BookingRow, host_tz: &str, base: Option<&str>, lang: &str
     }
 }
 
+/// Which side of a booking a chat is on, for the reply map.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Side {
+    Guest,
+    Host,
+}
+
+impl Side {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Side::Guest => "guest",
+            Side::Host => "host",
+        }
+    }
+}
+
+/// A notification about `booking_id` to one of its chats, retried like
+/// every notification. When Telegram took it, the message is mapped to the
+/// booking (ilia fork, `telegram_message_map`), so a reply to it in that
+/// chat picks the booking (`telegram::relay`).
+async fn deliver_about(
+    rt: &Runtime,
+    pool: &SqlitePool,
+    chat_id: i64,
+    msg: &Outgoing,
+    what: &'static str,
+    booking_id: &str,
+    side: Side,
+) -> bool {
+    match send(rt, pool, chat_id, msg, what, Some(booking_id), 3).await {
+        Some(message_id) => {
+            store::map_message(pool, chat_id, message_id, booking_id, side.as_str()).await;
+            true
+        }
+        None => false,
+    }
+}
+
 /// Send with up to `attempts` attempts (at most three). `true` when Telegram
 /// accepted it.
 pub(crate) async fn deliver(
@@ -333,13 +391,28 @@ pub(crate) async fn deliver(
     booking_id: Option<&str>,
     attempts: u8,
 ) -> bool {
+    send(rt, pool, chat_id, msg, what, booking_id, attempts)
+        .await
+        .is_some()
+}
+
+/// [`deliver`], returning the id Telegram gave the message.
+async fn send(
+    rt: &Runtime,
+    pool: &SqlitePool,
+    chat_id: i64,
+    msg: &Outgoing,
+    what: &'static str,
+    booking_id: Option<&str>,
+    attempts: u8,
+) -> Option<i64> {
     let booking_id = booking_id.unwrap_or("");
     let attempts = usize::from(attempts.clamp(1, 3));
     for attempt in 0..attempts {
         let wait = match rt.api.send_message(chat_id, msg).await {
-            Ok(()) => {
+            Ok(message_id) => {
                 tracing::info!(target: "calrs::telegram", what, booking_id, "telegram message sent");
-                return true;
+                return Some(message_id);
             }
             Err(TgError::Forbidden(_)) => {
                 let removed = store::unlink_chat(pool, chat_id).await;
@@ -350,7 +423,7 @@ pub(crate) async fn deliver(
                     removed,
                     "telegram chat blocked the bot; its links were removed"
                 );
-                return false;
+                return None;
             }
             Err(e @ (TgError::BadRequest(_) | TgError::Unauthorized | TgError::Conflict(_))) => {
                 tracing::warn!(
@@ -361,7 +434,7 @@ pub(crate) async fn deliver(
                     error = %e,
                     "telegram message refused"
                 );
-                return false;
+                return None;
             }
             Err(TgError::RateLimited { retry_after }) => rt
                 .retry
@@ -392,5 +465,5 @@ pub(crate) async fn deliver(
         attempts,
         "telegram message not delivered"
     );
-    false
+    None
 }

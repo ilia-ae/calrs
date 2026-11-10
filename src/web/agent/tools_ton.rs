@@ -17,15 +17,17 @@ use rmcp::{tool, tool_router, Json};
 impl AgentServer {
     #[tool(
         title = "Set event type price",
-        description = "Charge guests for one personal event type, in TON: price_usd in US \
-                       dollars (1 to 10000), converted at the rate of the moment a guest \
-                       books; the booking holds the time while the guest pays and is \
-                       confirmed by itself once the payment is final, or released at the \
-                       deadline. price_usd null removes the price (the type books free \
-                       again). Pass the version from get_event_type. Bookings already made \
-                       keep their terms. Asks the owner to confirm: say the price first. \
-                       Returns the price, the new version and warnings (payments off in this \
-                       server, notice too short to pay).",
+        description = "Charge guests for one personal event type, in TON: price_ton in TON \
+                       (the default, 1 to 100000; the guest pays exactly that), or price_usd \
+                       in US dollars (1 to 10000), converted at the rate of the moment a guest \
+                       books. The booking holds the time while the guest pays and is \
+                       confirmed by itself once the payment is final; an unpaid window of a \
+                       far meeting is renewed, else the time is released. Neither price \
+                       removes it (the type books free again). A new price makes the booking \
+                       form ask for the guest's Telegram. Pass the version from \
+                       get_event_type. Bookings already made keep their terms. Asks the owner \
+                       to confirm: say the price first. Returns the price, the new version and \
+                       warnings (payments off in this server, notice too short to pay).",
         annotations(
             read_only_hint = false,
             destructive_hint = true,

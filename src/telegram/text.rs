@@ -38,6 +38,26 @@ pub(crate) fn clean(value: &str, max: usize) -> String {
     shorten(&out, max)
 }
 
+/// A host's message (ilia fork, `web::messages`): like [`clean`], but the
+/// line breaks stay. Each line is cleaned on its own (controls become
+/// spaces, invisible characters go), more than one empty line in a row
+/// becomes one, and the whole is trimmed and cut to `max` characters.
+/// Host-written: it is not defanged.
+pub(crate) fn clean_lines(value: &str, max: usize) -> String {
+    let mut lines: Vec<String> = Vec::new();
+    for line in value.replace("\r\n", "\n").replace('\r', "\n").split('\n') {
+        let line = clean(line, max);
+        if line.is_empty() && lines.last().is_none_or(|l| l.is_empty()) {
+            continue;
+        }
+        lines.push(line);
+    }
+    while lines.last().is_some_and(|l| l.is_empty()) {
+        lines.pop();
+    }
+    shorten(&lines.join("\n"), max)
+}
+
 /// Cut to `max` characters, ending with `…` when anything was cut.
 pub(crate) fn shorten(value: &str, max: usize) -> String {
     if value.chars().count() <= max {
@@ -126,5 +146,8 @@ pub(crate) const GUEST_NAME_MAX: usize = 64;
 pub(crate) const EMAIL_MAX: usize = 254;
 pub(crate) const REASON_MAX: usize = 500;
 pub(crate) const LOCATION_MAX: usize = 300;
+/// Longest host message and guest message of a booking's thread.
+pub(crate) const HOST_TEXT_MAX: usize = 2000;
+pub(crate) const GUEST_TEXT_MAX: usize = 1000;
 /// Telegram's limit for a message text.
 pub(crate) const MESSAGE_MAX: usize = 4096;

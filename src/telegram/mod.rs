@@ -43,6 +43,7 @@ pub(crate) mod config;
 pub(crate) mod events;
 pub(crate) mod message;
 pub(crate) mod poller;
+pub(crate) mod relay;
 pub(crate) mod store;
 pub(crate) mod text;
 pub(crate) mod tokens;
@@ -176,6 +177,18 @@ pub(crate) fn notify(pool: &SqlitePool, booking_id: &str, event: TelegramEvent) 
             event,
         });
     }
+}
+
+/// [`notify`], saying whether the event was queued (ilia fork: a message
+/// of a booking's thread records it).
+pub(crate) fn notify_queued(pool: &SqlitePool, booking_id: &str, event: TelegramEvent) -> bool {
+    current().is_some_and(|rt| {
+        rt.enqueue(Job::Event {
+            pool: pool.clone(),
+            booking_id: booking_id.to_string(),
+            event,
+        })
+    })
 }
 
 /// Queue the reminder when the booking's guest has a linked chat. Returns

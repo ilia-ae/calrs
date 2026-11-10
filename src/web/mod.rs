@@ -14,6 +14,8 @@ mod hosts;
 mod ilia;
 mod invites;
 pub mod meeting;
+// ilia fork: host <-> guest messages (ilia-booking docs/operations.md).
+pub(crate) mod messages;
 mod notify;
 mod pending;
 mod public_pages;
@@ -760,6 +762,7 @@ pub(crate) fn router(state: Arc<AppState>) -> Router {
         // ilia fork: the TON payment page and the dashboard waive.
         .merge(ton_pay::router())
         .merge(telegram::router())
+        .merge(messages::router())
         .route("/", get(root_redirect))
         .route("/dashboard", get(dashboard))
         .route("/dashboard/event-types", get(dashboard_event_types))

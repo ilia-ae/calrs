@@ -25,11 +25,16 @@ struct Tg {
 }
 
 async fn tg_env() -> Tg {
+    tg_env_with(&[], None).await
+}
+
+/// [`tg_env`] with TON settings and, with `ton`, a price in TON.
+async fn tg_env_with(extra: &[(&'static str, &str)], ton: Option<u128>) -> Tg {
     let tg = fake::install_fake("ilia_test_bot").await;
     let lock = crate::test_support::ENV_LOCK.lock().await;
     let guard = crate::test_support::EnvGuard::new();
     std::env::set_var("CALRS_BASE_URL", BASE);
-    let e = env().await;
+    let e = env_priced(extra, ton).await;
     crate::telegram::store::save_event_type_mode(&e.pool, &e.et_id, "optional")
         .await
         .unwrap();
@@ -843,4 +848,111 @@ async fn after_two_key_changes_the_original_link_is_still_replaced() {
     // replaced one.
     assert_eq!(link_on([0u8; 32]).await, original);
     assert_eq!(row().await, (hash(&original), Some(hash(&latest))));
+}
+
+// --- booking flow v2 (ilia fork): TON prices and renewals in Telegram ---
+
+/// A TON price says no dollars; a renewal asks the linked guest again,
+/// with what is due and the new deadline, and tells the hosts nothing.
+#[tokio::test]
+async fn a_renewal_asks_the_linked_guest_again() {
+    let t = tg_env_with(&[("CALRS_TON_MAX_RENEWALS", "2")], Some(100_000_000_000)).await;
+    let e = &t.e;
+    let (bid, pay_token) = t.book("10:00").await;
+    t.start(&link_token(&[0u8; 32], &pay_token)).await;
+    let guest = t.to(GUEST_CHAT);
+    assert_eq!(guest.len(), 1, "{guest:#?}");
+    assert!(
+        guest[0].text.contains("Amount: 100.00 TON. Pay by "),
+        "{}",
+        guest[0].text
+    );
+    assert!(!guest[0].text.contains('$'), "{}", guest[0].text);
+    let expires: String =
+        sqlx::query_scalar("SELECT expires_at FROM ton_invoices WHERE booking_id = ?")
+            .bind(&bid)
+            .fetch_one(&e.pool)
+            .await
+            .unwrap();
+    let expires = crate::web::ton_pay::parse_stamp(&expires).unwrap();
+    assert_eq!(t.step(expires + Duration::seconds(5)).await.renewed, 1);
+    // Not before the indexer has read past the renewal.
+    assert_eq!(t.to(GUEST_CHAT).len(), 1);
+    e.chain
+        .height((expires + Duration::minutes(4)).timestamp() as u64);
+    t.step(expires + Duration::minutes(4)).await;
+    let guest = t.to(GUEST_CHAT);
+    assert_eq!(guest.len(), 2, "{guest:#?}");
+    let renewed = &guest[1];
+    assert!(
+        renewed.text.starts_with("The payment for Test Meeting, "),
+        "{}",
+        renewed.text
+    );
+    assert!(
+        renewed.text.contains("Pay the 100.00 TON still due by "),
+        "{}",
+        renewed.text
+    );
+    let deadline = (expires + Duration::seconds(5) + Duration::hours(6))
+        .format("%H:%M")
+        .to_string();
+    assert!(renewed.text.contains(&deadline), "{}", renewed.text);
+    assert!(
+        renewed
+            .text
+            .contains("If you have already paid, no action is needed"),
+        "{}",
+        renewed.text
+    );
+    assert_eq!(labels(renewed), ["Pay", "Cancel booking"]);
+    assert_eq!(
+        renewed.buttons[0].url,
+        format!("{BASE}/booking/pay/{pay_token}")
+    );
+    let reference = e.inv(&bid).await.reference;
+    assert!(!renewed.text.contains(&code(&reference)));
+    assert!(t.to(HOST_CHAT).is_empty(), "{:#?}", t.to(HOST_CHAT));
+    // Once.
+    t.step(expires + Duration::minutes(5)).await;
+    assert_eq!(t.to(GUEST_CHAT).len(), 2);
+    // Paid in the new window: confirmed, the hosts hear it, in TON only.
+    e.pay(100_000_000_000, &code(&reference));
+    t.step(e.now).await;
+    assert_eq!(booking_status(&e.pool, &bid).await, "confirmed");
+    let host = t.to(HOST_CHAT);
+    assert_eq!(host.len(), 1, "{host:#?}");
+    assert!(
+        host[0]
+            .text
+            .contains("Received 100.00 TON; the booking is confirmed."),
+        "{}",
+        host[0].text
+    );
+    assert!(!host[0].text.contains('$'));
+}
+
+/// With Telegram on, the price section offers the guest's Telegram,
+/// showing the type's own mode, and saves the choice.
+#[tokio::test]
+async fn the_price_section_offers_the_guest_telegram_mode() {
+    let t = tg_env().await;
+    let e = &t.e;
+    let session = e.session().await;
+    let edit = "/dashboard/event-types/test-meeting/edit";
+    let resp = e.app().oneshot(get_authed(edit, &session)).await.unwrap();
+    let page = body_string(resp).await;
+    assert!(page.contains("name=\"ton_guest_telegram\""), "{page}");
+    assert!(page.contains("<option value=\"optional\" selected>"));
+    let body = format!("_csrf={CSRF}&title=Test+Meeting&slug=test-meeting&duration_min=30&location_value=https%3A%2F%2Fmeet.example.com&avail_days=1,2,3,4,5&avail_start=09:00&avail_end=17:00&ton_price_enabled=on&ton_price_currency=USD&ton_price_amount=40&ton_guest_telegram=required");
+    let resp = e
+        .app()
+        .oneshot(post_form(edit, &session, CSRF, &body))
+        .await
+        .unwrap();
+    assert!(resp.status().is_redirection());
+    assert_eq!(
+        crate::telegram::store::event_type_mode(&e.pool, &e.et_id).await,
+        "required"
+    );
 }

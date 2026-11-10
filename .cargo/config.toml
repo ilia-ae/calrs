@@ -1,0 +1,14 @@
+# ilia fork (not in upstream calrs, so it never conflicts): the release
+# profile of the deployed binary. Measured in the builder container
+# (aarch64-unknown-linux-musl, cargo zigbuild, ilia-booking docs/operations.md):
+#   default                      37.8 MB,  92 s
+#   lto = "thin", 1 codegen unit 25.2 MB, 158 s
+#   lto = "fat",  1 codegen unit 24.1 MB, 187 s  <- this
+# strip = "symbols" saved 48 bytes over the default (debug info is already
+# stripped), so it is left out and panics keep their symbol names.
+# panic stays "unwind": a panicking tokio task must not take the server
+# down (the TON watcher's supervisor restarts its task). opt-level stays 3.
+# Tests and `cargo build` (dev) are not affected.
+[profile.release]
+lto = "fat"
+codegen-units = 1

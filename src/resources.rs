@@ -175,9 +175,14 @@ pub async fn sync_resource(
             return Err(e);
         }
     };
+    Ok(store_feed(pool, resource_id, &body).await)
+}
 
+/// The cache update of [`sync_resource`] from a fetched feed `body`
+/// (ilia fork: split out so the busy-only tests can feed it directly).
+pub(crate) async fn store_feed(pool: &SqlitePool, resource_id: &str, body: &str) -> u32 {
     let mut vevents: Vec<String> = if body.contains("BEGIN:VEVENT") {
-        split_vevents(&body)
+        split_vevents(body)
     } else {
         Vec::new()
     };
@@ -188,7 +193,7 @@ pub async fn sync_resource(
         vevents.truncate(MAX_FEED_EVENTS);
     }
 
-    let mut zones = crate::tzid::ResourceZones::new(&body);
+    let mut zones = crate::tzid::ResourceZones::new(body);
     let mut seen: Vec<(String, String)> = Vec::new();
     let mut count = 0u32;
     for vevent in &vevents {
@@ -196,7 +201,7 @@ pub async fn sync_resource(
         let fields = crate::utils::unfold_ical(vevent);
         let uid =
             extract_vevent_field(&fields, "UID").unwrap_or_else(|| Uuid::new_v4().to_string());
-        let summary = extract_vevent_field(&fields, "SUMMARY");
+        let summary = crate::busy_only::keep(extract_vevent_field(&fields, "SUMMARY"));
         let start_at = extract_vevent_field(&fields, "DTSTART").unwrap_or_default();
         let status = extract_vevent_field(&fields, "STATUS");
         let rrule = extract_vevent_field(&fields, "RRULE");
@@ -240,7 +245,7 @@ pub async fn sync_resource(
         .bind(all_day as i32)
         .bind(&timezone)
         .bind(&rrule)
-        .bind(vevent)
+        .bind(crate::busy_only::StoredIcal::new(vevent).for_row(rrule.as_deref()))
         .bind(&status)
         .bind(&transp)
         .bind(&summary)
@@ -274,7 +279,7 @@ pub async fn sync_resource(
     .execute(pool)
     .await;
 
-    Ok(count)
+    count
 }
 
 /// Sync every listed resource whose cache is older than

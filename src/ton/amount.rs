@@ -104,6 +104,19 @@ pub fn parse_ton(s: &str) -> Option<u128> {
     whole.checked_mul(NANO_PER_TON)?.checked_add(frac_nano)
 }
 
+/// Cheapest and dearest TON price (the `ton_prices` CHECK): 1 to 100000 TON.
+pub const MIN_PRICE_NANO: u128 = NANO_PER_TON;
+pub const MAX_PRICE_NANO: u128 = 100_000 * NANO_PER_TON;
+/// What a new price starts at: the owner's 100 TON.
+pub const DEFAULT_PRICE_TON: &str = "100";
+
+/// A TON price ("100", "12.5"): 1 to 100000 TON in steps of 0.01 TON, the
+/// invoice step, so the price is exactly the amount asked.
+pub fn parse_ton_price(s: &str) -> Option<u128> {
+    parse_ton(s)
+        .filter(|n| n % INVOICE_STEP_NANO == 0 && (MIN_PRICE_NANO..=MAX_PRICE_NANO).contains(n))
+}
+
 /// Parse US dollars ("40", "40.5", "40.00") into cents. At most 2 decimals.
 pub fn parse_usd_cents(s: &str) -> Option<u64> {
     let s = s.trim();
@@ -128,6 +141,21 @@ pub fn parse_usd_cents(s: &str) -> Option<u64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ton_prices() {
+        assert_eq!(parse_ton_price("100"), Some(100 * NANO_PER_TON));
+        assert_eq!(parse_ton_price(" 12.5 "), Some(12_500_000_000));
+        assert_eq!(parse_ton_price("1"), Some(NANO_PER_TON));
+        assert_eq!(parse_ton_price("100000"), Some(MAX_PRICE_NANO));
+        for bad in ["", "0.99", "100000.01", "12.345", "-1", "1e3", "abc", "0"] {
+            assert_eq!(parse_ton_price(bad), None, "{bad:?}");
+        }
+        assert_eq!(
+            format_ton(parse_ton_price(DEFAULT_PRICE_TON).unwrap()),
+            "100.00"
+        );
+    }
 
     #[test]
     fn forty_dollars_at_the_doc_rate() {

@@ -10,13 +10,74 @@ use super::{parse_stamp, stamp};
 use crate::ton::decide::{InvoiceStatus, InvoiceView};
 use crate::ton::Network;
 
+/// A price: in TON (the default; exactly the invoice amount, no rate) or
+/// in US dollars (converted at the rate of the moment the guest books).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Price {
+    Ton(u128),
+    Usd(u64),
+}
+
+impl Price {
+    /// From the `ton_prices` columns; `None` for a row the CHECKs would
+    /// not allow.
+    pub(crate) fn from_columns(
+        currency: &str,
+        price_nano: Option<i64>,
+        price_usd_cents: Option<i64>,
+    ) -> Option<Self> {
+        match currency {
+            "TON" => price_nano
+                .and_then(|n| u128::try_from(n).ok())
+                .filter(|n| *n > 0)
+                .map(Self::Ton),
+            "USD" => price_usd_cents
+                .and_then(|c| u64::try_from(c).ok())
+                .filter(|c| *c > 0)
+                .map(Self::Usd),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn currency(&self) -> &'static str {
+        match self {
+            Self::Ton(_) => "TON",
+            Self::Usd(_) => "USD",
+        }
+    }
+
+    /// `(currency, price_nano, price_usd_cents)` as stored.
+    pub(crate) fn columns(&self) -> (&'static str, Option<i64>, Option<i64>) {
+        match *self {
+            Self::Ton(n) => ("TON", i64::try_from(n).ok(), None),
+            Self::Usd(c) => ("USD", None, i64::try_from(c).ok()),
+        }
+    }
+
+    /// "100.00" (TON) or "40.00" (USD), without the unit.
+    pub(crate) fn amount(&self) -> String {
+        match *self {
+            Self::Ton(n) => crate::ton::amount::format_ton(n),
+            Self::Usd(c) => crate::ton::amount::format_usd_cents(u128::from(c)),
+        }
+    }
+}
+
 /// The price row of an event type, with what an invoice snapshots.
 #[derive(Clone, Debug, sqlx::FromRow)]
 pub(crate) struct PriceRow {
-    pub(crate) price_usd_cents: i64,
+    pub(crate) currency: String,
+    pub(crate) price_nano: Option<i64>,
+    pub(crate) price_usd_cents: Option<i64>,
     pub(crate) window_min: Option<i64>,
     pub(crate) is_team: i64,
     pub(crate) title: String,
+}
+
+impl PriceRow {
+    pub(crate) fn price(&self) -> Option<Price> {
+        Price::from_columns(&self.currency, self.price_nano, self.price_usd_cents)
+    }
 }
 
 /// The enabled price of an event type, if any. A database error is an
@@ -27,7 +88,7 @@ pub(crate) async fn price_for(
     event_type_id: &str,
 ) -> Result<Option<PriceRow>, sqlx::Error> {
     sqlx::query_as::<_, PriceRow>(
-        "SELECT p.price_usd_cents, p.window_min,
+        "SELECT p.currency, p.price_nano, p.price_usd_cents, p.window_min,
                 CASE WHEN et.team_id IS NULL THEN 0 ELSE 1 END AS is_team, et.title
          FROM ton_prices p JOIN event_types et ON et.id = p.event_type_id
          WHERE p.event_type_id = ? AND p.enabled = 1",
@@ -37,6 +98,58 @@ pub(crate) async fn price_for(
     .await
 }
 
+/// Write the price of `event_type_id` (insert or replace its terms) on a
+/// caller's connection. Returns whether the row is new. An enabled price
+/// makes the type ask for the guest's Telegram unless a mode was chosen
+/// for it ([`crate::telegram::store::default_mode_for_priced`]).
+pub(crate) async fn save_price(
+    conn: &mut SqliteConnection,
+    event_type_id: &str,
+    price: Price,
+    window_min: Option<i64>,
+    enabled: bool,
+    now: DateTime<Utc>,
+) -> Result<bool, sqlx::Error> {
+    let (currency, nano, cents) = price.columns();
+    let existed: bool = sqlx::query_scalar::<_, i64>(
+        "UPDATE ton_prices SET currency = ?, price_nano = ?, price_usd_cents = ?,
+             window_min = ?, enabled = ?, updated_at = ?
+         WHERE event_type_id = ? RETURNING 1",
+    )
+    .bind(currency)
+    .bind(nano)
+    .bind(cents)
+    .bind(window_min)
+    .bind(i64::from(enabled))
+    .bind(stamp(now))
+    .bind(event_type_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .is_some();
+    if enabled {
+        // Only inserts when no mode was ever chosen for the type.
+        crate::telegram::store::default_mode_for_priced(&mut *conn, event_type_id).await?;
+    }
+    if existed {
+        return Ok(false);
+    }
+    sqlx::query(
+        "INSERT INTO ton_prices (event_type_id, currency, price_nano, price_usd_cents,
+             window_min, enabled, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)",
+    )
+    .bind(event_type_id)
+    .bind(currency)
+    .bind(nano)
+    .bind(cents)
+    .bind(window_min)
+    .bind(i64::from(enabled))
+    .bind(stamp(now))
+    .execute(&mut *conn)
+    .await?;
+    Ok(true)
+}
+
 /// Any enabled price at all (the watcher then keeps its heartbeat fresh).
 pub(crate) async fn any_enabled_price(pool: &SqlitePool) -> bool {
     sqlx::query_scalar::<_, i64>("SELECT EXISTS (SELECT 1 FROM ton_prices WHERE enabled = 1)")
@@ -44,6 +157,18 @@ pub(crate) async fn any_enabled_price(pool: &SqlitePool) -> bool {
         .await
         .map(|v| v != 0)
         .unwrap_or(true)
+}
+
+/// Any enabled price in USD: only then is a rate ever fetched. A TON price
+/// needs none.
+pub(crate) async fn any_enabled_usd_price(pool: &SqlitePool) -> bool {
+    sqlx::query_scalar::<_, i64>(
+        "SELECT EXISTS (SELECT 1 FROM ton_prices WHERE enabled = 1 AND currency = 'USD')",
+    )
+    .fetch_one(pool)
+    .await
+    .map(|v| v != 0)
+    .unwrap_or(false)
 }
 
 /// An invoice counts toward the daily budget once it received money or
@@ -546,6 +671,32 @@ pub(crate) async fn watched_addresses(
     Ok(all)
 }
 
+/// ilia fork: open invoices, still owing, renewed since the guest was last
+/// told: (id, address_raw, renewed_at).
+pub(crate) async fn due_renewal_notices(
+    pool: &SqlitePool,
+) -> Result<Vec<(String, String, Option<String>)>, sqlx::Error> {
+    sqlx::query_as(
+        "SELECT id, address_raw, renewed_at FROM ton_invoices
+         WHERE status = 'open' AND renewal_notified < renewals AND paid_nano < amount_nano",
+    )
+    .fetch_all(pool)
+    .await
+}
+
+/// Claim the "pay again" notice of an invoice's latest renewal, once.
+pub(crate) async fn claim_renewal_notice(pool: &SqlitePool, invoice_id: &str) -> bool {
+    sqlx::query(
+        "UPDATE ton_invoices SET renewal_notified = renewals
+         WHERE id = ? AND status = 'open' AND renewal_notified < renewals",
+    )
+    .bind(invoice_id)
+    .execute(pool)
+    .await
+    .map(|r| r.rows_affected() == 1)
+    .unwrap_or(false)
+}
+
 /// Open or paid invoices exist (the watcher polls at full speed).
 pub(crate) async fn active_invoices(pool: &SqlitePool) -> bool {
     sqlx::query_scalar::<_, i64>(
@@ -694,9 +845,12 @@ pub(crate) async fn claim_problem_alert(
 }
 
 /// Confirmed invoices with money on them whose "payment received" is unsent.
+/// Every watcher step asks: the partial index holds only the unsent ones
+/// (ilia_007), where `(status, created_at)` would walk every confirmed
+/// invoice ever paid, and the planner would pick that one unasked.
 pub(crate) async fn due_received_notices(pool: &SqlitePool) -> Result<Vec<String>, sqlx::Error> {
     sqlx::query_scalar(
-        "SELECT id FROM ton_invoices
+        "SELECT id FROM ton_invoices INDEXED BY idx_ton_invoices_paid_notice
          WHERE status = 'confirmed' AND paid_nano > 0 AND paid_notice_sent_at IS NULL
          ORDER BY created_at LIMIT 50",
     )

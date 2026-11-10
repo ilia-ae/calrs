@@ -21,6 +21,8 @@ const FLUSH_CHAT: i64 = -424242;
 pub(crate) struct FakeApi {
     /// Every accepted message, in order.
     pub(crate) sent: Mutex<Vec<(i64, Outgoing)>>,
+    /// The message id of each accepted message, in the order of `sent`.
+    pub(crate) ids: Mutex<Vec<i64>>,
     /// Every send attempt, accepted or not.
     pub(crate) attempts: Mutex<Vec<i64>>,
     /// Answers to the next send attempts; empty means accept.
@@ -36,6 +38,8 @@ pub(crate) struct FakeApi {
     /// setMyDescription/setMyShortDescription calls: (language, description,
     /// short description).
     pub(crate) descriptions: Mutex<Vec<(Option<String>, String, String)>>,
+    /// setMyCommands answers 500 while set.
+    pub(crate) fail_menu: std::sync::atomic::AtomicBool,
 }
 
 impl FakeApi {
@@ -54,6 +58,18 @@ impl FakeApi {
             .filter(|(c, _)| *c == chat_id)
             .map(|(_, m)| m.text)
             .collect()
+    }
+
+    /// The id of the last message sent to `chat_id`.
+    pub(crate) fn last_id_to(&self, chat_id: i64) -> i64 {
+        let sent = self.sent();
+        let ids = self.ids.lock().unwrap().clone();
+        sent.iter()
+            .zip(ids)
+            .filter(|((c, _), _)| *c == chat_id)
+            .map(|(_, id)| id)
+            .next_back()
+            .unwrap_or_else(|| panic!("nothing sent to {chat_id}"))
     }
 
     /// Wait (at most 5 s) until a message to `chat_id` satisfies `pred`.
@@ -100,14 +116,16 @@ impl BotApi for FakeApi {
         }
     }
 
-    async fn send_message(&self, chat_id: i64, msg: &Outgoing) -> Result<(), TgError> {
+    async fn send_message(&self, chat_id: i64, msg: &Outgoing) -> Result<i64, TgError> {
         self.attempts.lock().unwrap().push(chat_id);
         let next = self.send_results.lock().unwrap().pop_front();
-        let result = next.unwrap_or(Ok(()));
-        if result.is_ok() {
-            self.sent.lock().unwrap().push((chat_id, msg.clone()));
-        }
-        result
+        next.unwrap_or(Ok(()))?;
+        // Ids in order, under the lock of `sent`, so `ids` lines up with it.
+        let mut sent = self.sent.lock().unwrap();
+        let id = 1000 + sent.len() as i64;
+        sent.push((chat_id, msg.clone()));
+        self.ids.lock().unwrap().push(id);
+        Ok(id)
     }
 
     async fn set_my_commands(
@@ -119,6 +137,9 @@ impl BotApi for FakeApi {
             language_code.map(str::to_string),
             commands.iter().map(|(c, _)| c.clone()).collect(),
         ));
+        if self.fail_menu.load(std::sync::atomic::Ordering::SeqCst) {
+            return Err(TgError::Server(500));
+        }
         Ok(())
     }
 
@@ -228,6 +249,29 @@ pub(crate) async fn memory_pool() -> SqlitePool {
         .unwrap();
     crate::db::migrate(&pool).await.unwrap();
     pool
+}
+
+/// A private-chat text from a person, replying to message `reply_to` of the
+/// bot (`None`: not a reply).
+pub(crate) fn private_message(
+    update_id: i64,
+    chat_id: i64,
+    text: &str,
+    reply_to: Option<i64>,
+) -> serde_json::Value {
+    let mut update = private_text(update_id, chat_id, None, text);
+    let message = &mut update["message"];
+    message.as_object_mut().unwrap().remove("entities");
+    if let Some(id) = reply_to {
+        message["reply_to_message"] = serde_json::json!({
+            "message_id": id,
+            "from": {"id": 123456789, "is_bot": true, "first_name": "Ilia"},
+            "chat": {"id": chat_id, "type": "private"},
+            "date": 1762700000,
+            "text": "earlier"
+        });
+    }
+    update
 }
 
 /// A private-chat update from a person, as Telegram sends it.

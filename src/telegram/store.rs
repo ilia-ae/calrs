@@ -38,6 +38,23 @@ pub(crate) async fn event_type_mode(pool: &SqlitePool, et_id: &str) -> &'static 
     mode::parse(stored.as_deref().unwrap_or(mode::OFF))
 }
 
+/// ilia fork: a newly priced event type asks for the guest's Telegram
+/// (`required`) unless a mode was chosen for it; the owner can lower it.
+/// Runs on the caller's connection, inside the price's transaction.
+pub(crate) async fn default_mode_for_priced(
+    conn: &mut sqlx::SqliteConnection,
+    et_id: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "INSERT OR IGNORE INTO telegram_event_types (event_type_id, guest_mode) VALUES (?, ?)",
+    )
+    .bind(et_id)
+    .bind(mode::REQUIRED)
+    .execute(&mut *conn)
+    .await
+    .map(|_| ())
+}
+
 pub(crate) async fn save_event_type_mode(
     pool: &SqlitePool,
     et_id: &str,
@@ -99,18 +116,55 @@ pub(crate) async fn claim_bot(pool: &SqlitePool, bot_id: i64) -> bool {
     };
     let sql = if reset {
         "UPDATE telegram_state SET bot_id = ?, update_offset = 0, bot_username = NULL,
-                updated_at = datetime('now') WHERE id = 'singleton'"
+                commands_hash = NULL, updated_at = datetime('now') WHERE id = 'singleton'"
     } else {
         "UPDATE telegram_state SET bot_id = ?, updated_at = datetime('now') WHERE id = 'singleton'"
     };
-    if let Err(e) = sqlx::query(sql).bind(bot_id).execute(pool).await {
+    // ilia fork: message ids are a per-bot sequence too, while a private
+    // chat's id is the user's and outlives the bot: a reply map kept from
+    // the old bot would send a host's reply to a new bot's message to some
+    // other booking's guest. Forgotten in the same transaction.
+    let claimed = async {
+        let mut tx = pool.begin().await?;
+        sqlx::query(sql).bind(bot_id).execute(&mut *tx).await?;
+        if reset {
+            sqlx::query("DELETE FROM telegram_message_map")
+                .execute(&mut *tx)
+                .await?;
+        }
+        tx.commit().await
+    }
+    .await;
+    if let Err(e) = claimed {
         tracing::warn!(target: "calrs::telegram", error = %e, "could not store the bot id");
         return false;
     }
     if reset {
-        tracing::info!(target: "calrs::telegram", "telegram bot changed; update offset and bot username reset");
+        tracing::info!(target: "calrs::telegram", "telegram bot changed; update offset, bot username and reply map reset");
     }
     reset
+}
+
+/// ilia fork (Optimize): the hash of the menus and descriptions this bot
+/// last took in full (`poller::menu_hash`); reset with the bot.
+pub(crate) async fn menu_hash(pool: &SqlitePool) -> Option<String> {
+    sqlx::query_scalar("SELECT commands_hash FROM telegram_state WHERE id = 'singleton'")
+        .fetch_optional(pool)
+        .await
+        .unwrap_or_else(log_err("read menu hash"))
+        .flatten()
+}
+
+pub(crate) async fn save_menu_hash(pool: &SqlitePool, hash: &str) {
+    if let Err(e) = sqlx::query(
+        "UPDATE telegram_state SET commands_hash = ?, updated_at = datetime('now') WHERE id = 'singleton'",
+    )
+    .bind(hash)
+    .execute(pool)
+    .await
+    {
+        tracing::warn!(target: "calrs::telegram", error = %e, "could not store the menu hash");
+    }
 }
 
 pub(crate) async fn load_offset(pool: &SqlitePool) -> i64 {
@@ -407,6 +461,14 @@ pub(crate) async fn unlink_chat(pool: &SqlitePool, chat_id: i64) -> u64 {
         tracing::warn!(target: "calrs::telegram", error = %e, "could not unlink guest chats");
         0
     });
+    // ilia fork (messages): what the chat could reply to goes with it.
+    if let Err(e) = sqlx::query("DELETE FROM telegram_message_map WHERE chat_id = ?")
+        .bind(chat_id)
+        .execute(pool)
+        .await
+    {
+        tracing::warn!(target: "calrs::telegram", error = %e, "could not forget a chat's messages");
+    }
     let hosts = sqlx::query("DELETE FROM telegram_user_chats WHERE chat_id = ?")
         .bind(chat_id)
         .execute(pool)
@@ -534,6 +596,9 @@ pub(crate) async fn user_chat(
 
 pub(crate) async fn unlink_user(pool: &SqlitePool, user_id: &str) {
     for sql in [
+        // ilia fork (messages): the host-side messages of that chat first.
+        "DELETE FROM telegram_message_map WHERE side = 'host'
+            AND chat_id IN (SELECT chat_id FROM telegram_user_chats WHERE user_id = ?)",
         "DELETE FROM telegram_user_chats WHERE user_id = ?",
         "DELETE FROM telegram_user_link_tokens WHERE user_id = ?",
     ] {
@@ -760,6 +825,93 @@ pub(crate) async fn rebook_path(pool: &SqlitePool, et_id: &str) -> Option<String
     }
 }
 
+// --- Messages (ilia fork; `telegram::relay`, `web::messages`) ---
+
+/// Remember that bot message `message_id` in `chat_id` is about
+/// `booking_id`, on `side` ("guest" or "host").
+pub(crate) async fn map_message(
+    pool: &SqlitePool,
+    chat_id: i64,
+    message_id: i64,
+    booking_id: &str,
+    side: &str,
+) {
+    if let Err(e) = sqlx::query(
+        "INSERT OR REPLACE INTO telegram_message_map (chat_id, message_id, booking_id, side, created_at)
+         VALUES (?, ?, ?, ?, ?)",
+    )
+    .bind(chat_id)
+    .bind(message_id)
+    .bind(booking_id)
+    .bind(side)
+    .bind(sql_time(Utc::now()))
+    .execute(pool)
+    .await
+    {
+        tracing::warn!(target: "calrs::telegram", error = %e, booking_id, "could not map a telegram message");
+    }
+}
+
+/// The booking and side a bot message in this chat was about.
+pub(crate) async fn mapped_message(
+    pool: &SqlitePool,
+    chat_id: i64,
+    message_id: i64,
+) -> Option<(String, String)> {
+    sqlx::query_as(
+        "SELECT booking_id, side FROM telegram_message_map WHERE chat_id = ? AND message_id = ?",
+    )
+    .bind(chat_id)
+    .bind(message_id)
+    .fetch_optional(pool)
+    .await
+    .unwrap_or_else(log_err("read a mapped message"))
+}
+
+/// The bookings this chat is linked to as their guest that still take
+/// messages: pending or confirmed, and not ended a day ago or more (the
+/// link expires with the meeting's end).
+pub(crate) async fn guest_bookings_of_chat(pool: &SqlitePool, chat_id: i64) -> Vec<String> {
+    sqlx::query_scalar(
+        "SELECT g.booking_id FROM telegram_guest_links g JOIN bookings b ON b.id = g.booking_id
+          WHERE g.chat_id = ? AND b.status IN ('pending', 'confirmed')
+            AND g.link_expires_at > ?
+          ORDER BY g.link_expires_at",
+    )
+    .bind(chat_id)
+    .bind(sql_time(Utc::now() - chrono::Duration::days(1)))
+    .fetch_all(pool)
+    .await
+    .unwrap_or_else(|e| {
+        tracing::warn!(target: "calrs::telegram", error = %e, "could not read a chat's bookings");
+        Vec::new()
+    })
+}
+
+/// The enabled user whose host chat this is.
+pub(crate) async fn host_user_of_chat(pool: &SqlitePool, chat_id: i64) -> Option<String> {
+    sqlx::query_scalar(
+        "SELECT c.user_id FROM telegram_user_chats c JOIN users u ON u.id = c.user_id
+          WHERE c.chat_id = ? AND u.enabled = 1",
+    )
+    .bind(chat_id)
+    .fetch_optional(pool)
+    .await
+    .unwrap_or_else(log_err("read a host chat"))
+}
+
+/// Whether Telegram took a thread message (`booking_messages.telegram_status`).
+pub(crate) async fn set_message_telegram_status(pool: &SqlitePool, id: &str, status: &str) {
+    if let Err(e) = sqlx::query("UPDATE booking_messages SET telegram_status = ? WHERE id = ?")
+        .bind(status)
+        .bind(id)
+        .execute(pool)
+        .await
+    {
+        tracing::warn!(target: "calrs::telegram", error = %e, "could not store a message status");
+    }
+}
+
 // --- Retention ---
 
 /// Drop what is no longer needed: guest links a week after the meeting, or a
@@ -796,6 +948,23 @@ pub(crate) async fn purge(pool: &SqlitePool, now: DateTime<Utc>) {
     .execute(pool)
     .await
     .map(|r| r.rows_affected());
+    // ilia fork (messages): a reply can pick a booking for 30 days; a
+    // guest-side message no longer once its chat is not linked to it.
+    let month_ago = sql_time(now - chrono::Duration::days(30));
+    if let Err(e) = sqlx::query(
+        "DELETE FROM telegram_message_map
+          WHERE created_at < ?1
+             OR (side = 'guest' AND NOT EXISTS (
+                    SELECT 1 FROM telegram_guest_links g
+                     WHERE g.booking_id = telegram_message_map.booking_id
+                       AND g.chat_id = telegram_message_map.chat_id))",
+    )
+    .bind(&month_ago)
+    .execute(pool)
+    .await
+    {
+        tracing::warn!(target: "calrs::telegram", error = %e, "telegram purge failed");
+    }
     let tokens = sqlx::query("DELETE FROM telegram_user_link_tokens WHERE expires_at < ?")
         .bind(&now_s)
         .execute(pool)

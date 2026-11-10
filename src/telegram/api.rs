@@ -56,6 +56,24 @@ pub(crate) struct Message {
     pub(crate) date: i64,
     #[serde(default)]
     pub(crate) text: Option<String>,
+    /// The message this one replies to (ilia fork: a reply to a bot
+    /// message picks the booking it was about, `telegram::relay`). Only its
+    /// id is read.
+    #[serde(default)]
+    pub(crate) reply_to_message: Option<ReplyRef>,
+}
+
+/// The replied-to message of a [`Message`]: its id only.
+#[derive(Debug, Clone, Deserialize)]
+pub(crate) struct ReplyRef {
+    pub(crate) message_id: i64,
+}
+
+/// What `sendMessage` answers: the sent message, of which only the id is
+/// read (it maps a reply back to its booking).
+#[derive(Debug, Deserialize)]
+struct SentMessage {
+    message_id: i64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -259,7 +277,8 @@ pub(crate) trait BotApi: Send + Sync {
     /// Raw updates: each is parsed on its own, so one odd update cannot stop
     /// the offset from advancing past the batch.
     async fn get_updates(&self, offset: i64) -> Result<Vec<serde_json::Value>, TgError>;
-    async fn send_message(&self, chat_id: i64, msg: &Outgoing) -> Result<(), TgError>;
+    /// Send `msg`; the id Telegram gave the sent message.
+    async fn send_message(&self, chat_id: i64, msg: &Outgoing) -> Result<i64, TgError>;
     /// `setMyCommands` for one language (`None`: the default list).
     async fn set_my_commands(
         &self,
@@ -358,13 +377,13 @@ impl BotApi for HttpApi {
         .await
     }
 
-    async fn send_message(&self, chat_id: i64, msg: &Outgoing) -> Result<(), TgError> {
+    async fn send_message(&self, chat_id: i64, msg: &Outgoing) -> Result<i64, TgError> {
         let body = serde_json::to_value(SendMessage::new(chat_id, msg))
             .map_err(|e| TgError::Other(e.to_string()))?;
-        let _: serde_json::Value = self
+        let sent: SentMessage = self
             .call("sendMessage", &body, Duration::from_secs(15))
             .await?;
-        Ok(())
+        Ok(sent.message_id)
     }
 
     async fn set_my_commands(

@@ -738,7 +738,7 @@ async fn upsert_calendar_provider(
 /// Provider-trait equivalent of [`upsert_raw_events`]. Splits the iCal blob
 /// into VEVENTs and upserts into the `events` table (same composite key:
 /// calendar_id + uid + recurrence_id).
-async fn upsert_provider_events(
+pub(crate) async fn upsert_provider_events(
     pool: &SqlitePool,
     cal_id: &str,
     raw_events: &[ProviderRawEvent],
@@ -747,15 +747,16 @@ async fn upsert_provider_events(
     for raw in raw_events {
         let vevent_blocks = split_vevents(&raw.ical);
         let mut zones = crate::tzid::ResourceZones::new(&raw.ical);
+        let stored_ical = crate::busy_only::StoredIcal::new(&raw.ical);
         for vevent in &vevent_blocks {
             // Unfolded once for the field reads below (#267).
             let fields = crate::utils::unfold_ical(vevent);
             let uid =
                 extract_vevent_field(&fields, "UID").unwrap_or_else(|| Uuid::new_v4().to_string());
-            let summary = extract_vevent_field(&fields, "SUMMARY");
+            let summary = crate::busy_only::keep(extract_vevent_field(&fields, "SUMMARY"));
             let start_at = extract_vevent_field(&fields, "DTSTART").unwrap_or_default();
-            let location = extract_vevent_field(&fields, "LOCATION");
-            let description = extract_vevent_field(&fields, "DESCRIPTION");
+            let location = crate::busy_only::keep(extract_vevent_field(&fields, "LOCATION"));
+            let description = crate::busy_only::keep(extract_vevent_field(&fields, "DESCRIPTION"));
             let status = extract_vevent_field(&fields, "STATUS");
             let rrule = extract_vevent_field(&fields, "RRULE");
             let recurrence_id = extract_vevent_field(&fields, "RECURRENCE-ID");
@@ -795,7 +796,7 @@ async fn upsert_provider_events(
             .bind(&description)
             .bind(&status)
             .bind(&rrule)
-            .bind(&raw.ical)
+            .bind(stored_ical.for_row(rrule.as_deref()))
             .bind(&recurrence_id)
             .bind(&timezone)
             .bind(&transp)
@@ -927,20 +928,25 @@ async fn upsert_calendar(
 }
 
 /// Upsert events from raw CalDAV data. Returns count of events processed.
-async fn upsert_raw_events(pool: &SqlitePool, cal_id: &str, raw_events: &[RawEvent]) -> u32 {
+pub(crate) async fn upsert_raw_events(
+    pool: &SqlitePool,
+    cal_id: &str,
+    raw_events: &[RawEvent],
+) -> u32 {
     let mut count = 0u32;
     for raw in raw_events {
         let vevent_blocks = split_vevents(&raw.ical_data);
         let mut zones = crate::tzid::ResourceZones::new(&raw.ical_data);
+        let stored_ical = crate::busy_only::StoredIcal::new(&raw.ical_data);
         for vevent in &vevent_blocks {
             // Unfolded once for the field reads below (#267).
             let fields = crate::utils::unfold_ical(vevent);
             let uid =
                 extract_vevent_field(&fields, "UID").unwrap_or_else(|| Uuid::new_v4().to_string());
-            let summary = extract_vevent_field(&fields, "SUMMARY");
+            let summary = crate::busy_only::keep(extract_vevent_field(&fields, "SUMMARY"));
             let start_at = extract_vevent_field(&fields, "DTSTART").unwrap_or_default();
-            let location = extract_vevent_field(&fields, "LOCATION");
-            let description = extract_vevent_field(&fields, "DESCRIPTION");
+            let location = crate::busy_only::keep(extract_vevent_field(&fields, "LOCATION"));
+            let description = crate::busy_only::keep(extract_vevent_field(&fields, "DESCRIPTION"));
             let status = extract_vevent_field(&fields, "STATUS");
             let rrule = extract_vevent_field(&fields, "RRULE");
             let recurrence_id = extract_vevent_field(&fields, "RECURRENCE-ID");
@@ -980,7 +986,7 @@ async fn upsert_raw_events(pool: &SqlitePool, cal_id: &str, raw_events: &[RawEve
             .bind(&description)
             .bind(&status)
             .bind(&rrule)
-            .bind(&raw.ical_data)
+            .bind(stored_ical.for_row(rrule.as_deref()))
             .bind(&recurrence_id)
             .bind(&timezone)
             .bind(&transp)

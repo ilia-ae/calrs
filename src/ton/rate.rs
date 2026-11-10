@@ -81,9 +81,15 @@ pub struct AcceptedRate {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RateRefusal {
     NoQuote,
-    Divergent { a: u64, b: u64 },
+    Divergent {
+        a: u64,
+        b: u64,
+    },
     SingleUnconfirmed,
     OutOfCorridor(u64),
+    /// No corridor is configured: USD prices are not bookable, and no rate
+    /// is fetched.
+    NoCorridor,
 }
 
 impl std::fmt::Display for RateRefusal {
@@ -99,6 +105,9 @@ impl std::fmt::Display for RateRefusal {
             Self::SingleUnconfirmed => f.write_str(
                 "only one source answered and there is no recent two-source rate near it",
             ),
+            Self::NoCorridor => {
+                f.write_str("USD prices need CALRS_TON_RATE_MIN_USD and CALRS_TON_RATE_MAX_USD")
+            }
             Self::OutOfCorridor(r) => {
                 write!(
                     f,

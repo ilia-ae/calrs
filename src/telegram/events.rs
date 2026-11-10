@@ -65,6 +65,17 @@ pub(crate) enum TelegramEvent {
     /// The guest hears about the two that keep a paid booking unconfirmed
     /// (`host_busy`, `confirm_failed`).
     PaymentProblem { problem: String },
+    /// TON (ilia fork): the payment window ended unpaid while the meeting
+    /// is far away, so it was renewed (the `renewal`th time). Guest: what is
+    /// still due and the new deadline. Hosts: nothing.
+    PaymentRenewed { renewal: u8 },
+    /// ilia fork (messages): a host wrote to the guest (`booking_messages`
+    /// row `id`). Guest: the text. `text` is host-written, already cleaned.
+    HostMessage { id: String, text: String },
+    /// ilia fork (messages): the guest wrote in their linked chat (row
+    /// `id`). Hosts: the text, cleaned and defanged when composed, with a
+    /// "reply to answer" line. `text` is guest-written: never logged.
+    GuestMessage { id: String, text: String },
 }
 
 /// Why the expiry sweep released a priced booking.
@@ -92,6 +103,7 @@ impl TelegramEvent {
                 | PaymentExtra { .. }
                 | PaymentExpired { .. }
                 | PaymentProblem { .. }
+                | PaymentRenewed { .. }
         )
     }
 
@@ -127,6 +139,9 @@ impl TelegramEvent {
             PaymentExtra { .. } => (false, true),
             PaymentExpired { .. } => (true, false),
             PaymentProblem { problem } => (Self::problem_for_guest(problem), true),
+            PaymentRenewed { .. } => (true, false),
+            HostMessage { .. } => (true, false),
+            GuestMessage { .. } => (false, true),
         };
         Audience { guest, hosts }
     }
@@ -166,6 +181,9 @@ impl TelegramEvent {
                 ..
             } => "payment_released_refund",
             PaymentProblem { .. } => "payment_problem",
+            PaymentRenewed { .. } => "payment_renewed",
+            HostMessage { .. } => "host_message",
+            GuestMessage { .. } => "guest_message",
         }
     }
 
@@ -199,6 +217,21 @@ impl TelegramEvent {
         ]
     }
 
+    /// The two message events, for tests.
+    #[cfg(test)]
+    pub(crate) fn message_samples() -> Vec<TelegramEvent> {
+        vec![
+            TelegramEvent::HostMessage {
+                id: "m1".into(),
+                text: "See you on Monday.\nBring the slides.".into(),
+            },
+            TelegramEvent::GuestMessage {
+                id: "m2".into(),
+                text: "Can we talk about pricing?".into(),
+            },
+        ]
+    }
+
     /// Every kind of payment event, one value each (each problem), for tests.
     #[cfg(test)]
     pub(crate) fn payment_samples() -> Vec<TelegramEvent> {
@@ -206,6 +239,7 @@ impl TelegramEvent {
         let mut all = vec![
             PaymentDue,
             PaymentPartial,
+            PaymentRenewed { renewal: 1 },
             PaymentReceived,
             PaymentLate {
                 value: "1.5".into(),

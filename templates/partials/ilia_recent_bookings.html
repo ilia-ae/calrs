@@ -1,0 +1,19 @@
+{# ilia fork: meetings that started but still take messages, for a week
+   after their end (src/web/messages.rs, recent_bookings). #}
+{% if ilia_recent %}
+<div class="card" style="margin-top: 1rem;">
+  <h2 style="margin-bottom: 0.25rem;">{{ t("msg-recent-title") }}</h2>
+  <p style="color: var(--text-muted); font-size: 0.85rem; margin: 0 0 0.75rem;">{{ t("msg-recent-help") }}</p>
+  {% for b in ilia_recent %}
+  <div class="booking-row" {% if not loop.last %}style="border-bottom: 1px solid var(--border);"{% endif %}>
+    <div class="booking-info">
+      <div>{{ t("bookings-with", title='<strong>' ~ (b.event_title | escape) ~ '</strong>', guest=b.guest_name | escape) | safe }}</div>
+      <div style="color: var(--text-muted); font-size: 0.85rem;">{{ b.start_at }} &middot; {{ b.guest_email }}</div>
+    </div>
+    <div class="booking-actions">
+      {% include "partials/ilia_messages_link.html" %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}

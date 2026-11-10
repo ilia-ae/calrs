@@ -12,6 +12,8 @@ mod booking;
 mod booking_actions;
 mod booking_time;
 mod branding;
+// ilia fork: busy-only calendar storage.
+mod busy_only;
 mod calendar_week_start;
 mod dashboard;
 mod directory;
@@ -24,6 +26,8 @@ mod guards;
 mod hosts;
 mod ilia;
 mod invites;
+// ilia fork: host <-> guest messages.
+mod messages;
 mod organizer;
 mod page_language;
 mod pending_hold;

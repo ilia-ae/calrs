@@ -37,6 +37,8 @@ pub(crate) struct PayRow {
     pub(crate) address_raw: String,
     pub(crate) event_title: String,
     pub(crate) start_at_utc: String,
+    /// `TON`: the amount is the price, the rate columns are neutral.
+    pub(crate) currency: String,
     pub(crate) price_usd_cents: i64,
     pub(crate) rate_usd_micro: i64,
     pub(crate) rate_sources: String,
@@ -57,6 +59,8 @@ pub(crate) struct PayRow {
     pub(crate) time_version: Option<i64>,
     pub(crate) cancel_token: Option<String>,
     pub(crate) booking_uid: Option<String>,
+    pub(crate) renewals: i64,
+    pub(crate) renewals_max: i64,
 }
 
 pub(crate) async fn load(pool: &SqlitePool, pay_token: &str) -> Option<PayRow> {
@@ -70,12 +74,13 @@ pub(crate) async fn load(pool: &SqlitePool, pay_token: &str) -> Option<PayRow> {
     }
     sqlx::query_as::<_, PayRow>(
         "SELECT i.id, i.booking_id, i.network, i.address_raw, i.event_title, i.start_at_utc,
-                i.price_usd_cents, i.rate_usd_micro, i.rate_sources, i.rate_at, i.amount_nano,
+                i.currency, i.price_usd_cents, i.rate_usd_micro, i.rate_sources, i.rate_at, i.amount_nano,
                 i.paid_nano, i.status, i.problem, i.expires_at, i.settle_by, i.reference,
                 i.link_emailed_at, i.event_type_id,
                 b.status AS booking_status, b.start_at AS booking_start,
                 b.guest_timezone AS booking_tz, b.language AS booking_lang,
-                b.time_version, b.cancel_token, b.uid AS booking_uid
+                b.time_version, b.cancel_token, b.uid AS booking_uid,
+                i.renewals, i.renewals_max
          FROM ton_invoices i LEFT JOIN bookings b ON b.id = i.booking_id
          WHERE i.pay_token = ?",
     )
@@ -353,6 +358,7 @@ pub(crate) async fn pay_page(
         None => (String::new(), String::new(), String::new()),
     };
     let rate_at = parse_stamp(&row.rate_at).unwrap_or(now);
+    let usd = row.currency == "USD";
     let rebook_url = if matches!(
         pay_state,
         PayState::Expired
@@ -400,10 +406,11 @@ pub(crate) async fn pay_page(
             amount_ton => format_ton(rest),
             total_ton => format_ton(from_i64(row.amount_nano)),
             paid_ton => format_ton(from_i64(row.paid_nano)),
-            usd => format_usd_cents(remaining_usd_cents(&row)),
-            rate => super::alerts::rate_display(row.rate_usd_micro),
-            rate_sources => source_names(&row.rate_sources),
-            rate_time => rate_at.format("%H:%M").to_string(),
+            // A TON price shows no dollars and no rate.
+            usd => usd.then(|| format_usd_cents(remaining_usd_cents(&row))),
+            rate => usd.then(|| super::alerts::rate_display(row.rate_usd_micro)),
+            rate_sources => usd.then(|| source_names(&row.rate_sources)),
+            rate_time => usd.then(|| rate_at.format("%H:%M").to_string()),
             address => address.clone().unwrap_or_default(),
             comment => code,
             ton_link => ton_link,
@@ -423,6 +430,9 @@ pub(crate) async fn pay_page(
             checked => query.checked.is_some(),
             rebook_url => rebook_url,
             telegram_link => telegram_link,
+            renewals => row.renewals,
+            renewals_max => row.renewals_max,
+            expires_at => row.expires_at,
         })
         .unwrap_or_else(|e| internal_error_body("template render", &e));
     private(Html(rendered).into_response())
@@ -459,6 +469,7 @@ pub(crate) async fn pay_status(
             "expires_at": row.expires_at,
             "settle_by": row.settle_by,
             "seconds_left": (expires - now).num_seconds().max(0),
+            "renewals": row.renewals,
         }))
         .into_response(),
     )
@@ -595,6 +606,57 @@ async fn email_links(
         crate::web::log_email_result(result, "guest_ton_pay_link", &booking_id);
     });
     true
+}
+
+/// ilia fork: the guest's "pay again by …" email after a renewal, to the
+/// address the booking was made with, with the new deadline, the payment
+/// page, the Telegram link and the cancel link. Only to a proven address:
+/// the guest asked for the link by email or paid any of it (anyone can type
+/// someone else's address into the form; such a guest hears of the renewal
+/// in their linked Telegram chat only). Nothing without a base URL (the
+/// links need one) or for an invoice no longer open.
+pub(crate) async fn email_renewal(
+    pool: &SqlitePool,
+    secret_key: &[u8; 32],
+    smtp: &crate::email::SmtpConfig,
+    invoice_id: &str,
+) -> anyhow::Result<()> {
+    let Some(base) = crate::settings::base_url() else {
+        tracing::warn!(target: TARGET, invoice = invoice_id, "renewal not emailed: CALRS_BASE_URL is not set");
+        return Ok(());
+    };
+    let row: Option<(String, String, String, Option<String>, Option<String>)> = sqlx::query_as(
+        "SELECT i.booking_id, i.pay_token, i.expires_at, b.cancel_token, b.guest_timezone
+         FROM ton_invoices i JOIN bookings b ON b.id = i.booking_id
+         WHERE i.id = ? AND i.status = 'open' AND b.status = 'pending'
+           AND (i.link_emailed_at IS NOT NULL OR i.paid_nano > 0)",
+    )
+    .bind(invoice_id)
+    .fetch_optional(pool)
+    .await?;
+    let Some((booking_id, pay_token, expires_at, cancel_token, tz)) = row else {
+        return Ok(());
+    };
+    let Some((mut mail, _)) = guest_mail(pool, &booking_id).await else {
+        return Ok(());
+    };
+    if let Some(expires) = parse_stamp(&expires_at) {
+        let (date, time) = date_and_time(&mail.lang, expires, tz.as_deref().unwrap_or("UTC"));
+        mail.pay_by = format!("{date}, {time}");
+    }
+    let base = base.trim_end_matches('/');
+    let pay_url = format!("{base}/booking/pay/{pay_token}");
+    let cancel_url = cancel_token.map(|t| format!("{base}/booking/cancel/{t}"));
+    let telegram_link = super::telegram::pay_link(pool, secret_key, &booking_id, &pay_token).await;
+    tracing::info!(target: TARGET, booking_id = %booking_id, "payment renewal emailed to the guest");
+    crate::email::send_guest_ton_renewed(
+        smtp,
+        &mail,
+        &pay_url,
+        cancel_url.as_deref(),
+        telegram_link.as_deref(),
+    )
+    .await
 }
 
 /// `POST …/email`: send the guest this page's link, once per invoice, to
@@ -742,6 +804,7 @@ mod tests {
                 .into(),
             event_title: "Call".into(),
             start_at_utc: "2030-01-01T10:00:00Z".into(),
+            currency: "USD".into(),
             price_usd_cents: 4000,
             rate_usd_micro: 2_000_000,
             rate_sources: "coingecko=2.000000;binance=2.000000".into(),
@@ -762,6 +825,8 @@ mod tests {
             time_version: Some(1),
             cancel_token: None,
             booking_uid: None,
+            renewals: 0,
+            renewals_max: 0,
         }
     }
 

@@ -93,6 +93,10 @@ pub(crate) struct Limits {
     pub(crate) help: Window<i64>,
     /// Bot replies across all chats: 60 a minute ([`Runtime::enqueue_reply`]).
     pub(crate) replies: Window<()>,
+    /// ilia fork (messages): guest texts per chat, 5 per 10 minutes.
+    pub(crate) guest_texts: Window<i64>,
+    /// Guest texts relayed to hosts across all chats: 100 an hour.
+    pub(crate) relays: Window<()>,
     global_warned: Mutex<Option<Instant>>,
 }
 
@@ -104,6 +108,8 @@ impl Default for Limits {
             global_failures: Window::new(60, Duration::from_secs(3600)),
             help: Window::new(1, Duration::from_secs(10 * 60)),
             replies: Window::new(60, Duration::from_secs(60)),
+            guest_texts: Window::new(5, Duration::from_secs(10 * 60)),
+            relays: Window::new(100, Duration::from_secs(3600)),
             global_warned: Mutex::new(None),
         }
     }
@@ -170,7 +176,13 @@ fn parse_command<'a>(text: &'a str, bot: Option<&str>) -> Option<(&'a str, &'a s
 
 /// A reply to whoever wrote: one attempt, behind the outbox reserve and the
 /// global reply budget.
-fn reply(rt: &Runtime, pool: &SqlitePool, chat_id: i64, msg: Outgoing, what: &'static str) {
+pub(crate) fn reply(
+    rt: &Runtime,
+    pool: &SqlitePool,
+    chat_id: i64,
+    msg: Outgoing,
+    what: &'static str,
+) {
     rt.enqueue_reply(Job::Reply {
         pool: pool.clone(),
         chat_id,
@@ -181,7 +193,13 @@ fn reply(rt: &Runtime, pool: &SqlitePool, chat_id: i64, msg: Outgoing, what: &'s
 }
 
 /// A reply that says nothing new: at most once per chat per 10 minutes.
-fn quiet_reply(rt: &Runtime, pool: &SqlitePool, chat_id: i64, msg: Outgoing, what: &'static str) {
+pub(crate) fn quiet_reply(
+    rt: &Runtime,
+    pool: &SqlitePool,
+    chat_id: i64,
+    msg: Outgoing,
+    what: &'static str,
+) {
     if rt.limits.help.hit(&chat_id) <= rt.limits.help.max() {
         reply(rt, pool, chat_id, msg, what);
     }
@@ -204,6 +222,7 @@ pub(crate) async fn handle_update(rt: &Runtime, pool: &SqlitePool, raw: &serde_j
     let Some(text) = message.text else {
         return;
     };
+    let reply_to = message.reply_to_message.map(|r| r.message_id);
     let text: String = text.trim().chars().take(MAX_TEXT).collect();
     let chat_id = message.chat.id;
     let lang = client_lang(from.language_code.as_deref());
@@ -217,8 +236,12 @@ pub(crate) async fn handle_update(rt: &Runtime, pool: &SqlitePool, raw: &serde_j
     }
     let bot = rt.bot_username();
     let Some((command, payload)) = parse_command(&text, bot.as_deref()) else {
-        // A command for another bot, or free text: the help, now and then.
+        // A command for another bot, or free text: a message about a
+        // booking (ilia fork, `relay`), else the help, now and then.
         if !text.starts_with('/') {
+            if super::relay::handle_text(rt, pool, chat_id, reply_to, &text, lang).await {
+                return;
+            }
             let help = message::bot_reply(Reply::Help, lang, &site_name());
             quiet_reply(rt, pool, chat_id, help, "help");
         }

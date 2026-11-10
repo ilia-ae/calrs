@@ -32,47 +32,85 @@ fn blank(v: Option<&str>) -> bool {
     v.is_none_or(|s| s.trim().is_empty())
 }
 
+/// The price section of the event type form as posted. `amount = None`
+/// means the form did not carry the section.
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct PriceForm<'a> {
+    pub(crate) enabled: Option<&'a str>,
+    pub(crate) amount: Option<&'a str>,
+    /// `TON` (the default when absent) or `USD`.
+    pub(crate) currency: Option<&'a str>,
+    pub(crate) window_min: Option<&'a str>,
+    /// The guest Telegram mode chosen in the section (only shown while
+    /// Telegram is on).
+    pub(crate) guest_telegram: Option<&'a str>,
+}
+
+/// `TON` unless the form says `USD`; `None` for anything else.
+fn currency_of(v: Option<&str>) -> Option<&'static str> {
+    match v.map(str::trim) {
+        None | Some("") | Some("TON") => Some("TON"),
+        Some("USD") => Some("USD"),
+        _ => None,
+    }
+}
+
+/// The posted amount as a price in the posted currency. A blank TON price
+/// is the default, 100 TON.
+fn parse_price(currency: &str, amount: &str) -> Option<store::Price> {
+    match currency {
+        "TON" if amount.trim().is_empty() => {
+            amount::parse_ton_price(amount::DEFAULT_PRICE_TON).map(store::Price::Ton)
+        }
+        "TON" => amount::parse_ton_price(amount).map(store::Price::Ton),
+        _ => amount::parse_usd_cents(amount)
+            .filter(|c| (MIN_CENTS..=MAX_CENTS).contains(c))
+            .map(store::Price::Usd),
+    }
+}
+
 /// Server-side check of the form's price section. `Err` is the Fluent key
 /// of the first problem. Team types cannot be priced (v1).
 pub(crate) fn validate_price_form(
-    enabled: Option<&str>,
-    usd: Option<&str>,
-    window_min: Option<&str>,
+    form: &PriceForm<'_>,
     team_id: Option<&str>,
 ) -> Result<(), &'static str> {
-    let on = checked(enabled);
+    let on = checked(form.enabled);
     if on && !blank(team_id) {
         return Err("ton-form-error-team");
     }
-    if on || !blank(usd) {
-        match usd.and_then(amount::parse_usd_cents) {
-            Some(c) if (MIN_CENTS..=MAX_CENTS).contains(&c) => {}
-            _ => return Err("ton-form-error-price"),
-        }
+    let currency = currency_of(form.currency).ok_or("ton-form-error-currency")?;
+    if (on || !blank(form.amount)) && parse_price(currency, form.amount.unwrap_or("")).is_none() {
+        return Err(if currency == "TON" {
+            "ton-form-error-price-ton"
+        } else {
+            "ton-form-error-price"
+        });
     }
-    if !blank(window_min) {
-        match window_min.and_then(|w| w.trim().parse::<i64>().ok()) {
+    if !blank(form.window_min) {
+        match form.window_min.and_then(|w| w.trim().parse::<i64>().ok()) {
             Some(w) if (10..=240).contains(&w) => {}
             _ => return Err("ton-form-error-window"),
         }
     }
+    if !blank(form.guest_telegram)
+        && !crate::telegram::username::mode::ALL.contains(&form.guest_telegram.unwrap_or("").trim())
+    {
+        return Err("ton-form-error-telegram");
+    }
     Ok(())
 }
 
-/// Store the form's price section (already validated). `usd = None` means
-/// the form did not carry the section: nothing changes. Unchecked with a
-/// price keeps it, switched off; unchecked and blank removes it. Only a
-/// personal type is ever priced. Open invoices are not touched: they run
+/// Store the form's price section (already validated). `amount = None`
+/// means the form did not carry the section: nothing changes. Unchecked
+/// with a price keeps it, switched off; unchecked and blank removes it.
+/// Only a personal type is ever priced. A new price makes the type ask for
+/// the guest's Telegram (`required`), and the section's own Telegram choice,
+/// when shown, is saved with it. Open invoices are not touched: they run
 /// to their end whatever the price does now. A saved price wakes the
 /// watcher, so a type priced after a quiet day is bookable at once.
-pub(crate) async fn save_price_form(
-    state: &AppState,
-    event_type_id: &str,
-    enabled: Option<&str>,
-    usd: Option<&str>,
-    window_min: Option<&str>,
-) {
-    let Some(usd) = usd else {
+pub(crate) async fn save_price_form(state: &AppState, event_type_id: &str, form: &PriceForm<'_>) {
+    let Some(raw) = form.amount else {
         return;
     };
     let pool = &state.pool;
@@ -84,49 +122,78 @@ pub(crate) async fn save_price_form(
             .ok()
             .flatten()
             .is_some_and(|v| v != 0);
-    let on = checked(enabled);
-    let cents = amount::parse_usd_cents(usd).filter(|c| (MIN_CENTS..=MAX_CENTS).contains(c));
-    let window = window_min
+    let on = checked(form.enabled);
+    // Unchecked and blank means no price, whatever the default.
+    let price = currency_of(form.currency)
+        .filter(|_| on || !raw.trim().is_empty())
+        .and_then(|c| parse_price(c, raw));
+    let window = form
+        .window_min
         .and_then(|w| w.trim().parse::<i64>().ok())
         .filter(|w| (10..=240).contains(w));
-    let result = match cents {
-        Some(cents) if personal => {
-            sqlx::query(
-                "INSERT INTO ton_prices (event_type_id, price_usd_cents, window_min, enabled, updated_at)
-                 VALUES (?, ?, ?, ?, ?)
-                 ON CONFLICT (event_type_id) DO UPDATE SET price_usd_cents = excluded.price_usd_cents,
-                     window_min = excluded.window_min, enabled = excluded.enabled,
-                     updated_at = excluded.updated_at",
-            )
-            .bind(event_type_id)
-            .bind(i64::try_from(cents).unwrap_or(i64::MAX))
-            .bind(window)
-            .bind(i64::from(on))
-            .bind(super::stamp(Utc::now()))
-            .execute(pool)
+    let result = match price {
+        Some(price) if personal => {
+            async {
+                let mut tx = pool.begin().await?;
+                let created =
+                    store::save_price(&mut tx, event_type_id, price, window, on, Utc::now())
+                        .await?;
+                tx.commit().await?;
+                Ok::<bool, sqlx::Error>(created)
+            }
             .await
         }
         Some(_) => {
             tracing::warn!(target: TARGET, event_type_id, "a team event type cannot be priced");
             return;
         }
-        None if !on && usd.trim().is_empty() => {
+        None if !on && raw.trim().is_empty() => {
             sqlx::query("DELETE FROM ton_prices WHERE event_type_id = ?")
                 .bind(event_type_id)
                 .execute(pool)
                 .await
+                .map(|_| false)
         }
         None => return,
     };
     match result {
-        Ok(_) => {
+        Ok(created) => {
             tracing::info!(
                 target: TARGET,
                 event_type_id,
-                cents = cents.unwrap_or(0),
-                enabled = on && cents.is_some(),
+                currency = price.map(|p| p.currency()).unwrap_or(""),
+                created,
+                enabled = on && price.is_some(),
                 "event type price saved"
             );
+            // The section's Telegram select: with the price on; with it
+            // off only when the owner already chose a mode for this type
+            // (lowering it stays possible), so an amount typed into a free
+            // type never makes its guests give a Telegram username.
+            let mode_chosen = || async {
+                sqlx::query_scalar::<_, i64>(
+                    "SELECT EXISTS (SELECT 1 FROM telegram_event_types WHERE event_type_id = ?)",
+                )
+                .bind(event_type_id)
+                .fetch_one(pool)
+                .await
+                .map(|v| v != 0)
+                .unwrap_or(false)
+            };
+            if price.is_some() && (on || mode_chosen().await) {
+                if let Some(mode) = form
+                    .guest_telegram
+                    .map(str::trim)
+                    .filter(|m| crate::telegram::username::mode::ALL.contains(m))
+                {
+                    if let Err(e) =
+                        crate::telegram::store::save_event_type_mode(pool, event_type_id, mode)
+                            .await
+                    {
+                        tracing::error!(target: TARGET, error = %e, event_type_id, "cannot save the guest Telegram mode");
+                    }
+                }
+            }
             super::wake_watcher(state);
         }
         Err(e) => {
@@ -143,8 +210,9 @@ pub(crate) async fn copy_price(
     to: &str,
 ) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "INSERT INTO ton_prices (event_type_id, price_usd_cents, window_min, enabled, updated_at)
-         SELECT ?, p.price_usd_cents, p.window_min, p.enabled, ?
+        "INSERT INTO ton_prices (event_type_id, currency, price_nano, price_usd_cents, window_min,
+             enabled, updated_at)
+         SELECT ?, p.currency, p.price_nano, p.price_usd_cents, p.window_min, p.enabled, ?
          FROM ton_prices p JOIN event_types et ON et.id = ?
          WHERE p.event_type_id = ? AND et.team_id IS NULL",
     )
@@ -157,31 +225,62 @@ pub(crate) async fn copy_price(
     .map(|_| ())
 }
 
-fn price_ctx(state: &AppState, enabled: bool, usd: String, window: String) -> minijinja::Value {
-    let (payments_on, default_window) = match state.ton.get() {
-        Some(rt) => (true, rt.cfg.window_min),
-        None => (false, 30),
+/// What the price section shows.
+struct PriceSection {
+    enabled: bool,
+    amount: String,
+    currency: &'static str,
+    window: String,
+    guest_telegram: &'static str,
+}
+
+fn price_ctx(state: &AppState, section: PriceSection) -> minijinja::Value {
+    let (payments_on, default_window, rates_on) = match state.ton.get() {
+        Some(rt) => (true, rt.cfg.window_min, rt.cfg.rate_policy.is_some()),
+        None => (false, 30, false),
     };
     context! {
-        enabled => enabled,
-        usd => usd,
-        window => window,
+        enabled => section.enabled,
+        amount => section.amount,
+        currency => section.currency,
+        window => section.window,
         default_window => default_window,
         payments_on => payments_on,
+        usd_unbookable => payments_on && !rates_on && section.currency == "USD",
+        placeholder => if section.currency == "USD" { "40.00" } else { amount::DEFAULT_PRICE_TON },
+        telegram_on => crate::telegram::enabled(),
+        guest_telegram => section.guest_telegram,
     }
 }
 
 /// The price section of a personal event type's form; `None` (no section)
-/// for a team type. `event_type_id = None` for a new one.
+/// for a team type. `event_type_id = None` for a new one: switched off, in
+/// TON, the amount blank (100 TON when switched on so).
 pub(crate) async fn price_form_ctx(
     state: &AppState,
     event_type_id: Option<&str>,
 ) -> Option<minijinja::Value> {
-    let Some(et_id) = event_type_id else {
-        return Some(price_ctx(state, false, String::new(), String::new()));
+    let fresh = PriceSection {
+        enabled: false,
+        amount: String::new(),
+        currency: "TON",
+        window: String::new(),
+        guest_telegram: crate::telegram::username::mode::REQUIRED,
     };
-    let row: Option<(Option<i64>, Option<i64>, Option<i64>, i64)> = sqlx::query_as(
-        "SELECT p.price_usd_cents, p.window_min, p.enabled, et.team_id IS NULL
+    let Some(et_id) = event_type_id else {
+        return Some(price_ctx(state, fresh));
+    };
+    #[allow(clippy::type_complexity)]
+    let row: Option<(
+        Option<String>,
+        Option<i64>,
+        Option<i64>,
+        Option<i64>,
+        Option<i64>,
+        i64,
+    )> = sqlx::query_as(
+        "SELECT p.currency, p.price_nano, p.price_usd_cents, p.window_min, p.enabled,
+                et.team_id IS NULL
          FROM event_types et LEFT JOIN ton_prices p ON p.event_type_id = et.id
          WHERE et.id = ?",
     )
@@ -190,57 +289,102 @@ pub(crate) async fn price_form_ctx(
     .await
     .ok()
     .flatten();
-    let (cents, window, enabled, personal) = row?;
+    let (currency, nano, cents, window, enabled, personal) = row?;
     if personal == 0 {
         return None;
     }
+    let price = currency
+        .as_deref()
+        .and_then(|c| store::Price::from_columns(c, nano, cents));
+    let Some(price) = price else {
+        // No price yet: the defaults, with the type's own Telegram mode
+        // if one was chosen.
+        let stored = crate::telegram::store::event_type_mode(&state.pool, et_id).await;
+        let chosen: Option<i64> =
+            sqlx::query_scalar("SELECT 1 FROM telegram_event_types WHERE event_type_id = ?")
+                .bind(et_id)
+                .fetch_optional(&state.pool)
+                .await
+                .ok()
+                .flatten();
+        return Some(price_ctx(
+            state,
+            PriceSection {
+                guest_telegram: if chosen.is_some() {
+                    stored
+                } else {
+                    fresh.guest_telegram
+                },
+                ..fresh
+            },
+        ));
+    };
     Some(price_ctx(
         state,
-        enabled == Some(1),
-        cents
-            .map(|c| format_usd_cents(from_i64(c)))
-            .unwrap_or_default(),
-        window.map(|w| w.to_string()).unwrap_or_default(),
+        PriceSection {
+            enabled: enabled == Some(1),
+            amount: price.amount(),
+            currency: price.currency(),
+            window: window.map(|w| w.to_string()).unwrap_or_default(),
+            guest_telegram: crate::telegram::store::event_type_mode(&state.pool, et_id).await,
+        },
     ))
 }
 
 /// The section echoed back after a validation error, as posted.
 pub(crate) fn price_form_from_post(
     state: &AppState,
-    enabled: Option<&str>,
-    usd: Option<&str>,
-    window_min: Option<&str>,
+    form: &PriceForm<'_>,
     personal: bool,
 ) -> Option<minijinja::Value> {
     personal.then(|| {
         price_ctx(
             state,
-            checked(enabled),
-            usd.unwrap_or("").trim().to_string(),
-            window_min.unwrap_or("").trim().to_string(),
+            PriceSection {
+                enabled: checked(form.enabled),
+                amount: form.amount.unwrap_or("").trim().to_string(),
+                currency: currency_of(form.currency).unwrap_or("TON"),
+                window: form.window_min.unwrap_or("").trim().to_string(),
+                guest_telegram: crate::telegram::username::mode::parse(
+                    form.guest_telegram
+                        .unwrap_or(crate::telegram::username::mode::REQUIRED),
+                ),
+            },
         )
     })
 }
 
-/// The price line of a public slot or form page: the USD price and, when
-/// a rate is cached, the approximate amount in TON (the exact one is fixed
-/// when the guest books). Never fetches on a page view.
+/// The price line of a public slot or form page. A TON price is shown as
+/// it is (the exact amount); a USD price with, when a rate is cached, the
+/// approximate amount in TON (the exact one is fixed when the guest
+/// books). Never fetches on a page view.
 pub(crate) async fn price_badge(state: &AppState, event_type_id: &str) -> Option<minijinja::Value> {
-    let price = store::price_for(&state.pool, event_type_id).await.ok()??;
-    if price.is_team != 0 {
+    let row = store::price_for(&state.pool, event_type_id).await.ok()??;
+    if row.is_team != 0 {
         return None;
     }
-    let cents = u64::try_from(price.price_usd_cents).ok()?;
-    let ton = state
-        .ton
-        .get()
-        .and_then(|rt| rt.cached_rate())
-        .and_then(|rate| amount::cents_to_nano(cents, rate.usd_micro))
-        .map(format_ton);
-    Some(context! {
-        usd => format_usd_cents(u128::from(cents)),
-        ton => ton,
-    })
+    // A guest is looking at a priced slot or form: an idle watcher steps
+    // now, so the booking finds its heartbeat fresh (ilia fork, Optimize).
+    if let Some(rt) = state.ton.get() {
+        rt.wake_if_idle(Utc::now());
+    }
+    match row.price()? {
+        store::Price::Ton(nano) => Some(context! {
+            ton_exact => format_ton(nano),
+        }),
+        store::Price::Usd(cents) => {
+            let ton = state
+                .ton
+                .get()
+                .and_then(|rt| rt.cached_rate())
+                .and_then(|rate| amount::cents_to_nano(cents, rate.usd_micro))
+                .map(format_ton);
+            Some(context! {
+                usd => format_usd_cents(u128::from(cents)),
+                ton => ton,
+            })
+        }
+    }
 }
 
 // --- the bookings dashboard ---------------------------------------------------
@@ -264,9 +408,11 @@ pub(crate) async fn dashboard_badges(
         i64,
         String,
         String,
+        i64,
+        i64,
     )> = sqlx::query_as(
         "SELECT i.booking_id, i.status, i.problem, i.amount_nano, i.paid_nano, i.excess_nano,
-                    i.expires_at, b.status
+                    i.expires_at, b.status, i.renewals, i.renewals_max
              FROM ton_invoices i
              JOIN bookings b ON b.id = i.booking_id
              JOIN event_types et ON et.id = b.event_type_id
@@ -279,8 +425,18 @@ pub(crate) async fn dashboard_badges(
     .unwrap_or_default();
     let tz = timezone.parse::<chrono_tz::Tz>().unwrap_or(chrono_tz::UTC);
     let mut out = std::collections::BTreeMap::new();
-    for (booking_id, status, problem, amount_nano, paid_nano, excess_nano, expires, _booking) in
-        rows
+    for (
+        booking_id,
+        status,
+        problem,
+        amount_nano,
+        paid_nano,
+        excess_nano,
+        expires,
+        _booking,
+        renewals,
+        renewals_max,
+    ) in rows
     {
         let amount = format_ton(from_i64(amount_nano));
         let until = parse_stamp(&expires)
@@ -330,6 +486,18 @@ pub(crate) async fn dashboard_badges(
             ("waived", _) => (tr("ton-dash-badge-waived", &[]), "success"),
             _ => (tr("ton-dash-badge-unpaid", &[]), "error"),
         };
+        // ilia fork: a renewed window says so ("renewal 1 of 2").
+        let label = if status == "open" && renewals > 0 {
+            let mut fa = fluent_bundle::FluentArgs::new();
+            fa.set("n", fluent_bundle::FluentValue::from(renewals));
+            fa.set("max", fluent_bundle::FluentValue::from(renewals_max));
+            format!(
+                "{label} · {}",
+                crate::i18n::translate(lang, "ton-dash-badge-renewed", Some(&fa))
+            )
+        } else {
+            label
+        };
         out.insert(
             booking_id.clone(),
             context! {
@@ -345,14 +513,17 @@ pub(crate) async fn dashboard_badges(
 }
 
 /// The booking, if it is the user's and pending, with its open invoice:
-/// (event title, guest name, amount nano, paid nano, expires_at).
+/// (event title, guest name, amount nano, paid nano, expires_at, renewals,
+/// renewals_max).
+#[allow(clippy::type_complexity)]
 async fn waivable(
     pool: &SqlitePool,
     booking_id: &str,
     user_id: &str,
-) -> Option<(String, String, i64, i64, String)> {
+) -> Option<(String, String, i64, i64, String, i64, i64)> {
     sqlx::query_as(
-        "SELECT et.title, b.guest_name, i.amount_nano, i.paid_nano, i.expires_at
+        "SELECT et.title, b.guest_name, i.amount_nano, i.paid_nano, i.expires_at, i.renewals,
+                i.renewals_max
          FROM bookings b
          JOIN event_types et ON et.id = b.event_type_id
          JOIN accounts a ON a.id = et.account_id
@@ -374,7 +545,7 @@ pub(crate) async fn waive_form(
     auth_user: crate::auth::AuthUser,
     Path(booking_id): Path<String>,
 ) -> Response {
-    let Some((title, guest, amount_nano, paid_nano, expires)) =
+    let Some((title, guest, amount_nano, paid_nano, expires, renewals, renewals_max)) =
         waivable(&state.pool, &booking_id, &auth_user.user.id).await
     else {
         return Redirect::to("/dashboard/bookings?error=waive-failed").into_response();
@@ -402,6 +573,8 @@ pub(crate) async fn waive_form(
             paid => (paid_nano > 0).then(|| format_ton(from_i64(paid_nano))),
             rest => format_ton(from_i64(amount_nano).saturating_sub(from_i64(paid_nano))),
             until => until,
+            renewals => renewals,
+            renewals_max => renewals_max,
         })
         .unwrap_or_else(|e| internal_error_body("template render", &e)),
     )
@@ -455,44 +628,88 @@ pub(in crate::web) async fn waive(
 mod tests {
     use super::*;
 
+    fn form<'a>(
+        enabled: Option<&'a str>,
+        amount: Option<&'a str>,
+        currency: Option<&'a str>,
+        window_min: Option<&'a str>,
+    ) -> PriceForm<'a> {
+        PriceForm {
+            enabled,
+            amount,
+            currency,
+            window_min,
+            guest_telegram: None,
+        }
+    }
+
     #[test]
     fn the_price_section_is_validated_on_the_server() {
-        assert_eq!(validate_price_form(None, None, None, None), Ok(()));
-        assert_eq!(validate_price_form(None, Some(""), Some(""), None), Ok(()));
+        let usd = Some("USD");
+        let v = |f: PriceForm<'_>, team: Option<&str>| validate_price_form(&f, team);
+        assert_eq!(v(form(None, None, None, None), None), Ok(()));
+        assert_eq!(v(form(None, Some(""), None, Some("")), None), Ok(()));
+        assert_eq!(v(form(Some("on"), Some("40"), usd, None), None), Ok(()));
         assert_eq!(
-            validate_price_form(Some("on"), Some("40"), None, None),
-            Ok(())
-        );
-        assert_eq!(
-            validate_price_form(Some("on"), Some("40.50"), Some("15"), Some("")),
+            v(form(Some("on"), Some("40.50"), usd, Some("15")), Some("")),
             Ok(())
         );
         for bad in ["", "0.99", "10000.01", "abc", "40.505", "-5", "1e3"] {
             assert_eq!(
-                validate_price_form(Some("on"), Some(bad), None, None),
+                v(form(Some("on"), Some(bad), usd, None), None),
                 Err("ton-form-error-price"),
                 "{bad:?}"
             );
         }
+        // TON, the default currency: 1 to 100000 TON in 0.01 steps.
+        for ok in ["100", "1", "12.5", "100000", "99.99"] {
+            assert_eq!(
+                v(form(Some("on"), Some(ok), None, None), None),
+                Ok(()),
+                "{ok}"
+            );
+            assert_eq!(
+                v(form(Some("on"), Some(ok), Some("TON"), None), None),
+                Ok(())
+            );
+        }
+        // Blank and switched on: the default, 100 TON.
+        assert_eq!(v(form(Some("on"), Some(""), None, None), None), Ok(()));
+        for bad in ["0.5", "100000.01", "1.001", "x"] {
+            assert_eq!(
+                v(form(Some("on"), Some(bad), None, None), None),
+                Err("ton-form-error-price-ton"),
+                "{bad:?}"
+            );
+        }
+        assert_eq!(
+            v(form(Some("on"), Some("100"), Some("EUR"), None), None),
+            Err("ton-form-error-currency")
+        );
         // A price kept switched off must still be a price.
         assert_eq!(
-            validate_price_form(None, Some("x"), None, None),
+            v(form(None, Some("x"), usd, None), None),
             Err("ton-form-error-price")
         );
         for bad in ["9", "241", "x"] {
             assert_eq!(
-                validate_price_form(Some("on"), Some("40"), Some(bad), None),
+                v(form(Some("on"), Some("40"), usd, Some(bad)), None),
                 Err("ton-form-error-window")
             );
         }
         assert_eq!(
-            validate_price_form(Some("on"), Some("40"), None, Some("team-1")),
+            v(form(Some("on"), Some("40"), usd, None), Some("team-1")),
             Err("ton-form-error-team")
         );
         // Unpriced team types are fine.
+        assert_eq!(v(form(None, None, None, None), Some("team-1")), Ok(()));
+        let mut f = form(Some("on"), Some("100"), None, None);
+        f.guest_telegram = Some("optional");
+        assert_eq!(validate_price_form(&f, None), Ok(()));
+        f.guest_telegram = Some("always");
         assert_eq!(
-            validate_price_form(None, None, None, Some("team-1")),
-            Ok(())
+            validate_price_form(&f, None),
+            Err("ton-form-error-telegram")
         );
     }
 }

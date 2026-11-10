@@ -281,8 +281,10 @@ pub(super) struct EventTypeForm {
     // ilia fork: the TON price of a personal type (docs/ton.md). The price
     // field's presence marks the section; the checkbox is "on" or absent.
     pub(super) ton_price_enabled: Option<String>,
-    pub(super) ton_price_usd: Option<String>,
+    pub(super) ton_price_amount: Option<String>,
+    pub(super) ton_price_currency: Option<String>,
     pub(super) ton_window_min: Option<String>,
+    pub(super) ton_guest_telegram: Option<String>,
 }
 
 /// Longest event type title accepted, the same limit as team names.
@@ -338,12 +340,7 @@ pub(super) fn validate_event_type_form(form: &EventTypeForm) -> Result<String, &
     ) {
         return Err("form-error-event-type-horizon");
     }
-    crate::web::ton_pay::validate_price_form(
-        form.ton_price_enabled.as_deref(),
-        form.ton_price_usd.as_deref(),
-        form.ton_window_min.as_deref(),
-        form.team_id.as_deref(),
-    )?;
+    crate::web::ton_pay::validate_price_form(&ton_price_form(form), form.team_id.as_deref())?;
 
     let slug = form.slug.trim().to_lowercase().replace(' ', "-");
     if slug.is_empty() {
@@ -2217,7 +2214,7 @@ async fn render_event_type_form_error(
             form_pending => PendingSettings::from_form(form)
                 .unwrap_or(PendingSettings::DEFAULT)
                 .context(),
-            ton_price => ton_pay::price_form_from_post(state, form.ton_price_enabled.as_deref(), form.ton_price_usd.as_deref(), form.ton_window_min.as_deref(), !is_group),
+            ton_price => ton_pay::price_form_from_post(state, &ton_price_form(form), !is_group),
             form_reminder_minutes => parse_int_field(&form.reminder_minutes, 0),
             form_max_additional_guests => parse_int_field(&form.max_additional_guests, 0),
             form_scheduling_mode => scheduling_mode,
@@ -3849,12 +3846,16 @@ async fn copy_event_type_children(tx: &mut Tx<'_>, from: &str, to: &str) -> sqlx
 /// ilia fork: store the price section of a personal event type's form
 /// (`ton_pay::save_price_form`; team types are never priced).
 async fn save_ton_price(state: &AppState, et_id: &str, form: &EventTypeForm) {
-    ton_pay::save_price_form(
-        state,
-        et_id,
-        form.ton_price_enabled.as_deref(),
-        form.ton_price_usd.as_deref(),
-        form.ton_window_min.as_deref(),
-    )
-    .await;
+    ton_pay::save_price_form(state, et_id, &ton_price_form(form)).await;
+}
+
+/// ilia fork: the form's price section.
+fn ton_price_form(form: &EventTypeForm) -> ton_pay::PriceForm<'_> {
+    ton_pay::PriceForm {
+        enabled: form.ton_price_enabled.as_deref(),
+        amount: form.ton_price_amount.as_deref(),
+        currency: form.ton_price_currency.as_deref(),
+        window_min: form.ton_window_min.as_deref(),
+        guest_telegram: form.ton_guest_telegram.as_deref(),
+    }
 }

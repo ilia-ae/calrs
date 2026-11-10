@@ -502,3 +502,11 @@ tg-guest-payment-taken = Der Termin, den Sie für { $event }, { $when } gewählt
 tg-guest-payment-refund = Wir haben Ihre Zahlung für { $event }, { $when } erhalten, aber der Termin konnte nicht bestätigt werden, deshalb wurde die Buchung freigegeben. { $host } erstattet die Zahlung und meldet sich bei Ihnen.
 tg-guest-payment-refund-part = Ein Teil der Zahlung war schon eingegangen: { $host } meldet sich wegen der Erstattung bei Ihnen.
 tg-guest-payment-held = Wir haben Ihre Zahlung für { $event }, { $when } erhalten, aber die Buchung konnte nicht automatisch bestätigt werden. { $host } meldet sich bei Ihnen.
+
+## ilia fork: booking flow v2 (docs/ton.md, docs/operations.md)
+ton-etf-usd-no-rates = Auf diesem Server sind keine Wechselkurse eingerichtet (CALRS_TON_RATE_MIN_USD und CALRS_TON_RATE_MAX_USD), daher kann ein Preis in USD nicht gebucht werden. Geben Sie den Preis in TON an.
+ton-etf-telegram-help = Bei einer bezahlten Buchung standardmäßig erforderlich: Der Gast bekommt dann Zahlungserinnerungen und ist über Telegram erreichbar. Sie können es optional machen oder ausschalten.
+tg-guest-payment-due-ton = Ihre Buchung wartet auf die Zahlung: { $event }, { $when }. Betrag: { $amount } TON. Bezahlen Sie bis { $deadline }, sonst wird der Termin freigegeben.
+ton-email-renewed-subject = Ihr Termin ist noch reserviert: { $event }
+ton-email-renewed-message = Die Zahlung für { $event } mit { $host } ist noch nicht bei uns eingegangen, daher bleibt Ihr Termin bis { $deadline } reserviert. Wenn Sie schon bezahlt haben, ist nichts weiter zu tun: Die Zahlung wird angerechnet. Andernfalls bezahlen Sie bis dahin auf der Seite unten oder stornieren Sie die Buchung, wenn sich Ihre Pläne geändert haben.
+tg-guest-payment-renewed = Die Zahlung für { $event }, { $when } ist noch nicht eingegangen, daher bleibt der Termin bis { $deadline } für Sie reserviert. Bezahlen Sie die noch offenen { $rest } TON bis dahin, sonst wird der Termin freigegeben. Wenn Sie schon bezahlt haben, ist nichts weiter zu tun: Die Zahlung wird angerechnet.

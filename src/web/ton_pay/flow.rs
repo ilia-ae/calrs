@@ -123,6 +123,11 @@ pub(crate) async fn open_for_booking(
     match invoice::open_invoice(conn, booking_id, p).await {
         Ok(opened) => Ok(Some(opened)),
         Err(refusal) => {
+            if refusal == Refusal::Capacity {
+                if let Some(rt) = state.ton.get() {
+                    rt.note_capacity_refusal(p.created_at);
+                }
+            }
             tracing::warn!(target: TARGET, booking_id, reason = %refusal, "invoice refused in the booking transaction");
             Err(refusal_page(
                 state,
@@ -271,8 +276,9 @@ pub(crate) async fn booking_ended(pool: &SqlitePool, booking_id: &str) {
 /// upstream's notices (guest, host, attendees, SMS) do not apply: the host
 /// was never asked to approve, and the guest watched the countdown. The
 /// guest hears that the booking was released when they asked for the link
-/// by email or paid any of it; a guest who paid in full (the time was
-/// taken meanwhile) always hears that the payment will be refunded. A
+/// by email or paid any of it (the address is then proven); a guest who
+/// paid in full (the time was taken meanwhile) always hears that the
+/// payment will be refunded. A
 /// waived booking is an ordinary request by now: upstream's notices go out.
 /// Returns `true` when this handled the booking (upstream then sends
 /// nothing).
@@ -283,7 +289,8 @@ pub(crate) async fn handle_expired_notice(
 ) -> bool {
     type Row = (String, String, Option<String>, i64, Option<String>);
     let row: Option<Row> = match sqlx::query_as(
-        "SELECT id, status, problem, paid_nano, link_emailed_at FROM ton_invoices WHERE booking_id = ?",
+        "SELECT id, status, problem, paid_nano, link_emailed_at
+         FROM ton_invoices WHERE booking_id = ?",
     )
     .bind(booking_id)
     .fetch_optional(pool)
@@ -332,6 +339,9 @@ pub(crate) async fn handle_expired_notice(
         _ => return true,
     };
     let told_anyway = reason == crate::email::TonReleased::Refund;
+    // The typed address is not proven: only a guest who asked for the
+    // link by email or paid any of it hears the end (ilia fork: the same
+    // guests a renewal emails; others heard of a renewal in Telegram only).
     if !told_anyway && link_emailed.is_none() && paid_nano == 0 {
         return true;
     }

@@ -606,12 +606,22 @@ pub(super) async fn dashboard_bookings(
         .collect();
     let telegram_guests =
         super::telegram::dashboard_labels(&state.pool, &telegram_ids, auth_user.lang).await;
+    let (ilia_recent, ilia_messages) = super::messages::dashboard_ctx(
+        &state.pool,
+        &user.id,
+        auth_user.lang,
+        host_tz,
+        &telegram_ids,
+    )
+    .await;
 
     Html(
         tmpl.render(context! {
             sidebar => sidebar_context(&auth_user, "bookings"),
             lang => auth_user.lang,
             telegram_guests => telegram_guests,
+            ilia_messages => ilia_messages,
+            ilia_recent => ilia_recent,
             error_message => error_message,
             pending_bookings => pending_ctx,
             claimable_bookings => claimable_ctx,

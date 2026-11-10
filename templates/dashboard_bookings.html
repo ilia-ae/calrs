@@ -20,6 +20,7 @@
       {% if b.notes %}<div class="booking-notes" tabindex="0"><strong>{{ t("confirmed-detail-notes") }}</strong> {{ b.notes }}</div>{% endif %}
     </div>
     <div class="booking-actions">
+      {% include "partials/ilia_messages_link.html" %}
       {% if pay and pay.unpaid %}{% include "partials/ton_unpaid_actions.html" %}{% else %}
       <form method="post" action="/dashboard/bookings/{{ b.id }}/confirm" style="margin: 0;">
         <button type="submit" class="slot-btn" style="font-size: 0.8rem; cursor: pointer; color: var(--success); border-color: var(--success);">{{ t("bookings-confirm") }}</button>
@@ -82,6 +83,7 @@
         {% if b.notes %}<div class="booking-notes" tabindex="0"><strong>{{ t("confirmed-detail-notes") }}</strong> {{ b.notes }}</div>{% endif %}
       </div>
       <div class="booking-actions">
+        {% include "partials/ilia_messages_link.html" %}
         {% if not (b.awaiting_reschedule is defined and b.awaiting_reschedule) %}
         <a href="/dashboard/bookings/{{ b.id }}/reschedule" class="slot-btn booking-action-btn" style="font-size: 0.8rem; text-decoration: none; color: var(--accent); cursor: pointer;">{{ t("bookings-reschedule") }}</a>
         {% endif %}
@@ -103,4 +105,5 @@
     </div>
   {% endif %}
 </div>
+{% include "partials/ilia_recent_bookings.html" %}
 {% endblock %}

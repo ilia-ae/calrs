@@ -1504,7 +1504,7 @@ fn guest_payment(lang: &str, open: bool, partly_paid: bool) -> message::GuestPay
         amount: "20.00".into(),
         paid: if partly_paid { "5.00" } else { "0.00" }.into(),
         rest: if partly_paid { "15.00" } else { "20.00" }.into(),
-        usd: "40.00".into(),
+        usd: Some("40.00".into()),
         deadline: message::when(
             lang,
             NaiveDate::from_ymd_opt(2026, 8, 10).unwrap(),
@@ -1521,7 +1521,7 @@ fn host_payment() -> message::HostPayment {
     message::HostPayment {
         amount: "20.00".into(),
         paid: "20.00".into(),
-        usd: "40.00".into(),
+        usd: Some("40.00".into()),
     }
 }
 
@@ -1565,6 +1565,39 @@ fn every_payment_event_composes_in_every_locale() {
     }
 }
 
+/// ilia fork: a price in TON says no dollars, to the guest or the hosts,
+/// in any locale.
+#[test]
+fn a_ton_price_shows_no_dollars() {
+    for (lang, _) in crate::i18n::supported_with_labels() {
+        let mut gv = guest_view(lang, "Product demo");
+        let mut p = guest_payment(lang, true, false);
+        p.usd = None;
+        gv.payment = Some(p);
+        let mut hv = host_view(lang);
+        hv.payment = Some(message::HostPayment {
+            usd: None,
+            ..host_payment()
+        });
+        for event in TelegramEvent::payment_samples() {
+            for msg in [
+                message::guest(&event, &gv, lang),
+                message::host(&event, &hv, lang),
+            ]
+            .into_iter()
+            .flatten()
+            {
+                assert!(!msg.text.contains('$'), "{lang} {event:?}: {}", msg.text);
+                assert!(!msg.text.contains("tg-"), "{lang} {event:?}: {}", msg.text);
+            }
+        }
+        let due = message::guest(&TelegramEvent::PaymentPartial, &gv, lang);
+        assert!(due.is_none() || due.unwrap().text.contains("20.00"));
+        let received = message::host(&TelegramEvent::PaymentReceived, &hv, lang).unwrap();
+        assert!(received.text.contains("20.00"), "{lang}: {}", received.text);
+    }
+}
+
 #[test]
 fn the_payment_link_goes_only_into_open_payment_messages_to_the_guest() {
     let lang = "en";
@@ -1578,7 +1611,9 @@ fn the_payment_link_goes_only_into_open_payment_messages_to_the_guest() {
             carries,
             matches!(
                 event,
-                TelegramEvent::PaymentDue | TelegramEvent::PaymentPartial
+                TelegramEvent::PaymentDue
+                    | TelegramEvent::PaymentPartial
+                    | TelegramEvent::PaymentRenewed { .. }
             ),
             "{event:?}"
         );
@@ -1586,6 +1621,7 @@ fn the_payment_link_goes_only_into_open_payment_messages_to_the_guest() {
     // Once the invoice is no longer open, nobody is asked to pay.
     v.payment = Some(guest_payment(lang, false, false));
     assert!(message::guest(&TelegramEvent::PaymentPartial, &v, lang).is_none());
+    assert!(message::guest(&TelegramEvent::PaymentRenewed { renewal: 1 }, &v, lang).is_none());
     let linked = message::guest(&TelegramEvent::PaymentDue, &v, lang).unwrap();
     assert_eq!(
         linked.text,
@@ -1840,4 +1876,209 @@ fn a_late_transfer_from_a_stranger_is_for_the_hosts_only() {
         to_guest: true,
     };
     assert!(own.audience().guest);
+}
+
+// --- ilia fork: messages with guests ---
+
+#[test]
+fn message_events_compose_in_every_locale_for_their_side_only() {
+    for (lang, _) in crate::i18n::supported_with_labels() {
+        for event in TelegramEvent::message_samples() {
+            let audience = event.audience();
+            let g = message::guest(&event, &guest_view(lang, "Product demo"), lang);
+            let h = message::host(&event, &host_view(lang), lang);
+            assert_eq!(g.is_some(), audience.guest, "{lang} {event:?}");
+            assert_eq!(h.is_some(), audience.hosts, "{lang} {event:?}");
+            let msg = g.or(h).unwrap();
+            let what = format!("{lang} {event:?}: {}", msg.text);
+            assert!(!msg.text.contains("tg-"), "{what}");
+            assert!(msg.text.contains("Product demo"), "{what}");
+            assert!(!msg.text.contains("))"), "{what}");
+            // The text itself, and a line on how to answer after it.
+            let body = match &event {
+                TelegramEvent::HostMessage { .. } => "See you on Monday.\nBring the slides.",
+                _ => "Can we talk about pricing?",
+            };
+            assert!(msg.text.contains(&format!("\n\n{body}\n\n")), "{what}");
+            // Nothing that carries a booking token, in either direction.
+            let all = format!("{} {:?}", msg.text, msg.buttons);
+            for t in [
+                "/booking/cancel/",
+                "/booking/reschedule/",
+                "/booking/ics/",
+                "/booking/pay/",
+            ] {
+                assert!(!all.contains(t), "{what}");
+            }
+        }
+    }
+}
+
+#[test]
+fn exact_english_and_russian_thread_messages() {
+    let host = TelegramEvent::HostMessage {
+        id: "m".into(),
+        text: "See you.".into(),
+    };
+    let guest = TelegramEvent::GuestMessage {
+        id: "m".into(),
+        text: "Hi".into(),
+    };
+    let en = message::guest(&host, &guest_view("en", "Product demo"), "en").unwrap();
+    assert_eq!(
+        en.text,
+        "Message from Ilia about Product demo, Monday, August 17, 2026, 14:00 (Europe/Paris):\n\n\
+         See you.\n\nTo answer, write your reply here."
+    );
+    assert!(en.buttons.is_empty());
+    let ru = message::host(&guest, &host_view("ru"), "ru").unwrap();
+    assert!(
+        ru.text
+            .starts_with("Сообщение от гостя Eve (eve@example.test) по записи: Product demo, "),
+        "{}",
+        ru.text
+    );
+    assert!(
+        ru.text
+            .ends_with("\n\nHi\n\nЧтобы ответить гостю, ответьте на это сообщение."),
+        "{}",
+        ru.text
+    );
+}
+
+#[test]
+fn a_guest_text_is_one_defanged_line_in_the_hosts_chat() {
+    let event = TelegramEvent::GuestMessage {
+        id: "m".into(),
+        text: "Visit https://pay.example/login\n\u{202E}now /start @bot".into(),
+    };
+    let msg = message::host(&event, &host_view("en"), "en").unwrap();
+    assert!(
+        msg.text
+            .contains("\n\nVisit https[:]//pay[.]example/login now [/]start [@]bot\n\n"),
+        "{}",
+        msg.text
+    );
+    assert!(!msg.text.contains('\u{202E}'));
+}
+
+#[test]
+fn host_text_keeps_its_lines_and_loses_invisible_characters() {
+    assert_eq!(
+        text::clean_lines("  Hello\r\n\r\n\r\n\u{200B}see\tyou\u{202E}\n\n", 100),
+        "Hello\n\nsee you"
+    );
+    assert_eq!(text::clean_lines("\n \n", 100), "");
+    assert_eq!(text::clean_lines("abcdef", 4), "abc…");
+}
+
+#[test]
+fn a_reply_carries_the_id_of_the_message_it_answers() {
+    let update: Update =
+        serde_json::from_value(fake::private_message(5, 42, "Yes", Some(1003))).unwrap();
+    let message = update.message.unwrap();
+    assert_eq!(message.reply_to_message.map(|r| r.message_id), Some(1003));
+    let plain: Update = serde_json::from_value(fake::private_message(6, 42, "Yes", None)).unwrap();
+    assert!(plain.message.unwrap().reply_to_message.is_none());
+}
+
+// --- ilia fork, Optimize: the menu is sent only when it changed ---
+
+/// Start the poller once over `api`, until its first long poll, and stop it.
+async fn start_once(pool: &sqlx::SqlitePool, api: Arc<FakeApi>) {
+    let (rt, _rx) = Runtime::new(api.clone(), None, fake::fast_retry());
+    let (stop_tx, stop_rx) = tokio::sync::watch::channel(false);
+    let task = tokio::spawn(poller::run(
+        rt,
+        pool.clone(),
+        stop_rx,
+        PollPolicy::default(),
+    ));
+    for _ in 0..500 {
+        if !api.offsets.lock().unwrap().is_empty() {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    assert!(!api.offsets.lock().unwrap().is_empty(), "no long poll");
+    stop_tx.send(true).unwrap();
+    tokio::time::timeout(Duration::from_secs(1), task)
+        .await
+        .unwrap()
+        .unwrap();
+}
+
+fn menu_calls(api: &FakeApi) -> (usize, usize) {
+    (
+        api.commands.lock().unwrap().len(),
+        api.descriptions.lock().unwrap().len(),
+    )
+}
+
+#[tokio::test]
+async fn the_menu_is_sent_once_per_text_change_and_bot() {
+    let pool = fake::memory_pool().await;
+    let langs = poller::menus().len();
+    assert_eq!(langs, 10, "the default and nine two-letter languages");
+    store::claim_bot(&pool, 123456789).await;
+
+    // First start: 10 setMyCommands and 10 setMyDescription (each two calls
+    // on the wire, the long and the short text).
+    let api = Arc::new(FakeApi::default());
+    start_once(&pool, api.clone()).await;
+    assert_eq!(menu_calls(&api), (langs, langs));
+    assert_eq!(
+        store::menu_hash(&pool).await.as_deref(),
+        Some(poller::menu_hash(&poller::menus()).as_str())
+    );
+
+    // A restart with the same texts: getMe only.
+    let api = Arc::new(FakeApi::default());
+    start_once(&pool, api.clone()).await;
+    assert_eq!(menu_calls(&api), (0, 0));
+
+    // Changed texts (a new release): sent again. A failed call keeps the
+    // old hash, so the next start retries.
+    sqlx::query("UPDATE telegram_state SET commands_hash = 'older-release'")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let api = Arc::new(FakeApi::default());
+    api.fail_menu
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    start_once(&pool, api.clone()).await;
+    assert_eq!(menu_calls(&api), (langs, langs));
+    assert_eq!(
+        store::menu_hash(&pool).await.as_deref(),
+        Some("older-release")
+    );
+    let api = Arc::new(FakeApi::default());
+    start_once(&pool, api.clone()).await;
+    assert_eq!(menu_calls(&api), (langs, langs));
+
+    // Another bot's token starts over.
+    assert!(store::claim_bot(&pool, 987654321).await);
+    assert_eq!(store::menu_hash(&pool).await, None);
+    let api = Arc::new(FakeApi::default());
+    start_once(&pool, api.clone()).await;
+    assert_eq!(menu_calls(&api), (langs, langs));
+}
+
+#[test]
+fn the_menu_hash_follows_every_text() {
+    let menus = poller::menus();
+    let base = poller::menu_hash(&menus);
+    assert_eq!(base.len(), 64);
+    let mut changed = poller::menus();
+    changed[3].short.push('!');
+    assert_ne!(poller::menu_hash(&changed), base);
+    let mut changed = poller::menus();
+    changed[0].commands[0].1.push('!');
+    assert_ne!(poller::menu_hash(&changed), base);
+    // Moving a character between two fields changes it too.
+    let mut a = poller::menus();
+    a[1].description.push('x');
+    let mut b = poller::menus();
+    b[1].short.insert(0, 'x');
+    assert_ne!(poller::menu_hash(&a), poller::menu_hash(&b));
 }

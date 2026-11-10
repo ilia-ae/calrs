@@ -53,11 +53,12 @@
 
   {% if can_pay %}
   <p style="margin-bottom: 0.25rem;"><strong>{{ t("ton-pay-held-until", time=held_until, zone=zone) }}</strong> <span id="ton-left" data-seconds="{{ seconds_left }}" style="color: var(--text-muted);"></span></p>
+  {% if renewals > 0 %}<p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0;">{{ t("ton-pay-renewed", n=renewals, max=renewals_max) }}</p>{% endif %}
 
   <div style="margin-top: 1rem;">
     <div class="ton-label">{{ t("ton-pay-amount-label") }}</div>
     <div class="ton-amount">{{ amount_ton }} TON</div>
-    <div style="color: var(--text-muted); font-size: 0.85rem;">{{ t("ton-pay-rate", usd=usd, rate=rate, sources=rate_sources, time=rate_time) }}</div>
+    {% if usd %}<div style="color: var(--text-muted); font-size: 0.85rem;">{{ t("ton-pay-rate", usd=usd, rate=rate, sources=rate_sources, time=rate_time) }}</div>{% endif %}
   </div>
 
   <div class="ton-actions">
@@ -145,10 +146,18 @@
   }
   {% if live %}
   var current = {{ pay_state | tojson }};
+  // ilia fork: a renewal moves the deadline while the state can stay
+  // "waiting": a new deadline or renewal count reloads the page too.
+  var shownExpiry = {{ expires_at | tojson }}, shownRenewals = {{ renewals | tojson }};
   var poll = function () {
     fetch({{ status_url | tojson }}, { credentials: 'same-origin', cache: 'no-store' })
       .then(function (r) { return r.json(); })
-      .then(function (j) { if (j && j.state && j.state !== current) location.reload(); })
+      .then(function (j) {
+        if (!j || !j.state) return;
+        if (j.state !== current
+            || (j.expires_at && j.expires_at !== shownExpiry)
+            || (typeof j.renewals === 'number' && j.renewals !== shownRenewals)) location.reload();
+      })
       .catch(function () {});
   };
   setInterval(poll, 5000);

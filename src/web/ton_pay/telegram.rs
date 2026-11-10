@@ -45,6 +45,7 @@ pub(crate) struct PaymentFacts {
     pub(crate) status: String,
     pub(crate) amount_nano: i64,
     pub(crate) paid_nano: i64,
+    pub(crate) currency: String,
     pub(crate) price_usd_cents: i64,
     pub(crate) expires_at: String,
     pub(crate) pay_token: String,
@@ -77,9 +78,9 @@ impl PaymentFacts {
         format_ton(from_i64(self.amount_nano).saturating_sub(from_i64(self.paid_nano)))
     }
 
-    /// The price in USD.
-    pub(crate) fn usd(&self) -> String {
-        format_usd_cents(from_i64(self.price_usd_cents))
+    /// The price in USD; `None` for a price in TON.
+    pub(crate) fn usd(&self) -> Option<String> {
+        (self.currency == "USD").then(|| format_usd_cents(from_i64(self.price_usd_cents)))
     }
 
     pub(crate) fn expires(&self) -> Option<DateTime<Utc>> {
@@ -95,7 +96,7 @@ impl PaymentFacts {
 /// The invoice of `booking_id`, if it has one.
 pub(crate) async fn facts(pool: &SqlitePool, booking_id: &str) -> Option<PaymentFacts> {
     sqlx::query_as::<_, PaymentFacts>(
-        "SELECT status, amount_nano, paid_nano, price_usd_cents, expires_at, pay_token
+        "SELECT status, amount_nano, paid_nano, currency, price_usd_cents, expires_at, pay_token
          FROM ton_invoices WHERE booking_id = ?",
     )
     .bind(booking_id)
@@ -147,11 +148,21 @@ pub(crate) async fn pay_page_link(
     booking_id: &str,
     pay_token: &str,
 ) -> Option<String> {
+    pay_link(&state.pool, &state.secret_key, booking_id, pay_token).await
+}
+
+/// [`pay_page_link`] from the pool and key (the alert sinks have no state).
+pub(crate) async fn pay_link(
+    pool: &SqlitePool,
+    secret_key: &[u8; 32],
+    booking_id: &str,
+    pay_token: &str,
+) -> Option<String> {
     if !crate::telegram::enabled() {
         return None;
     }
-    let token = link_token(&state.secret_key, pay_token);
-    crate::telegram::offered_priced_link(&state.pool, booking_id, &token).await
+    let token = link_token(secret_key, pay_token);
+    crate::telegram::offered_priced_link(pool, booking_id, &token).await
 }
 
 // --- events -----------------------------------------------------------------
@@ -256,6 +267,21 @@ pub(crate) async fn event_for_alert(
         TonAlert::PaymentReceived { invoice_id } => {
             let booking_id = booking_of(pool, invoice_id).await?;
             Some((booking_id, TelegramEvent::PaymentReceived))
+        }
+        TonAlert::Renewed { invoice_id } => {
+            let (booking_id, renewals): (String, i64) =
+                sqlx::query_as("SELECT booking_id, renewals FROM ton_invoices WHERE id = ?")
+                    .bind(invoice_id)
+                    .fetch_optional(pool)
+                    .await
+                    .ok()
+                    .flatten()?;
+            Some((
+                booking_id,
+                TelegramEvent::PaymentRenewed {
+                    renewal: u8::try_from(renewals).unwrap_or(u8::MAX),
+                },
+            ))
         }
         TonAlert::Health { .. } => None,
     }

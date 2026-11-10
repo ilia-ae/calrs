@@ -224,7 +224,7 @@ pub async fn run(pool: &SqlitePool, key: &[u8; 32], cmd: BookingCommands) -> Res
                     if s < buf_end && e > buf_start {
                         bail!(
                             "Conflict with '{}' ({} – {})",
-                            summary.as_deref().unwrap_or("(no title)"),
+                            summary.as_deref().unwrap_or("Busy"),
                             s.format("%H:%M"),
                             e.format("%H:%M")
                         );
