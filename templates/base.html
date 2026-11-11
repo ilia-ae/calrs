@@ -364,10 +364,8 @@
     }
     .powered a { color: var(--text-muted); text-decoration: none; }
     .powered a:hover { color: var(--text-secondary); }
-    /* ilia fork: AGPL source link, also shown when embedded. */
-    .source-link { text-align: center; font-size: 0.75rem; margin-top: 0.5rem; }
-    .source-link a { color: var(--text-muted); text-decoration: none; }
-    .source-link a:hover { color: var(--text-secondary); }
+    /* ilia fork: the dashboard has no made-by part, and without a source URL nothing is left. */
+    .powered:empty { display: none; }
 
     .error {
       color: var(--error-text);
@@ -495,7 +493,7 @@
        content. */
     body { padding: 1rem 0.75rem; background: transparent; display: block; min-height: 0; }
     .container { max-width: none; }
-    .logo, .powered, .theme-pill, #theme-toggle { display: none !important; }
+    .logo, .made-by, .theme-pill, #theme-toggle { display: none !important; }
     {% if embed_brand %}
     /* Apply the brand accent in both light and dark mode. The `html.dark`
        selector is needed to out-specify base.html's `html.dark` accent rule;
@@ -540,8 +538,10 @@
   {% endif %}
   <div class="container">
     {% block content %}{% endblock %}
-    {% block footer %}<div class="powered"><span>{{ t('base-powered-by') }} <a href="https://cal.rs">calrs</a></span></div>{% endblock %}
-    {% if source_url %}<div class="source-link"><a href="{{ source_url }}" target="_blank" rel="noopener noreferrer">{{ t('base-source-code') }}</a></div>{% endif %}
+    {#- ilia fork (src/web/ilia.rs): one line in English whatever the page language. The made-by
+        part is the footer block, hidden when embedded and left out by the dashboard; the AGPL
+        source link of the running version stays on every page. #}
+    <div class="powered">{% block footer %}<span class="made-by">{% if made_by_name %}Made by {% if made_by_url %}<a href="{{ made_by_url }}" target="_blank" rel="noopener noreferrer">{{ made_by_name }}</a>{% else %}{{ made_by_name }}{% endif %} · {% endif %}based on <a href="https://cal.rs" target="_blank" rel="noopener noreferrer">calrs</a>{% if source_url %} · {% endif %}</span>{% endblock %}{% if source_url %}<a class="source-link" href="{{ source_url }}" target="_blank" rel="noopener noreferrer">Source code</a>{% endif %}</div>
     {% block theme_toggle %}
     <button id="theme-toggle" type="button" title="{{ t('base-theme-toggle') }}" aria-label="{{ t('base-theme-toggle') }}" class="theme-pill">
       <span class="theme-pill-track">

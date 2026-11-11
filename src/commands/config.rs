@@ -54,6 +54,11 @@ pub enum ConfigCommands {
         /// CalDAV/EWS (empty string clears it)
         #[arg(long)]
         allow_private_hosts: Option<String>,
+        /// Link behind the logo on public pages, http:// or https:// (empty
+        /// string clears it), as Admin → Company link. A running `calrs serve`
+        /// shows it after a restart.
+        #[arg(long)]
+        company_link: Option<String>,
     },
     /// Dump all configuration as JSON
     Dump {
@@ -775,11 +780,23 @@ pub async fn run(pool: &SqlitePool, key: &[u8; 32], cmd: ConfigCommands) -> Resu
         ConfigCommands::General {
             base_url,
             allow_private_hosts,
+            company_link,
         } => {
             // Load the cache so we can report the effective values (env-aware).
             crate::settings::load_from_db(pool).await;
 
-            if base_url.is_none() && allow_private_hosts.is_none() {
+            // Checked like the admin form does, before anything is written, so
+            // a rejected link leaves every setting as it was.
+            let company_link = company_link.map(|link| link.trim().to_string());
+            if let Some(link) = &company_link {
+                if !link.is_empty() && !crate::web::is_safe_company_link(link) {
+                    anyhow::bail!(
+                        "Company link must start with http:// or https:// (empty string clears it)"
+                    );
+                }
+            }
+
+            if base_url.is_none() && allow_private_hosts.is_none() && company_link.is_none() {
                 // Show current values.
                 println!("{}:", "General".bold());
                 let stored_base: Option<String> =
@@ -833,6 +850,20 @@ pub async fn run(pool: &SqlitePool, key: &[u8; 32], cmd: ConfigCommands) -> Resu
                     } else {
                         String::new()
                     }
+                );
+
+                let stored_link: Option<String> = sqlx::query_scalar(
+                    "SELECT company_link FROM auth_config WHERE id = 'singleton'",
+                )
+                .fetch_one(pool)
+                .await
+                .unwrap_or(None);
+                println!(
+                    "  Company link:         {}",
+                    stored_link
+                        .as_deref()
+                        .filter(|s| !s.is_empty())
+                        .unwrap_or("(not set)")
                 );
             } else {
                 // Mirror `admin_update_general`: a field forced by an
@@ -904,6 +935,22 @@ pub async fn run(pool: &SqlitePool, key: &[u8; 32], cmd: ConfigCommands) -> Resu
                         Some(v) => println!("{} Allowed private hosts set to: {}", "✓".green(), v),
                         None => println!("{} Allowed private hosts cleared", "✓".green()),
                     }
+                }
+                if let Some(link) = company_link {
+                    // Stored as `admin_update_company_link` stores it: trimmed,
+                    // NULL when cleared.
+                    let value = Some(link).filter(|l| !l.is_empty());
+                    sqlx::query(
+                        "UPDATE auth_config SET company_link = ?, updated_at = datetime('now') WHERE id = 'singleton'",
+                    )
+                    .bind(&value)
+                    .execute(pool)
+                    .await?;
+                    match &value {
+                        Some(v) => println!("{} Company link set to: {}", "✓".green(), v),
+                        None => println!("{} Company link cleared", "✓".green()),
+                    }
+                    println!("  A running `calrs serve` shows it after a restart.");
                 }
             }
         }
@@ -1246,6 +1293,7 @@ mod tests {
             ConfigCommands::General {
                 base_url: Some("https://cal.example.com/".to_string()),
                 allow_private_hosts: Some(" Radicale , 127.0.0.1 ".to_string()),
+                company_link: None,
             },
         )
         .await
@@ -1267,6 +1315,7 @@ mod tests {
             ConfigCommands::General {
                 base_url: Some(String::new()),
                 allow_private_hosts: Some(String::new()),
+                company_link: None,
             },
         )
         .await
@@ -1280,6 +1329,89 @@ mod tests {
         .unwrap();
         assert!(base.is_none());
         assert!(hosts.is_none());
+    }
+
+    /// `--company-link` is checked and stored like Admin → Company link
+    /// (`admin_update_company_link`), and the dump shows it, so deploy tooling
+    /// can compare before it writes.
+    #[tokio::test]
+    async fn config_general_sets_and_clears_the_company_link() {
+        let pool = setup_db().await;
+        let key = [0u8; 32];
+        let general = |link: &str| ConfigCommands::General {
+            base_url: None,
+            allow_private_hosts: None,
+            company_link: Some(link.to_string()),
+        };
+        async fn stored(pool: &SqlitePool) -> Option<String> {
+            sqlx::query_scalar("SELECT company_link FROM auth_config WHERE id = 'singleton'")
+                .fetch_one(pool)
+                .await
+                .unwrap()
+        }
+
+        run(&pool, &key, general("  https://ilia.ae  "))
+            .await
+            .unwrap();
+        assert_eq!(stored(&pool).await.as_deref(), Some("https://ilia.ae"));
+        let dump = build_dump_output(&pool).await.unwrap();
+        assert_eq!(dump["auth"]["company_link"], "https://ilia.ae");
+
+        run(&pool, &key, general("HTTP://example.com/a"))
+            .await
+            .unwrap();
+        assert_eq!(stored(&pool).await.as_deref(), Some("HTTP://example.com/a"));
+
+        // Empty (or blank) clears it to NULL, as the form does.
+        run(&pool, &key, general("  ")).await.unwrap();
+        assert_eq!(stored(&pool).await, None);
+        let dump = build_dump_output(&pool).await.unwrap();
+        assert!(dump["auth"]["company_link"].is_null());
+    }
+
+    #[tokio::test]
+    async fn config_general_rejects_an_unsafe_company_link_and_writes_nothing() {
+        let pool = setup_db().await;
+        let key = [0u8; 32];
+        run(
+            &pool,
+            &key,
+            ConfigCommands::General {
+                base_url: None,
+                allow_private_hosts: None,
+                company_link: Some("https://ilia.ae".to_string()),
+            },
+        )
+        .await
+        .unwrap();
+
+        for bad in [
+            "javascript:alert(1)",
+            "data:text/html,<script>",
+            "example.com",
+            "//example.com",
+        ] {
+            let result = run(
+                &pool,
+                &key,
+                ConfigCommands::General {
+                    base_url: Some("https://cal.example.com".to_string()),
+                    allow_private_hosts: None,
+                    company_link: Some(bad.to_string()),
+                },
+            )
+            .await;
+            assert!(result.is_err(), "{bad}");
+        }
+
+        let (link, base): (Option<String>, Option<String>) =
+            sqlx::query_as("SELECT company_link, base_url FROM auth_config WHERE id = 'singleton'")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(link.as_deref(), Some("https://ilia.ae"));
+        // The other field of the rejected call was not written either.
+        assert!(base.is_none());
     }
 
     #[tokio::test]
@@ -1302,6 +1434,7 @@ mod tests {
             ConfigCommands::General {
                 base_url: Some("https://cal.example.com".to_string()),
                 allow_private_hosts: Some("cli.internal".to_string()),
+                company_link: None,
             },
         )
         .await
@@ -1500,6 +1633,31 @@ mod tests {
             .find(|u| u["email"] == "bob@test.com")
             .expect("bob should be in the dump");
         assert!(!bob["enabled"].as_bool().unwrap());
+    }
+
+    /// Deploy tooling (the ilia-booking Ansible role) compares a user's
+    /// profile timezone with the dump before `calrs user set-timezone`.
+    #[tokio::test]
+    async fn config_dump_shows_each_users_timezone() {
+        let pool = setup_db().await;
+        for (email, tz) in [("a@test.com", "Asia/Almaty"), ("b@test.com", "UTC")] {
+            sqlx::query(
+                "INSERT INTO users (id, email, name, timezone, role, auth_provider) \
+                 VALUES (?, ?, 'U', ?, 'user', 'local')",
+            )
+            .bind(Uuid::new_v4().to_string())
+            .bind(email)
+            .bind(tz)
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+
+        let output = build_dump_output(&pool).await.unwrap();
+        let users = output["users"].as_array().unwrap();
+        assert_eq!(users[0]["email"], "a@test.com");
+        assert_eq!(users[0]["timezone"], "Asia/Almaty");
+        assert_eq!(users[1]["timezone"], "UTC");
     }
 
     #[tokio::test]

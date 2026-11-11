@@ -212,7 +212,6 @@ base-loader-please-wait = Bitte warte, die neuesten Kalenderdaten werden geladen
 base-stop-impersonating = Identitätswechsel beenden
 base-theme-toggle = Design wechseln
 base-powered-by = Läuft mit
-base-source-code = Quellcode
 
 # Profile (templates/profile.html)
 

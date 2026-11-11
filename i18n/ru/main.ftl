@@ -212,7 +212,6 @@ base-loader-please-wait = Подождите, загружаем актуаль�
 base-stop-impersonating = Вернуться в свой аккаунт
 base-theme-toggle = Сменить тему
 base-powered-by = Сделано на
-base-source-code = Исходный код
 
 # Profile (templates/profile.html)
 

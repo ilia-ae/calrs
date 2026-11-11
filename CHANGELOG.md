@@ -187,6 +187,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 ### Added
 
 - **`--password-stdin` for scripted setups** - `calrs user create`, `user set-password`, `source add` and `source update` read the password from stdin with `--password-stdin`, like `docker login`, so Ansible or a CI job can create the admin and connect a calendar without a terminal. One trailing newline is dropped. The other values must then come from flags, since stdin holds the password.
+- **`calrs user set-timezone <email> <tz>`** - Sets a user's profile timezone from the command line, the same setting as Settings → Profile and the "your browser timezone is ..." banner, so a scripted setup does not leave the admin on UTC. The name is checked like the web form does (IANA, e.g. `Europe/Paris`); an already set timezone is a no-op that exits 0, an unknown name or user is an error. `calrs user create --timezone <tz>` sets it at creation.
+- **`calrs config general --company-link <url>`** - Sets the link behind the logo on public pages from the command line, the same setting as Admin → Company link and checked the same way (http or https only; anything else is an error and nothing is written). An empty string clears it. `calrs config dump` already shows it as `auth.company_link`, and `calrs config general` without options now shows it too. A running server picks it up after a restart.
 
 ### Fixed
 

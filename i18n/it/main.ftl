@@ -212,7 +212,6 @@ base-loader-please-wait = Attendi, caricamento dei dati del calendario...
 base-stop-impersonating = Termina impersonificazione
 base-theme-toggle = Cambia tema
 base-powered-by = Offerto da
-base-source-code = Codice sorgente
 
 # Profile (templates/profile.html)
 

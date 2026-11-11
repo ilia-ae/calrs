@@ -27,6 +27,9 @@ pub enum UserCommands {
         /// Needs --email and --name, since stdin then holds the password.
         #[arg(long)]
         password_stdin: bool,
+        /// Profile timezone, an IANA name such as Europe/Paris (default: UTC)
+        #[arg(long)]
+        timezone: Option<String>,
     },
     /// Reset local MFA and revoke sessions (server-operator recovery)
     ResetMfa { email: String },
@@ -60,6 +63,13 @@ pub enum UserCommands {
         #[arg(long)]
         password_stdin: bool,
     },
+    /// Set a user's profile timezone (the one Settings → Profile shows)
+    SetTimezone {
+        /// User email
+        email: String,
+        /// IANA timezone name, such as Europe/Paris
+        timezone: String,
+    },
     /// Permanently delete a user and all data uniquely owned by them
     Delete {
         /// User email
@@ -81,37 +91,20 @@ pub async fn run(pool: &SqlitePool, data_dir: &Path, cmd: UserCommands) -> Resul
             name,
             admin,
             password_stdin,
+            timezone,
         } => {
             if password_stdin && (email.is_none() || name.is_none()) {
                 anyhow::bail!(
                     "--password-stdin needs --email and --name: stdin holds the password"
                 );
             }
+            // Checked before any prompt, so a typo costs no password entry.
+            let timezone = timezone.as_deref().map(parse_timezone).transpose()?;
             let email = email.unwrap_or_else(|| prompt("Email"));
             let name = name.unwrap_or_else(|| prompt("Name"));
             let password = read_secret("Password", password_stdin)?;
-
-            if password.len() < 12 {
-                anyhow::bail!("Password must be at least 12 characters");
-            }
-
-            let password_hash = auth::hash_password(&password)?;
-            let user_id = Uuid::new_v4().to_string();
-            let username = auth::generate_username(pool, &email).await?;
-
-            let mut tx = pool.begin().await?;
-            let role = auth::create_local_user(
-                &mut *tx,
-                &user_id,
-                &email,
-                &name,
-                &password_hash,
-                &username,
-                admin,
-            )
-            .await?;
-            auth::create_user_account(&mut tx, &user_id, &name, &email).await?;
-            tx.commit().await?;
+            let role =
+                create_user(pool, &email, &name, &password, admin, timezone.as_deref()).await?;
 
             println!(
                 "{} User created: {} <{}> (role: {})",
@@ -269,6 +262,24 @@ pub async fn run(pool: &SqlitePool, data_dir: &Path, cmd: UserCommands) -> Resul
                 email
             );
         }
+        UserCommands::SetTimezone { email, timezone } => {
+            let tz = parse_timezone(&timezone)?;
+            match set_timezone(pool, &email, &tz).await? {
+                TimezoneChange::NotFound => anyhow::bail!("User not found: {email}"),
+                TimezoneChange::Unchanged => {
+                    println!("Timezone of {email} is already {tz}; nothing to do.");
+                }
+                TimezoneChange::Changed { from } => {
+                    println!(
+                        "{} Timezone of {} set to {} (was {}).",
+                        "✓".green(),
+                        email,
+                        tz,
+                        from
+                    );
+                }
+            }
+        }
         UserCommands::Delete { email, yes } => {
             let user: Option<(String, String, String, String)> =
                 sqlx::query_as("SELECT id, name, role, auth_provider FROM users WHERE email = ?")
@@ -323,6 +334,90 @@ pub async fn run(pool: &SqlitePool, data_dir: &Path, cmd: UserCommands) -> Resul
     }
 
     Ok(())
+}
+
+/// An IANA timezone name as the web settings accept it (`chrono_tz`), in
+/// its canonical spelling; anything else is an error naming the value.
+fn parse_timezone(input: &str) -> Result<String> {
+    let input = input.trim();
+    input
+        .parse::<chrono_tz::Tz>()
+        .map(|tz| tz.name().to_string())
+        .map_err(|_| {
+            anyhow::anyhow!("Invalid timezone: {input:?} (an IANA name such as Europe/Paris)")
+        })
+}
+
+#[derive(Debug, PartialEq)]
+enum TimezoneChange {
+    NotFound,
+    Unchanged,
+    Changed { from: String },
+}
+
+/// Store `tz` (already validated) as the profile timezone of the user with
+/// this email: the `users.timezone` column the profile form and the
+/// timezone banner write. Nothing is written when it is already set.
+async fn set_timezone(pool: &SqlitePool, email: &str, tz: &str) -> Result<TimezoneChange> {
+    let current: Option<String> = sqlx::query_scalar("SELECT timezone FROM users WHERE email = ?")
+        .bind(email)
+        .fetch_optional(pool)
+        .await?;
+    let Some(current) = current else {
+        return Ok(TimezoneChange::NotFound);
+    };
+    if current == tz {
+        return Ok(TimezoneChange::Unchanged);
+    }
+    sqlx::query("UPDATE users SET timezone = ?, updated_at = datetime('now') WHERE email = ?")
+        .bind(tz)
+        .bind(email)
+        .execute(pool)
+        .await?;
+    Ok(TimezoneChange::Changed { from: current })
+}
+
+/// Store a new local user and their scheduling account in one transaction,
+/// with the profile timezone when given (`timezone` already validated by
+/// `parse_timezone`; `None` keeps the column default, UTC). Returns the role
+/// the user got: the first user becomes admin even without `admin`.
+async fn create_user(
+    pool: &SqlitePool,
+    email: &str,
+    name: &str,
+    password: &str,
+    admin: bool,
+    timezone: Option<&str>,
+) -> Result<String> {
+    if password.len() < 12 {
+        anyhow::bail!("Password must be at least 12 characters");
+    }
+
+    let password_hash = auth::hash_password(password)?;
+    let user_id = Uuid::new_v4().to_string();
+    let username = auth::generate_username(pool, email).await?;
+
+    let mut tx = pool.begin().await?;
+    let role = auth::create_local_user(
+        &mut *tx,
+        &user_id,
+        email,
+        name,
+        &password_hash,
+        &username,
+        admin,
+    )
+    .await?;
+    auth::create_user_account(&mut tx, &user_id, name, email).await?;
+    if let Some(tz) = timezone {
+        sqlx::query("UPDATE users SET timezone = ? WHERE id = ?")
+            .bind(tz)
+            .bind(&user_id)
+            .execute(&mut *tx)
+            .await?;
+    }
+    tx.commit().await?;
+    Ok(role)
 }
 
 /// The id of the user with this email, or an empty string when there is
@@ -655,6 +750,212 @@ mod tests {
         )
         .await;
         assert!(result.is_ok());
+    }
+
+    async fn timezone_of(pool: &SqlitePool, email: &str) -> String {
+        sqlx::query_scalar("SELECT timezone FROM users WHERE email = ?")
+            .bind(email)
+            .fetch_one(pool)
+            .await
+            .unwrap()
+    }
+
+    fn set_tz_cmd(email: &str, timezone: &str) -> UserCommands {
+        UserCommands::SetTimezone {
+            email: email.to_string(),
+            timezone: timezone.to_string(),
+        }
+    }
+
+    #[test]
+    fn parse_timezone_accepts_iana_names_only() {
+        assert_eq!(parse_timezone("Asia/Almaty").unwrap(), "Asia/Almaty");
+        assert_eq!(parse_timezone(" Europe/Paris\n").unwrap(), "Europe/Paris");
+        assert_eq!(parse_timezone("UTC").unwrap(), "UTC");
+        for bad in [
+            "",
+            "  ",
+            "Mars/Olympus",
+            "Paris",
+            "+05:00",
+            "Asia/Almaty; DROP",
+        ] {
+            let err = parse_timezone(bad).unwrap_err().to_string();
+            assert!(err.contains("Invalid timezone"), "{bad:?}: {err}");
+        }
+    }
+
+    #[tokio::test]
+    async fn set_timezone_writes_the_profile_column() {
+        let pool = setup_db().await;
+        insert_user(&pool, "alice@test.com", "Alice", "admin").await;
+        insert_user(&pool, "bob@test.com", "Bob", "user").await;
+
+        run(
+            &pool,
+            &std::env::temp_dir(),
+            set_tz_cmd("alice@test.com", " Asia/Almaty "),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(timezone_of(&pool, "alice@test.com").await, "Asia/Almaty");
+        assert_eq!(
+            timezone_of(&pool, "bob@test.com").await,
+            "UTC",
+            "only Alice"
+        );
+    }
+
+    #[tokio::test]
+    async fn set_timezone_reports_no_change_when_already_set() {
+        let pool = setup_db().await;
+        insert_user(&pool, "alice@test.com", "Alice", "admin").await;
+
+        assert_eq!(
+            set_timezone(&pool, "alice@test.com", "Asia/Almaty")
+                .await
+                .unwrap(),
+            TimezoneChange::Changed {
+                from: "UTC".to_string()
+            }
+        );
+        assert_eq!(
+            set_timezone(&pool, "alice@test.com", "Asia/Almaty")
+                .await
+                .unwrap(),
+            TimezoneChange::Unchanged
+        );
+        // The command itself succeeds on a no-op, so scripts can rerun it.
+        run(
+            &pool,
+            &std::env::temp_dir(),
+            set_tz_cmd("alice@test.com", "Asia/Almaty"),
+        )
+        .await
+        .unwrap();
+        assert_eq!(timezone_of(&pool, "alice@test.com").await, "Asia/Almaty");
+    }
+
+    #[tokio::test]
+    async fn set_timezone_refuses_an_invalid_name_or_unknown_user() {
+        let pool = setup_db().await;
+        insert_user(&pool, "alice@test.com", "Alice", "admin").await;
+
+        let err = run(
+            &pool,
+            &std::env::temp_dir(),
+            set_tz_cmd("alice@test.com", "Mars/Olympus"),
+        )
+        .await
+        .unwrap_err();
+        assert!(err.to_string().contains("Invalid timezone"), "{err}");
+        assert_eq!(timezone_of(&pool, "alice@test.com").await, "UTC");
+
+        // Unlike promote/enable, an unknown user is an error: a script
+        // setting a timezone must not pass silently.
+        let err = run(
+            &pool,
+            &std::env::temp_dir(),
+            set_tz_cmd("ghost@test.com", "Asia/Almaty"),
+        )
+        .await
+        .unwrap_err();
+        assert!(err.to_string().contains("User not found"), "{err}");
+        assert_eq!(
+            set_timezone(&pool, "ghost@test.com", "Asia/Almaty")
+                .await
+                .unwrap(),
+            TimezoneChange::NotFound
+        );
+    }
+
+    #[tokio::test]
+    async fn create_user_stores_the_given_timezone() {
+        let pool = setup_db().await;
+        let role = create_user(
+            &pool,
+            "alice@test.com",
+            "Alice",
+            "long-enough-password",
+            true,
+            Some("Asia/Almaty"),
+        )
+        .await
+        .unwrap();
+        assert_eq!(role, "admin");
+        assert_eq!(timezone_of(&pool, "alice@test.com").await, "Asia/Almaty");
+        // The scheduling account is created in the same transaction.
+        let accounts: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM accounts a JOIN users u ON u.id = a.user_id
+             WHERE u.email = 'alice@test.com'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(accounts, 1);
+    }
+
+    #[tokio::test]
+    async fn create_user_without_a_timezone_keeps_utc() {
+        let pool = setup_db().await;
+        create_user(
+            &pool,
+            "alice@test.com",
+            "Alice",
+            "long-enough-password",
+            false,
+            None,
+        )
+        .await
+        .unwrap();
+        assert_eq!(timezone_of(&pool, "alice@test.com").await, "UTC");
+    }
+
+    #[tokio::test]
+    async fn create_user_refuses_a_short_password_and_writes_nothing() {
+        let pool = setup_db().await;
+        let err = create_user(
+            &pool,
+            "alice@test.com",
+            "Alice",
+            "short",
+            true,
+            Some("Asia/Almaty"),
+        )
+        .await
+        .unwrap_err();
+        assert!(err.to_string().contains("at least 12"), "{err}");
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(count, 0);
+    }
+
+    #[tokio::test]
+    async fn create_refuses_an_invalid_timezone_before_reading_the_password() {
+        let pool = setup_db().await;
+        // stdin is never read: the timezone is checked first.
+        let err = run(
+            &pool,
+            &std::env::temp_dir(),
+            UserCommands::Create {
+                email: Some("alice@test.com".to_string()),
+                name: Some("Alice".to_string()),
+                admin: true,
+                password_stdin: true,
+                timezone: Some("Mars/Olympus".to_string()),
+            },
+        )
+        .await
+        .unwrap_err();
+        assert!(err.to_string().contains("Invalid timezone"), "{err}");
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(count, 0);
     }
 
     #[tokio::test]

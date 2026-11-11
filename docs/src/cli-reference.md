@@ -132,6 +132,11 @@ calrs config auth [OPTIONS]
     --registration <BOOL>        Enable/disable registration
     --allowed-domains <DOMAINS>  Comma-separated domains or "any"
 
+calrs config general [OPTIONS]      # Without options: show the current values
+    --base-url <URL>                Public base URL (empty string clears it)
+    --allow-private-hosts <HOSTS>   Hostnames allowed to resolve to private IPs (empty clears)
+    --company-link <URL>            Link behind the logo on public pages (empty clears)
+
 calrs config oidc [OPTIONS]
     --issuer-url <URL>        OIDC issuer URL
     --client-id <ID>          Client ID
@@ -139,6 +144,8 @@ calrs config oidc [OPTIONS]
     --enabled <BOOL>          Enable/disable OIDC
     --auto-register <BOOL>    Auto-create users on first login
 ```
+
+`--company-link` is the setting of Admin → Company link and is checked the same way: only `http://` and `https://` links are accepted, anything else is an error and nothing is written. `calrs config dump` shows it as `auth.company_link`. A running `calrs serve` reads it at startup, so restart it to show a new link.
 
 #### Relaying through a local MTA
 
@@ -216,8 +223,11 @@ calrs user create [OPTIONS]
     --name <NAME>      User display name
     --admin            Grant admin role
     --password-stdin   Read the password from stdin (needs --email and --name)
+    --timezone <TZ>    Profile timezone, an IANA name such as Europe/Paris (default: UTC)
 
 calrs user list
+
+calrs user set-timezone <EMAIL> <TZ>   # Profile timezone, as in Settings → Profile
 
 calrs user set-password <EMAIL> [--password-stdin]   # Also signs out all of its sessions
 calrs user reset-mfa <EMAIL>           # Reset local MFA and revoke all sessions
@@ -230,6 +240,8 @@ calrs user disable <EMAIL>     Disable user account
 
 calrs user enable <EMAIL>      Enable user account
 ```
+
+`set-timezone` accepts the IANA names the profile form offers (`Asia/Almaty`, `Europe/Paris`, `UTC`) and writes the same setting. It exits 0 without writing when the timezone is already set, and fails for an unknown name or user, so a script can run it on every deploy; `calrs config dump` shows each user's `timezone` to compare with first.
 
 ### `calrs serve`
 

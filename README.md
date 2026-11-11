@@ -546,10 +546,12 @@ calrs config smtp                    Configure SMTP for email notifications
 calrs config show                    Show current configuration
 calrs config smtp-test <email>       Send a test email
 calrs config auth                    Configure registration/domain restrictions
+calrs config general --company-link <url>  Set the link behind the logo
 calrs config oidc                    Configure OIDC (SSO via Keycloak, etc.)
 calrs user list                      List users
 calrs user create                    Create a user
 calrs user set-password <email>      Set a user's password
+calrs user set-timezone <email> <tz> Set a user's profile timezone
 calrs user promote <email>           Promote user to admin
 calrs serve [--host 127.0.0.1] [--port 3000]  Start the web booking server
 ```

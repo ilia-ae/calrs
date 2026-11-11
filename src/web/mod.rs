@@ -56,6 +56,8 @@ use tower_http::trace::TraceLayer;
 use week_start::{WeekStart, WeekStartSetting};
 
 use admin::*;
+// Also `calrs config general --company-link`, checked like the admin form.
+pub(crate) use admin::is_safe_company_link;
 pub(crate) use availability::expand_recurring_into_busy;
 use availability::*;
 use booking::*;
@@ -722,7 +724,7 @@ pub(crate) async fn build_state(
     env.set_undefined_behavior(minijinja::UndefinedBehavior::Lenient);
     env.set_loader(minijinja::path_loader("templates"));
     crate::i18n::register(&mut env);
-    ilia::register(&mut env, std::env::var("CALRS_SOURCE_URL").ok().as_deref());
+    ilia::register(&mut env, &ilia::Footer::from_env());
 
     // Populate the process-global runtime-settings cache (base URL, private-host
     // allowlist) so synchronous readers and email/link builders see DB values.

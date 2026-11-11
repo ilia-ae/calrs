@@ -212,7 +212,6 @@ base-loader-please-wait = Proszę czekać, ładowanie najnowszych danych kalenda
 base-stop-impersonating = Zakończ podszywanie się
 base-theme-toggle = Przełącz motyw
 base-powered-by = Zasilane przez
-base-source-code = Kod źródłowy
 
 # Profile (templates/profile.html)
 
