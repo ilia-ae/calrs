@@ -283,6 +283,9 @@ pub(crate) struct Client<S> {
     timeout: Duration,
     /// Bytes read for the current command.
     budget: usize,
+    /// Messages in the selected folder: the last `* n EXISTS`, less the
+    /// `* n EXPUNGE`s since. `None` before a SELECT.
+    exists: Option<u32>,
 }
 
 impl<S: AsyncRead + AsyncWrite + Unpin> Client<S> {
@@ -295,6 +298,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Client<S> {
             caps: Vec::new(),
             timeout: COMMAND_TIMEOUT,
             budget: 0,
+            exists: None,
         }
     }
 
@@ -463,9 +467,30 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Client<S> {
                 }
             }
         };
-        match tokio::time::timeout(timeout, work).await {
-            Ok(r) => r,
-            Err(_) => Err(Error::Timeout),
+        let lines = match tokio::time::timeout(timeout, work).await {
+            Ok(r) => r?,
+            Err(_) => return Err(Error::Timeout),
+        };
+        self.track_exists(&lines);
+        Ok(lines)
+    }
+
+    /// Keep [`Client::exists`] current from a command's untagged lines.
+    fn track_exists(&mut self, lines: &[Line]) {
+        for line in lines {
+            let values = line.values();
+            if let (Some(Value::Atom(n)), Some(Value::Atom(what))) = (values.get(1), values.get(2))
+            {
+                if what.eq_ignore_ascii_case("EXISTS") {
+                    if let Ok(n) = n.parse() {
+                        self.exists = Some(n);
+                    }
+                } else if what.eq_ignore_ascii_case("EXPUNGE") {
+                    if let Some(e) = self.exists.as_mut() {
+                        *e = e.saturating_sub(1);
+                    }
+                }
+            }
         }
     }
 
@@ -615,10 +640,19 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Client<S> {
         Ok(uids)
     }
 
-    /// The UID of the last message (`FETCH * (UID)`), for a server whose
-    /// SELECT gave no UIDNEXT.
+    /// The UID of the last message: `FETCH <n> (UID)`, `n` the folder's
+    /// message count from EXISTS. iCloud answers `FETCH * …` (and any bare
+    /// `*`) with `BAD Parse Error`, so the number is spelled out; `*` only
+    /// before any EXISTS was seen. An empty folder has none.
     pub(crate) async fn last_uid(&mut self) -> Result<Option<u32>> {
-        let lines = self.run(&[raw(b"FETCH * (UID)")]).await?;
+        let n = match self.exists {
+            Some(0) => return Ok(None),
+            Some(n) => n.to_string(),
+            None => "*".to_string(),
+        };
+        let lines = self
+            .run(&[raw(b"FETCH"), raw(n.as_bytes()), raw(b"(UID)")])
+            .await?;
         Ok(fetched(&lines).into_iter().map(|f| f.uid).max())
     }
 

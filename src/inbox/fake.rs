@@ -57,6 +57,11 @@ pub(crate) struct FakeState {
     pub(crate) moved: Vec<(u32, String)>,
     pub(crate) copied: Vec<(u32, String)>,
     pub(crate) expunged: Vec<u32>,
+    /// Answer like iCloud (imap.mail.me.com, 2026-11-11): a bare `*` as a
+    /// message set (`FETCH * (UID)`, `UID FETCH * …`, `UID SEARCH UID *`)
+    /// is `BAD Parse Error`, and `UID <n>:*` above the last UID matches
+    /// nothing (RFC 3501: the last message).
+    pub(crate) icloud: bool,
 }
 
 impl Default for FakeState {
@@ -75,6 +80,7 @@ impl Default for FakeState {
             moved: Vec::new(),
             copied: Vec::new(),
             expunged: Vec::new(),
+            icloud: false,
         }
     }
 }
@@ -191,12 +197,15 @@ pub(crate) fn dead_connector() -> Connector {
 }
 
 /// The UIDs of an IMAP sequence set (`5`, `3,4`, `2:*`).
-fn uid_set(set: &str, max: u32) -> Vec<u32> {
+fn uid_set(set: &str, max: u32, icloud: bool) -> Vec<u32> {
     let mut out = Vec::new();
     for part in set.split(',') {
         match part.split_once(':') {
             Some((a, b)) => {
                 let a: u32 = a.parse().unwrap_or(1);
+                if icloud && b == "*" && a > max {
+                    continue;
+                }
                 let b: u32 = if b == "*" {
                     max
                 } else {
@@ -414,7 +423,10 @@ fn answer(
                     "UNSEEN" => unseen = true,
                     "UID" => {
                         let set = words.next().unwrap_or("");
-                        want = Some(uid_set(set, max).into_iter().collect());
+                        if st.icloud && set == "*" {
+                            return vec![format!("{tag} BAD Parse Error\r\n").into_bytes()];
+                        }
+                        want = Some(uid_set(set, max, st.icloud).into_iter().collect());
                     }
                     _ => {}
                 }
@@ -439,9 +451,19 @@ fn answer(
             ]
         }
         "FETCH" => {
+            // `FETCH <n> (UID)` or `FETCH * (UID)`: that message's UID.
+            let set = rest.split(' ').nth(1).unwrap_or("");
+            if st.icloud && set == "*" {
+                return vec![format!("{tag} BAD Parse Error\r\n").into_bytes()];
+            }
+            let at = if set == "*" {
+                st.msgs.len()
+            } else {
+                set.parse().unwrap_or(0)
+            };
             let mut out = Vec::new();
-            if let Some((i, m)) = st.msgs.iter().enumerate().next_back() {
-                out.push(format!("* {} FETCH (UID {})\r\n", i + 1, m.uid).into_bytes());
+            if let Some(m) = at.checked_sub(1).and_then(|i| st.msgs.get(i)) {
+                out.push(format!("* {at} FETCH (UID {})\r\n", m.uid).into_bytes());
             }
             out.push(ok("FETCH"));
             out
@@ -451,7 +473,10 @@ fn answer(
             let set = parts.next().unwrap_or("");
             let items = parts.next().unwrap_or("").to_ascii_uppercase();
             let max = st.msgs.iter().map(|m| m.uid).max().unwrap_or(0);
-            let want = uid_set(set, max);
+            if st.icloud && set == "*" {
+                return vec![format!("{tag} BAD Parse Error\r\n").into_bytes()];
+            }
+            let want = uid_set(set, max, st.icloud);
             let mut out = Vec::new();
             for (i, m) in st.msgs.iter().enumerate() {
                 if !want.contains(&m.uid) {
@@ -526,13 +551,19 @@ fn answer(
             let mut parts = rest.splitn(4, ' ').skip(2);
             let uid: u32 = parts.next().unwrap_or("0").parse().unwrap_or(0);
             let folder = unquote(parts.next().unwrap_or(""));
+            let mut out = Vec::new();
             if name == "UID MOVE" {
-                st.msgs.retain(|m| m.uid != uid);
+                // RFC 6851: the moved message is expunged here, by number.
+                if let Some(i) = st.msgs.iter().position(|m| m.uid == uid) {
+                    st.msgs.remove(i);
+                    out.push(format!("* {} EXPUNGE\r\n", i + 1).into_bytes());
+                }
                 st.moved.push((uid, folder));
             } else {
                 st.copied.push((uid, folder));
             }
-            vec![ok("done")]
+            out.push(ok("done"));
+            out
         }
         "UID EXPUNGE" => {
             let uid: u32 = rest
@@ -544,12 +575,15 @@ fn answer(
             let deleted = st
                 .msgs
                 .iter()
-                .any(|m| m.uid == uid && m.flags.iter().any(|f| f == "\\Deleted"));
-            if deleted {
-                st.msgs.retain(|m| m.uid != uid);
+                .position(|m| m.uid == uid && m.flags.iter().any(|f| f == "\\Deleted"));
+            let mut out = Vec::new();
+            if let Some(i) = deleted {
+                st.msgs.remove(i);
                 st.expunged.push(uid);
+                out.push(format!("* {} EXPUNGE\r\n", i + 1).into_bytes());
             }
-            vec![ok("EXPUNGE")]
+            out.push(ok("EXPUNGE"));
+            out
         }
         "LOGOUT" => vec![b"* BYE logging out\r\n".to_vec(), ok("LOGOUT")],
         _ => vec![format!("{tag} BAD unknown command\r\n").into_bytes()],

@@ -894,6 +894,63 @@ async fn the_sender_limit_counts_matched_mail_and_leaves_the_rest_unread() {
     assert!(!seen(&state, real[20]), "over the limit: left unread");
 }
 
+/// iCloud (imap.mail.me.com) answers a bare `*` as a message set with `BAD
+/// Parse Error` and `UID <n>:*` above the last UID with nothing. A poll with
+/// no new mail, the skip of an empty span and new mail after it all work
+/// there, in shared mode and not, without a `*` on the wire.
+#[tokio::test]
+async fn icloud_polls_without_a_bare_star() {
+    let _relay = relay(true);
+    let (_app, pool, _session, _et_id) = setup_test_app().await;
+    for shared in [true, false] {
+        sqlx::query("DELETE FROM inbox_state")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let state = fake::shared();
+        let mut config = Config::for_tests(INBOX, true);
+        config.shared = shared;
+        let c = ctx(&pool, config);
+        let old = {
+            let mut st = state.lock().unwrap();
+            st.icloud = true;
+            st.uidnext = 5_000;
+            st.deliver(&mail("guest@test.com", INBOX, "old", "", "old"), true)
+        };
+        let port = fake::serve(state.clone()).await;
+        // First run, then a poll with nothing new: the state stays.
+        poll(&c, port).await;
+        let stats = poll(&c, port).await;
+        assert!(stats.0.is_empty(), "{shared}: {stats:?}");
+        let saved = crate::inbox::store::state(&pool, "INBOX").await.unwrap();
+        assert_eq!(saved.last_uid, old, "{shared}");
+        // Mail far above the last UID (moved away in between): the empty
+        // span is skipped and the new message found in the same poll.
+        let new = {
+            let mut st = state.lock().unwrap();
+            st.uidnext = old + 4_000;
+            st.deliver(&mail("guest@test.com", INBOX, "new", "", "new"), false)
+        };
+        let stats = poll(&c, port).await;
+        assert_eq!(count(&stats, "unmatched"), 1, "{shared}: {stats:?}");
+        let saved = crate::inbox::store::state(&pool, "INBOX").await.unwrap();
+        assert_eq!(saved.last_uid, new, "{shared}");
+        let st = state.lock().unwrap();
+        assert!(
+            st.commands
+                .iter()
+                .all(|c| !c.split(' ').any(|w| w == "*" || w.ends_with(":*"))),
+            "{shared}: {:?}",
+            st.commands
+        );
+        assert!(
+            st.commands.iter().any(|c| c.starts_with("FETCH 2 (UID)")),
+            "{shared}: {:?}",
+            st.commands
+        );
+    }
+}
+
 /// A SELECT refused (a folder that does not exist) is the service's
 /// problem, logged as such, with the normal back-off, never as a refused
 /// login.
