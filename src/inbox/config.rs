@@ -21,6 +21,7 @@ pub(crate) const ENV_VARS: &[&str] = &[
     "CALRS_INBOX_POLL_MIN",
     "CALRS_INBOX_FOLDER",
     "CALRS_INBOX_DONE_FOLDER",
+    "CALRS_INBOX_SHARED",
 ];
 
 #[derive(Clone, PartialEq, Eq)]
@@ -43,6 +44,11 @@ pub(crate) struct Config {
     pub(crate) folder: String,
     /// Where processed mail is moved; unset: it is only marked `\Seen`.
     pub(crate) done_folder: Option<String>,
+    /// The mailbox is also a person's own (`CALRS_INBOX_SHARED`): a new
+    /// message is matched on a few headers first, and only a reply to calrs
+    /// mail is read, filtered, flagged or moved (`poller`). The first run
+    /// starts at UIDNEXT.
+    pub(crate) shared: bool,
 }
 
 impl std::fmt::Debug for Config {
@@ -59,6 +65,7 @@ impl std::fmt::Debug for Config {
             .field("poll", &self.poll)
             .field("folder", &self.folder)
             .field("done_folder", &self.done_folder)
+            .field("shared", &self.shared)
             .finish()
     }
 }
@@ -85,6 +92,7 @@ impl Config {
             poll: Duration::from_secs(120),
             folder: "INBOX".into(),
             done_folder: None,
+            shared: false,
         }
     }
 }
@@ -189,11 +197,13 @@ pub(crate) fn parse(env: impl Fn(&str) -> Option<String>) -> Result<Option<Confi
     let Some(address) = address.filter(|a| plain_address(a)) else {
         return Err("CALRS_INBOX_ADDRESS");
     };
-    let plus = match get("CALRS_INBOX_PLUS").as_deref() {
-        None | Some("0") | Some("false") | Some("no") | Some("off") => false,
-        Some("1") | Some("true") | Some("yes") | Some("on") => true,
-        Some(_) => return Err("CALRS_INBOX_PLUS"),
+    let flag = |name: &'static str| match get(name).as_deref() {
+        None | Some("0") | Some("false") | Some("no") | Some("off") => Ok(false),
+        Some("1") | Some("true") | Some("yes") | Some("on") => Ok(true),
+        Some(_) => Err(name),
     };
+    let plus = flag("CALRS_INBOX_PLUS")?;
+    let shared = flag("CALRS_INBOX_SHARED")?;
     let poll = match get("CALRS_INBOX_POLL_MIN") {
         None => 2,
         Some(v) => match v.parse::<u64>() {
@@ -234,6 +244,7 @@ pub(crate) fn parse(env: impl Fn(&str) -> Option<String>) -> Result<Option<Confi
         poll: Duration::from_secs(poll * 60),
         folder,
         done_folder,
+        shared,
     }))
 }
 
@@ -299,6 +310,7 @@ mod tests {
         assert_eq!(c.poll, Duration::from_secs(120));
         assert_eq!(c.folder, "INBOX");
         assert_eq!(c.done_folder, None);
+        assert!(!c.shared);
         assert_eq!(c.parts(), ("booking", "ilia.ae"));
         assert!(!format!("{c:?}").contains("p w"));
     }
@@ -311,6 +323,7 @@ mod tests {
             ("CALRS_INBOX_POLL_MIN", "0"),
             ("CALRS_INBOX_POLL_MIN", "61"),
             ("CALRS_INBOX_PLUS", "maybe"),
+            ("CALRS_INBOX_SHARED", "maybe"),
             ("CALRS_INBOX_ADDRESS", "booking+x@ilia.ae"),
             ("CALRS_INBOX_ADDRESS", "not an address"),
             ("CALRS_INBOX_FOLDER", "Входящие"),
@@ -326,10 +339,12 @@ mod tests {
             ("CALRS_INBOX_ADDRESS", "Booking@Ilia.ae"),
             ("CALRS_INBOX_DONE_FOLDER", "calrs/done"),
             ("CALRS_INBOX_IMAP_CA_FILE", "/etc/calrs/inbox-ca.pem"),
+            ("CALRS_INBOX_SHARED", "on"),
         ])))
         .unwrap()
         .unwrap();
         assert_eq!(c.port, 19993);
+        assert!(c.shared);
         assert!(c.plus);
         assert_eq!(c.address, "booking@ilia.ae");
         assert_eq!(c.done_folder.as_deref(), Some("calrs/done"));

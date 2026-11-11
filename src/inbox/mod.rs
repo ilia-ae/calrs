@@ -25,6 +25,10 @@
 //!   booking's thread as `via = 'email'` ([`store`]). The hosts' Telegram
 //!   chats hear about it like a Telegram text. HTML is never rendered,
 //!   stored or forwarded; text, addresses and the password are never logged.
+//!   In shared mode (`CALRS_INBOX_SHARED`: the mailbox is also a person's
+//!   own) a new message is matched on its headers first, and only a reply
+//!   to calrs mail is read in full, filtered, flagged or moved; the first
+//!   run skips the mailbox's history ([`poller`]).
 //!
 //! **Tokens** are `base32(HMAC-SHA256(inbox_key, "calrs-reply-v1\0" || uid))`
 //! cut to 16 characters (80 bits), with `inbox_key` derived from the server's
@@ -201,6 +205,12 @@ pub(crate) async fn spawn(
         moves = config.done_folder.is_some(),
         "inbox on"
     );
+    if config.shared {
+        tracing::info!(
+            target: "calrs::inbox",
+            "inbox shared mode on: new mail is matched on its headers; only replies to calrs mail are read, flagged or moved"
+        );
+    }
     let ctx = Arc::new(poller::Ctx::new(pool, config, key, ours));
     let connect = tls::connector(ctx.config.clone());
     let task = tokio::spawn(poller::run(ctx, connect, poller::Policy::default(), stop));

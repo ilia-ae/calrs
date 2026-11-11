@@ -1317,3 +1317,423 @@ async fn in_relay_mode_no_guest_mail_carries_the_owners_address() {
         "{checked:?}"
     );
 }
+
+/// Shared mode: the system mailbox is also the owner's own (iCloud+
+/// `mail@ilia.ae`, ilia-booking docs/decisions.md, 2026-11-11).
+fn shared_config() -> Config {
+    let mut config = Config::for_tests(INBOX, false);
+    config.shared = true;
+    config
+}
+
+/// The commands the fake recorded for `uid`: a full fetch, or any flag,
+/// move or copy.
+fn touched(state: &fake::Shared, uid: u32) -> Vec<String> {
+    let id = format!(" {uid} ");
+    state
+        .lock()
+        .unwrap()
+        .commands
+        .iter()
+        .filter(|c| {
+            let c = format!("{c} ");
+            c.contains(&id)
+                && (c.contains("BODY.PEEK[]")
+                    || c.starts_with("UID STORE")
+                    || c.starts_with("UID MOVE")
+                    || c.starts_with("UID COPY")
+                    || c.starts_with("UID EXPUNGE"))
+        })
+        .cloned()
+        .collect()
+}
+
+#[tokio::test]
+async fn a_shared_mailbox_reads_only_replies_to_calrs_mail() {
+    let _relay = test_mode(true, Some(shared_config()));
+    let (_app, pool, _session, et_id) = setup_test_app().await;
+    let id = booking(&pool, &et_id, 48, "confirmed").await;
+    let token = token_of(&id);
+    let reference = format!("In-Reply-To: <calrs.{token}.00aa11bb22cc33dd@ilia.ae>\r\n");
+    let state = fake::shared();
+    state.lock().unwrap().caps = vec!["MOVE"];
+    // The owner's history, a guest's unread reply among it: never searched.
+    let history: Vec<u32> = {
+        let mut st = state.lock().unwrap();
+        vec![
+            st.deliver(
+                &mail("bank@bank.example", INBOX, "Your OTP", "", "123456"),
+                false,
+            ),
+            st.deliver(
+                &mail("guest@test.com", INBOX, "Re: hi", &reference, "Old reply"),
+                false,
+            ),
+        ]
+    };
+    let mut config = shared_config();
+    config.done_folder = Some("calrs".into());
+    let c = ctx(&pool, config);
+    let port = fake::serve(state.clone()).await;
+    assert!(poll(&c, port).await.0.is_empty());
+    let saved = crate::inbox::store::state(&pool, "INBOX").await.unwrap();
+    assert_eq!(saved.last_uid, 2);
+    {
+        let st = state.lock().unwrap();
+        assert_eq!(st.count("UID SEARCH"), 0, "{:?}", st.commands);
+        assert_eq!(st.count("UID FETCH"), 0, "{:?}", st.commands);
+    }
+
+    let (private, read, news, away, dsn, tag, reply, auto_reply) = {
+        let mut st = state.lock().unwrap();
+        let mut d = |raw: String, seen: bool| st.deliver(&raw, seen);
+        (
+            d(
+                mail("friend@friend.example", INBOX, "Dinner", "", "PRIVATE-TEXT"),
+                false,
+            ),
+            d(
+                mail("friend@friend.example", INBOX, "Photos", "", "Already read"),
+                true,
+            ),
+            d(
+                mail(
+                    "news@shop.example",
+                    INBOX,
+                    "Sale",
+                    "List-Id: <news.shop.example>\r\nList-Unsubscribe: <https://shop.example/u>\r\n",
+                    "Buy",
+                ),
+                false,
+            ),
+            d(
+                mail(
+                    "colleague@corp.example",
+                    INBOX,
+                    "Out of office",
+                    "Auto-Submitted: auto-replied\r\n",
+                    "Away",
+                ),
+                false,
+            ),
+            d(
+                format!(
+                    "From: MAILER-DAEMON@mx.example\r\nTo: {INBOX}\r\nSubject: Undelivered\r\n\
+                     Content-Type: multipart/report; report-type=delivery-status; boundary=\"b\"\r\n\r\n\
+                     --b\r\nContent-Type: text/plain\r\n\r\nfailed\r\n--b--\r\n"
+                ),
+                false,
+            ),
+            // A subject tag from a stranger: token-shaped, still not a match.
+            d(
+                mail("stranger@q.example", INBOX, &format!("Re: [#{token}]"), "", "Spoofed"),
+                false,
+            ),
+            d(
+                mail("guest@test.com", INBOX, "Re: hi", &reference, "See you Tuesday."),
+                false,
+            ),
+            // A matched automatic reply: handled as today.
+            d(
+                mail(
+                    "guest@test.com",
+                    INBOX,
+                    "Out of office",
+                    &format!("{reference}Auto-Submitted: auto-replied\r\n"),
+                    "Away",
+                ),
+                false,
+            ),
+        )
+    };
+    let log = LogCapture::default();
+    let stats = {
+        let _guard = log.install();
+        poll(&c, port).await
+    };
+    assert_eq!(count(&stats, "stored"), 1, "{stats:?}");
+    assert_eq!(count(&stats, "autoreply"), 1, "{stats:?}");
+    assert_eq!(count(&stats, "unmatched"), 6, "{stats:?}");
+    assert_eq!(
+        thread_rows(&pool, &id)
+            .await
+            .into_iter()
+            .map(|r| r.2)
+            .collect::<Vec<_>>(),
+        ["See you Tuesday."]
+    );
+    let st = state.lock().unwrap();
+    // Only the two matched messages were moved to the done folder.
+    assert_eq!(
+        st.moved,
+        vec![
+            (reply, "calrs".to_string()),
+            (auto_reply, "calrs".to_string())
+        ]
+    );
+    drop(st);
+    for uid in history
+        .iter()
+        .copied()
+        .chain([private, read, news, away, dsn, tag])
+    {
+        assert!(
+            touched(&state, uid).is_empty(),
+            "{uid}: {:?}",
+            touched(&state, uid)
+        );
+    }
+    // Their flags are as the owner left them.
+    for uid in history
+        .iter()
+        .copied()
+        .chain([private, news, away, dsn, tag])
+    {
+        assert_eq!(state.lock().unwrap().flags_of(uid), Some(vec![]), "{uid}");
+    }
+    assert_eq!(
+        state.lock().unwrap().flags_of(read),
+        Some(vec!["\\Seen".to_string()])
+    );
+    // Each new message was asked for its size and the match headers only;
+    // the full body only for the two that matched.
+    let st = state.lock().unwrap();
+    let fetches: Vec<&String> = st
+        .commands
+        .iter()
+        .filter(|c| c.starts_with("UID FETCH"))
+        .collect();
+    let headers = fetches
+        .iter()
+        .filter(|c| c.contains("BODY.PEEK[HEADER.FIELDS (FROM TO CC "))
+        .count();
+    let full = fetches.iter().filter(|c| c.contains("BODY.PEEK[]")).count();
+    assert_eq!((headers, full, fetches.len()), (8, 2, 10), "{fetches:#?}");
+    drop(st);
+    // Nothing of the private mail reached the log: no UID, no address, no
+    // subject, no text.
+    let all = log.all();
+    for uid in [private, read, news, away, dsn, tag] {
+        assert!(!all.contains(&format!("uid={uid} ")), "{all}");
+    }
+    for secret in [
+        "friend@",
+        "PRIVATE-TEXT",
+        "Dinner",
+        "news@shop",
+        "Sale",
+        "stranger@",
+    ] {
+        assert!(!all.contains(secret), "{secret}: {all}");
+    }
+}
+
+#[tokio::test]
+async fn a_shared_mailbox_starts_over_from_uidnext_on_a_new_uidvalidity() {
+    let _relay = test_mode(true, Some(shared_config()));
+    let (_app, pool, _session, et_id) = setup_test_app().await;
+    let id = booking(&pool, &et_id, 48, "confirmed").await;
+    let reference = format!(
+        "References: <a@gmail.com>\r\n <calrs.{}.00aa@ilia.ae>\r\n",
+        token_of(&id)
+    );
+    let state = fake::shared();
+    let port = fake::serve(state.clone()).await;
+    let c = ctx(&pool, shared_config());
+    assert!(poll(&c, port).await.0.is_empty());
+    // A folded References header is matched whole.
+    let first = state.lock().unwrap().deliver(
+        &mail("guest@test.com", INBOX, "Re: hi", &reference, "First"),
+        false,
+    );
+    assert_eq!(count(&poll(&c, port).await, "stored"), 1);
+    assert!(seen(&state, first));
+    {
+        let mut st = state.lock().unwrap();
+        st.uidvalidity = 2000;
+        st.deliver(
+            &mail(
+                "guest@test.com",
+                INBOX,
+                "Re: hi",
+                &reference,
+                "Before the reset",
+            ),
+            false,
+        );
+    }
+    assert!(poll(&c, port).await.0.is_empty());
+    state.lock().unwrap().deliver(
+        &mail(
+            "guest@test.com",
+            INBOX,
+            "Re: hi",
+            &reference,
+            "After the reset",
+        ),
+        false,
+    );
+    assert_eq!(count(&poll(&c, port).await, "stored"), 1);
+    let bodies: Vec<String> = thread_rows(&pool, &id)
+        .await
+        .into_iter()
+        .map(|r| r.2)
+        .collect();
+    assert_eq!(bodies, ["First", "After the reset"]);
+}
+
+/// Off (the default), the same unrelated mail is handled as before: the
+/// first run takes the unseen history and the filters mark a newsletter.
+#[tokio::test]
+async fn without_shared_mode_unrelated_automatic_mail_is_still_marked() {
+    let _relay = relay(false);
+    let (_app, pool, _session, _et_id) = setup_test_app().await;
+    let state = fake::shared();
+    let (news, private) = {
+        let mut st = state.lock().unwrap();
+        (
+            st.deliver(
+                &mail(
+                    "news@shop.example",
+                    INBOX,
+                    "Sale",
+                    "List-Id: <news.shop.example>\r\n",
+                    "Buy",
+                ),
+                false,
+            ),
+            st.deliver(
+                &mail("friend@friend.example", INBOX, "Dinner", "", "Hi"),
+                false,
+            ),
+        )
+    };
+    let port = fake::serve(state.clone()).await;
+    let stats = poll(&ctx(&pool, Config::for_tests(INBOX, false)), port).await;
+    assert_eq!(
+        (count(&stats, "list"), count(&stats, "unmatched")),
+        (1, 1),
+        "{stats:?}"
+    );
+    assert!(seen(&state, news));
+    assert!(!seen(&state, private));
+    // Read in full, and no header-only fetch.
+    let st = state.lock().unwrap();
+    assert!(!st.commands.iter().any(|c| c.contains("HEADER.FIELDS")));
+    assert_eq!(
+        st.commands
+            .iter()
+            .filter(|c| c.contains("BODY.PEEK[]"))
+            .count(),
+        2
+    );
+}
+
+/// Shared mode: the mailbox's own person writes from it too. A reply to
+/// them from someone they copied in, or a forward, still carries our
+/// Message-ID, and calrs's own mail can land in it: none of it is a guest
+/// writing, and all of it stays as the person left it.
+#[tokio::test]
+async fn a_shared_mailbox_leaves_others_replies_and_its_own_mail_alone() {
+    let _relay = test_mode(true, Some(shared_config()));
+    let (_app, pool, _session, et_id) = setup_test_app().await;
+    let id = booking(&pool, &et_id, 48, "confirmed").await;
+    // A test booking whose guest is the mailbox itself.
+    let own = booking(&pool, &et_id, 72, "confirmed").await;
+    sqlx::query("UPDATE bookings SET guest_email = ? WHERE id = ?")
+        .bind(INBOX)
+        .bind(&own)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let token = token_of(&id);
+    let ours = format!("<calrs.{token}.00aa11bb22cc33dd@ilia.ae>");
+    let state = fake::shared();
+    state.lock().unwrap().caps = vec!["MOVE"];
+    let mut config = shared_config();
+    config.done_folder = Some("calrs".into());
+    let c = ctx(&pool, config);
+    let port = fake::serve(state.clone()).await;
+    assert!(poll(&c, port).await.0.is_empty());
+
+    let (partner, forward, copy, reply) = {
+        let mut st = state.lock().unwrap();
+        let mut d = |raw: String| st.deliver(&raw, false);
+        (
+            // The owner answered the guest and copied in a partner, who
+            // pressed Reply: to the owner alone, our Message-ID inherited.
+            d(mail(
+                "partner@p.example",
+                INBOX,
+                "Re: Re: hi",
+                &format!("In-Reply-To: <owner-answer@ilia.ae>\r\nReferences: {ours}\r\n <owner-answer@ilia.ae>\r\n"),
+                "PRIVATE-NOTE for the owner",
+            )),
+            // A forward that keeps References.
+            d(mail(
+                "colleague@corp.example",
+                INBOX,
+                "Fwd: hi",
+                &format!("References: {ours}\r\n"),
+                "Forwarded",
+            )),
+            // calrs's own message to the guest that is the mailbox.
+            d(mail(
+                INBOX,
+                INBOX,
+                &format!("Message from Test User [#{}]", token_of(&own)),
+                "X-Calrs-Origin: host-message\r\n",
+                "Our own text",
+            )),
+            d(mail(
+                "guest@test.com",
+                INBOX,
+                "Re: hi",
+                &format!("In-Reply-To: {ours}\r\n"),
+                "See you Tuesday.",
+            )),
+        )
+    };
+    let log = LogCapture::default();
+    let stats = {
+        let _guard = log.install();
+        poll(&c, port).await
+    };
+    assert_eq!(
+        (
+            count(&stats, "stored"),
+            count(&stats, "unmatched"),
+            count(&stats, "loop")
+        ),
+        (1, 2, 1),
+        "{stats:?}"
+    );
+    let bodies = |rows: Vec<(String, String, String, String, String)>| {
+        rows.into_iter().map(|r| r.2).collect::<Vec<_>>()
+    };
+    assert_eq!(bodies(thread_rows(&pool, &id).await), ["See you Tuesday."]);
+    assert!(bodies(thread_rows(&pool, &own).await).is_empty());
+    // The other people's mail is not even read in full.
+    for uid in [partner, forward] {
+        assert!(
+            touched(&state, uid).is_empty(),
+            "{uid}: {:?}",
+            touched(&state, uid)
+        );
+    }
+    // Our own mail is read (it matched), but neither flagged nor moved.
+    assert!(touched(&state, copy)
+        .iter()
+        .all(|c| !c.starts_with("UID STORE") && !c.starts_with("UID MOVE")));
+    for uid in [partner, forward, copy] {
+        assert_eq!(state.lock().unwrap().flags_of(uid), Some(vec![]), "{uid}");
+    }
+    assert_eq!(
+        state.lock().unwrap().moved,
+        vec![(reply, "calrs".to_string())]
+    );
+    let all = log.all();
+    for secret in ["partner@", "PRIVATE-NOTE", "colleague@", "Our own text"] {
+        assert!(!all.contains(secret), "{secret}: {all}");
+    }
+}

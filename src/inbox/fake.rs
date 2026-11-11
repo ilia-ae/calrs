@@ -211,6 +211,41 @@ fn uid_set(set: &str, max: u32) -> Vec<u32> {
     out
 }
 
+/// The field names of a `HEADER.FIELDS (…)` fetch item, uppercased.
+fn header_fields(items: &str) -> Option<Vec<String>> {
+    let at = items.find("HEADER.FIELDS (")? + "HEADER.FIELDS (".len();
+    let end = items[at..].find(')')? + at;
+    Some(
+        items[at..end]
+            .split_whitespace()
+            .map(str::to_ascii_uppercase)
+            .collect(),
+    )
+}
+
+/// The header lines of `raw` named in `names` (with their continuation
+/// lines), then a blank line, as a server answers `HEADER.FIELDS`.
+fn pick_headers(raw: &[u8], names: &[String]) -> Vec<u8> {
+    let text = String::from_utf8_lossy(raw);
+    let header = text
+        .split_once("\r\n\r\n")
+        .map_or(text.as_ref(), |(h, _)| h);
+    let mut out = String::new();
+    let mut keep = false;
+    for line in header.split("\r\n") {
+        if !line.starts_with([' ', '\t']) {
+            let name = line.split(':').next().unwrap_or("").to_ascii_uppercase();
+            keep = names.contains(&name);
+        }
+        if keep {
+            out.push_str(line);
+            out.push_str("\r\n");
+        }
+    }
+    out.push_str("\r\n");
+    out.into_bytes()
+}
+
 fn unquote(s: &str) -> String {
     s.trim()
         .trim_matches('"')
@@ -422,7 +457,23 @@ fn answer(
                 if !want.contains(&m.uid) {
                     continue;
                 }
-                if items.contains("BODY.PEEK[]") {
+                if let Some(names) = header_fields(&items) {
+                    // `BODY.PEEK[HEADER.FIELDS (…)]`: those header lines
+                    // (folded ones whole) and the blank line after them.
+                    let picked = pick_headers(&m.raw, &names);
+                    let mut head = format!(
+                        "* {} FETCH (UID {} RFC822.SIZE {} BODY[HEADER.FIELDS ({})] {{{}}}\r\n",
+                        i + 1,
+                        m.uid,
+                        m.raw.len(),
+                        names.join(" "),
+                        picked.len()
+                    )
+                    .into_bytes();
+                    head.extend_from_slice(&picked);
+                    head.extend_from_slice(b")\r\n");
+                    out.push(head);
+                } else if items.contains("BODY.PEEK[]") {
                     let (a, b) = m.raw.split_at(m.raw.len() / 2);
                     let mut head = format!(
                         "* {} FETCH (UID {} BODY[]<0> {{{}}}\r\n",

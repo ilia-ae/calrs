@@ -13,6 +13,17 @@
 //! A subject tag alone is accepted only from the guest's or an attendee's
 //! address.
 //!
+//! A shared mailbox (`CALRS_INBOX_SHARED`) is also a person's own, and that
+//! person writes from it too: anyone they answer or copy in carries our
+//! Message-ID on in References, so there no proof is enough from another
+//! address, and only the guest's or an attendee's From is accepted
+//! (`known_only` in [`find`]). Mail from anyone else is the person's own and
+//! stays untouched.
+//!
+//! Everything read here is in the headers (recipients, In-Reply-To and
+//! References, Subject, From), never the body: a shared mailbox is matched
+//! on its headers alone before any message is read in full (`poller`).
+//!
 //! Candidates are the pending or confirmed bookings that ended at most a
 //! week ago (the thread's own rule): a few hundred rows at most, each token
 //! recomputed and compared in constant time.
@@ -141,12 +152,21 @@ fn tokens(m: &Inbound, domain: &str) -> Vec<(Proof, String)> {
     out
 }
 
-/// The booking `m` is about, if any.
+/// Whether `m` carries anything token-shaped at all (a plus recipient at
+/// our domain, a `calrs.` reference, a subject tag): without one, [`find`]
+/// matches nothing and the bookings need not be read.
+pub(crate) fn may_match(m: &Inbound, domain: &str) -> bool {
+    !tokens(m, domain).is_empty()
+}
+
+/// The booking `m` is about, if any. With `known_only` (shared mode) only
+/// the guest's or an attendee's From is accepted, whatever the proof.
 pub(crate) fn find(
     m: &Inbound,
     candidates: &[Candidate],
     key: &[u8; 32],
     domain: &str,
+    known_only: bool,
 ) -> Option<Matched> {
     let wanted = tokens(m, domain);
     if wanted.is_empty() {
@@ -172,7 +192,7 @@ pub(crate) fn find(
             Some(_) => Sender::Attendee,
             None => Sender::Other,
         };
-        if *proof == Proof::Subject && sender == Sender::Other {
+        if sender == Sender::Other && (known_only || *proof == Proof::Subject) {
             continue;
         }
         return Some(Matched {
@@ -218,17 +238,17 @@ mod tests {
         let t2 = token_with(&KEY, "uid-2");
         let mut m = from("stranger@q.example");
         m.recipients = vec![format!("booking+{t2}@ilia.ae")];
-        let hit = find(&m, &cands(), &KEY, "ilia.ae").unwrap();
+        let hit = find(&m, &cands(), &KEY, "ilia.ae", false).unwrap();
         assert_eq!(
             (hit.booking_id.as_str(), hit.proof, hit.sender),
             ("b2", Proof::Recipient, Sender::Other)
         );
         // Another domain's plus address is not ours.
-        assert_eq!(find(&m, &cands(), &KEY, "other.example"), None);
+        assert_eq!(find(&m, &cands(), &KEY, "other.example", false), None);
 
         let mut m = from("guest@x.example");
         m.references = format!("<a@gmail.com> <calrs.{t1}.00aa@ilia.ae>");
-        let hit = find(&m, &cands(), &KEY, "ilia.ae").unwrap();
+        let hit = find(&m, &cands(), &KEY, "ilia.ae", false).unwrap();
         assert_eq!(
             (hit.booking_id.as_str(), hit.proof, hit.sender),
             ("b1", Proof::Reference, Sender::Guest)
@@ -237,14 +257,14 @@ mod tests {
         // An attendee is matched as an attendee, not as the guest.
         let mut m = from("friend@y.example");
         m.subject = format!("Re: Message from Ilia [#{t1}]");
-        let hit = find(&m, &cands(), &KEY, "ilia.ae").unwrap();
+        let hit = find(&m, &cands(), &KEY, "ilia.ae", false).unwrap();
         assert_eq!((hit.proof, hit.sender), (Proof::Subject, Sender::Attendee));
         // A forward's recipient replying with our Message-ID: matched, but
         // as another address.
         let mut m = from("colleague@corp.example");
         m.references = format!("<calrs.{t1}.00aa@ilia.ae>");
         assert_eq!(
-            find(&m, &cands(), &KEY, "ilia.ae").unwrap().sender,
+            find(&m, &cands(), &KEY, "ilia.ae", false).unwrap().sender,
             Sender::Other
         );
     }
@@ -254,14 +274,42 @@ mod tests {
         let t1 = token_with(&KEY, "uid-1");
         let mut m = from("stranger@q.example");
         m.subject = format!("Re: [#{t1}]");
-        assert_eq!(find(&m, &cands(), &KEY, "ilia.ae"), None);
+        assert_eq!(find(&m, &cands(), &KEY, "ilia.ae", false), None);
         let mut m = from("guest@x.example");
         m.subject = "Re: [#aaaaaaaaaaaaaaaa]".into();
         m.recipients = vec!["booking+bbbbbbbbbbbbbbbb@ilia.ae".into()];
-        assert_eq!(find(&m, &cands(), &KEY, "ilia.ae"), None);
+        assert_eq!(find(&m, &cands(), &KEY, "ilia.ae", false), None);
         // Under another key the right uid is a wrong token.
         let mut m = from("guest@x.example");
         m.references = format!("<calrs.{t1}.00@ilia.ae>");
-        assert_eq!(find(&m, &cands(), &[1u8; 32], "ilia.ae"), None);
+        assert_eq!(find(&m, &cands(), &[1u8; 32], "ilia.ae", false), None);
+    }
+
+    #[test]
+    fn known_only_accepts_the_guest_and_attendees_alone() {
+        let t1 = token_with(&KEY, "uid-1");
+        let refs = format!("<calrs.{t1}.00aa@ilia.ae> <owner-reply@ilia.ae>");
+        // Someone the mailbox's owner answered or copied in, replying to
+        // the owner with our Message-ID still in References; a forward that
+        // keeps it; a plus address: none is accepted from another address.
+        let mut m = from("partner@p.example");
+        m.references = refs.clone();
+        assert!(find(&m, &cands(), &KEY, "ilia.ae", false).is_some());
+        assert_eq!(find(&m, &cands(), &KEY, "ilia.ae", true), None);
+        let mut m = from("partner@p.example");
+        m.recipients = vec![format!("booking+{t1}@ilia.ae")];
+        assert_eq!(find(&m, &cands(), &KEY, "ilia.ae", true), None);
+        // The guest and an attendee still match, by any proof.
+        let mut m = from("guest@x.example");
+        m.references = refs;
+        let hit = find(&m, &cands(), &KEY, "ilia.ae", true).unwrap();
+        assert_eq!(
+            (hit.booking_id.as_str(), hit.proof, hit.sender),
+            ("b1", Proof::Reference, Sender::Guest)
+        );
+        let mut m = from("friend@y.example");
+        m.subject = format!("Re: [#{t1}]");
+        let hit = find(&m, &cands(), &KEY, "ilia.ae", true).unwrap();
+        assert_eq!((hit.proof, hit.sender), (Proof::Subject, Sender::Attendee));
     }
 }

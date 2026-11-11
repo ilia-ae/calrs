@@ -20,11 +20,24 @@
 //! minutes. The log says whether the transport (connect, TLS) or the
 //! service (NO, BAD, protocol) failed.
 //!
-//! First run in a folder: only the unseen mail among the last
-//! [`SEARCH_SPAN`] UIDs is taken, and the history before it is skipped. The
-//! state is saved only once all of it was processed, so a session that
-//! breaks half-way takes the rest next time. A UIDVALIDITY change starts
-//! again from UIDNEXT. Later polls take at most [`Policy::batch`] messages.
+//! First run in a folder (outside shared mode): only the unseen mail
+//! among the last [`SEARCH_SPAN`] UIDs is taken, and the history before it
+//! is skipped. The state is saved only once all of it was processed, so a
+//! session that breaks half-way takes the rest next time. A UIDVALIDITY
+//! change starts again from UIDNEXT. Later polls take at most
+//! [`Policy::batch`] messages.
+//!
+//! Shared mode (`CALRS_INBOX_SHARED`, a mailbox that is also a person's
+//! own): per new message only `RFC822.SIZE` and the headers the match needs
+//! ([`MATCH_HEADERS`], at most [`HEADERS_MAX`] bytes) are fetched, and the
+//! match runs on them alone, and only from the guest's or an attendee's
+//! address (`matcher::find`, `known_only`). Only a message that matches a
+//! booking is fetched in full, filtered, stored, flagged or moved; any
+//! other one is counted as `unmatched` and nothing else: no full fetch, no
+//! flag, no move, no log line of its own. A matched message that is our
+//! own mail (`filter::Drop::Loop`) is counted as `loop` and left as it is.
+//! The first run starts at UIDNEXT: the mailbox's history is never
+//! searched.
 //!
 //! Logs carry counts by outcome, UIDs, sizes and booking ids; never an
 //! address, a subject or the text.
@@ -57,6 +70,15 @@ pub(crate) const MATCHED_PER_HOUR: u32 = 200;
 pub(crate) const SEARCH_SPAN: u32 = 1000;
 /// Empty spans one poll skips before it waits for the next.
 const EMPTY_SPANS_PER_POLL: u32 = 100;
+/// Shared mode: the headers fetched to match a new message (`matcher`
+/// reads the recipients, In-Reply-To and References, Subject and From;
+/// Message-ID only matters to a matched message, read in full).
+pub(crate) const MATCH_HEADERS: &str =
+    "FROM TO CC DELIVERED-TO X-ORIGINAL-TO ENVELOPE-TO IN-REPLY-TO REFERENCES SUBJECT";
+/// Shared mode: the most of those headers read (a partial fetch, so one
+/// crafted header can never exceed the client's literal cap and wedge the
+/// session on its UID).
+pub(crate) const HEADERS_MAX: u32 = 64 * 1024;
 
 /// Timing of the loop.
 #[derive(Debug, Clone)]
@@ -148,18 +170,33 @@ const fn leave(reason: &'static str) -> Disposition {
 /// unmatched, a pending TON booking's (the Telegram rule keeps it out of
 /// the thread, not out of sight), and over a limit. Only what nobody needs
 /// (automatic mail, empty, a duplicate) is marked handled without storing.
+/// In shared mode the match comes first: the filters only ever mark mail
+/// that is about a booking, and never our own mail.
 pub(crate) async fn handle(ctx: &Ctx, raw: &[u8]) -> Disposition {
     let Some(m) = mime::parse(raw) else {
         return leave("unreadable");
     };
-    if let Some(why) = filter::check(&m, &ctx.ours) {
-        return handled(why.as_str());
+    let shared = ctx.config.shared;
+    if !shared {
+        if let Some(why) = filter::check(&m, &ctx.ours) {
+            return handled(why.as_str());
+        }
     }
     let pool = &ctx.pool;
     let candidates = matcher::candidates(pool).await;
-    let Some(hit) = matcher::find(&m, &candidates, &ctx.key, ctx.ours.domain()) else {
+    let Some(hit) = matcher::find(&m, &candidates, &ctx.key, ctx.ours.domain(), shared) else {
         return leave("unmatched");
     };
+    if shared {
+        match filter::check(&m, &ctx.ours) {
+            // Our own mail in the person's mailbox (their copy of what
+            // calrs sent, or the mailbox given as a guest's address): never
+            // a guest writing, and theirs to read. Left as it is.
+            Some(filter::Drop::Loop) => return leave("loop"),
+            Some(why) => return handled(why.as_str()),
+            None => {}
+        }
+    }
     let booking_id = hit.booking_id.as_str();
     let Some(booking) = tg_store::booking_row(pool, booking_id).await else {
         return leave("unmatched");
@@ -269,7 +306,21 @@ async fn mark<S: AsyncRead + AsyncWrite + Unpin>(
     }
 }
 
-/// One message: its size, then its body, then what to do.
+/// Shared mode: whether the headers of a new message match a booking.
+async fn matches_on_headers(ctx: &Ctx, headers: &[u8]) -> bool {
+    let Some(m) = mime::parse(headers) else {
+        return false;
+    };
+    let domain = ctx.ours.domain();
+    if !matcher::may_match(&m, domain) {
+        return false;
+    }
+    let candidates = matcher::candidates(&ctx.pool).await;
+    matcher::find(&m, &candidates, &ctx.key, domain, true).is_some()
+}
+
+/// One message: its size, then its body, then what to do. In shared mode
+/// its size and match headers first, and the rest only when they match.
 async fn process<S: AsyncRead + AsyncWrite + Unpin>(
     client: &mut Client<S>,
     ctx: &Ctx,
@@ -277,12 +328,30 @@ async fn process<S: AsyncRead + AsyncWrite + Unpin>(
     stats: &mut Stats,
 ) -> imap::Result<()> {
     let set = uid.to_string();
-    let meta = client.uid_fetch(&set, "(UID RFC822.SIZE FLAGS)").await?;
-    let Some(meta) = meta.into_iter().find(|f| f.uid == uid) else {
-        stats.add("gone");
-        return Ok(());
+    let size = if ctx.config.shared {
+        let items = format!(
+            "(UID RFC822.SIZE BODY.PEEK[HEADER.FIELDS ({MATCH_HEADERS})]<0.{HEADERS_MAX}>)"
+        );
+        let meta = client.uid_fetch(&set, &items).await?;
+        let Some(meta) = meta.into_iter().find(|f| f.uid == uid) else {
+            stats.add("gone");
+            return Ok(());
+        };
+        // Not ours: counted, and nothing else.
+        if !matches_on_headers(ctx, meta.body.as_deref().unwrap_or_default()).await {
+            stats.add("unmatched");
+            return Ok(());
+        }
+        meta.size
+    } else {
+        let meta = client.uid_fetch(&set, "(UID RFC822.SIZE FLAGS)").await?;
+        let Some(meta) = meta.into_iter().find(|f| f.uid == uid) else {
+            stats.add("gone");
+            return Ok(());
+        };
+        meta.size
     };
-    let size = meta.size.unwrap_or(u32::MAX);
+    let size = size.unwrap_or(u32::MAX);
     if size > MESSAGE_MAX {
         tracing::info!(target: "calrs::inbox", uid, size, "inbox message over the size limit; left unread");
         stats.add("oversize");
@@ -392,6 +461,9 @@ pub(crate) async fn poll_once<S: AsyncRead + AsyncWrite + Unpin>(
             };
             if state.is_some() {
                 tracing::warn!(target: "calrs::inbox", "inbox UIDVALIDITY changed; starting from the next message");
+            } else if ctx.config.shared {
+                // A person's own mailbox: its history is theirs.
+                tracing::info!(target: "calrs::inbox", "inbox shared mode: first run starts from the next message");
             } else if last > 0 {
                 // The unseen mail of the last span; the state is saved
                 // only once all of it is done, so a session that breaks
