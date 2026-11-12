@@ -14,7 +14,7 @@
   {% if email %}
   <form method="post" action="/booking/pay/resend" style="margin-top: 1.25rem;">
     <input type="hidden" name="email" value="{{ email }}">
-    <button type="submit" class="btn" style="cursor: pointer;">{{ t("ton-resend-submit") }}</button>
+    <button type="submit" class="btn">{{ t("ton-resend-submit") }}</button>
   </form>
   {% endif %}
 </div>

@@ -530,6 +530,18 @@ Also `src/ton/settings.rs` (the key and its unit test), `src/web/apply/ton.rs` a
 
 ---
 
+## Buttons and the dark accent (ilia fork)
+
+**Concept** (owner's request 2026-11-12: "every button the same, make it look good"): one button system in `templates/base.html`. `.btn` is the primary fill (solid `--accent`, text `--on-accent`, min-height 2.75rem, full width by default as upstream's form submits are, `inline-flex` so an `<a class="btn">` looks like a `<button>`, no underline); modifiers `.btn-secondary` (outlined), `.btn-ghost` (text only), `.btn-auto` (sized to the label), `.btn-sm` (copy buttons), `.btn-lg`; `.btn-row` lays them out (`form` children are `display: contents`). `[hidden]` is `display: none !important` globally, so a `.btn` that starts hidden stays hidden. `.slot-btn` (time slots, dashboard actions) is unchanged. Tokens added: `--on-accent`, `--warn`/`--warn-bg`/`--warn-border`, `--mono`. The payment page (`ton_pay.html`) follows the layout of BTCPay Server's checkout v2 (read from its source): one 30rem column on every width; head, amount, one box for the state and the deadline (the countdown pill turns amber under 5 minutes and red under 1, `data-level`), the wallet buttons before the QR code (a phone cannot scan its own screen), the QR code, the address and comment rows (the comment marked amber) with the five rules right under them, the follow-up actions, the contact line; a finished payment shows only the state as a centred result with an icon. The Telegram card (`ilia/telegram_confirmed.html`, Telegram's blue on the shared shape) sits under it at the same width. Both use only these classes. Text on accent fills anywhere is `var(--on-accent)`, never a literal white; the destructive buttons are `.btn-danger`.
+
+**Dark accent:** `custom_theme_css` (`src/web/branding.rs`) used to repeat the light accent in `html.dark`; ilia.ae's `#313131` was then a dark bar on the dark card (1.4:1). When the accent's WCAG contrast with the derived dark surface is under `DARK_ACCENT_MIN_CONTRAST` (2.0), dark mode uses a light accent on the text hue (`DARK_ACCENT_L`, hover `DARK_ACCENT_HOVER_L`) and its subtle/border/muted tints; a saturated brand color (`#be1621`, 2.7:1) is kept. `--on-accent` is white or the dark background, whichever contrasts more with the accent (`on_accent`). Tests: `custom_theme_lightens_an_accent_lost_on_the_dark_surface`, `custom_theme_keeps_a_saturated_accent_in_dark_mode`.
+
+**Embed brand:** `EmbedParams::brand_css` emits its own `--on-accent` for the brand fill. A dark palette passed through as configured takes its background as the dark text choice.
+
+**Upstream files touched:** `src/web/branding.rs`, `src/web/tests/branding.rs`, `templates/base.html`, `templates/confirmed.html` (the "Add to calendar" link), `templates/booking_reschedule_confirm.html`, `booking_host_reschedule.html` and `ton_already_open.html` (inline styles dropped), `booking_cancel_form.html`, `booking_decline_form.html`, `ton_waive_confirm.html` (`.btn-danger`), and white text on accent fills replaced by `var(--on-accent)` in `slots.html`, `profile.html`, `team_profile.html`, `dashboard_base.html`, `dashboard_overview.html`, `dashboard_sources.html`, `settings.html`, `team_settings.html`, `team_form.html`, `event_type_form.html`, `source_calendars.html`, `source_write_setup.html`, `admin.html`, `embed.html`.
+
+---
+
 ## Known issues & TODOs
 
 ### Security

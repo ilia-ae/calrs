@@ -15,7 +15,7 @@
   {% endif %}
   {% if renewals > 0 %}<p style="color: var(--text-muted); font-size: 0.875rem;">{{ t("ton-dash-badge-renewed", n=renewals, max=renewals_max) }}</p>{% endif %}
   <form method="post" action="/dashboard/ton/waive/{{ booking_id }}" style="margin-top: 1.25rem;">
-    <button type="submit" class="btn" style="background: var(--error-text);">{{ t("ton-waive-submit") }}</button>
+    <button type="submit" class="btn btn-danger">{{ t("ton-waive-submit") }}</button>
     <a href="/dashboard/bookings" style="display: inline-block; margin-left: 0.75rem; color: var(--text-muted); text-decoration: none; font-size: 0.9rem;">{{ t("ton-waive-back") }}</a>
   </form>
 </div>

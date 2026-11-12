@@ -1,7 +1,21 @@
 {# ilia fork: "Get notifications in Telegram", the booking's single-use deep link
-   (src/telegram/mod.rs, `booking_created`). #}
-<div class="card" style="text-align: center;">
-  <h2 style="margin: 0 0 0.5rem; font-size: 1.1rem;">{{ t("tg-confirmed-title") }}</h2>
-  <p style="color: var(--text-muted); font-size: 0.9rem; margin: 0 0 1rem;">{{ t("tg-confirmed-body") }}</p>
-  <a href="{{ telegram_link }}" target="_blank" rel="noopener noreferrer" style="display: inline-block; padding: 0.625rem 1.125rem; border-radius: var(--radius); background: #229ED9; color: #fff; text-decoration: none; font-weight: 600; font-size: 0.9rem;">{{ t("tg-confirmed-button") }}</a>
+   (src/telegram/mod.rs, `booking_created`). Telegram's own blue, the shared button shape. #}
+<style>
+  .tg-card { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+  .tg-card-icon { flex: none; width: 2.75rem; height: 2.75rem; border-radius: 50%; background: #229ED9; display: grid; place-items: center; }
+  .tg-card-icon svg { width: 1.375rem; height: 1.375rem; color: #fff; transform: translateX(-1px); }
+  .tg-card-text { flex: 1 1 12rem; min-width: 0; }
+  .tg-card-text h2 { margin: 0 0 0.125rem; font-size: 1rem; color: var(--text); }
+  .tg-card-text p { color: var(--text-muted); font-size: 0.875rem; margin: 0; line-height: 1.5; }
+  .btn-telegram { background: #229ED9; color: #fff; }
+  .btn-telegram:hover { background: #1b8bc2; color: #fff; }
+  @media (max-width: 600px) { .tg-card .btn { width: 100%; } }
+</style>
+<div class="card tg-card">
+  <div class="tg-card-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/></svg></div>
+  <div class="tg-card-text">
+    <h2>{{ t("tg-confirmed-title") }}</h2>
+    <p>{{ t("tg-confirmed-body") }}</p>
+  </div>
+  <a class="btn btn-auto btn-telegram" href="{{ telegram_link }}" target="_blank" rel="noopener noreferrer">{{ t("tg-confirmed-button") }}</a>
 </div>

@@ -65,6 +65,11 @@
       --shadow-lg: 0 4px 6px rgba(0,0,0,0.05), 0 2px 4px rgba(0,0,0,0.03);
       --radius: 10px;
       --radius-lg: 14px;
+      --on-accent: #fff;
+      --warn: #b45309;
+      --warn-bg: rgba(245,158,11,0.08);
+      --warn-border: rgba(217,119,6,0.45);
+      --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
     }
 
     html.dark {
@@ -84,11 +89,15 @@
       --success: #22c55e;
       --error-bg: rgba(220,38,38,0.1);
       --error-text: #f87171;
+      --warn: #fbbf24;
+      --warn-bg: rgba(245,158,11,0.07);
+      --warn-border: rgba(251,191,36,0.35);
       --shadow: 0 1px 3px rgba(0,0,0,0.3);
       --shadow-lg: 0 4px 6px rgba(0,0,0,0.25);
     }
     html.dark .badge-warning { background: rgba(234,179,8,0.15); color: #fbbf24; }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    [hidden] { display: none !important; }
 
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -234,7 +243,7 @@
       transform: scale(0.97);
       box-shadow: none;
     }
-    .slot-btn:focus-visible, .slot-pill:focus-visible, .btn:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible {
+    .slot-btn:focus-visible, .slot-pill:focus-visible, .btn:focus-visible, .ton-copy:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible {
       outline: 2px solid var(--accent);
       outline-offset: 2px;
     }
@@ -304,23 +313,48 @@
       background-color: var(--surface-hover);
     }
 
+    /* Buttons (ilia fork): one shape for every action. .btn is the primary
+       fill, full width by default as upstream's form submits are;
+       .btn-secondary is outlined, .btn-ghost is text only; .btn-auto sizes to
+       the label, .btn-sm is the compact one (copy), .btn-row lays them out. */
     .btn {
-      display: inline-block;
-      padding: 0.75rem 1.5rem;
-      background: linear-gradient(135deg, var(--accent), var(--accent-hover));
-      color: #fff;
-      border: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      min-height: 2.75rem;
+      padding: 0.625rem 1.25rem;
+      background: var(--accent);
+      color: var(--on-accent);
+      border: 1px solid transparent;
       border-radius: var(--radius);
+      font: inherit;
       font-size: 0.95rem;
       font-weight: 600;
+      line-height: 1.25;
+      text-align: center;
+      text-decoration: none;
       cursor: pointer;
       width: 100%;
-      transition: all 0.15s ease;
+      transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
       letter-spacing: -0.01em;
     }
-    .btn:hover { background: linear-gradient(135deg, var(--accent-hover), var(--accent)); box-shadow: var(--shadow-lg); }
-    .btn:active { transform: scale(0.97); box-shadow: none; }
+    .btn:hover { background: var(--accent-hover); color: var(--on-accent); box-shadow: var(--shadow-lg); }
+    .btn:active { transform: scale(0.98); box-shadow: none; }
     .btn:disabled { background: var(--accent-muted); cursor: not-allowed; }
+    .btn svg { width: 1.125em; height: 1.125em; flex: none; }
+    .btn-secondary { background: var(--surface); color: var(--text); border-color: var(--border); font-weight: 500; }
+    .btn-secondary:hover { background: var(--surface-hover); color: var(--text); border-color: var(--border-hover); box-shadow: none; }
+    .btn-ghost { background: transparent; color: var(--text-secondary); font-weight: 500; }
+    .btn-ghost:hover { background: var(--surface-hover); color: var(--text); box-shadow: none; }
+    .btn-danger, .btn-danger:hover { background: #dc2626; color: #fff; }
+    .btn-danger:hover { background: #b91c1c; }
+    .btn-auto { width: auto; }
+    .btn-sm { min-height: 2rem; padding: 0.3125rem 0.75rem; font-size: 0.8125rem; font-weight: 500; border-radius: 8px; }
+    .btn-lg { min-height: 3.25rem; font-size: 1rem; }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
+    .btn-row > form { margin: 0; display: contents; }
+    @media (prefers-reduced-motion: reduce) { .btn, .slot-btn { transition: none; } .btn:active, .slot-btn:hover, .slot-btn:active { transform: none; } }
 
     /* Confirmation */
     .check {

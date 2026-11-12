@@ -37,8 +37,11 @@ impl EmbedParams {
     pub(super) fn brand_css(&self) -> Option<String> {
         let raw = self.brand.as_deref()?.trim_start_matches('#');
         let (r, g, b) = hex_to_rgb(raw)?;
+        // ilia fork: text on the brand fill, since /accent.css computed its
+        // --on-accent for the org accent, which this rule replaces.
+        let on = on_accent(&format!("#{r:02x}{g:02x}{b:02x}"), "#111111");
         Some(format!(
-            "--accent: #{hex}; --accent-hover: #{hex}; \
+            "--accent: #{hex}; --accent-hover: #{hex}; --on-accent: {on}; \
              --accent-subtle: rgba({r},{g},{b},0.12); \
              --accent-border: rgba({r},{g},{b},0.3); \
              --accent-muted: rgba({r},{g},{b},0.5);",
@@ -407,6 +410,45 @@ const DARK_TEXT_MAX_SAT: f32 = 0.15;
 /// the configured palette is unusual.
 const DARK_TEXT_MIN_L: f32 = 0.40;
 
+/// WCAG relative luminance of a `#rrggbb` color (0 for anything unparsable).
+fn luminance(hex: &str) -> f32 {
+    let Some((r, g, b)) = hex_to_rgb(hex.trim().trim_start_matches('#')) else {
+        return 0.0;
+    };
+    let lin = |c: u8| {
+        let c = c as f32 / 255.0;
+        if c <= 0.039_28 {
+            c / 12.92
+        } else {
+            ((c + 0.055) / 1.055).powf(2.4)
+        }
+    };
+    0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
+}
+
+/// WCAG contrast ratio of two colors, from 1 to 21.
+pub(super) fn contrast(a: &str, b: &str) -> f32 {
+    let (la, lb) = (luminance(a), luminance(b));
+    (la.max(lb) + 0.05) / (la.min(lb) + 0.05)
+}
+
+/// ilia fork: below this contrast with the dark surface an accent fill is lost
+/// in dark mode (ilia.ae's #313131 on #181818 is 1.4:1), so dark mode uses a
+/// light accent instead. A saturated brand color (#be1621, 2.7:1) is kept.
+const DARK_ACCENT_MIN_CONTRAST: f32 = 2.0;
+/// Lightness of the light accent dark mode falls back to, and of its hover.
+const DARK_ACCENT_L: f32 = 0.93;
+const DARK_ACCENT_HOVER_L: f32 = 0.82;
+
+/// Text on an accent fill: white, or the dark background when that reads better.
+fn on_accent(accent: &str, dark: &str) -> String {
+    if contrast(accent, "#ffffff") >= contrast(accent, dark) {
+        "#ffffff".to_string()
+    } else {
+        dark.to_string()
+    }
+}
+
 /// Build custom theme CSS from user-provided hex colors.
 ///
 /// The admin panel only collects one set of colors, which are taken to be the
@@ -480,13 +522,34 @@ pub(super) fn custom_theme_css(
         (txt_l - DARK_TEXT_MUTED_STEP).max(DARK_TEXT_MIN_L),
     );
 
+    // ilia fork: an accent as dark as the dark surface becomes a light one there.
+    let (dark_accent, dark_accent_hover) =
+        if contrast(accent, &dark_surface) < DARK_ACCENT_MIN_CONTRAST {
+            (
+                hsl_to_hex(txt_h, txt_s, DARK_ACCENT_L),
+                hsl_to_hex(txt_h, txt_s, DARK_ACCENT_HOVER_L),
+            )
+        } else {
+            (accent.to_string(), accent_hover.to_string())
+        };
+    let (dr, dg, db) = hex_to_rgb(&dark_accent[1..]).unwrap_or((r, g, b));
+    // The darker of the configured pair: `text` for a light palette, `bg` for
+    // a dark one passed through as configured.
+    let ink = if luminance(text) <= luminance(bg) {
+        text
+    } else {
+        bg
+    };
+    let on_light = on_accent(accent, ink);
+    let on_dark = on_accent(&dark_accent, &dark_bg);
+
     format!(
-        ":root{{--bg:{bg};--surface:{surface};--text:{text};--accent:{accent};--accent-hover:{accent_hover};\
+        ":root{{--bg:{bg};--surface:{surface};--text:{text};--accent:{accent};--accent-hover:{accent_hover};--on-accent:{on_light};\
          --accent-subtle:rgba({r},{g},{b},0.08);--accent-border:rgba({r},{g},{b},0.25);--accent-muted:rgba({r},{g},{b},0.5)}}\
          html.dark{{--bg:{dark_bg};--surface:{dark_surface};--surface-hover:{dark_border};--text:{dark_text};\
          --text-secondary:{dark_text_secondary};--text-muted:{dark_text_muted};--border:{dark_border};--border-hover:{dark_border_hover};\
-         --accent:{accent};--accent-hover:{accent_hover};\
-         --accent-subtle:rgba({r},{g},{b},0.12);--accent-border:rgba({r},{g},{b},0.3);--accent-muted:rgba({r},{g},{b},0.5)}}",
+         --accent:{dark_accent};--accent-hover:{dark_accent_hover};--on-accent:{on_dark};\
+         --accent-subtle:rgba({dr},{dg},{db},0.12);--accent-border:rgba({dr},{dg},{db},0.3);--accent-muted:rgba({dr},{dg},{db},0.5)}}",
     )
 }
 

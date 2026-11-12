@@ -7,92 +7,185 @@
 {% block head %}
 {% if live %}<noscript><meta http-equiv="refresh" content="15"></noscript>{% endif %}
 <style>
-  .ton-amount { font-size: 1.75rem; font-weight: 700; letter-spacing: -0.01em; }
-  .ton-row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin: 0.375rem 0; }
-  .ton-row code { font-size: 0.95rem; padding: 0.25rem 0.5rem; background: var(--surface-hover); border: 1px solid var(--border); border-radius: 6px; word-break: break-all; user-select: all; -webkit-user-select: all; }
-  .ton-label { color: var(--text-muted); font-size: 0.85rem; min-width: 6.5rem; }
-  .ton-qr { width: 220px; max-width: 100%; margin: 0.75rem 0; padding: 0; border-radius: 8px; overflow: hidden; }
+  /* Payment page (ilia fork). Layout after BTCPay Server's checkout v2: one
+     narrow column, the same on a desktop and a phone. Amount, then one box for
+     the state and the deadline, the wallet buttons (before the QR code: a phone
+     cannot scan its own screen), the QR code, the address and comment rows
+     with the rules right under them, the follow-up actions, the contact line.
+     A finished payment replaces all of it with a centred result. */
+  .ton-wrap { max-width: 30rem; margin-inline: auto; }
+  .ton-wrap .tg-card .btn { width: 100%; }
+  .ton-head { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; text-align: center; margin-bottom: 1.5rem; }
+  .ton-head h1 { text-wrap: balance; }
+  .ton-head .subtitle { margin: 0; }
+
+  .ton-amountbox { text-align: center; margin-bottom: 1rem; }
+  .ton-label { color: var(--text-muted); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+  .ton-amount { font-size: 2.5rem; font-weight: 700; letter-spacing: -0.03em; line-height: 1.1; font-variant-numeric: tabular-nums; margin-top: 0.25rem; overflow-wrap: anywhere; }
+  .ton-rate { color: var(--text-muted); font-size: 0.8125rem; margin-top: 0.375rem; font-variant-numeric: tabular-nums; }
+
+  .ton-status { background: var(--surface-hover); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem 1rem; text-align: center; }
+  .ton-state { display: flex; justify-content: center; align-items: baseline; gap: 0.5rem; font-size: 0.925rem; line-height: 1.5; }
+  .ton-state::before { content: ""; flex: none; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--text-muted); transform: translateY(-0.05rem); }
+  .ton-state[data-state="waiting"]::before, .ton-state[data-state="partial"]::before { background: #f59e0b; box-shadow: 0 0 0 3px rgba(245,158,11,0.2); }
+  .ton-state[data-state="seen"]::before, .ton-state[data-state="checking"]::before, .ton-state[data-state="paid"]::before { background: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.2); }
+  .ton-state[data-state="confirmed"]::before, .ton-state[data-state="waived"]::before { background: var(--success); box-shadow: 0 0 0 3px rgba(34,197,94,0.2); }
+  .ton-state[data-state="expired"]::before, .ton-state[data-state="late"]::before, .ton-state[data-state="revoked"]::before,
+  .ton-state[data-state="taken"]::before, .ton-state[data-state="refund"]::before, .ton-state[data-state="busy"]::before { background: var(--error-text); box-shadow: 0 0 0 3px rgba(239,68,68,0.15); }
+  .ton-deadline { margin-top: 0.625rem; padding-top: 0.625rem; border-top: 1px solid var(--border); display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 0.375rem 0.625rem; font-size: 0.875rem; }
+  .ton-deadline strong { font-weight: 500; color: var(--text-secondary); }
+  .ton-timer { font-variant-numeric: tabular-nums; font-size: 0.8125rem; font-weight: 600; padding: 0.125rem 0.625rem; border-radius: 999px; background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+  .ton-timer:empty { display: none; }
+  .ton-timer[data-level="soon"] { background: var(--warn-bg); color: var(--warn); border-color: var(--warn-border); }
+  .ton-timer[data-level="late"] { background: transparent; color: var(--error-text); border-color: currentColor; }
+  .ton-renewed { color: var(--text-muted); font-size: 0.8125rem; margin-top: 0.25rem; }
+
+  /* A finished payment: the state alone, as a centred result. */
+  .ton-result { background: none; border: 0; padding: 0.5rem 0 0; }
+  .ton-result .ton-state { flex-direction: column; align-items: center; gap: 0.875rem; font-size: 1rem; max-width: 24rem; margin-inline: auto; }
+  .ton-result .ton-state::before { display: none; }
+  .ton-result-icon { display: grid; place-items: center; width: 3rem; height: 3rem; border-radius: 50%; background: var(--text-muted); color: #fff; box-shadow: 0 0 0 6px rgba(107,114,128,0.15); }
+  .ton-result-icon svg { width: 1.5rem; height: 1.5rem; }
+  .ton-result .ton-state[data-state="seen"] .ton-result-icon, .ton-result .ton-state[data-state="checking"] .ton-result-icon, .ton-result .ton-state[data-state="paid"] .ton-result-icon { background: #3b82f6; box-shadow: 0 0 0 6px rgba(59,130,246,0.2); }
+  .ton-result .ton-state[data-state="confirmed"] .ton-result-icon, .ton-result .ton-state[data-state="waived"] .ton-result-icon { background: var(--success); box-shadow: 0 0 0 6px rgba(34,197,94,0.2); }
+  .ton-result .ton-state[data-state="expired"] .ton-result-icon, .ton-result .ton-state[data-state="late"] .ton-result-icon, .ton-result .ton-state[data-state="revoked"] .ton-result-icon,
+  .ton-result .ton-state[data-state="taken"] .ton-result-icon, .ton-result .ton-state[data-state="refund"] .ton-result-icon, .ton-result .ton-state[data-state="busy"] .ton-result-icon { background: var(--error-text); box-shadow: 0 0 0 6px rgba(239,68,68,0.15); }
+
+  .ton-note { color: var(--text-muted); font-size: 0.875rem; margin: 0.625rem 0 0; text-align: center; }
+  .ton-note.ok { color: var(--success); }
+  .ton-note.bad { color: var(--error-text); }
+  .ton-contact { font-size: 0.8125rem; margin-top: 1.25rem; }
+
+  .ton-wallets { display: flex; flex-direction: column; gap: 0.625rem; margin-top: 1.25rem; }
+  .ton-scan { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; width: 14rem; max-width: 100%; margin: 1.5rem auto 0; }
+  .ton-qr { width: 100%; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); background: #fff; }
   .ton-qr svg { display: block; width: 100%; height: auto; }
-  .ton-other summary { cursor: pointer; color: var(--text-muted); font-size: 0.875rem; }
-  .ton-warn { margin-top: 1rem; padding: 0.75rem 1rem; border: 1px solid #f59e0b; border-radius: var(--radius); background: rgba(245,158,11,0.08); font-size: 0.875rem; }
-  .ton-warn li { margin-left: 1.1rem; }
-  .ton-state { padding: 0.75rem 1rem; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface-hover); margin-bottom: 1rem; }
-  .ton-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 1.25rem; }
-  .ton-actions form { margin: 0; }
-  .ton-copy { font-size: 0.8rem; cursor: pointer; padding: 0.25rem 0.625rem; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); }
+  .ton-scan p { color: var(--text-muted); font-size: 0.8125rem; line-height: 1.4; text-align: center; margin: 0; }
+  .ton-other { margin-top: 0.75rem; text-align: center; }
+  .ton-other summary { display: inline-block; cursor: pointer; color: var(--text-secondary); font-size: 0.875rem; list-style: none; }
+  .ton-other summary::-webkit-details-marker { display: none; }
+  .ton-other summary::before { content: "\25B8"; display: inline-block; margin-right: 0.375rem; transition: transform 0.15s ease; }
+  .ton-other[open] summary::before { transform: rotate(90deg); }
+  .ton-other summary:hover { color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
+  .ton-other summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+  .ton-other .ton-scan { margin-top: 0.75rem; }
+
+  .ton-fields { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1.5rem; }
+  .ton-field { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 0.75rem; row-gap: 0.25rem; align-items: center; padding: 0.625rem 0.75rem 0.625rem 0.875rem; background: var(--surface-hover); border: 1px solid var(--border); border-radius: var(--radius); }
+  .ton-field .ton-label { grid-column: 1; grid-row: 1; }
+  .ton-field code { grid-column: 1; grid-row: 2; font-family: var(--mono); font-size: 0.9rem; line-height: 1.4; overflow-wrap: anywhere; user-select: all; -webkit-user-select: all; }
+  .ton-field .ton-copy { grid-column: 2; grid-row: 1 / 3; }
+  .ton-field-memo { border-color: var(--warn-border); box-shadow: inset 3px 0 0 var(--warn); }
+  .ton-field-memo code { font-size: 1.0625rem; font-weight: 600; }
+  #ton-copy-status { text-align: center; color: var(--text-muted); font-size: 0.8125rem; min-height: 1.2em; margin: 0; }
+
+  .ton-warn { margin-top: 0.5rem; padding: 0.875rem 1.125rem; border: 1px solid var(--warn-border); border-radius: var(--radius); background: var(--warn-bg); font-size: 0.875rem; line-height: 1.55; }
+  .ton-warn ul { display: flex; flex-direction: column; gap: 0.375rem; padding-left: 1.1rem; }
+  .ton-warn li::marker { color: var(--warn); }
+  .ton-actions { margin-top: 1.5rem; flex-direction: column; align-items: stretch; gap: 0.5rem; }
+
+  @media (max-width: 600px) {
+    .ton-wrap > .card { padding: 1.5rem 1.25rem; }
+    .ton-amount { font-size: 2.125rem; }
+    .ton-scan { width: 12rem; }
+    .ton-status:not(.ton-result) { padding: 0.75rem; }
+  }
 </style>
 {% endblock %}
 
 {% block content %}
+<div class="ton-wrap">
 <div class="logo"><img src="/logo" alt="" onerror="this.closest('.logo').style.display='none'"></div>
 
 <div class="card">
-  <h1>{{ event_title }}{% if test_booking %}{% include "partials/ilia_test_badge.html" %}{% endif %}</h1>
-  <p class="subtitle">{{ t("email-date-at-time", date=meeting_date, time=meeting_time) }}</p>
-
-  <div class="ton-state" id="ton-state" data-state="{{ pay_state }}">
-    {% if pay_state == "waiting" %}{{ t("ton-pay-state-waiting") }}
-    {% elif pay_state == "seen" %}{{ t("ton-pay-state-seen") }}
-    {% elif pay_state == "partial" %}{{ t("ton-pay-state-partial", paid=paid_ton, rest=amount_ton) }}
-    {% elif pay_state == "checking" %}{{ t("ton-pay-state-checking") }}
-    {% elif pay_state == "paid" %}{{ t("ton-pay-state-paid") }}
-    {% elif pay_state == "confirmed" %}{{ t("ton-pay-state-confirmed") }}
-    {% elif pay_state == "waived" %}{{ t("ton-pay-state-waived") }}
-    {% elif pay_state == "busy" %}{{ t("ton-pay-state-busy") }}
-    {% elif pay_state == "expired" %}{{ t("ton-pay-state-expired") }}
-    {% elif pay_state == "late" %}{{ t("ton-pay-state-late") }}
-    {% elif pay_state == "revoked" %}{{ t("ton-pay-state-revoked") }}
-    {% elif pay_state == "taken" %}{{ t("ton-pay-state-taken") }}
-    {% elif pay_state == "refund" %}{{ t("ton-pay-state-refund", paid=paid_ton) }}
-    {% else %}{{ t("ton-pay-state-closed") }}{% endif %}
+  <div class="ton-head">
+    <h1>{{ event_title }}{% if test_booking %}{% include "partials/ilia_test_badge.html" %}{% endif %}</h1>
+    <p class="subtitle">{{ t("email-date-at-time", date=meeting_date, time=meeting_time) }}</p>
   </div>
-  {% if host_email %}<p style="font-size: 0.875rem;">{{ t("ton-pay-contact", host=host_name, email=host_email) }}</p>{% endif %}
-
-  {% if emailed %}<p style="color: var(--success); font-size: 0.875rem;">{{ t("ton-pay-emailed") }}</p>{% endif %}
-  {% if email_failed %}<p style="color: var(--error-text); font-size: 0.875rem;">{{ t("ton-pay-email-unavailable") }}</p>{% endif %}
-  {% if checked and live %}<p style="color: var(--text-muted); font-size: 0.875rem;">{{ t("ton-pay-checking-now") }}</p>{% endif %}
 
   {% if can_pay %}
-  <p style="margin-bottom: 0.25rem;"><strong>{{ t("ton-pay-held-until", time=held_until, zone=zone) }}</strong> <span id="ton-left" data-seconds="{{ seconds_left }}" style="color: var(--text-muted);"></span></p>
-  {% if renewals > 0 %}<p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0;">{{ t("ton-pay-renewed", n=renewals, max=renewals_max) }}</p>{% endif %}
-
-  <div style="margin-top: 1rem;">
+  <div class="ton-amountbox">
     <div class="ton-label">{{ t("ton-pay-amount-label") }}</div>
     <div class="ton-amount">{{ amount_ton }} TON</div>
-    {% if usd %}<div style="color: var(--text-muted); font-size: 0.85rem;">{{ t("ton-pay-rate", usd=usd, rate=rate, sources=rate_sources, time=rate_time) }}</div>{% endif %}
+    {% if usd %}<div class="ton-rate">{{ t("ton-pay-rate", usd=usd, rate=rate, sources=rate_sources, time=rate_time) }}</div>{% endif %}
+  </div>
+  {% endif %}
+
+  <div class="ton-status{% if not can_pay %} ton-result{% endif %}">
+    <div class="ton-state" id="ton-state" data-state="{{ pay_state }}" role="status">
+      {% if not can_pay %}<span class="ton-result-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">{% if pay_state in ["confirmed", "waived"] %}<path d="M5 12.5l4.5 4.5L19 7.5"/>{% elif pay_state in ["seen", "checking", "paid"] %}<circle cx="12" cy="12" r="8"/><path d="M12 8v4l2.5 2.5"/>{% elif pay_state == "closed" %}<path d="M6 12h12"/>{% else %}<path d="M7 7l10 10M17 7L7 17"/>{% endif %}</svg></span>{% endif %}
+      <span>{% if pay_state == "waiting" %}{{ t("ton-pay-state-waiting") }}
+      {% elif pay_state == "seen" %}{{ t("ton-pay-state-seen") }}
+      {% elif pay_state == "partial" %}{{ t("ton-pay-state-partial", paid=paid_ton, rest=amount_ton) }}
+      {% elif pay_state == "checking" %}{{ t("ton-pay-state-checking") }}
+      {% elif pay_state == "paid" %}{{ t("ton-pay-state-paid") }}
+      {% elif pay_state == "confirmed" %}{{ t("ton-pay-state-confirmed") }}
+      {% elif pay_state == "waived" %}{{ t("ton-pay-state-waived") }}
+      {% elif pay_state == "busy" %}{{ t("ton-pay-state-busy") }}
+      {% elif pay_state == "expired" %}{{ t("ton-pay-state-expired") }}
+      {% elif pay_state == "late" %}{{ t("ton-pay-state-late") }}
+      {% elif pay_state == "revoked" %}{{ t("ton-pay-state-revoked") }}
+      {% elif pay_state == "taken" %}{{ t("ton-pay-state-taken") }}
+      {% elif pay_state == "refund" %}{{ t("ton-pay-state-refund", paid=paid_ton) }}
+      {% else %}{{ t("ton-pay-state-closed") }}{% endif %}</span>
+    </div>
+    {% if can_pay %}
+    <div class="ton-deadline">
+      <strong>{{ t("ton-pay-held-until", time=held_until, zone=zone) }}</strong>
+      <span class="ton-timer" id="ton-left" data-seconds="{{ seconds_left }}"></span>
+    </div>
+    {% if renewals > 0 %}<p class="ton-renewed">{{ t("ton-pay-renewed", n=renewals, max=renewals_max) }}</p>{% endif %}
+    {% endif %}
   </div>
 
-  <div class="ton-actions">
-    {#- Tonkeeper first: its link names the coin (asset_id), so a multichain Tonkeeper keeps the
-        amount and opens the confirmation; the plain ton:// link is for other wallets. #}
-    <a class="btn" href="{{ keeper_link }}" rel="noopener noreferrer">{{ t("ton-pay-open-tonkeeper") }}</a>
-    <a class="slot-btn" href="{{ ton_link }}" rel="noopener noreferrer" style="text-decoration: none; align-self: center;">{{ t("ton-pay-open-wallet") }}</a>
+  {% if emailed %}<p class="ton-note ok">{{ t("ton-pay-emailed") }}</p>{% endif %}
+  {% if email_failed %}<p class="ton-note bad">{{ t("ton-pay-email-unavailable") }}</p>{% endif %}
+  {% if checked and live %}<p class="ton-note">{{ t("ton-pay-checking-now") }}</p>{% endif %}
+
+  {% if can_pay %}
+  {#- Tonkeeper first: its link names the coin (asset_id), so a multichain Tonkeeper keeps the
+      amount and opens the confirmation; the plain ton:// link is for other wallets. #}
+  <div class="ton-wallets">
+    <a class="btn btn-lg" href="{{ keeper_link }}" rel="noopener noreferrer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 6.5h15L12 20.5z"/><path d="M12 6.5v14"/></svg>{{ t("ton-pay-open-tonkeeper") }}</a>
+    <a class="btn btn-secondary" href="{{ ton_link }}" rel="noopener noreferrer">{{ t("ton-pay-open-wallet") }}</a>
   </div>
 
   {#- Two codes (`crate::ton::link`): Tonkeeper's link names the coin, which
       other wallets refuse; the plain `ton://` one waits behind a toggle. -#}
   {% if keeper_qr_svg %}
-  <div class="ton-qr" role="img"
-       aria-label="{{ t('ton-pay-qr-alt-tonkeeper') }}">
-    {{ keeper_qr_svg | safe }}
+  <div class="ton-scan">
+    <div class="ton-qr" role="img"
+         aria-label="{{ t('ton-pay-qr-alt-tonkeeper') }}">
+      {{ keeper_qr_svg | safe }}
+    </div>
+    <p>{{ t("ton-pay-scan-tonkeeper") }}</p>
   </div>
-  <p style="color: var(--text-muted); font-size: 0.85rem;">{{ t("ton-pay-scan-tonkeeper") }}</p>
   {% endif %}
   {% if qr_svg %}
   <details class="ton-other">
     <summary>{{ t("ton-pay-qr-other") }}</summary>
-    <div class="ton-qr" role="img"
-         aria-label="{{ t('ton-pay-qr-alt') }}">
-      {{ qr_svg | safe }}
+    <div class="ton-scan">
+      <div class="ton-qr" role="img"
+           aria-label="{{ t('ton-pay-qr-alt') }}">
+        {{ qr_svg | safe }}
+      </div>
+      <p>{{ t("ton-pay-scan") }}</p>
     </div>
-    <p style="color: var(--text-muted); font-size: 0.85rem;">{{ t("ton-pay-scan") }}</p>
   </details>
   {% endif %}
 
-  <div style="margin-top: 1rem;">
-    <div class="ton-row"><span class="ton-label">{{ t("ton-pay-address") }}</span><code id="ton-address">{{ address }}</code><button type="button" class="ton-copy" data-copy="ton-address" aria-label="{{ t('ton-pay-copy-address') }}" hidden>{{ t("ton-pay-copy") }}</button></div>
-    <div class="ton-row"><span class="ton-label">{{ t("ton-pay-comment") }}</span><code id="ton-comment">{{ comment }}</code><button type="button" class="ton-copy" data-copy="ton-comment" aria-label="{{ t('ton-pay-copy-comment') }}" hidden>{{ t("ton-pay-copy") }}</button></div>
-    <p id="ton-copy-status" role="status" aria-live="polite" style="color: var(--text-muted); font-size: 0.85rem; min-height: 1em; margin: 0.25rem 0 0;"></p>
+  <div class="ton-fields">
+    <div class="ton-field">
+      <span class="ton-label">{{ t("ton-pay-address") }}</span>
+      <code id="ton-address">{{ address }}</code>
+      <button type="button" class="btn btn-secondary btn-sm btn-auto ton-copy" data-copy="ton-address" aria-label="{{ t('ton-pay-copy-address') }}" hidden>{{ t("ton-pay-copy") }}</button>
+    </div>
+    <div class="ton-field ton-field-memo">
+      <span class="ton-label">{{ t("ton-pay-comment") }}</span>
+      <code id="ton-comment">{{ comment }}</code>
+      <button type="button" class="btn btn-secondary btn-sm btn-auto ton-copy" data-copy="ton-comment" aria-label="{{ t('ton-pay-copy-comment') }}" hidden>{{ t("ton-pay-copy") }}</button>
+    </div>
+    <p id="ton-copy-status" role="status" aria-live="polite"></p>
   </div>
 
   <div class="ton-warn">
@@ -105,18 +198,21 @@
     </ul>
   </div>
 
-  <div class="ton-actions">
-    <form method="post" action="{{ check_url }}"><button type="submit" class="slot-btn" style="cursor: pointer;">{{ t("ton-pay-check") }}</button></form>
-    {% if show_email %}<form method="post" action="{{ email_url }}"><button type="submit" class="slot-btn" style="cursor: pointer;">{{ t("ton-pay-email") }}</button></form>{% endif %}
+  <div class="btn-row ton-actions">
+    <form method="post" action="{{ check_url }}"><button type="submit" class="btn btn-secondary">{{ t("ton-pay-check") }}</button></form>
+    {% if show_email %}<form method="post" action="{{ email_url }}"><button type="submit" class="btn btn-ghost">{{ t("ton-pay-email") }}</button></form>{% endif %}
   </div>
   {% endif %}
 
   {% if rebook_url %}
-  <p style="margin-top: 1rem;"><a href="{{ rebook_url }}" style="color: var(--accent);">{{ t("ton-pay-rebook") }}</a></p>
+  <div class="btn-row ton-actions"><a class="btn btn-lg" href="{{ rebook_url }}">{{ t("ton-pay-rebook") }}</a></div>
   {% endif %}
+
+  {% if host_email %}<p class="ton-note ton-contact">{{ t("ton-pay-contact", host=host_name, email=host_email) }}</p>{% endif %}
 </div>
 
 {% if telegram_link %}{% include "ilia/telegram_confirmed.html" %}{% endif %}
+</div>
 
 <script>
 (function () {
@@ -138,14 +234,16 @@
   };
   document.querySelectorAll('.ton-copy').forEach(function (btn) {
     btn.hidden = false;
+    var label = btn.textContent, timer;
     btn.addEventListener('click', function () {
       var el = document.getElementById(btn.getAttribute('data-copy'));
       if (!el) return;
       var text = el.textContent.trim();
       if (!navigator.clipboard || !navigator.clipboard.writeText) { fallback(el); return; }
       navigator.clipboard.writeText(text).then(function () {
-        var old = btn.textContent; btn.textContent = I18N.copied; say(I18N.copied);
-        setTimeout(function () { btn.textContent = old; say(''); }, 1500);
+        btn.textContent = I18N.copied; say(I18N.copied);
+        clearTimeout(timer);
+        timer = setTimeout(function () { btn.textContent = label; say(''); }, 1500);
       }, function () { fallback(el); });
     });
   });
@@ -156,6 +254,7 @@
       var s = Math.max(0, Math.round((end - Date.now()) / 1000));
       var mm = Math.floor(s / 60), ss = s % 60;
       left.textContent = I18N.left.replace('%1', mm + ':' + (ss < 10 ? '0' : '') + ss);
+      left.dataset.level = s <= 60 ? 'late' : s <= 300 ? 'soon' : '';
     };
     tick(); setInterval(tick, 1000);
   }

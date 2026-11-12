@@ -808,3 +808,61 @@ async fn an_avatar_that_cannot_be_written_is_reported() {
     .unwrap();
     assert_eq!(recorded, 0, "a failed write records no avatar");
 }
+
+#[test]
+fn custom_theme_lightens_an_accent_lost_on_the_dark_surface() {
+    // ilia fork: ilia.ae's near-black accent kept as is made every primary
+    // button a dark bar on a dark card in dark mode.
+    let css = custom_theme_css("#313131", "#111111", "#f6f6f6", "#ffffff", "#313131");
+    let (light, dark) = theme_blocks(&css);
+    assert!(light.contains("--accent:#313131"), "{}", light);
+    assert_eq!(css_var(&light, "--on-accent"), "#ffffff");
+    let accent = css_var(&dark, "--accent");
+    let surface = css_var(&dark, "--surface");
+    assert!(
+        contrast(&accent, &surface) >= 7.0,
+        "{} on {}",
+        accent,
+        surface
+    );
+    // Text on the light accent is the dark background, not white.
+    let on = css_var(&dark, "--on-accent");
+    assert!(contrast(&on, &accent) >= 7.0, "{} on {}", on, accent);
+    assert!(
+        !dark.contains("rgba(49,49,49"),
+        "subtle tints follow the dark accent: {}",
+        dark
+    );
+}
+
+#[test]
+fn custom_theme_keeps_a_saturated_accent_in_dark_mode() {
+    let css = custom_theme_css("#be1621", "#a01219", "#f5f4f0", "#ffffff", "#1a1b38");
+    let (_, dark) = theme_blocks(&css);
+    assert_eq!(css_var(&dark, "--accent"), "#be1621");
+    assert_eq!(css_var(&dark, "--on-accent"), "#ffffff");
+}
+
+#[test]
+fn brand_css_picks_text_for_its_own_fill() {
+    // ilia fork: the embed brand replaces the accent, so it carries its own
+    // --on-accent rather than the one /accent.css computed for the org accent.
+    let on = |hex: &str| {
+        let p = EmbedParams {
+            brand: Some(hex.to_string()),
+            ..Default::default()
+        };
+        p.brand_css().expect("valid hex yields css")
+    };
+    assert!(on("313131").contains("--on-accent: #ffffff"));
+    assert!(on("ffff00").contains("--on-accent: #111111"));
+    assert!(on("fff").contains("--on-accent: #111111"));
+}
+
+#[test]
+fn custom_theme_dark_palette_puts_dark_text_on_a_light_accent() {
+    // A palette that is dark already: the dark ink is its background.
+    let css = custom_theme_css("#eeeeee", "#dddddd", "#111111", "#1a1a1a", "#eeeeee");
+    let (light, _) = theme_blocks(&css);
+    assert_eq!(css_var(&light, "--on-accent"), "#111111");
+}
