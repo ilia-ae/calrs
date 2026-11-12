@@ -48,7 +48,7 @@
     height: 40px;
     border-radius: 50%;
     background: var(--accent);
-    color: #fff;
+    color: var(--on-accent);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -257,7 +257,7 @@
   }
   .cal-cell.selected {
     background: var(--accent) !important;
-    color: #fff !important;
+    color: var(--on-accent) !important;
   }
   .cal-cell.today:not(.selected) {
     box-shadow: inset 0 0 0 2px var(--accent);
@@ -489,7 +489,7 @@
   }
   .view-toggle button.active {
     background: var(--accent);
-    color: #fff;
+    color: var(--on-accent);
   }
   .view-toggle button svg {
     width: 14px;
@@ -719,7 +719,7 @@
         {% if team_members is defined and team_members %}
         <div style="display: flex; align-items: center; margin-top: 0.25rem;">
           {% for m in team_members %}{% if loop.index0 < 6 %}
-          <span title="{{ m.name }}" style="width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 0.55rem; font-weight: 600; flex-shrink: 0; overflow: hidden; border: 2px solid var(--surface);{% if loop.index0 > 0 %} margin-left: -6px;{% endif %}">
+          <span title="{{ m.name }}" style="width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: var(--on-accent); display: inline-flex; align-items: center; justify-content: center; font-size: 0.55rem; font-weight: 600; flex-shrink: 0; overflow: hidden; border: 2px solid var(--surface);{% if loop.index0 > 0 %} margin-left: -6px;{% endif %}">
             {% if m.has_avatar %}<img src="/avatar/{{ m.id }}" alt="" style="width:100%;height:100%;object-fit:cover;">{% else %}{{ m.initials }}{% endif %}
           </span>
           {% endif %}{% endfor %}
@@ -734,7 +734,7 @@
     <div style="display: flex; flex-direction: column; gap: 0.5rem;">
       <div style="display: flex; align-items: center;">
         {% for m in dg_members %}{% if loop.index0 < 4 %}
-        <span title="{{ m.name }}" style="width: 36px; height: 36px; border-radius: 50%; background: var(--accent); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 600; flex-shrink: 0; overflow: hidden; border: 2px solid var(--surface);{% if loop.index0 > 0 %} margin-left: -10px;{% endif %}">
+        <span title="{{ m.name }}" style="width: 36px; height: 36px; border-radius: 50%; background: var(--accent); color: var(--on-accent); display: inline-flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 600; flex-shrink: 0; overflow: hidden; border: 2px solid var(--surface);{% if loop.index0 > 0 %} margin-left: -10px;{% endif %}">
           {% if m.has_avatar %}<img src="/avatar/{{ m.id }}" alt="" style="width:100%;height:100%;object-fit:cover;">{% else %}{{ m.initials }}{% endif %}
         </span>
         {% endif %}{% endfor %}
@@ -1151,7 +1151,7 @@
       btns.forEach(function(b) {
         if (b.dataset.format === format) {
           b.style.background = 'var(--accent)';
-          b.style.color = '#fff';
+          b.style.color = 'var(--on-accent)';
         } else {
           b.style.background = 'var(--surface)';
           b.style.color = 'var(--text)';

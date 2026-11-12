@@ -74,7 +74,7 @@
   <div style="margin-top: 1.25rem;">
     <label style="display: block; font-weight: 500; margin-bottom: 0.5rem; font-size: 0.875rem;">{{ t("team-settings-avatar") }}</label>
     <div style="display: flex; align-items: center; gap: 1rem;">
-      <div style="width: 64px; height: 64px; border-radius: 50%; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 1.25rem; flex-shrink: 0; overflow: hidden;">
+      <div style="width: 64px; height: 64px; border-radius: 50%; background: var(--accent); color: var(--on-accent); display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 1.25rem; flex-shrink: 0; overflow: hidden;">
         {% if team_has_avatar %}
           <img src="/team-avatar/{{ team_id }}" alt="" style="width: 100%; height: 100%; object-fit: cover;">
         {% else %}
@@ -159,7 +159,7 @@
     <div id="members-list" style="margin-bottom: 1rem;">
       {% for m in members %}
       <div class="member-row" data-id="{{ m.id }}" data-type="user" style="display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0; {% if not loop.last or linked_groups %}border-bottom: 1px solid var(--border);{% endif %}">
-        <div style="width: 32px; height: 32px; border-radius: 50%; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 0.7rem; flex-shrink: 0; overflow: hidden;">
+        <div style="width: 32px; height: 32px; border-radius: 50%; background: var(--accent); color: var(--on-accent); display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 0.7rem; flex-shrink: 0; overflow: hidden;">
           {% if m.has_avatar %}
             <img src="/avatar/{{ m.id }}" alt="" style="width: 100%; height: 100%; object-fit: cover;">
           {% else %}
@@ -185,7 +185,7 @@
         <span style="display: inline-flex; align-items: center;">
           {% for m in g.members %}
           {% if loop.index0 < 6 %}
-          <span title="{{ m.name }}" style="width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 0.55rem; font-weight: 600; flex-shrink: 0; overflow: hidden; border: 2px solid var(--surface);{% if loop.index0 > 0 %} margin-left: -8px;{% endif %}">
+          <span title="{{ m.name }}" style="width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: var(--on-accent); display: inline-flex; align-items: center; justify-content: center; font-size: 0.55rem; font-weight: 600; flex-shrink: 0; overflow: hidden; border: 2px solid var(--surface);{% if loop.index0 > 0 %} margin-left: -8px;{% endif %}">
             {% if m.has_avatar %}<img src="/avatar/{{ m.id }}" style="width:100%;height:100%;object-fit:cover;">{% else %}{{ m.initials }}{% endif %}
           </span>
           {% endif %}
@@ -299,7 +299,7 @@ var MEMBER_COUNT_OTHER = {{ t('teams-member-count', count=2) | tojson }};
     shown.forEach(function(m, i) {
       var av = document.createElement('span');
       av.title = m.name;
-      av.style.cssText = 'width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 0.55rem; font-weight: 600; flex-shrink: 0; overflow: hidden; border: 2px solid var(--surface);' + (i > 0 ? ' margin-left: -8px;' : '');
+      av.style.cssText = 'width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: var(--on-accent); display: inline-flex; align-items: center; justify-content: center; font-size: 0.55rem; font-weight: 600; flex-shrink: 0; overflow: hidden; border: 2px solid var(--surface);' + (i > 0 ? ' margin-left: -8px;' : '');
       if (m.hasAvatar) {
         av.innerHTML = '<img src="/avatar/' + m.id + '" style="width:100%;height:100%;object-fit:cover;">';
       } else {
@@ -324,7 +324,7 @@ var MEMBER_COUNT_OTHER = {{ t('teams-member-count', count=2) | tojson }};
     row.dataset.type = 'user';
     row.style.cssText = 'display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0; border-top: 1px solid var(--border);';
     var avatar = document.createElement('div');
-    avatar.style.cssText = 'width: 32px; height: 32px; border-radius: 50%; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 0.7rem; flex-shrink: 0; overflow: hidden;';
+    avatar.style.cssText = 'width: 32px; height: 32px; border-radius: 50%; background: var(--accent); color: var(--on-accent); display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 0.7rem; flex-shrink: 0; overflow: hidden;';
     if (user.hasAvatar) {
       avatar.innerHTML = '<img src="/avatar/' + user.id + '" style="width:100%;height:100%;object-fit:cover;">';
     } else {
@@ -463,7 +463,7 @@ var MEMBER_COUNT_OTHER = {{ t('teams-member-count', count=2) | tojson }};
         row.onmouseleave = function() { this.style.background = 'none'; };
         row.onclick = function() { addMember(u); };
         var avatar = document.createElement('div');
-        avatar.style.cssText = 'width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 600; flex-shrink: 0; overflow: hidden;';
+        avatar.style.cssText = 'width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: var(--on-accent); display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 600; flex-shrink: 0; overflow: hidden;';
         if (u.hasAvatar) {
           avatar.innerHTML = '<img src="/avatar/' + u.id + '" style="width:100%;height:100%;object-fit:cover;">';
         } else {

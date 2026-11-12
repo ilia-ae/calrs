@@ -49,7 +49,7 @@
           {% endif %}
           </div>
           <div class="source-url">{{ s.url }}</div>
-          <div class="source-meta">{% if s.auth_type == "oauth2" %}<span style="background: var(--accent); color: white; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.7rem; font-weight: 600;">OAuth2</span> {% endif %}{{ s.username }}</div>
+          <div class="source-meta">{% if s.auth_type == "oauth2" %}<span style="background: var(--accent); color: var(--on-accent); padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.7rem; font-weight: 600;">OAuth2</span> {% endif %}{{ s.username }}</div>
           <div class="source-meta">{{ t("sources-last-sync") }} {{ s.last_synced }}</div>
           {% if s.calendars %}<div class="source-meta">{{ t("sources-calendars-synced", synced=s.synced_count, total=s.calendars | length) }}</div>{% endif %}
         </div>
