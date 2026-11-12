@@ -295,6 +295,32 @@ fn guest_address(row: &PayRow) -> Option<String> {
     Some(addr.for_guest(network))
 }
 
+/// The ways a wallet is handed the payment. Two links because no single one
+/// works everywhere (`crate::ton::link`): Tonkeeper's carries `asset_id`,
+/// which MyTonWallet refuses, and without which a multichain Tonkeeper
+/// drops the amount. Each has its own QR code: Tonkeeper's scanner and the
+/// phone's camera read the `https://` link, other wallets the `ton://` one.
+#[derive(Default)]
+struct PayLinks {
+    ton: String,
+    keeper: String,
+    ton_qr: String,
+    keeper_qr: String,
+}
+
+impl PayLinks {
+    fn new(network: Network, address: &str, nano: u128, code: &str, exp_unix: i64) -> Self {
+        let ton = link::transfer_uri(address, nano, code, exp_unix);
+        let keeper = link::tonkeeper_uri(network, address, nano, code, exp_unix);
+        Self {
+            ton_qr: qr::svg(&ton).unwrap_or_default(),
+            keeper_qr: qr::svg(&keeper).unwrap_or_default(),
+            ton,
+            keeper,
+        }
+    }
+}
+
 fn meeting_start(row: &PayRow) -> DateTime<Utc> {
     match (row.time_version, row.booking_start.as_deref()) {
         (Some(1), Some(s)) => parse_stamp(s),
@@ -347,14 +373,9 @@ pub(crate) async fn pay_page(
     let rest = remaining(&row);
     let code = reference::display(&row.reference);
     let address = guest_address(&row).filter(|_| pay_state.can_pay());
-    let (ton_link, keeper_link, qr_svg) = match &address {
-        Some(a) => {
-            let uri = link::transfer_uri(a, rest, &code, expires.timestamp());
-            let keeper = link::tonkeeper_uri(a, rest, &code, expires.timestamp());
-            let svg = qr::svg(&uri).unwrap_or_default();
-            (uri, keeper, svg)
-        }
-        None => (String::new(), String::new(), String::new()),
+    let links = match (&address, Network::parse(&row.network)) {
+        (Some(a), Some(network)) => PayLinks::new(network, a, rest, &code, expires.timestamp()),
+        _ => PayLinks::default(),
     };
     let rate_at = parse_stamp(&row.rate_at).unwrap_or(now);
     let usd = row.currency == "USD";
@@ -414,9 +435,10 @@ pub(crate) async fn pay_page(
             rate_time => usd.then(|| rate_at.format("%H:%M").to_string()),
             address => address.clone().unwrap_or_default(),
             comment => code,
-            ton_link => ton_link,
-            keeper_link => keeper_link,
-            qr_svg => qr_svg,
+            ton_link => links.ton,
+            keeper_link => links.keeper,
+            keeper_qr_svg => links.keeper_qr,
+            qr_svg => links.ton_qr,
             held_until => held_until,
             zone => tz.name(),
             seconds_left => (expires - now).num_seconds().max(0),
@@ -934,5 +956,29 @@ mod tests {
         assert!(guest_address(&t).unwrap().starts_with("0Q"));
         assert_eq!(source_names("coingecko=1;binance=2"), "CoinGecko + Binance");
         assert_eq!(source_names("binance=2"), "Binance");
+    }
+
+    #[test]
+    fn each_wallet_gets_the_link_it_honours() {
+        let address = guest_address(&row("open", None)).unwrap();
+        let links = PayLinks::new(
+            Network::Mainnet,
+            &address,
+            20_000_000_000,
+            "B-7KQ3M9XD2F",
+            1_893_403_800,
+        );
+        assert_eq!(
+            links.keeper,
+            "https://app.tonkeeper.com/transfer/UQCD39VS5jcptHL8vMjEXrzGaRcCVYto7HUn4bpAOg8xqEBI?amount=20000000000&text=B-7KQ3M9XD2F&exp=1893403800&asset_id=ton/mainnet/coin"
+        );
+        assert_eq!(
+            links.ton,
+            "ton://transfer/UQCD39VS5jcptHL8vMjEXrzGaRcCVYto7HUn4bpAOg8xqEBI?amount=20000000000&text=B-7KQ3M9XD2F&exp=1893403800"
+        );
+        // Each QR code draws its own link.
+        assert_eq!(links.keeper_qr, qr::svg(&links.keeper).unwrap());
+        assert_eq!(links.ton_qr, qr::svg(&links.ton).unwrap());
+        assert_ne!(links.keeper_qr, links.ton_qr);
     }
 }

@@ -1859,8 +1859,13 @@ async fn a_paid_booking_goes_to_its_payment_page_and_holds_the_slot() {
     assert!(page.contains(&code(&inv.reference)));
     assert!(page.contains("UQCD39VS5jcptHL8vMjEXrzGaRcCVYto7HUn4bpAOg8xqEBI"));
     assert!(page.contains("ton://transfer/UQCD39VS5jcptHL8vMjEXrzGaRcCVYto7HUn4bpAOg8xqEBI?amount=20000000000&amp;text="));
-    assert!(page.contains("https://app.tonkeeper.com/transfer/"));
-    assert!(page.contains("<svg"));
+    assert!(page.contains("https://app.tonkeeper.com/transfer/UQCD39VS5jcptHL8vMjEXrzGaRcCVYto7HUn4bpAOg8xqEBI?amount=20000000000&amp;text="));
+    // Only Tonkeeper's link names the coin: MyTonWallet refuses `asset_id`.
+    assert!(page.contains("&amp;asset_id=ton/mainnet/coin\""));
+    assert_eq!(page.matches("asset_id=").count(), 1);
+    // A QR code per link, the plain one behind a toggle.
+    assert_eq!(page.matches("class=\"ton-qr\"").count(), 2);
+    assert!(page.contains("<details class=\"ton-other\">"));
     assert!(page.contains("$40.00"));
     assert!(page.contains("CoinGecko + Binance"));
     // Never the guest's details.
@@ -2818,6 +2823,7 @@ async fn an_unpaid_booking_whose_time_was_taken_is_released_before_payment() {
     let (_, _, page) = e.get_page(&format!("/booking/pay/{token}")).await;
     assert!(page.contains(&crate::i18n::translate("en", "ton-pay-state-taken", None)));
     assert!(!page.contains("ton://transfer"));
+    assert!(!page.contains("app.tonkeeper.com"));
 }
 
 /// A part paid, then the booking ends unconfirmed: the owner is told the

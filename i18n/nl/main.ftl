@@ -1706,10 +1706,13 @@ ton-pay-held-until = De tijd wordt voor je vastgehouden tot { $time } ({ $zone }
 ton-pay-left = nog %1
 ton-pay-amount-label = Te betalen bedrag
 ton-pay-rate = ≈ $ { $usd } · 1 TON = $ { $rate } ({ $sources }, { $time } UTC)
-ton-pay-open-wallet = Wallet openen
+ton-pay-open-wallet = Andere wallet
 ton-pay-open-tonkeeper = Openen in Tonkeeper
 ton-pay-qr-alt = QR-code met de betaalgegevens
 ton-pay-scan = Of scan deze code met de app van je wallet.
+ton-pay-qr-alt-tonkeeper = QR-code voor Tonkeeper met de betaalgegevens
+ton-pay-scan-tonkeeper = Of scan deze code met Tonkeeper of de camera van je telefoon.
+ton-pay-qr-other = Een andere wallet, zoals MyTonWallet? Toon de QR-code daarvoor
 ton-pay-address = Adres
 ton-pay-comment = Opmerking
 ton-pay-copy = Kopiëren

@@ -1759,10 +1759,13 @@ ton-pay-held-until = Время за вами до { $time } ({ $zone }).
 ton-pay-left = осталось %1
 ton-pay-amount-label = К оплате
 ton-pay-rate = ≈ ${ $usd } · 1 TON = ${ $rate } ({ $sources }, { $time } UTC)
-ton-pay-open-wallet = Открыть кошелёк
+ton-pay-open-wallet = Другой кошелёк
 ton-pay-open-tonkeeper = Открыть в Tonkeeper
 ton-pay-qr-alt = QR-код с данными для оплаты
 ton-pay-scan = Или отсканируйте этот код в приложении кошелька.
+ton-pay-qr-alt-tonkeeper = QR-код для Tonkeeper с данными для оплаты
+ton-pay-scan-tonkeeper = Или отсканируйте этот код в Tonkeeper или камерой телефона.
+ton-pay-qr-other = Другой кошелёк, например MyTonWallet? Показать его QR-код
 ton-pay-address = Адрес
 ton-pay-comment = Комментарий
 ton-pay-copy = Скопировать

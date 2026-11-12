@@ -1704,10 +1704,13 @@ ton-pay-held-until = L’orario è riservato per te fino alle { $time } ({ $zone
 ton-pay-left = mancano %1
 ton-pay-amount-label = Importo da pagare
 ton-pay-rate = ≈ { $usd } $ · 1 TON = { $rate } $ ({ $sources }, { $time } UTC)
-ton-pay-open-wallet = Apri il wallet
+ton-pay-open-wallet = Altro portafoglio
 ton-pay-open-tonkeeper = Apri in Tonkeeper
 ton-pay-qr-alt = Codice QR con i dati del pagamento
 ton-pay-scan = Oppure scansiona questo codice con l’app del tuo wallet.
+ton-pay-qr-alt-tonkeeper = Codice QR per Tonkeeper con i dati del pagamento
+ton-pay-scan-tonkeeper = Oppure scansiona questo codice con Tonkeeper o con la fotocamera del telefono.
+ton-pay-qr-other = Un altro wallet, come MyTonWallet? Mostra il suo codice QR
 ton-pay-address = Indirizzo
 ton-pay-comment = Commento
 ton-pay-copy = Copia

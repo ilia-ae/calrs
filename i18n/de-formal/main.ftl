@@ -428,6 +428,7 @@ ton-bae-body-unpaid = Diese Buchung ist nicht bezahlt und kann daher nicht best�
 ton-bae-body-reschedule-unpaid = Diese Buchung ist nicht bezahlt und kann daher nicht verschoben werden. Bezahlen Sie sie oder stornieren Sie sie und buchen Sie einen anderen Termin.
 ton-pay-held-until = Der Termin ist bis { $time } ({ $zone }) für Sie reserviert.
 ton-pay-scan = Oder scannen Sie diesen Code mit Ihrer Wallet-App.
+ton-pay-scan-tonkeeper = Oder scannen Sie diesen Code mit Tonkeeper oder der Kamera Ihres Handys.
 ton-pay-warn-comment = Der Kommentar ist Pflicht: Daran erkennen wir Ihre Zahlung.
 ton-pay-warn-encrypt = Verschlüsseln Sie den Kommentar nicht.
 ton-pay-warn-token = Zahlen Sie in TON, nicht mit Tokens.

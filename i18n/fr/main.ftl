@@ -1704,10 +1704,13 @@ ton-pay-held-until = Le créneau vous est réservé jusqu’à { $time } ({ $zon
 ton-pay-left = encore %1
 ton-pay-amount-label = Montant à payer
 ton-pay-rate = ≈ { $usd } $ · 1 TON = { $rate } $ ({ $sources }, { $time } UTC)
-ton-pay-open-wallet = Ouvrir le portefeuille
+ton-pay-open-wallet = Autre portefeuille
 ton-pay-open-tonkeeper = Ouvrir dans Tonkeeper
 ton-pay-qr-alt = QR code contenant les informations de paiement
 ton-pay-scan = Ou scannez ce code avec l’application de votre portefeuille.
+ton-pay-qr-alt-tonkeeper = QR code pour Tonkeeper contenant les informations de paiement
+ton-pay-scan-tonkeeper = Ou scannez ce code avec Tonkeeper ou l’appareil photo de votre téléphone.
+ton-pay-qr-other = Un autre portefeuille, comme MyTonWallet ? Afficher son QR code
 ton-pay-address = Adresse
 ton-pay-comment = Commentaire
 ton-pay-copy = Copier

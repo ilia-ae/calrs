@@ -1704,10 +1704,13 @@ ton-pay-held-until = Aeg on sinu jaoks kinni kuni { $time } ({ $zone }).
 ton-pay-left = jäänud %1
 ton-pay-amount-label = Makstav summa
 ton-pay-rate = ≈ { $usd } $ · 1 TON = { $rate } $ ({ $sources }, { $time } UTC)
-ton-pay-open-wallet = Ava rahakott
+ton-pay-open-wallet = Muu rahakott
 ton-pay-open-tonkeeper = Ava Tonkeeperis
 ton-pay-qr-alt = Makseandmetega QR-kood
 ton-pay-scan = Või skanni see kood oma rahakoti rakendusega.
+ton-pay-qr-alt-tonkeeper = Makseandmetega QR-kood Tonkeeperi jaoks
+ton-pay-scan-tonkeeper = Või skanni see kood Tonkeeperi või telefoni kaameraga.
+ton-pay-qr-other = Muu rahakott, näiteks MyTonWallet? Näita selle QR-koodi
 ton-pay-address = Aadress
 ton-pay-comment = Kommentaar
 ton-pay-copy = Kopeeri

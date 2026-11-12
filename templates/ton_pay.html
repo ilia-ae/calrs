@@ -13,6 +13,7 @@
   .ton-label { color: var(--text-muted); font-size: 0.85rem; min-width: 6.5rem; }
   .ton-qr { width: 220px; max-width: 100%; margin: 0.75rem 0; padding: 0; border-radius: 8px; overflow: hidden; }
   .ton-qr svg { display: block; width: 100%; height: auto; }
+  .ton-other summary { cursor: pointer; color: var(--text-muted); font-size: 0.875rem; }
   .ton-warn { margin-top: 1rem; padding: 0.75rem 1rem; border: 1px solid #f59e0b; border-radius: var(--radius); background: rgba(245,158,11,0.08); font-size: 0.875rem; }
   .ton-warn li { margin-left: 1.1rem; }
   .ton-state { padding: 0.75rem 1rem; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface-hover); margin-bottom: 1rem; }
@@ -62,16 +63,30 @@
   </div>
 
   <div class="ton-actions">
-    <a class="btn" href="{{ ton_link }}" rel="noopener noreferrer">{{ t("ton-pay-open-wallet") }}</a>
-    <a class="slot-btn" href="{{ keeper_link }}" rel="noopener noreferrer" style="text-decoration: none; align-self: center;">{{ t("ton-pay-open-tonkeeper") }}</a>
+    {#- Tonkeeper first: its link names the coin (asset_id), so a multichain Tonkeeper keeps the
+        amount and opens the confirmation; the plain ton:// link is for other wallets. #}
+    <a class="btn" href="{{ keeper_link }}" rel="noopener noreferrer">{{ t("ton-pay-open-tonkeeper") }}</a>
+    <a class="slot-btn" href="{{ ton_link }}" rel="noopener noreferrer" style="text-decoration: none; align-self: center;">{{ t("ton-pay-open-wallet") }}</a>
   </div>
 
-  {% if qr_svg %}
+  {#- Two codes (`crate::ton::link`): Tonkeeper's link names the coin, which
+      other wallets refuse; the plain `ton://` one waits behind a toggle. -#}
+  {% if keeper_qr_svg %}
   <div class="ton-qr" role="img"
-       aria-label="{{ t('ton-pay-qr-alt') }}">
-    {{ qr_svg | safe }}
+       aria-label="{{ t('ton-pay-qr-alt-tonkeeper') }}">
+    {{ keeper_qr_svg | safe }}
   </div>
-  <p style="color: var(--text-muted); font-size: 0.85rem;">{{ t("ton-pay-scan") }}</p>
+  <p style="color: var(--text-muted); font-size: 0.85rem;">{{ t("ton-pay-scan-tonkeeper") }}</p>
+  {% endif %}
+  {% if qr_svg %}
+  <details class="ton-other">
+    <summary>{{ t("ton-pay-qr-other") }}</summary>
+    <div class="ton-qr" role="img"
+         aria-label="{{ t('ton-pay-qr-alt') }}">
+      {{ qr_svg | safe }}
+    </div>
+    <p style="color: var(--text-muted); font-size: 0.85rem;">{{ t("ton-pay-scan") }}</p>
+  </details>
   {% endif %}
 
   <div style="margin-top: 1rem;">
