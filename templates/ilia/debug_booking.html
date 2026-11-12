@@ -12,6 +12,14 @@
   <p style="color: var(--warning-text, #b45309); font-size: 0.85rem; margin-bottom: 0;">{{ t("dbg-switch-note") }} <a href="/dashboard/admin/ton#debug-block">{{ t("nav-admin-ton") }}</a></p>
 </div>
 
+{% if own_chat_missing %}
+<div class="card" id="debug-booking-no-chat" role="note" style="border: 2px solid var(--warning-text, #b45309); background: rgba(245, 158, 11, 0.08);">
+  <h2 style="margin: 0 0 0.35rem; font-size: 1.05rem; color: var(--warning-text, #b45309);">{{ t("dbg-no-chat-title") }}</h2>
+  <p style="font-size: 0.9rem; margin: 0 0 0.6rem;">{{ t("dbg-no-chat-body") }}</p>
+  <a class="btn" id="debug-booking-link-chat" href="{{ telegram_settings_path }}">{{ t("dbg-no-chat-link") }}</a>
+</div>
+{% endif %}
+
 {% if cancelled is not none %}
 <div class="card" id="debug-booking-cancelled" data-cancelled="{{ cancelled }}" style="border-color: var(--accent);">
   <div style="font-size: 0.9rem;">{{ t("dbg-cancelled", count=cancelled) }}</div>
@@ -100,6 +108,15 @@
     </div>
     {% endif %}
     <div class="form-group">
+      <label for="dbg-guest-lang">{{ t("dbg-guest-lang") }}</label>
+      <select id="dbg-guest-lang" name="guest_lang" style="{{ field_style }}">
+        {% for l in guest_langs %}
+        <option value="{{ l.code }}" lang="{{ l.code }}"{% if l.selected %} selected{% endif %}>{{ l.label }}</option>
+        {% endfor %}
+      </select>
+      <span style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">{{ t("dbg-guest-lang-help") }}</span>
+    </div>
+    <div class="form-group">
       <label for="dbg-notes">{{ t("dbg-notes") }}</label>
       <textarea id="dbg-notes" name="notes" rows="2" maxlength="5000" style="{{ field_style }}">{{ notes }}</textarea>
     </div>
@@ -111,7 +128,7 @@
       <span style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">
         {% if not telegram_on %}{{ t("dbg-own-chat-off") }}
         {% elif own_chat_linked %}{{ t("dbg-own-chat-linked", who=own_chat_label) }} {{ t("dbg-own-chat-help") }}
-        {% else %}{{ t("dbg-own-chat-not-linked") }} <a href="/dashboard/settings/telegram">{{ t("tg-settings-nav") }}</a>{% endif %}
+        {% else %}{{ t("dbg-own-chat-not-linked") }} <a href="{{ telegram_settings_path }}">{{ t("tg-settings-nav") }}</a>{% endif %}
       </span>
     </div>
     {% if selected.priced %}
@@ -149,12 +166,13 @@
   {% if bookings %}
   <div style="overflow-x: auto;">
   <table style="width: 100%; font-size: 0.825rem; border-collapse: collapse;">
-    <tr><th style="text-align: left;">{{ t("dbg-col-when") }}</th><th style="text-align: left;">{{ t("dbg-col-type") }}</th><th style="text-align: left;">{{ t("dbg-col-status") }}</th><th style="text-align: left;">{{ t("dbg-col-payment") }}</th><th style="text-align: left;">{{ t("dbg-col-timing") }}</th><th style="text-align: left;">{{ t("dbg-col-telegram") }}</th></tr>
+    <tr><th style="text-align: left;">{{ t("dbg-col-when") }}</th><th style="text-align: left;">{{ t("dbg-col-type") }}</th><th style="text-align: left;">{{ t("dbg-col-status") }}</th><th style="text-align: left;">{{ t("dbg-col-lang") }}</th><th style="text-align: left;">{{ t("dbg-col-payment") }}</th><th style="text-align: left;">{{ t("dbg-col-timing") }}</th><th style="text-align: left;">{{ t("dbg-col-telegram") }}</th></tr>
     {% for b in bookings %}
     <tr data-booking="{{ b.id }}" data-status="{{ b.status }}" data-live="{{ '1' if b.live else '0' }}">
       <td style="padding: 0.2rem 0.5rem 0.2rem 0; white-space: nowrap;">{{ b.when }}</td>
       <td style="padding: 0.2rem 0.5rem 0.2rem 0;">{{ b.title }}</td>
       <td style="padding: 0.2rem 0.5rem 0.2rem 0;">{{ b.status_label }}</td>
+      <td style="padding: 0.2rem 0.5rem 0.2rem 0;" class="dbg-lang" data-lang="{{ b.language or '' }}">{{ b.language_label or "—" }}</td>
       <td style="padding: 0.2rem 0.5rem 0.2rem 0;">{% if b.invoice %}{{ b.invoice_label }}{% if b.pay_url %} · <a href="{{ b.pay_url }}">{{ t("dbg-open-pay") }}</a>{% endif %}{% if b.renewals_max %} · <span class="dbg-renewals">{{ t("dbg-renewals", n=b.renewals, max=b.renewals_max) }}</span>{% endif %}{% if b.open %}<br><span class="dbg-countdown" data-expires="{{ b.expires_unix }}" data-settle="{{ b.settle_unix }}" style="font-variant-numeric: tabular-nums;">{{ t("dbg-cd-until", expires=b.expires_local, settle=b.settle_local) }}</span>{% endif %}{% else %}—{% endif %}</td>
       <td style="padding: 0.2rem 0.5rem 0.2rem 0;"{% if b.fast %} class="dbg-fast"{% endif %}>{{ b.timing or "—" }}</td>
       <td style="padding: 0.2rem 0;">{% if b.own_chat %}{{ t("dbg-own-chat-yes") }}{% else %}—{% endif %}</td>
