@@ -211,6 +211,7 @@ base-loader-checking = Verificando disponibilidade
 base-loader-please-wait = Aguarde, carregando os dados mais recentes do calendário...
 base-stop-impersonating = Encerrar personificação
 base-theme-toggle = Alternar tema
+base-language-choose = Escolha seu idioma
 base-powered-by = Desenvolvido com
 
 # Profile (templates/profile.html)

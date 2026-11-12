@@ -211,6 +211,7 @@ base-loader-checking = Beschikbaarheid controleren
 base-loader-please-wait = Even geduld, de nieuwste agendagegevens worden geladen...
 base-stop-impersonating = Stoppen met meekijken als gebruiker
 base-theme-toggle = Thema wisselen
+base-language-choose = Kies je taal
 base-powered-by = Mogelijk gemaakt door
 
 # Profile (templates/profile.html)

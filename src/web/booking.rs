@@ -1599,7 +1599,7 @@ pub(super) async fn handle_booking_for_user(
         }
     };
 
-    let lang = user_page_lang(user_lang.as_deref(), &page_mode, visitor);
+    let lang = user_page_lang(user_lang.as_deref(), &page_mode, &headers);
     let needs_approval = requires_confirmation != 0;
     // ilia fork: the guest's Telegram username, when the event type asks.
     let telegram_username = match super::telegram::resolve_guest_telegram(
@@ -2465,7 +2465,7 @@ pub(super) async fn handle_booking(
     let lang = user_page_lang(
         owner_language.as_deref(),
         page_mode.as_deref().unwrap_or(""),
-        visitor,
+        &headers,
     );
     let needs_approval = requires_confirmation != 0;
     // ilia fork: the guest's Telegram username, when the event type asks.

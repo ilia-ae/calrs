@@ -15,6 +15,8 @@ mod format;
 mod hosts;
 mod ilia;
 mod invites;
+// ilia fork: the language switcher of public pages.
+mod lang_switch;
 pub mod meeting;
 // ilia fork: host <-> guest messages (ilia-booking docs/operations.md).
 pub(crate) mod messages;
@@ -1091,6 +1093,8 @@ pub(crate) fn router(state: Arc<AppState>) -> Router {
         // Legacy single-user routes (kept for backward compatibility)
         .route("/{slug}", get(show_slots))
         .route("/{slug}/book", get(show_book_form).post(handle_booking))
+        // ilia fork: `?lang=` (cookie and redirect) and the switcher's page.
+        .layer(axum::middleware::from_fn(lang_switch::middleware))
         .layer(TraceLayer::new_for_http())
         .layer(axum::middleware::from_fn(csrf_cookie_middleware))
         // Keep scheduling pages and their date/query variants out of search
