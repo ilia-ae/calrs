@@ -101,16 +101,89 @@ pub(crate) fn validate_price_form(
     Ok(())
 }
 
+/// What a price section asks to store.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum PriceWrite {
+    /// The price, its payment window (`None`: the server's default) and
+    /// whether it is switched on. Unchecked with a price keeps it, off.
+    Save {
+        price: store::Price,
+        window_min: Option<i64>,
+        enabled: bool,
+    },
+    /// No price: unchecked and blank.
+    Remove,
+}
+
+impl PriceWrite {
+    fn price(&self) -> Option<store::Price> {
+        match self {
+            Self::Save { price, .. } => Some(*price),
+            Self::Remove => None,
+        }
+    }
+}
+
+/// What a price section that passed `validate_price_form` stores; `None`
+/// when the form did not carry the section (`amount = None`), or for a
+/// value the validation refuses.
+pub(crate) fn price_write(form: &PriceForm<'_>) -> Option<PriceWrite> {
+    let raw = form.amount?;
+    let on = checked(form.enabled);
+    // Unchecked and blank means no price, whatever the default.
+    let price = currency_of(form.currency)
+        .filter(|_| on || !raw.trim().is_empty())
+        .and_then(|c| parse_price(c, raw));
+    let window_min = form
+        .window_min
+        .and_then(|w| w.trim().parse::<i64>().ok())
+        .filter(|w| (10..=240).contains(w));
+    match price {
+        Some(price) => Some(PriceWrite::Save {
+            price,
+            window_min,
+            enabled: on,
+        }),
+        None if !on && raw.trim().is_empty() => Some(PriceWrite::Remove),
+        None => None,
+    }
+}
+
+/// Store `write` for event type `event_type_id` on `conn`, inside the
+/// caller's transaction (`store::save_price`: a price switched on makes a
+/// type with no chosen Telegram mode ask for it, `required`). True when a
+/// price row was created. The caller checks that the type is personal.
+pub(crate) async fn write_price(
+    conn: &mut sqlx::SqliteConnection,
+    event_type_id: &str,
+    write: PriceWrite,
+    now: chrono::DateTime<Utc>,
+) -> Result<bool, sqlx::Error> {
+    match write {
+        PriceWrite::Save {
+            price,
+            window_min,
+            enabled,
+        } => store::save_price(conn, event_type_id, price, window_min, enabled, now).await,
+        PriceWrite::Remove => sqlx::query("DELETE FROM ton_prices WHERE event_type_id = ?")
+            .bind(event_type_id)
+            .execute(&mut *conn)
+            .await
+            .map(|_| false),
+    }
+}
+
 /// Store the form's price section (already validated). `amount = None`
 /// means the form did not carry the section: nothing changes. Unchecked
-/// with a price keeps it, switched off; unchecked and blank removes it.
-/// Only a personal type is ever priced. A new price makes the type ask for
-/// the guest's Telegram (`required`), and the section's own Telegram choice,
-/// when shown, is saved with it. Open invoices are not touched: they run
-/// to their end whatever the price does now. A saved price wakes the
-/// watcher, so a type priced after a quiet day is bookable at once.
+/// with a price keeps it, switched off; unchecked and blank removes it
+/// (`price_write`). Only a personal type is ever priced. A new price makes
+/// the type ask for the guest's Telegram (`required`), and the section's own
+/// Telegram choice, when shown, is saved with it. Open invoices are not
+/// touched: they run to their end whatever the price does now. A saved
+/// price wakes the watcher, so a type priced after a quiet day is bookable
+/// at once.
 pub(crate) async fn save_price_form(state: &AppState, event_type_id: &str, form: &PriceForm<'_>) {
-    let Some(raw) = form.amount else {
+    let Some(write) = price_write(form) else {
         return;
     };
     let pool = &state.pool;
@@ -123,39 +196,18 @@ pub(crate) async fn save_price_form(state: &AppState, event_type_id: &str, form:
             .flatten()
             .is_some_and(|v| v != 0);
     let on = checked(form.enabled);
-    // Unchecked and blank means no price, whatever the default.
-    let price = currency_of(form.currency)
-        .filter(|_| on || !raw.trim().is_empty())
-        .and_then(|c| parse_price(c, raw));
-    let window = form
-        .window_min
-        .and_then(|w| w.trim().parse::<i64>().ok())
-        .filter(|w| (10..=240).contains(w));
-    let result = match price {
-        Some(price) if personal => {
-            async {
-                let mut tx = pool.begin().await?;
-                let created =
-                    store::save_price(&mut tx, event_type_id, price, window, on, Utc::now())
-                        .await?;
-                tx.commit().await?;
-                Ok::<bool, sqlx::Error>(created)
-            }
-            .await
-        }
-        Some(_) => {
-            tracing::warn!(target: TARGET, event_type_id, "a team event type cannot be priced");
-            return;
-        }
-        None if !on && raw.trim().is_empty() => {
-            sqlx::query("DELETE FROM ton_prices WHERE event_type_id = ?")
-                .bind(event_type_id)
-                .execute(pool)
-                .await
-                .map(|_| false)
-        }
-        None => return,
-    };
+    let price = write.price();
+    if price.is_some() && !personal {
+        tracing::warn!(target: TARGET, event_type_id, "a team event type cannot be priced");
+        return;
+    }
+    let result = async {
+        let mut tx = pool.begin().await?;
+        let created = write_price(&mut tx, event_type_id, write, Utc::now()).await?;
+        tx.commit().await?;
+        Ok::<bool, sqlx::Error>(created)
+    }
+    .await;
     match result {
         Ok(created) => {
             tracing::info!(

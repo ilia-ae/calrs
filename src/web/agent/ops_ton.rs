@@ -289,9 +289,11 @@ fn check_window(window: Option<i64>) -> Result<Option<i64>, ToolError> {
 }
 
 /// The price row of `et_id` as (price, window, enabled).
-type PriceRow = (ton_pay::store::Price, Option<i64>, i64);
+pub(crate) type PriceRow = (ton_pay::store::Price, Option<i64>, i64);
 
-async fn read_price(
+/// The stored price of `et_id`, switched on or not; `None` without a row
+/// (or for one the CHECKs would not allow).
+pub(crate) async fn read_price(
     conn: &mut sqlx::SqliteConnection,
     et_id: &str,
 ) -> Result<Option<PriceRow>, ToolError> {

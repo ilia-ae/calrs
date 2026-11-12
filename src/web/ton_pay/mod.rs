@@ -30,8 +30,8 @@ use crate::ton::toncenter::{HttpIndexer, TonIndexer};
 use crate::web::{AppState, RateLimiter};
 
 pub(crate) use admin::{
-    copy_price, dashboard_badges, price_badge, price_form_ctx, price_form_from_post,
-    save_price_form, validate_price_form, PriceForm,
+    copy_price, dashboard_badges, price_badge, price_form_ctx, price_form_from_post, price_write,
+    save_price_form, validate_price_form, write_price, PriceForm, PriceWrite,
 };
 pub(in crate::web) use flow::{
     after_booking, approval_refused_for_token, approval_refused_page, booking_ended,

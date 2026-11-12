@@ -751,6 +751,363 @@ async fn an_exported_section_applies_with_no_change() {
     assert_eq!(item.timezone, Some(None));
 }
 
+// --- TON price ---
+
+/// The paid consultation of book.ilia.ae: the free one at $500 an hour.
+fn paid() -> Value {
+    let mut item = consultation();
+    item["slug"] = json!("cto-60");
+    item["title"] = json!("CTO Consultation");
+    item["duration_min"] = json!(60);
+    item["min_notice_min"] = json!(1440);
+    item["frequency_limits"] = json!([]);
+    item["ton_price"] = json!({"usd": "500.00", "window_min": null, "enabled": true});
+    item
+}
+
+/// The `ton_prices` row of `slug`: currency, nanotons, cents, window,
+/// enabled.
+type PriceCols = (String, Option<i64>, Option<i64>, Option<i64>, i64);
+
+async fn price(env: &ApplyEnv, slug: &str) -> Option<PriceCols> {
+    sqlx::query_as(
+        "SELECT p.currency, p.price_nano, p.price_usd_cents, p.window_min, p.enabled
+         FROM ton_prices p JOIN event_types et ON et.id = p.event_type_id
+         WHERE et.slug = ? AND et.team_id IS NULL",
+    )
+    .bind(slug)
+    .fetch_optional(&env.pool)
+    .await
+    .unwrap()
+}
+
+#[tokio::test]
+async fn a_ton_price_is_created_changed_switched_off_and_removed() {
+    let env = ApplyEnv::new().await;
+    let json = et_doc(json!([consultation(), paid()]), None);
+    let report = env.apply(&json, false).await.unwrap();
+    assert_eq!(
+        paths(&report),
+        ["event_types[15min]", "event_types[cto-60]"]
+    );
+    assert_eq!(price(&env, "15min").await, None);
+    assert_eq!(
+        price(&env, "cto-60").await,
+        Some(("USD".into(), None, Some(50_000), None, 1))
+    );
+    // The item's Telegram mode wins over the one a new price sets.
+    assert_eq!(
+        telegram_mode(&env, "cto-60").await.as_deref(),
+        Some("optional")
+    );
+    let applied = env.snapshot().await;
+    let again = env.apply(&json, false).await.unwrap();
+    assert!(again.changed.is_empty(), "{:?}", again.changed);
+    assert_eq!(
+        env.snapshot().await,
+        applied,
+        "a run with nothing to do wrote"
+    );
+
+    // In TON, with a window of its own; window_min and enabled left out
+    // are the defaults, so the short form states the same price.
+    let with = |price: Value| et_doc(json!([{"slug": "cto-60", "ton_price": price}]), None);
+    let report = env
+        .apply(&with(json!({"ton": "420.50", "window_min": 20})), false)
+        .await
+        .unwrap();
+    assert_eq!(
+        report.changed,
+        vec![Change {
+            path: "event_types[cto-60].ton_price".into(),
+            before: json!({"usd": "500.00", "window_min": null, "enabled": true}),
+            after: json!({"ton": "420.50", "window_min": 20, "enabled": true}),
+        }]
+    );
+    assert_eq!(
+        price(&env, "cto-60").await,
+        Some(("TON".into(), Some(420_500_000_000), None, Some(20), 1))
+    );
+    assert!(env
+        .apply(
+            &with(json!({"ton": "420.50", "window_min": 20, "enabled": true})),
+            false
+        )
+        .await
+        .unwrap()
+        .changed
+        .is_empty());
+
+    // Switched off: kept, the type books free (the form's unchecked box).
+    let report = env
+        .apply(
+            &with(json!({"ton": "420.50", "window_min": 20, "enabled": false})),
+            false,
+        )
+        .await
+        .unwrap();
+    assert_eq!(paths(&report), ["event_types[cto-60].ton_price"]);
+    assert_eq!(
+        price(&env, "cto-60").await,
+        Some(("TON".into(), Some(420_500_000_000), None, Some(20), 0))
+    );
+
+    // null: free again, the row is gone; the Telegram mode stays.
+    let report = env.apply(&with(Value::Null), false).await.unwrap();
+    let change = change(&report, "event_types[cto-60].ton_price");
+    assert_eq!(change.after, Value::Null);
+    assert_eq!(price(&env, "cto-60").await, None);
+    assert_eq!(
+        telegram_mode(&env, "cto-60").await.as_deref(),
+        Some("optional")
+    );
+    assert!(env
+        .apply(&with(Value::Null), false)
+        .await
+        .unwrap()
+        .changed
+        .is_empty());
+}
+
+/// A price switched on asks for the guest's Telegram on a type that has no
+/// mode chosen, as on the form: reported when the item gives no mode,
+/// overridden when it gives one.
+#[tokio::test]
+async fn a_new_price_sets_the_telegram_mode_the_form_would() {
+    let env = ApplyEnv::new().await;
+    insert_personal_et(&env.pool, &env.admin_id, "plain").await;
+    insert_personal_et(&env.pool, &env.admin_id, "quiet").await;
+    let usd = json!({"usd": "40.00"});
+    let report = env
+        .apply(
+            &et_doc(
+                json!([{"slug": "plain", "ton_price": usd},
+                       {"slug": "quiet", "ton_price": usd, "telegram_guest_mode": "off"}]),
+                None,
+            ),
+            false,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        paths(&report),
+        [
+            "event_types[plain].ton_price",
+            "event_types[plain].telegram_guest_mode",
+            "event_types[quiet].ton_price"
+        ]
+    );
+    let mode = change(&report, "event_types[plain].telegram_guest_mode");
+    assert_eq!(
+        (&mode.before, &mode.after),
+        (&json!("off"), &json!("required"))
+    );
+    assert_eq!(
+        telegram_mode(&env, "plain").await.as_deref(),
+        Some("required")
+    );
+    assert_eq!(telegram_mode(&env, "quiet").await.as_deref(), Some("off"));
+    let again = env
+        .apply(
+            &et_doc(
+                json!([{"slug": "plain", "ton_price": usd},
+                       {"slug": "quiet", "ton_price": usd, "telegram_guest_mode": "off"}]),
+                None,
+            ),
+            false,
+        )
+        .await
+        .unwrap();
+    assert!(again.changed.is_empty(), "{:?}", again.changed);
+}
+
+/// A price created switched off sets no Telegram mode, and an item's `off`
+/// that is already in force writes none either: the type has no
+/// `telegram_event_types` row, which reads as `off` (the form's default).
+/// A check of the stored mode must read a missing row as `off` (the
+/// Molecule scenario `calrs_ton` of ilia-booking does).
+#[tokio::test]
+async fn a_switched_off_price_with_telegram_off_leaves_no_mode_row() {
+    let env = ApplyEnv::new().await;
+    let mut item = paid();
+    item["slug"] = json!("paused");
+    item["ton_price"] = json!({"usd": "500.00", "window_min": null, "enabled": false});
+    item["telegram_guest_mode"] = json!("off");
+    let json = et_doc(json!([item]), None);
+    let report = env.apply(&json, false).await.unwrap();
+    assert_eq!(paths(&report), ["event_types[paused]"]);
+    assert_eq!(
+        price(&env, "paused").await,
+        Some(("USD".into(), None, Some(50_000), None, 0))
+    );
+    assert_eq!(telegram_mode(&env, "paused").await, None);
+    let exported = env.export().await.unwrap().event_types.unwrap();
+    let paused = exported.items.iter().find(|i| i.slug == "paused").unwrap();
+    assert_eq!(
+        serde_json::to_value(paused.telegram_guest_mode).unwrap(),
+        json!("off")
+    );
+    let again = env.apply(&json, false).await.unwrap();
+    assert!(again.changed.is_empty(), "{:?}", again.changed);
+    assert_eq!(telegram_mode(&env, "paused").await, None);
+}
+
+/// The price section's own refusals (`validate_price_form`), the spelling
+/// of the stored price, and the object's shape.
+#[tokio::test]
+async fn a_ton_price_the_form_refuses_or_would_respell_is_refused() {
+    let env = ApplyEnv::new().await;
+    env.apply(&et_doc(json!([paid()]), None), false)
+        .await
+        .unwrap();
+    let cases: Vec<(Value, &str)> = vec![
+        (json!({"usd": "500"}), "event_types[cto-60].ton_price.usd"),
+        (json!({"usd": "500.5"}), "event_types[cto-60].ton_price.usd"),
+        (json!({"ton": "100"}), "event_types[cto-60].ton_price.ton"),
+        (
+            json!({"usd": " 500.00"}),
+            "event_types[cto-60].ton_price.usd",
+        ),
+        (json!({"usd": ""}), "event_types[cto-60].ton_price.usd"),
+        (json!({"usd": "0.50"}), "event_types[cto-60].ton_price"),
+        (json!({"usd": "10000.01"}), "event_types[cto-60].ton_price"),
+        (json!({"usd": "5e2"}), "event_types[cto-60].ton_price"),
+        (json!({"ton": "0.005"}), "event_types[cto-60].ton_price"),
+        (json!({"ton": "100000.01"}), "event_types[cto-60].ton_price"),
+        (
+            json!({"usd": "500.00", "window_min": 5}),
+            "event_types[cto-60].ton_price",
+        ),
+        (
+            json!({"usd": "500.00", "window_min": 241}),
+            "event_types[cto-60].ton_price",
+        ),
+        (
+            json!({"usd": "500.00", "ton": "100.00"}),
+            "event_types[cto-60].ton_price",
+        ),
+        (json!({}), "event_types[cto-60].ton_price"),
+        (json!({"window_min": 30}), "event_types[cto-60].ton_price"),
+        (json!({"usd": 500}), "(document)"),
+        (json!({"usd": null}), "(document)"),
+        (json!({"usd": "500.00", "currency": "USD"}), "(document)"),
+        (json!("500.00"), "(document)"),
+    ];
+    for (value, path) in cases {
+        let error = refused(
+            &env,
+            &et_doc(
+                json!([{"slug": "cto-60", "ton_price": value.clone()}]),
+                None,
+            ),
+            path,
+        )
+        .await;
+        if path.ends_with(".usd") && value["usd"] == json!("500") {
+            assert!(
+                error.to_string().contains(r#"spell it "500.00""#),
+                "{error}"
+            );
+        }
+    }
+    // The form's own message, in English.
+    let error = refused(
+        &env,
+        &et_doc(
+            json!([{"slug": "cto-60", "ton_price": {"usd": "0.50"}}]),
+            None,
+        ),
+        "event_types[cto-60].ton_price",
+    )
+    .await;
+    assert!(
+        error.to_string().contains("from 1 to 10000"),
+        "not the form's message: {error}"
+    );
+    // A new type is checked the same way, before anything is written.
+    let mut new = paid();
+    new["slug"] = json!("cto-90");
+    new["ton_price"] = json!({"ton": "12.345"});
+    refused(
+        &env,
+        &et_doc(json!([new]), None),
+        "event_types[cto-90].ton_price",
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn a_priced_dry_run_reports_what_a_real_run_does_and_writes_nothing() {
+    let env = ApplyEnv::new().await;
+    insert_personal_et(&env.pool, &env.admin_id, "plain").await;
+    let json = et_doc(
+        json!([paid(), {"slug": "plain", "ton_price": {"ton": "25.00", "window_min": 60}}]),
+        None,
+    );
+    let before = env.snapshot().await;
+    let dry = env.apply(&json, true).await.unwrap();
+    assert_eq!(env.snapshot().await, before, "the dry run wrote");
+    let real = env.apply(&json, false).await.unwrap();
+    assert_eq!(dry.changed, real.changed);
+    assert_eq!(
+        paths(&real),
+        [
+            "event_types[cto-60]",
+            "event_types[plain].ton_price",
+            "event_types[plain].telegram_guest_mode"
+        ]
+    );
+}
+
+#[tokio::test]
+async fn exported_prices_apply_with_no_change() {
+    let env = ApplyEnv::new().await;
+    let mut off = paid();
+    off["slug"] = json!("paused");
+    off["ton_price"] = json!({"ton": "100.00", "window_min": 45, "enabled": false});
+    env.apply(&et_doc(json!([consultation(), paid(), off]), None), false)
+        .await
+        .unwrap();
+    // A price set through the web form, not by apply.
+    let hand = insert_personal_et(&env.pool, &env.admin_id, "hand-made").await;
+    sqlx::query(
+        "INSERT INTO ton_prices (event_type_id, currency, price_nano, window_min, enabled, updated_at)
+         VALUES (?, 'TON', 12340000000, NULL, 1, '2026-11-12T00:00:00Z')",
+    )
+    .bind(&hand)
+    .execute(&env.pool)
+    .await
+    .unwrap();
+
+    let exported = env.export().await.unwrap().event_types.unwrap();
+    let by_slug = |slug: &str| {
+        exported
+            .items
+            .iter()
+            .find(|i| i.slug == slug)
+            .map(|i| serde_json::to_value(&i.ton_price).unwrap())
+            .unwrap()
+    };
+    assert_eq!(by_slug("15min"), Value::Null);
+    assert_eq!(
+        by_slug("cto-60"),
+        json!({"usd": "500.00", "window_min": null, "enabled": true})
+    );
+    assert_eq!(
+        by_slug("paused"),
+        json!({"ton": "100.00", "window_min": 45, "enabled": false})
+    );
+    assert_eq!(
+        by_slug("hand-made"),
+        json!({"ton": "12.34", "window_min": null, "enabled": true})
+    );
+    let json = doc(json!({ "event_types": serde_json::to_value(&exported).unwrap() }));
+    let before = env.snapshot().await;
+    let report = env.apply(&json, false).await.unwrap();
+    assert!(report.changed.is_empty(), "{:?}", report.changed);
+    assert_eq!(env.snapshot().await, before);
+}
+
 // --- Sources ---
 
 /// A Kerio-like source of the admin with three calendars, one of them

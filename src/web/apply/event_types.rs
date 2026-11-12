@@ -9,8 +9,8 @@
 //! the whole form a browser would post. The form is posted only when a
 //! setting it carries differs from the stored one.
 //!
-//! Three settings are not on that form and are written the way their own
-//! pages write them:
+//! Four settings are not posted with that form and are written the way their
+//! own pages write them:
 //! - `enabled` through the list's toggle (`toggle_event_type`), only when it
 //!   differs;
 //! - `telegram_guest_mode` with `telegram::store::save_event_type_mode`, the
@@ -20,6 +20,14 @@
 //!   timezone nor pin the followed one. After the form, a timezone that is
 //!   still not the asked one is set with one `UPDATE`, as MCP's
 //!   `set_weekly_hours` does.
+//! - `ton_price`: the form's price section, checked by its own check
+//!   (`ton_pay::validate_price_form`) and turned into what it stores
+//!   (`ton_pay::price_write`) from the fields a browser would post for it,
+//!   then written by `ton_pay::write_price` on the run's connection: the
+//!   form's own save runs in a transaction of its own (`pool.begin()`),
+//!   which SQLite refuses inside the run's. A price switched on makes a type
+//!   with no Telegram mode chosen ask for it (`required`), as on the form;
+//!   `telegram_guest_mode` in the item is written after it.
 //!
 //! `weekly_hours: null` means the profile's default hours: the event type's
 //! rules are a copy of `user_availability_rules` as they are once the
@@ -35,12 +43,13 @@
 use super::{
     answered, check_opt_text, check_text, check_timezone, form, ApplyError, CalendarView, Ctx, Day,
     DayHours, EventTypeItem, EventTypes, FrequencyLimit, GuestMode, LocationType, Period,
-    PhoneMode, Prune, Visibility, Window,
+    PhoneMode, Prune, TonPrice, Visibility, Window,
 };
 use crate::web::agent::dto;
 use crate::web::agent::error::ToolError;
 use crate::web::agent::ops_write::{self, EditState, Rule};
 use crate::web::event_types::EventTypeForm;
+use crate::web::ton_pay::{self, store::Price, PriceForm, PriceWrite};
 use axum::extract::{Path, State};
 use axum::response::IntoResponse;
 use serde::de::DeserializeOwned;
@@ -68,7 +77,7 @@ const SEED_END: &str = "17:00";
 
 /// The keys of an item after `slug`, in the document's order: the order
 /// of a report's changes.
-const KEYS: [&str; 30] = [
+const KEYS: [&str; 31] = [
     "title",
     "description",
     "duration_min",
@@ -97,12 +106,19 @@ const KEYS: [&str; 30] = [
     "reschedule_notice_min",
     "sms_phone_mode",
     "frequency_limits",
+    "ton_price",
     "telegram_guest_mode",
     "enabled",
 ];
 
 /// Settings not carried by the event type form (see the module comment).
-const OFF_FORM: [&str; 3] = ["timezone", "enabled", "telegram_guest_mode"];
+const OFF_FORM: [&str; 4] = ["timezone", "enabled", "ton_price", "telegram_guest_mode"];
+
+/// What an item's `ton_price` is. The release guards of the role grep for
+/// this string in the source and in the binary (as for `FORMAT`): keep it a
+/// literal, and used at runtime (the refusal of a price with neither or
+/// both amounts).
+pub(crate) const TON_PRICE_SHAPE: &str = "ton_price: null or {ton|usd, window_min, enabled}";
 
 fn item_path(slug: &str) -> String {
     format!("event_types[{slug}]")
@@ -185,6 +201,30 @@ async fn profile_rules(ctx: &Ctx) -> Result<Vec<Rule>, ApplyError> {
     Ok(rules)
 }
 
+/// The stored price of `et_id` in the document's shape; `None` when free.
+async fn stored_price(ctx: &Ctx, et_id: &str) -> Result<Option<TonPrice>, ApplyError> {
+    let mut conn = ctx.pool().acquire().await?;
+    let row = crate::web::agent::ops_ton::read_price(&mut conn, et_id)
+        .await
+        .map_err(read_error)?;
+    Ok(row.map(|(price, window_min, enabled)| price_item(price, window_min, enabled != 0)))
+}
+
+/// A price as the document states it, the amount as the form shows it.
+fn price_item(price: Price, window_min: Option<i64>, enabled: bool) -> TonPrice {
+    let amount = Some(price.amount());
+    let (ton, usd) = match price {
+        Price::Ton(_) => (amount, None),
+        Price::Usd(_) => (None, amount),
+    };
+    TonPrice {
+        ton,
+        usd,
+        window_min,
+        enabled,
+    }
+}
+
 /// The stored guest Telegram mode (`off` when none is stored).
 async fn guest_mode(ctx: &Ctx, et_id: &str) -> GuestMode {
     GuestMode::from_key(crate::telegram::store::event_type_mode(ctx.pool(), et_id).await)
@@ -227,8 +267,9 @@ fn limits_of(limits: &[(i64, String, bool)]) -> Vec<FrequencyLimit> {
     out
 }
 
-/// A form state and its Telegram mode as a document item, every key given.
-fn item_of(state: &EditState, mode: GuestMode) -> EventTypeItem {
+/// A form state, its Telegram mode and its price as a document item, every
+/// key given.
+fn item_of(state: &EditState, mode: GuestMode, price: &Option<TonPrice>) -> EventTypeItem {
     EventTypeItem {
         slug: state.slug.clone(),
         title: Some(state.title.clone()),
@@ -259,6 +300,7 @@ fn item_of(state: &EditState, mode: GuestMode) -> EventTypeItem {
         reschedule_notice_min: Some(state.reschedule_notice_min),
         sms_phone_mode: PhoneMode::from_key(&state.sms_phone_mode),
         frequency_limits: Some(limits_of(&state.frequency_limits)),
+        ton_price: Some(price.clone()),
         telegram_guest_mode: Some(mode),
         enabled: Some(state.enabled),
     }
@@ -274,11 +316,57 @@ fn as_map(item: &EventTypeItem) -> Result<Map<String, Value>, ApplyError> {
 
 // --- The desired state ---
 
-/// An item's desired state: the form state with the item applied, and the
-/// Telegram mode.
+/// An item's desired state: the form state with the item applied, the
+/// Telegram mode and the price.
 struct Wanted {
     state: EditState,
     mode: GuestMode,
+    /// The item gives `telegram_guest_mode`: written after the price.
+    mode_given: bool,
+    price: Option<TonPrice>,
+    /// What the price section stores, when the item gives `ton_price`.
+    price_write: Option<PriceWrite>,
+}
+
+/// `ton_price` as the fields a browser posts for the form's price section,
+/// checked by the form's own check and turned into what the form stores.
+/// null is the section unchecked and blank (no price). The amount must be
+/// spelled as the form shows the stored price, so the document and an
+/// export compare as text.
+fn price_wanted(slug: &str, price: Option<&TonPrice>) -> Result<PriceWrite, ApplyError> {
+    let path = at(slug, "ton_price");
+    let window = price.and_then(|p| p.window_min).map(|w| w.to_string());
+    let (currency, amount) = match price.map(|p| (&p.ton, &p.usd)) {
+        None => (None, ""),
+        Some((Some(a), None)) => (Some("TON"), a.as_str()),
+        Some((None, Some(a))) => (Some("USD"), a.as_str()),
+        Some(_) => return Err(ApplyError::invalid(&path, TON_PRICE_SHAPE)),
+    };
+    let form = PriceForm {
+        enabled: price.filter(|p| p.enabled).map(|_| "on"),
+        amount: Some(amount),
+        currency,
+        window_min: window.as_deref(),
+        guest_telegram: None,
+    };
+    ton_pay::validate_price_form(&form, None)
+        .map_err(|key| ApplyError::invalid(&path, crate::i18n::translate("en", key, None)))?;
+    let write = ton_pay::price_write(&form).ok_or_else(|| {
+        ApplyError::internal(
+            "price",
+            "the price section stores nothing for a valid price",
+        )
+    })?;
+    if let (Some(given), PriceWrite::Save { price: stored, .. }) = (price, write) {
+        if stored.amount() != amount {
+            let key = if given.ton.is_some() { "ton" } else { "usd" };
+            return Err(ApplyError::invalid(
+                format!("{path}.{key}"),
+                format!("spell it {:?}", stored.amount()),
+            ));
+        }
+    }
+    Ok(write)
 }
 
 /// The item as the MCP edit (`EventTypePatch`), without what `EditState`
@@ -346,13 +434,15 @@ fn limit_rows(
     Ok(rows)
 }
 
-/// `base` with `item` applied, checked the way MCP checks an edit.
-/// `profile` is what `weekly_hours: null` stands for.
+/// `base` with `item` applied, checked the way MCP checks an edit (and the
+/// price the way the form's price section checks it). `profile` is what
+/// `weekly_hours: null` stands for.
 async fn wanted(
     ctx: &Ctx,
     item: &EventTypeItem,
     base: EditState,
     base_mode: GuestMode,
+    base_price: Option<TonPrice>,
     profile: &[Rule],
 ) -> Result<Wanted, ApplyError> {
     let slug = item.slug.as_str();
@@ -377,9 +467,16 @@ async fn wanted(
     if let Some(enabled) = item.enabled {
         state.enabled = enabled;
     }
+    let (price, price_write) = match &item.ton_price {
+        Some(price) => (price.clone(), Some(price_wanted(slug, price.as_ref())?)),
+        None => (base_price, None),
+    };
     Ok(Wanted {
         state,
         mode: item.telegram_guest_mode.unwrap_or(base_mode),
+        mode_given: item.telegram_guest_mode.is_some(),
+        price,
+        price_write,
     })
 }
 
@@ -432,11 +529,12 @@ fn differences(
     item: &EventTypeItem,
     before: &EditState,
     before_mode: GuestMode,
+    before_price: &Option<TonPrice>,
     want: &Wanted,
 ) -> Result<Vec<(String, Value, Value)>, ApplyError> {
     let given = as_map(item)?;
-    let stored = as_map(&item_of(before, before_mode))?;
-    let desired = as_map(&item_of(&want.state, want.mode))?;
+    let stored = as_map(&item_of(before, before_mode, before_price))?;
+    let desired = as_map(&item_of(&want.state, want.mode, &want.price))?;
     Ok(KEYS
         .iter()
         .filter(|key| given.contains_key(**key))
@@ -451,15 +549,20 @@ fn differences(
 /// `item` without the keys whose value is already the stored one: those
 /// need neither a check nor a write, so a document that says what is
 /// stored (an export) applies as it is, even where the stored value is one
-/// the checks would refuse today.
+/// the checks would refuse today. `telegram_guest_mode` stays: a price the
+/// run switches on can change the stored mode (`off` when none was chosen,
+/// then `required`), and a mode the item gives is written after it.
 fn without_stored(
     item: &EventTypeItem,
     state: &EditState,
     mode: GuestMode,
+    price: &Option<TonPrice>,
 ) -> Result<EventTypeItem, ApplyError> {
-    let stored = as_map(&item_of(state, mode))?;
+    let stored = as_map(&item_of(state, mode, price))?;
     let mut given = as_map(item)?;
-    given.retain(|key, value| key == "slug" || stored.get(key) != Some(value));
+    given.retain(|key, value| {
+        key == "slug" || key == "telegram_guest_mode" || stored.get(key) != Some(value)
+    });
     serde_json::from_value(Value::Object(given))
         .map_err(|e| ApplyError::internal("event type item", e))
 }
@@ -508,6 +611,18 @@ fn check_item(item: &EventTypeItem) -> Result<(), ApplyError> {
                 path,
                 format!("spell it {:?}", tz.name()),
             ));
+        }
+    }
+    if let Some(Some(price)) = &item.ton_price {
+        match (&price.ton, &price.usd) {
+            (Some(amount), None) => check_text(&at(slug, "ton_price.ton"), amount, None)?,
+            (None, Some(amount)) => check_text(&at(slug, "ton_price.usd"), amount, None)?,
+            _ => {
+                return Err(ApplyError::invalid(
+                    at(slug, "ton_price"),
+                    format!("give exactly one of ton and usd ({TON_PRICE_SHAPE})"),
+                ))
+            }
         }
     }
     if let Some(Some(days)) = &item.weekly_hours {
@@ -573,9 +688,10 @@ pub(super) async fn check(ctx: &Ctx, section: &EventTypes) -> Result<(), ApplyEr
                     .await
                     .map_err(read_error)?;
                 let mode = guest_mode(ctx, &et_id).await;
-                let item = without_stored(item, &base, mode)?;
+                let price = stored_price(ctx, &et_id).await?;
+                let item = without_stored(item, &base, mode, &price)?;
                 check_item(&item)?;
-                wanted(ctx, &item, base, mode, &profile).await?;
+                wanted(ctx, &item, base, mode, price, &profile).await?;
             }
             None => {
                 if !has_account {
@@ -592,7 +708,7 @@ pub(super) async fn check(ctx: &Ctx, section: &EventTypes) -> Result<(), ApplyEr
                 }
                 check_item(item)?;
                 let base = new_form(slug, &ctx.me, &profile);
-                wanted(ctx, item, base, GuestMode::Off, &profile).await?;
+                wanted(ctx, item, base, GuestMode::Off, None, &profile).await?;
             }
         }
     }
@@ -678,7 +794,7 @@ async fn create(ctx: &mut Ctx, item: &EventTypeItem, profile: &[Rule]) -> Result
     let slug = item.slug.as_str();
     let path = item_path(slug);
     let base = new_form(slug, &ctx.me, profile);
-    let want = wanted(ctx, item, base, GuestMode::Off, profile).await?;
+    let want = wanted(ctx, item, base, GuestMode::Off, None, profile).await?;
     ctx.record(&path, Value::Null, "created");
 
     let fields = want.state.form_fields(&ctx.me.timezone, true, true);
@@ -701,7 +817,7 @@ async fn create(ctx: &mut Ctx, item: &EventTypeItem, profile: &[Rule]) -> Result
             "the form answered as saved but created no event type",
         )
     })?;
-    off_form(ctx, slug, &et_id, &want).await
+    off_form(ctx, slug, &et_id, &want, false).await
 }
 
 /// An event type that exists: each differing setting recorded, the form
@@ -717,9 +833,18 @@ async fn update(
         .await
         .map_err(read_error)?;
     let before_mode = guest_mode(ctx, et_id).await;
-    let item = &without_stored(item, &before, before_mode)?;
-    let want = wanted(ctx, item, before.clone(), before_mode, profile).await?;
-    let changes = differences(item, &before, before_mode, &want)?;
+    let before_price = stored_price(ctx, et_id).await?;
+    let item = &without_stored(item, &before, before_mode, &before_price)?;
+    let want = wanted(
+        ctx,
+        item,
+        before.clone(),
+        before_mode,
+        before_price.clone(),
+        profile,
+    )
+    .await?;
+    let changes = differences(item, &before, before_mode, &before_price, &want)?;
     if changes.is_empty() {
         return Ok(());
     }
@@ -761,18 +886,38 @@ async fn update(
         .into_response();
         answered(&item_path(slug), response).await?;
     }
-    off_form(ctx, slug, et_id, &want).await
+    off_form(ctx, slug, et_id, &want, true).await
 }
 
 /// The settings the form does not carry, each written only when it differs.
-async fn off_form(ctx: &Ctx, slug: &str, et_id: &str, want: &Wanted) -> Result<(), ApplyError> {
+/// `record`: a Telegram mode the price changes (the item giving none) is
+/// recorded, as the form's own effect (not for a created type, one entry).
+async fn off_form(
+    ctx: &mut Ctx,
+    slug: &str,
+    et_id: &str,
+    want: &Wanted,
+    record: bool,
+) -> Result<(), ApplyError> {
     let now = EditState::load(ctx.pool(), et_id)
         .await
         .map_err(read_error)?;
     if now.enabled != want.state.enabled {
         toggle(ctx, slug).await?;
     }
-    if guest_mode(ctx, et_id).await != want.mode {
+    if let Some(write) = want.price_write {
+        if stored_price(ctx, et_id).await? != want.price {
+            let mode_before = guest_mode(ctx, et_id).await;
+            let mut conn = ctx.pool().acquire().await?;
+            ton_pay::write_price(&mut conn, et_id, write, chrono::Utc::now()).await?;
+            drop(conn);
+            if record && !want.mode_given {
+                let mode_after = guest_mode(ctx, et_id).await;
+                ctx.record(at(slug, "telegram_guest_mode"), mode_before, mode_after);
+            }
+        }
+    }
+    if want.mode_given && guest_mode(ctx, et_id).await != want.mode {
         crate::telegram::store::save_event_type_mode(ctx.pool(), et_id, want.mode.key()).await?;
     }
     if now.timezone != want.state.timezone {
@@ -816,10 +961,12 @@ pub(super) async fn verify(ctx: &Ctx, section: &EventTypes) -> Result<(), ApplyE
             .await
             .map_err(read_error)?;
         let mode = guest_mode(ctx, &et_id).await;
-        let item = &without_stored(item, &now, mode)?;
-        let want = wanted(ctx, item, now.clone(), mode, &profile).await?;
-        if let Some((key, stored, desired)) =
-            differences(item, &now, mode, &want)?.into_iter().next()
+        let price = stored_price(ctx, &et_id).await?;
+        let item = &without_stored(item, &now, mode, &price)?;
+        let want = wanted(ctx, item, now.clone(), mode, price.clone(), &profile).await?;
+        if let Some((key, stored, desired)) = differences(item, &now, mode, &price, &want)?
+            .into_iter()
+            .next()
         {
             return Err(ApplyError::stored_differs(
                 at(slug, &key),
@@ -885,7 +1032,8 @@ pub(super) async fn export(ctx: &Ctx) -> Result<Option<EventTypes>, ApplyError> 
         let state = EditState::load(ctx.pool(), &et_id)
             .await
             .map_err(read_error)?;
-        let mut item = item_of(&state, guest_mode(ctx, &et_id).await);
+        let price = stored_price(ctx, &et_id).await?;
+        let mut item = item_of(&state, guest_mode(ctx, &et_id).await, &price);
         if state.weekly_hours == profile {
             item.weekly_hours = Some(None);
         }
@@ -977,7 +1125,7 @@ mod tests {
         };
         let mut state = new_form("x", &me, &[(1, "09:00".into(), "17:00".into())]);
         state.title = "X".into();
-        let map = as_map(&item_of(&state, GuestMode::Off)).unwrap();
+        let map = as_map(&item_of(&state, GuestMode::Off, &None)).unwrap();
         let mut keys: Vec<&str> = map
             .keys()
             .map(String::as_str)

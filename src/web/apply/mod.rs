@@ -733,6 +733,13 @@ pub(crate) struct EventTypeItem {
         skip_serializing_if = "Option::is_none"
     )]
     pub(crate) frequency_limits: Option<Vec<FrequencyLimit>>,
+    /// The price section of the event type form; null: free (no price).
+    #[serde(
+        default,
+        deserialize_with = "nullable",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub(crate) ton_price: Option<Option<TonPrice>>,
     #[serde(
         default,
         deserialize_with = "present",
@@ -754,6 +761,39 @@ pub(crate) struct EventTypeItem {
 pub(crate) struct FrequencyLimit {
     pub(crate) count: i64,
     pub(crate) period: Period,
+}
+
+/// The TON price of an event type (`ton_prices`), the event type form's
+/// price section: exactly one of `ton` (the invoice amount itself) and
+/// `usd` (converted at the rate of the moment the guest books), spelled as
+/// the form shows a stored price ("100.00", "500.00"). Always the whole
+/// price: `window_min` and `enabled` left out take their defaults.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct TonPrice {
+    #[serde(
+        default,
+        deserialize_with = "present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub(crate) ton: Option<String>,
+    #[serde(
+        default,
+        deserialize_with = "present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub(crate) usd: Option<String>,
+    /// Minutes the guest has to pay; null: the server's default
+    /// (`CALRS_TON_WINDOW_MIN`).
+    #[serde(default)]
+    pub(crate) window_min: Option<i64>,
+    /// false keeps the price switched off: the type books free.
+    #[serde(default = "switched_on")]
+    pub(crate) enabled: bool,
+}
+
+fn switched_on() -> bool {
+    true
 }
 
 // --- The report ---

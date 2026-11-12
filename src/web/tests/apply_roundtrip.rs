@@ -162,6 +162,41 @@ fn production(avatar_file: &str, avatar_sha: &str) -> Value {
             "reschedule_notice_min": 120,
             "sms_phone_mode": "off",
             "frequency_limits": [{"count": 4, "period": "day"}],
+            "ton_price": null,
+            "telegram_guest_mode": "optional",
+            "enabled": true
+        }, {
+            "slug": "cto-60",
+            "title": "CTO Consultation",
+            "description": "A one-hour **CTO consultation**. Rate: $500/hour, paid in TON when you \
+                            book. [About me](https://ilia.ae/en/about/)",
+            "duration_min": 60,
+            "slot_interval_min": null,
+            "buffer_before": 0,
+            "buffer_after": 15,
+            "min_notice_min": 1440,
+            "requires_confirmation": false,
+            "pending_blocks_slot": true,
+            "pending_expiry_hours": 24,
+            "visibility": "public",
+            "location_type": "jitsi_auto",
+            "location_value": null,
+            "meeting_pattern_override": null,
+            "timezone": null,
+            "weekly_hours": null,
+            "booking_horizon_days": 14,
+            "bookable_from": null,
+            "bookable_until": null,
+            "reminder_minutes": 60,
+            "max_additional_guests": 1,
+            "first_slot_only": false,
+            "default_calendar_view": "month",
+            "week_start": null,
+            "cancel_notice_min": 120,
+            "reschedule_notice_min": 120,
+            "sms_phone_mode": "off",
+            "frequency_limits": [],
+            "ton_price": {"usd": "500.00", "window_min": null, "enabled": true},
             "telegram_guest_mode": "optional",
             "enabled": true
         }]}
@@ -238,6 +273,7 @@ async fn the_production_document_applies_once_then_changes_nothing_and_exports_i
         "site.jitsi",
         "sources[0].write_calendar",
         "event_types[15min]",
+        "event_types[cto-60]",
     ] {
         assert!(changed.contains(&path), "{path} not in {changed:?}");
     }
@@ -290,6 +326,20 @@ async fn the_production_document_applies_once_then_changes_nothing_and_exports_i
             .collect::<Vec<_>>(),
         "weekly_hours null: the profile's hours of the same run"
     );
+
+    let price: (String, Option<i64>, Option<i64>, i64) = sqlx::query_as(
+        "SELECT p.currency, p.price_usd_cents, p.window_min, p.enabled FROM ton_prices p
+         JOIN event_types et ON et.id = p.event_type_id WHERE et.slug = 'cto-60'",
+    )
+    .fetch_one(&env.pool)
+    .await
+    .unwrap();
+    assert_eq!(price, ("USD".to_string(), Some(50_000), None, 1));
+    let priced: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM ton_prices")
+        .fetch_one(&env.pool)
+        .await
+        .unwrap();
+    assert_eq!(priced, 1, "the free consultation stays free");
 
     // The second run: nothing to change, not even a timestamp.
     let applied = env.snapshot().await;
@@ -703,7 +753,30 @@ enum Card {
     Jitsi,
     /// Event types → New (`create_event_type`).
     NewEventType,
+    /// Event types → New, its price section on, in US dollars.
+    NewUsdPriced,
+    /// Event types → New, its price section on, in TON.
+    NewTonPriced,
 }
+
+/// What `Card::NewEventType` posts.
+const NEW_EVENT_TYPE: [(&str, &str); 15] = [
+    ("title", "Call"),
+    ("slug", "call"),
+    ("description", ""),
+    ("duration_min", "30"),
+    ("location_type", "custom"),
+    ("location_value", "By phone"),
+    ("visibility", "public"),
+    ("timezone", "UTC"),
+    ("avail_schedule", "1:09:00-17:00"),
+    ("min_notice_min", "60"),
+    ("buffer_before", "0"),
+    ("buffer_after", "0"),
+    ("reminder_minutes", "1440"),
+    ("max_additional_guests", "0"),
+    ("default_calendar_view", "month"),
+];
 
 impl Card {
     /// The fields the page posts when nothing is changed.
@@ -739,23 +812,28 @@ impl Card {
                 ("jitsi_pattern", ""),
                 ("jitsi_display_name", ""),
             ],
-            Card::NewEventType => &[
-                ("title", "Call"),
-                ("slug", "call"),
-                ("description", ""),
-                ("duration_min", "30"),
-                ("location_type", "custom"),
-                ("location_value", "By phone"),
-                ("visibility", "public"),
-                ("timezone", "UTC"),
-                ("avail_schedule", "1:09:00-17:00"),
-                ("min_notice_min", "60"),
-                ("buffer_before", "0"),
-                ("buffer_after", "0"),
-                ("reminder_minutes", "1440"),
-                ("max_additional_guests", "0"),
-                ("default_calendar_view", "month"),
+            Card::NewEventType => &NEW_EVENT_TYPE,
+            Card::NewUsdPriced => &[
+                ("ton_price_enabled", "on"),
+                ("ton_price_currency", "USD"),
+                ("ton_price_amount", "40.00"),
+                ("ton_window_min", ""),
             ],
+            Card::NewTonPriced => &[
+                ("ton_price_enabled", "on"),
+                ("ton_price_currency", "TON"),
+                ("ton_price_amount", "100.00"),
+                ("ton_window_min", ""),
+            ],
+        }
+    }
+
+    /// The fields posted under `base`: a priced card is the new event type
+    /// form with its price section.
+    fn under(self) -> &'static [(&'static str, &'static str)] {
+        match self {
+            Card::NewUsdPriced | Card::NewTonPriced => &NEW_EVENT_TYPE,
+            _ => &[],
         }
     }
 }
@@ -763,8 +841,9 @@ impl Card {
 /// Post `card` with `overrides` on top of its base fields, as the admin.
 async fn post(env: &ApplyEnv, card: Card, overrides: &[(&'static str, &str)]) -> Response {
     let mut fields: Vec<(&'static str, String)> = card
-        .base()
+        .under()
         .iter()
+        .chain(card.base())
         .map(|(k, v)| (*k, v.to_string()))
         .collect();
     for (key, value) in overrides {
@@ -808,7 +887,7 @@ async fn post(env: &ApplyEnv, card: Card, overrides: &[(&'static str, &str)]) ->
                 .await
                 .into_response()
         }
-        Card::NewEventType => {
+        Card::NewEventType | Card::NewUsdPriced | Card::NewTonPriced => {
             let (headers, form) = apply::form(&fields).await.unwrap();
             crate::web::event_types::create_event_type(state(), ctx.auth_user(), headers, form)
                 .await
@@ -878,6 +957,9 @@ async fn every_value_apply_refuses_the_web_form_refuses_rewrites_or_keeps_on_pur
         }
         json!({"event_types": {"items": [item]}})
     };
+    const PRICES: &str = "SELECT group_concat(currency || ':' \
+        || coalesce(price_nano, price_usd_cents) || ':' || coalesce(window_min, '')) \
+        FROM ton_prices";
     let window = |start: &str, end: &str| json!({"start": start, "end": end});
     let overlapping =
         json!([{"day": "mon", "windows": [window("10:00", "12:00"), window("11:00", "13:00")]}]);
@@ -1158,6 +1240,80 @@ async fn every_value_apply_refuses_the_web_form_refuses_rewrites_or_keeps_on_pur
             web: Web::Keeps,
             doc: item(json!({"booking_horizon_days": 400})),
             path: "event_types[call].booking_horizon_days",
+        },
+        // --- The TON price section ---
+        Parity {
+            card: Card::NewUsdPriced,
+            field: "ton_price_amount",
+            value: "0.50",
+            read: PRICES,
+            given: Some("USD:50:"),
+            web: Web::Refuses,
+            doc: item(json!({"ton_price": {"usd": "0.50"}})),
+            path: "event_types[call].ton_price",
+        },
+        Parity {
+            card: Card::NewUsdPriced,
+            field: "ton_price_amount",
+            value: "40.005",
+            read: PRICES,
+            given: None,
+            web: Web::Refuses,
+            doc: item(json!({"ton_price": {"usd": "40.005"}})),
+            path: "event_types[call].ton_price",
+        },
+        Parity {
+            card: Card::NewUsdPriced,
+            field: "ton_window_min",
+            value: "5",
+            read: PRICES,
+            given: Some("USD:4000:5"),
+            web: Web::Refuses,
+            doc: item(json!({"ton_price": {"usd": "40.00", "window_min": 5}})),
+            path: "event_types[call].ton_price",
+        },
+        Parity {
+            card: Card::NewTonPriced,
+            field: "ton_price_amount",
+            value: "0.005",
+            read: PRICES,
+            given: None,
+            web: Web::Refuses,
+            doc: item(json!({"ton_price": {"ton": "0.005"}})),
+            path: "event_types[call].ton_price",
+        },
+        // Kept: one spelling per price, the one the form shows a stored
+        // price in, so a document and an export compare as text.
+        Parity {
+            card: Card::NewUsdPriced,
+            field: "ton_price_amount",
+            value: "500",
+            read: PRICES,
+            given: Some("USD:50000:"),
+            web: Web::Keeps,
+            doc: item(json!({"ton_price": {"usd": "500"}})),
+            path: "event_types[call].ton_price.usd",
+        },
+        Parity {
+            card: Card::NewTonPriced,
+            field: "ton_price_amount",
+            value: "100",
+            read: PRICES,
+            given: Some("TON:100000000000:"),
+            web: Web::Keeps,
+            doc: item(json!({"ton_price": {"ton": "100"}})),
+            path: "event_types[call].ton_price.ton",
+        },
+        // Rewritten: the form trims the amount.
+        Parity {
+            card: Card::NewUsdPriced,
+            field: "ton_price_amount",
+            value: " 40.00",
+            read: PRICES,
+            given: Some(" 40.00"),
+            web: Web::Rewrites,
+            doc: item(json!({"ton_price": {"usd": " 40.00"}})),
+            path: "event_types[call].ton_price.usd",
         },
     ];
     let mut wrong = Vec::new();

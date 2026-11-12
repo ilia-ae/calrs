@@ -88,6 +88,7 @@
         "reschedule_notice_min": 120,
         "sms_phone_mode": "off",
         "frequency_limits": [{"count": 4, "period": "day"}],
+        "ton_price": null,
         "telegram_guest_mode": "optional",
         "enabled": true
       },
@@ -101,6 +102,7 @@
         "weekly_hours": [
           {"day": "tue", "windows": [{"start": "15:00", "end": "17:00"}]}
         ],
+        "ton_price": {"ton": "25.00", "window_min": 20, "enabled": true},
         "telegram_guest_mode": "off",
         "enabled": false
       }

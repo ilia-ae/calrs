@@ -116,6 +116,8 @@ calrs --data-dir D config apply --export [--user E]    # stored state, same sche
         "cancel_notice_min": 120, "reschedule_notice_min": 120,   // nullable
         "sms_phone_mode": "off",          // off | optional | required
         "frequency_limits": [{"count": 4, "period": "day"}],      // whole list; [] = none; day|week|month|year
+        "ton_price": null,                // nullable (null = free); or the whole price, see "TON price" below:
+                                          // {"usd": "500.00", "window_min": null, "enabled": true}
         "telegram_guest_mode": "optional",// off | optional | required
         "enabled": true
       }
@@ -126,9 +128,17 @@ calrs --data-dir D config apply --export [--user E]    # stored state, same sche
 
 - **Event type items:**
   - Field names, values and ranges are the MCP `EventTypePatch` ones (`src/web/agent/dto.rs`).
-  - Three things differ: `timezone` is nullable here; `weekly_hours`, `frequency_limits`, `telegram_guest_mode` and `enabled` are extra keys; and there is no `version`.
+  - Three things differ: `timezone` is nullable here; `weekly_hours`, `frequency_limits`, `ton_price`, `telegram_guest_mode` and `enabled` are extra keys; and there is no `version`.
   - A key that is left out keeps the stored value. On creation, a missing key takes the new event type form's default.
-  - These are not in v1 and are left as they are: busy calendars, resources, watchers, team fields, date overrides and the TON price.
+  - These are not in v1 and are left as they are: busy calendars, resources, watchers, team fields and date overrides.
+- **TON price (`ton_price`, added after v1 froze; same format string):** the price section of the event type form (`ton_prices`).
+  - `null` is free: no price, a stored one is removed (the section unchecked and blank).
+  - Otherwise an object, always the whole price: exactly one of `ton` (the invoice amount itself, no exchange rate) and `usd` (converted at the rate of the moment the guest books, inside the server's corridor `CALRS_TON_RATE_MIN_USD`..`MAX_USD`); `window_min`, the minutes the guest has to pay (10..240, `null` = the server's `CALRS_TON_WINDOW_MIN`), left out = `null`; `enabled`, left out = `true`, `false` keeps the price switched off (the type books free, the section's unchecked box with an amount).
+  - The amount is a string spelled as the form shows a stored price: `"500.00"`, `"100.00"`, `"12.35"`. `"500"` is refused with `spell it "500.00"`, so a document and an export compare as text.
+  - Checks: the form's own (`ton_pay::validate_price_form`, its English message): USD 1..10000 with at most two decimals, TON 1..100000 in steps of 0.01, the window 10..240. What is stored is what the form stores for the same fields (`ton_pay::price_write`, `ton_pay::write_price`, `store::save_price`), written after the form, as `timezone` is: the form's own save opens a transaction, which SQLite refuses inside the run's.
+  - Like the form, a price switched on makes a type with no Telegram mode chosen ask for the guest's Telegram (`required`). A `telegram_guest_mode` in the item is written after the price and wins. Without one, the mode the price set is reported as `event_types[<slug>].telegram_guest_mode`.
+  - Nothing is refused because payments are off on the server: the form does not refuse either (it notes that a paid type cannot be booked until they are), and `config apply` does not run with `calrs serve`'s environment. Open invoices keep their terms; the new price applies to bookings made from then on.
+  - An older calrs refuses the key (`deny_unknown_fields`, exit 2, nothing written). The marker of a calrs that knows it is the literal `TON_PRICE_SHAPE` in `src/web/apply/event_types.rs`: `ton_price: null or {ton|usd, window_min, enabled}`, in the source and in the binary.
 - **Not in the document:** `base_url` and `allow_private_hosts` belong to the environment, so they are unknown keys. There are no secrets in v1.
 
 ### Canonical values
@@ -143,7 +153,8 @@ The rule covers:
 - whitespace that `trim` would drop;
 - weekly windows that are unsorted, overlapping or more than 10 a day;
 - a slug the handler would rewrite;
-- `custom` given with a theme other than `custom`.
+- `custom` given with a theme other than `custom`;
+- a TON price amount not spelled as the form shows it (`"500"` for `"500.00"`).
 
 The checks reuse the existing validators: `check_text`/`check_opt_text`/`check_timezone` (below), `i18n::is_supported`, `admin::is_safe_company_link`, `validate_event_type_form`, `parse_bookable_range`, and from `ops_write` `check_title`, `check_description`, `weekly_rules` and `schedule_string`.
 
@@ -164,7 +175,7 @@ The checks reuse the existing validators: `check_text`/`check_opt_text`/`check_t
 - `event_types[<slug>]` with `before: null, after: "created"` for a created event type, or `before: "present", after: null` for a deleted one. Disabling by prune is `event_types[<slug>].enabled`, true to false.
 
 **Values:**
-- `before` and `after` are JSON in the document's own shape. `weekly_hours` and `frequency_limits` appear as whole lists.
+- `before` and `after` are JSON in the document's own shape. `weekly_hours` and `frequency_limits` appear as whole lists, `ton_price` as the whole object with every key (or `null`).
 - A cleared secret column shows `"(secret set)"` changing to `null` (`SECRET_SET`).
 - `profile.avatar` shows `"sha256:<hex>"`, or `null`.
 
