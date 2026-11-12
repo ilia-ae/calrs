@@ -682,6 +682,12 @@ const SENTINEL_COLUMNS: &[(&str, &str)] = &[
     // returned (the chat ids are integers: `SENTINEL_INT_COLUMNS`).
     ("telegram_user_chats", "telegram_username"),
     ("telegram_state", "bot_username"),
+    // ilia fork: passkeys. Public data, but nothing the model needs.
+    ("ilia_webauthn_credentials", "rp_id"),
+    ("ilia_webauthn_credentials", "credential_id"),
+    ("ilia_webauthn_credentials", "public_key"),
+    ("ilia_webauthn_credentials", "transports"),
+    ("ilia_webauthn_credentials", "name"),
 ];
 
 /// INTEGER columns that must never be returned: planted with
@@ -853,6 +859,11 @@ async fn seed_everything(fx: &Fixture) {
         "INSERT INTO mfa_recovery_codes (user_id, code_hash) VALUES (?, 'code')",
         "INSERT INTO mfa_challenges (token_hash, user_id, password_hash, purpose, expires_at)
          VALUES ('challenge', ?, 'hash', 'login', 0)",
+        // ilia fork: a passkey. (A ceremony row is not seeded: its foreign
+        // keys reference the token hash and session id the test overwrites.)
+        "INSERT INTO ilia_webauthn_credentials (id, user_id, rp_id, credential_id, public_key,
+             algorithm, sign_count, uv_initialized, backup_eligible, backup_state, name, created_at)
+         VALUES ('passkey-1', ?1, 'book.example.test', x'0102', x'3059', -7, 0, 1, 0, 0, 'YubiKey', 0)",
     ] {
         sqlx::query(statement)
             .bind(&fx.user_id)

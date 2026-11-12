@@ -48,7 +48,8 @@ Every user-facing string goes through Fluent (`i18n/`).
 | `src/db.rs` | SQLite pool setup and the migration list (`migrate()`) |
 | `src/models.rs` | Domain structs (mostly documentation; queries use tuples) |
 | `src/auth.rs` | Passwords, sessions, OIDC, extractors (`AuthUser`, `AdminUser`, `OptionalAuthUser`), login/register handlers |
-| `src/mfa.rs` | Local TOTP two-factor authentication: enrollment, login challenges, recovery codes, the admin policy, `/auth/mfa` and `/dashboard/settings/mfa` routes (tests in `src/mfa/tests.rs`) |
+| `src/mfa.rs` | Local TOTP two-factor authentication: enrollment, login challenges, recovery codes, the admin policy, `/auth/mfa` and `/dashboard/settings/mfa` routes (tests in `src/mfa/tests.rs`); in the ilia fork also the passkey proof (`Proof`, `consume_proof`), the management actions and the last-factor rule |
+| `src/webauthn/` | ilia fork: passkeys and security keys as a second factor. `mod.rs` (`Rp` from `CALRS_BASE_URL`, user handle, options JSON, form types, key names), `verify.rs` (the pure verifier: clientDataJSON, authenticator data, Ed25519/ES256/RS256, counter rule), `store.rs` (credential and ceremony SQL, `has_factor`), `flows.rs` (`/auth/mfa/passkey`, `/auth/mfa/passkey/enroll`, `/dashboard/settings/mfa/confirm`, `/dashboard/settings/mfa/passkeys`, `/static/webauthn.js`, the passkey half of the MFA pages); tests in `tests.rs` (verifier, spec vectors), `flow_tests.rs` (HTTP flows) and `flow_tests/ui.rs` (pages, script, headers), with the software authenticator `softkey.rs` |
 | `src/crypto.rs` | AES-256-GCM for stored credentials, secret key management |
 | `src/credentials.rs` | ilia fork: secrets from systemd credentials (`LoadCredentialEncrypted=`): `load_into_env(NAMES)` at the start of `main`, before the runtime, sets each variable from `$CREDENTIALS_DIRECTORY/<NAME>` unless already set; names only in the log, see CLAUDE.md "Systemd credentials" |
 | `src/settings.rs` | Runtime settings (base URL, private-host policy): env overrides DB |
@@ -139,7 +140,7 @@ Call sites use `crate::email::name` whatever file `name` lives in.
 | `migrations/` | SQL migrations, numbered |
 | `templates/` | minijinja templates (`base.html`, `dashboard_base.html` and the pages extending them) |
 | `i18n/{lang}/main.ftl` | Translations, English is the source of truth |
-| `assets/` | Files embedded in the binary (logo, fonts, `embed.js`, vendored intl-tel-input) |
+| `assets/` | Files embedded in the binary (logo, fonts, `embed.js`, vendored intl-tel-input, the ilia fork's `webauthn.js`) |
 | `docs/src/` | User documentation (mdBook) |
 
 ## Key concepts and who owns them
@@ -242,6 +243,13 @@ Call sites use `crate::email::name` whatever file `name` lives in.
   `watcher::IDLE_PRICED`), the Telegram menu hash (`poller::menu_hash`),
   hot-path indexes in `migrations/ilia_007_optimize.sql`, and the
   measurements in `src/web/tests/ton_perf.rs` (all `#[ignore]`).
+- **Passkeys** (ilia fork, `src/webauthn/`, see CLAUDE.md "Passkeys and
+  security keys (ilia fork)"): `webauthn::flows::router()` is merged next to
+  `mfa::router()`; `AppState::passkeys` holds the RP read once from
+  `CALRS_BASE_URL`; the MFA pages include the `templates/auth/ilia_*.html`
+  partials; "has a factor" (`webauthn::store::has_factor`) is TOTP or a key
+  in `auth::validate_session`, the OIDC link check, `mfa::begin_login` and the
+  policy. Migration `ilia_010_webauthn.sql`.
 - **Captcha** (`src/web/captcha.rs`, CSP in `src/web/mod.rs`, widget in
   `templates/book.html`).
 - **Migrations** (`migrations/`, `src/db.rs`). A new file must also be added

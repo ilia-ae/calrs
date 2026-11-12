@@ -31,7 +31,7 @@ pub enum UserCommands {
         #[arg(long)]
         timezone: Option<String>,
     },
-    /// Reset local MFA and revoke sessions (server-operator recovery)
+    /// Reset local MFA (authenticator app, passkeys, recovery codes) and revoke sessions (server-operator recovery)
     ResetMfa { email: String },
     /// List all users
     List,

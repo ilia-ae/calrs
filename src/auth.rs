@@ -91,7 +91,10 @@ pub async fn validate_session(pool: &SqlitePool, token: &str) -> Option<User> {
          WHERE s.id = ? AND s.expires_at > ? AND u.enabled = 1
          AND (u.auth_provider != 'local'
               OR (SELECT mfa_required FROM auth_config WHERE id = 'singleton') = 0
-              OR (s.mfa_verified = 1 AND EXISTS (SELECT 1 FROM user_mfa WHERE user_id = u.id)))",
+              OR (s.mfa_verified = 1
+                  AND (EXISTS (SELECT 1 FROM user_mfa WHERE user_id = u.id)
+                       -- ilia fork: a passkey is a second factor too.
+                       OR EXISTS (SELECT 1 FROM ilia_webauthn_credentials WHERE user_id = u.id))))",
     )
     .bind(token)
     .bind(&now)
@@ -1628,11 +1631,9 @@ async fn find_or_create_oidc_user(
         // then applies instead of the local one. Not automatically for an
         // account that set up local MFA: the matching address alone would
         // switch that protection off.
-        let local_mfa: bool =
-            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM user_mfa WHERE user_id = ?)")
-                .bind(&id)
-                .fetch_one(pool)
-                .await?;
+        // ilia fork: TOTP or a passkey.
+        let local_mfa =
+            crate::webauthn::store::has_factor(&mut *pool.acquire().await?, &id).await?;
         if local_mfa {
             tracing::warn!(
                 email = %email, subject = %subject,
@@ -3276,6 +3277,40 @@ mod tests {
             validate_session(&pool, &session.id).await.is_some(),
             "a refused link changes nothing"
         );
+    }
+
+    /// ilia fork: a passkey is local MFA too (docs/passkeys-plan.md).
+    #[tokio::test]
+    async fn oidc_link_is_refused_for_an_account_with_only_a_passkey() {
+        let pool = setup_db().await;
+        let id = insert_user(&pool, "keys@company.com", "Keys", "admin").await;
+        sqlx::query(
+            "INSERT INTO ilia_webauthn_credentials (id, user_id, rp_id, credential_id, public_key,
+                 algorithm, sign_count, uv_initialized, backup_eligible, backup_state, name, created_at)
+             VALUES ('k1', ?, 'book.example.test', x'01', x'00', -7, 0, 0, 0, 0, 'Key', 0)",
+        )
+        .bind(&id)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let cfg = auth_config_with_oidc(&pool, false).await;
+        let err = find_or_create_oidc_user(
+            &pool,
+            "verified-sub",
+            "keys@company.com",
+            true,
+            "Keys",
+            &cfg,
+        )
+        .await
+        .unwrap_err();
+        assert!(err.to_string().contains("two-factor authentication"));
+        let provider: String = sqlx::query_scalar("SELECT auth_provider FROM users WHERE id = ?")
+            .bind(&id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(provider, "local");
     }
 
     #[tokio::test]

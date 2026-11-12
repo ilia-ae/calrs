@@ -1,0 +1,44 @@
+{# ilia fork: "confirm it's you" before an MFA change (docs/passkeys-plan.md §4.5). #}
+<div class="ilia-mfa">
+{% include "auth/ilia_mfa_style.html" %}
+  <h2>{{ t("ilia-mfa-confirm-title") }}</h2>
+  <p><strong>{% if action == "passkey_add" %}{{ t("ilia-mfa-action-passkey-add") }}{% elif action == "passkey_rename" %}{{ t("ilia-mfa-action-passkey-rename", name=key_name) }}{% elif action == "passkey_delete" %}{{ t("ilia-mfa-action-passkey-delete", name=key_name) }}{% elif action == "totp_add" %}{{ t("ilia-mfa-action-totp-add") }}{% elif action == "disable" %}{{ t("ilia-mfa-action-totp-remove") }}{% elif action == "regenerate" %}{{ t("ilia-mfa-action-regenerate") }}{% elif action == "policy" %}{{ t("ilia-mfa-action-policy") }} {{ t("mfa-required") if policy == "required" else t("mfa-optional") }}{% endif %}</strong></p>
+  {% if last_factor and mandatory %}
+  <p class="error" role="alert">{{ t("ilia-mfa-last-factor") }}</p>
+  {% else %}
+  {% if turns_off %}<p class="error">{{ t("ilia-mfa-last-factor-off") }}</p>{% endif %}
+  <p>{{ t("ilia-mfa-confirm-help") }}</p>
+  <form method="post" action="{{ post_to }}" id="webauthn-form">
+    <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+    {% if action == "policy" %}<input type="hidden" name="policy" value="{{ policy }}">{% else %}<input type="hidden" name="action" value="{{ action }}">{% endif %}
+    {% if credential %}<input type="hidden" name="credential" value="{{ credential }}">{% endif %}
+    {% if kind %}<input type="hidden" name="kind" value="{{ kind }}">{% endif %}
+    {% if action == "passkey_rename" %}
+    <div class="form-group">
+      <label for="passkey-name">{{ t("ilia-passkey-new-name") }}</label>
+      <input type="text" name="name" id="passkey-name" value="{{ key_name }}" required maxlength="64" autocomplete="off" spellcheck="false">
+    </div>
+    {% endif %}
+    <div class="form-group">
+      <label for="password">{{ t("login-password") }}</label>
+      <input type="password" name="password" id="password" required autocomplete="current-password">
+    </div>
+    {% if method == "passkey" %}
+    {% with create = false %}{% include "auth/ilia_webauthn_fields.html" %}{% endwith %}
+    <button type="button" class="btn btn-passkey" data-webauthn="get" data-form="webauthn-form" hidden>{{ t("ilia-passkey-confirm") }}</button>
+    {% else %}
+    <div class="form-group">
+      <label for="code">{{ t("ilia-mfa-recovery-code") if method == "recovery" else t("mfa-totp-code") }}</label>
+      <input type="text" name="code" id="code" required autocomplete="one-time-code" maxlength="32" spellcheck="false">
+    </div>
+    <button class="btn" type="submit">{{ t("ilia-mfa-confirm-code") }}</button>
+    {% endif %}
+  </form>
+  {% if method == "passkey" %}{% include "auth/ilia_webauthn_notices.html" %}{% endif %}
+  {% set base = "/dashboard/settings/mfa/confirm?action=" ~ action ~ ("&credential=" ~ credential if credential else "") ~ ("&policy=" ~ policy if policy else "") ~ ("&kind=" ~ kind if kind else "") %}
+  {% if passkey_available and method != "passkey" %}<a class="btn btn-secondary" href="{{ base }}&amp;method=passkey">{{ t("ilia-mfa-use-passkey") }}</a>{% endif %}
+  {% if has_totp and method != "totp" %}<a class="btn btn-secondary" href="{{ base }}&amp;method=totp">{{ t("ilia-mfa-use-totp") }}</a>{% endif %}
+  {% if method != "recovery" %}<a class="btn btn-secondary" href="{{ base }}&amp;method=recovery">{{ t("ilia-mfa-use-recovery") }}</a>{% endif %}
+  {% endif %}
+  <p style="margin-top: 1rem;"><a href="{{ '/dashboard/admin' if action == 'policy' else '/dashboard/settings/mfa' }}">{{ t("mfa-back") }}</a></p>
+</div>

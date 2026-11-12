@@ -1,0 +1,66 @@
+{# ilia fork: the MFA settings: passkeys, the authenticator app, recovery codes (docs/passkeys-plan.md §6). #}
+<div class="ilia-mfa">
+{% include "auth/ilia_mfa_style.html" %}
+  <p class="mfa-status {{ 'mfa-status-on' if has_factor else 'mfa-status-off' }}">{{ t("ilia-mfa-status-on") if has_factor else t("ilia-mfa-status-off") }}</p>
+  {% if mandatory %}<p>{{ t("mfa-required-help") }}</p>{% endif %}
+  {% if not has_factor %}
+  {% if passkeys_on %}<p>{{ t("ilia-mfa-setup-intro") }}</p>{% endif %}
+  <form method="post" action="/dashboard/settings/mfa">
+    <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+    <div class="form-group">
+      <label for="password">{{ t("login-password") }}</label>
+      <input type="password" name="password" id="password" required autocomplete="current-password">
+    </div>
+    <button class="btn" name="action" value="enable">{{ t("mfa-enable") }}</button>
+  </form>
+  {% else %}
+  {% if passkeys_on or keys %}
+  <section>
+    <h2>{{ t("ilia-passkey-list") }}</h2>
+    {% if not passkeys_on %}<p class="error">{{ t("ilia-passkey-unavailable") }}</p>{% endif %}
+    {% if keys %}
+    <ul class="passkey-list">
+      {% for key in keys %}
+      <li>
+        <strong class="passkey-name">{{ key.name }}</strong><span class="passkey-kind{{ ' passkey-kind-synced' if key.synced else '' }}">{{ t("ilia-passkey-kind-synced") if key.synced else t("ilia-passkey-kind-hardware") }}</span>
+        <p class="passkey-meta">{{ t("ilia-passkey-added", date=key.added) }} · {% if key.last_used %}{{ t("ilia-passkey-last-used", date=key.last_used) }}{% else %}{{ t("ilia-passkey-never-used") }}{% endif %}</p>
+        {% if key.other_site %}<p class="passkey-meta error">{{ t("ilia-passkey-other-site", rp_id=key.other_site) }}</p>{% endif %}
+        <p class="passkey-actions">
+          <a href="/dashboard/settings/mfa/confirm?action=passkey_rename&amp;credential={{ key.id }}">{{ t("ilia-passkey-rename") }}</a>
+          <a href="/dashboard/settings/mfa/confirm?action=passkey_delete&amp;credential={{ key.id }}">{{ t("ilia-passkey-delete") }}</a>
+        </p>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p>{{ t("ilia-passkey-none") }}</p>
+    {% endif %}
+    {% if key_count == 1 %}<p>{{ t("ilia-passkey-backup-advice") }}</p>{% endif %}
+    {% if passkeys_on %}
+      {% if limit_reached %}<p>{{ t("ilia-passkey-limit", max=max_keys) }}</p>
+      {% else %}
+      <p class="passkey-meta">{{ t("ilia-passkey-kinds-help") }}</p>
+      <a class="btn" href="/dashboard/settings/mfa/confirm?action=passkey_add&amp;kind=security-key">{{ t("ilia-passkey-add-security-key") }}</a>
+      <a class="btn btn-secondary" href="/dashboard/settings/mfa/confirm?action=passkey_add&amp;kind=device">{{ t("ilia-passkey-add-device") }}</a>
+      {% endif %}
+    {% endif %}
+  </section>
+  {% endif %}
+  <section>
+    <h2>{{ t("ilia-mfa-totp-title") }}</h2>
+    <p>{{ t("ilia-mfa-totp-on") if has_totp else t("ilia-mfa-totp-off") }}</p>
+    {% if has_totp %}
+      {% if totp_removable or not mandatory %}<a class="btn btn-secondary" href="/dashboard/settings/mfa/confirm?action=disable">{{ t("ilia-mfa-totp-remove") }}</a>{% endif %}
+    {% else %}
+      <a class="btn btn-secondary" href="/dashboard/settings/mfa/confirm?action=totp_add">{{ t("ilia-mfa-totp-add") }}</a>
+    {% endif %}
+  </section>
+  <section>
+    <h2>{{ t("ilia-mfa-recovery-title") }}</h2>
+    <p>{{ t("ilia-mfa-recovery-left", count=recovery_left) }}</p>
+    <a class="btn btn-secondary" href="/dashboard/settings/mfa/confirm?action=regenerate">{{ t("mfa-regenerate") }}</a>
+  </section>
+  <p style="margin-top: 1.5rem;">{{ t("ilia-mfa-changes-help") }}</p>
+  {% endif %}
+  <p><a href="/dashboard/settings">{{ t("mfa-back") }}</a></p>
+</div>

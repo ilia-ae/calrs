@@ -1,0 +1,14 @@
+{# ilia fork: the name of a new key and the two ways to add one; `kind` (the settings page's choice) leads. #}
+<div class="form-group">
+  <label for="passkey-name">{{ t("ilia-passkey-name") }}</label>
+  <input type="text" name="name" id="passkey-name" maxlength="64" autocomplete="off" spellcheck="false" aria-describedby="passkey-name-help">
+  <small id="passkey-name-help">{{ t("ilia-passkey-name-help") }}</small>
+</div>
+<p>{{ t("ilia-passkey-register-help") }}</p>
+{% if kind == "device" %}
+<button type="button" class="btn btn-passkey" data-webauthn="create" data-hints="client-device,hybrid" data-form="webauthn-form" hidden>{{ t("ilia-passkey-add-device") }}</button>
+<button type="button" class="btn btn-secondary" data-webauthn="create" data-hints="security-key" data-form="webauthn-form" hidden>{{ t("ilia-passkey-add-security-key") }}</button>
+{% else %}
+<button type="button" class="btn btn-passkey" data-webauthn="create" data-hints="security-key" data-form="webauthn-form" hidden>{{ t("ilia-passkey-add-security-key") }}</button>
+<button type="button" class="btn btn-secondary" data-webauthn="create" data-hints="client-device,hybrid" data-form="webauthn-form" hidden>{{ t("ilia-passkey-add-device") }}</button>
+{% endif %}

@@ -2056,3 +2056,77 @@ tg-host-attendee-email = E-mail de { $sender }, participant supplémentaire de l
 tg-host-other-email = E-mail d'une autre adresse, pas celle de l'invité : { $sender }, dans le fil de la réservation de { $guest } ({ $email }) au sujet de { $event }, { $when } :
 booking-blocked-body-system = L'hôte exige un préavis d'au moins { $minutes } minutes. Si vous ne pouvez pas être présent, écrivez à <a href="{ $href }">{ $address }</a>.
 booking-blocked-body-no-reply = L'hôte exige un préavis d'au moins { $minutes } minutes. Si vous ne pouvez pas être présent, prévenez l'hôte par un autre moyen.
+
+## ilia fork: passkeys and security keys (docs/passkeys-plan.md)
+
+ilia-passkey-sign-in = Se connecter avec une clé d’accès
+ilia-mfa-login-help-passkey = Confirmez cette connexion avec votre clé d’accès ou votre clé de sécurité. La connexion expire au bout de 10 minutes.
+ilia-mfa-use-totp = Utiliser un code d’application
+ilia-mfa-use-recovery = Utiliser un code de récupération
+ilia-mfa-use-passkey = Utiliser une clé d’accès
+ilia-mfa-use-passkey-instead = Utiliser plutôt une clé d’accès ou une clé de sécurité
+ilia-mfa-totp-login-help = Saisissez le code à six chiffres de votre application d’authentification. La connexion expire au bout de 10 minutes.
+ilia-mfa-recovery-code = Code de récupération
+ilia-mfa-recovery-login-help = Saisissez l’un des codes de récupération que vous avez enregistrés. Chaque code ne fonctionne qu’une fois. La connexion expire au bout de 10 minutes.
+ilia-passkey-unsupported = Ce navigateur ne prend pas en charge les clés d’accès ni les clés de sécurité. Choisissez une autre méthode ci-dessous ou ouvrez cette page dans un navigateur à jour.
+ilia-passkey-noscript = Les clés d’accès nécessitent JavaScript. Activez-le pour ce site ou choisissez une autre méthode ci-dessous.
+ilia-passkey-cancelled = La demande a été annulée ou a expiré. Réessayez ou choisissez une autre méthode.
+ilia-passkey-invalid = La clé d’accès ou la clé de sécurité n’a pas pu être vérifiée, ou la demande a expiré. Réessayez ou choisissez une autre méthode.
+ilia-passkey-key-type = Ce navigateur ne sait pas lire ce type de clé, elle ne peut donc pas être ajoutée ici. Essayez un autre navigateur, par exemple une version à jour de Firefox ou de Chrome, ou choisissez une autre méthode.
+ilia-passkey-wrong-site = Les clés d’accès ne fonctionnent qu’à l’adresse { $origin }. Ouvrez cette page à cette adresse et réessayez, ou choisissez une autre méthode.
+ilia-mfa-enroll-help = Choisissez comment vous confirmerez chaque connexion. Une clé d’accès ou une clé de sécurité est le choix le plus sûr : elle ne fonctionne que sur ce site, une fausse copie de la page ne peut donc pas l’utiliser.
+ilia-passkey-add-security-key = Ajouter une clé de sécurité
+ilia-passkey-add-device = Ajouter une clé d’accès sur cet appareil ou ce téléphone
+ilia-passkey-kinds-help = Une clé de sécurité est une clé USB ou NFC, comme une YubiKey. Une clé d’accès sur cet appareil ou ce téléphone utilise Touch ID, Face ID, Windows Hello ou le verrouillage de l’écran du téléphone, et peut être synchronisée avec vos autres appareils.
+ilia-mfa-use-app-instead = Utiliser plutôt une application d’authentification
+ilia-passkey-name = Nom de la clé
+ilia-passkey-name-help = Facultatif, par exemple « YubiKey du trousseau » ou « MacBook ». 64 caractères au maximum.
+ilia-passkey-default-security-key = Clé de sécurité { $n }
+ilia-passkey-default-device = Clé d’accès { $n }
+ilia-passkey-register-help = Appuyez sur un bouton et suivez votre navigateur : insérez la clé de sécurité et touchez-la, ou confirmez avec Touch ID, Face ID, Windows Hello ou votre téléphone.
+ilia-passkey-exists = Cette clé est déjà enregistrée.
+ilia-mfa-recovery-help = Conservez ces codes de récupération en lieu sûr ; ils ne sont affichés qu’une fois. Chaque code remplace une clé d’accès ou un code d’application pour une connexion. Les nouveaux codes remplacent tous les précédents.
+ilia-mfa-status-on = L’authentification à deux facteurs est activée.
+ilia-mfa-status-off = L’authentification à deux facteurs est désactivée.
+ilia-mfa-setup-intro = Ajoutez une deuxième étape à chaque connexion : une clé d’accès ou une clé de sécurité (YubiKey, Touch ID, Face ID, Windows Hello, votre téléphone), ou une application d’authentification.
+ilia-passkey-list = Clés d’accès et clés de sécurité
+ilia-passkey-none = Aucune clé d’accès ni clé de sécurité pour l’instant.
+ilia-passkey-kind-hardware = Clé matérielle
+ilia-passkey-kind-synced = Clé d’accès synchronisée
+ilia-passkey-added = Ajoutée le { $date }
+ilia-passkey-last-used = Dernière utilisation le { $date }
+ilia-passkey-never-used = Pas encore utilisée
+ilia-passkey-other-site = Enregistrée pour { $rp_id } ; elle ne fonctionne pas à cette adresse.
+ilia-passkey-rename = Renommer
+ilia-passkey-delete = Supprimer
+ilia-passkey-add = Ajouter une clé d’accès ou une clé de sécurité
+ilia-passkey-new-name = Nouveau nom
+ilia-passkey-limit = Vous avez atteint le nombre maximal de clés ({ $max }). Supprimez-en une pour en ajouter une autre.
+ilia-passkey-backup-advice = Ajoutez une deuxième clé et conservez-la en lieu sûr, pour que la perte d’une clé ne vous bloque pas l’accès.
+ilia-passkey-unavailable = Les clés d’accès sont désactivées : l’adresse publique du serveur (CALRS_BASE_URL) n’est pas une adresse https://. Contactez l’administrateur. Les clés déjà ajoutées restent listées et peuvent être supprimées.
+ilia-mfa-totp-title = Application d’authentification
+ilia-mfa-totp-on = Une application d’authentification est configurée.
+ilia-mfa-totp-off = Aucune application d’authentification n’est configurée.
+ilia-mfa-totp-add = Configurer une application d’authentification
+ilia-mfa-totp-remove = Supprimer l’application d’authentification
+ilia-mfa-recovery-title = Codes de récupération
+ilia-mfa-recovery-left =
+    { $count ->
+        [one] { $count } code de récupération restant
+       *[other] { $count } codes de récupération restants
+    }
+ilia-mfa-last-factor = L’authentification à deux facteurs est obligatoire : votre dernière méthode de connexion ne peut donc pas être supprimée. Ajoutez-en d’abord une autre.
+ilia-mfa-last-factor-off = C’est votre dernière méthode : la supprimer désactive l’authentification à deux facteurs et efface vos codes de récupération.
+ilia-mfa-changes-help = Chaque modification ici demande votre mot de passe et une clé d’accès ou un code, et déconnecte vos autres sessions.
+ilia-mfa-confirm-title = Confirmez votre identité
+ilia-mfa-confirm-help = Saisissez votre mot de passe, puis confirmez avec une clé d’accès ou un code.
+ilia-passkey-confirm = Confirmer avec une clé d’accès
+ilia-mfa-confirm-code = Confirmer avec un code
+ilia-mfa-action-passkey-add = Vous ajoutez une clé d’accès ou une clé de sécurité.
+ilia-mfa-action-passkey-rename = Vous renommez la clé « { $name } ».
+ilia-mfa-action-passkey-delete = Vous supprimez la clé « { $name } ».
+ilia-mfa-action-totp-add = Vous configurez une application d’authentification.
+ilia-mfa-action-totp-remove = Vous supprimez l’application d’authentification.
+ilia-mfa-action-regenerate = Vous remplacez tous les codes de récupération.
+ilia-mfa-action-policy = Vous réglez la règle d’authentification à deux facteurs des comptes locaux sur :
+ilia-mfa-policy-continue = Continuer

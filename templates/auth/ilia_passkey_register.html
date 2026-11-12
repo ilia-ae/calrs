@@ -1,0 +1,12 @@
+{# ilia fork: registers a key after "confirm it's you" (docs/passkeys-plan.md §4.6). #}
+<div class="ilia-mfa">
+{% include "auth/ilia_mfa_style.html" %}
+  <h2>{{ t("ilia-passkey-add") }}</h2>
+  <form method="post" action="/dashboard/settings/mfa/passkeys" id="webauthn-form">
+    <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+    {% with create = true %}{% include "auth/ilia_webauthn_fields.html" %}{% endwith %}
+    {% include "auth/ilia_passkey_name.html" %}
+  </form>
+  {% include "auth/ilia_webauthn_notices.html" %}
+  <p style="margin-top: 1rem;"><a href="/dashboard/settings/mfa">{{ t("mfa-manage") }}</a></p>
+</div>

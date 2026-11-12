@@ -1,0 +1,12 @@
+{# ilia fork: from a code view to the other methods, shown only when a passkey is on offer (docs/passkeys-plan.md §4.3). #}
+{% if passkey_available %}
+<div class="ilia-mfa">
+{% include "auth/ilia_mfa_style.html" %}
+{% if mode == "login" %}
+  <a class="btn btn-secondary" href="/auth/mfa?method=passkey">{{ t("ilia-mfa-use-passkey") }}</a>
+  {% if method == "totp" %}<a class="btn btn-secondary" href="/auth/mfa?method=recovery">{{ t("ilia-mfa-use-recovery") }}</a>{% elif has_totp %}<a class="btn btn-secondary" href="/auth/mfa?method=totp">{{ t("ilia-mfa-use-totp") }}</a>{% endif %}
+{% elif mode == "enroll" %}
+  <a class="btn btn-secondary" href="/auth/mfa?method=passkey">{{ t("ilia-mfa-use-passkey-instead") }}</a>
+{% endif %}
+</div>
+{% endif %}

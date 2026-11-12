@@ -2056,3 +2056,77 @@ tg-host-attendee-email = Correo de { $sender }, asistente adicional de la reserv
 tg-host-other-email = Correo de otra dirección, no la del invitado: { $sender }, en la conversación de la reserva de { $guest } ({ $email }) sobre { $event }, { $when }:
 booking-blocked-body-system = El anfitrión exige al menos { $minutes } minutos de antelación. Si no puedes asistir, escribe a <a href="{ $href }">{ $address }</a>.
 booking-blocked-body-no-reply = El anfitrión exige al menos { $minutes } minutos de antelación. Si no puedes asistir, avisa al anfitrión por otro medio.
+
+## ilia fork: passkeys and security keys (docs/passkeys-plan.md)
+
+ilia-passkey-sign-in = Iniciar sesión con llave de acceso
+ilia-mfa-login-help-passkey = Confirma este inicio de sesión con tu llave de acceso o llave de seguridad. El inicio de sesión caduca a los 10 minutos.
+ilia-mfa-use-totp = Usar código de la aplicación
+ilia-mfa-use-recovery = Usar código de recuperación
+ilia-mfa-use-passkey = Usar llave de acceso
+ilia-mfa-use-passkey-instead = Usar en su lugar una llave de acceso o de seguridad
+ilia-mfa-totp-login-help = Introduce el código de seis dígitos de tu aplicación de autenticación. El inicio de sesión caduca a los 10 minutos.
+ilia-mfa-recovery-code = Código de recuperación
+ilia-mfa-recovery-login-help = Introduce uno de los códigos de recuperación que guardaste. Cada código funciona una sola vez. El inicio de sesión caduca a los 10 minutos.
+ilia-passkey-unsupported = Este navegador no admite llaves de acceso ni llaves de seguridad. Elige otro método más abajo o abre esta página en un navegador actualizado.
+ilia-passkey-noscript = Las llaves de acceso necesitan JavaScript. Actívalo para este sitio o elige otro método más abajo.
+ilia-passkey-cancelled = La solicitud se canceló o caducó. Inténtalo de nuevo o elige otro método.
+ilia-passkey-invalid = No se pudo verificar la llave de acceso o la llave de seguridad, o la solicitud caducó. Inténtalo de nuevo o elige otro método.
+ilia-passkey-key-type = Este navegador no puede leer este tipo de llave, así que no se puede añadir aquí. Prueba con otro navegador, como una versión actualizada de Firefox o Chrome, o elige otro método.
+ilia-passkey-wrong-site = Las llaves de acceso solo funcionan en { $origin }. Abre esta página allí e inténtalo de nuevo, o elige otro método.
+ilia-mfa-enroll-help = Elige cómo confirmarás cada inicio de sesión. Una llave de acceso o de seguridad es la opción más segura: solo funciona en este sitio, así que una copia falsa de la página no puede usarla.
+ilia-passkey-add-security-key = Añadir una llave de seguridad
+ilia-passkey-add-device = Añadir una llave de acceso en este dispositivo o teléfono
+ilia-passkey-kinds-help = Una llave de seguridad es una llave USB o NFC, como una YubiKey. Una llave de acceso en este dispositivo o teléfono usa Touch ID, Face ID, Windows Hello o el bloqueo de pantalla del teléfono, y puede sincronizarse con tus otros dispositivos.
+ilia-mfa-use-app-instead = Usar en su lugar una aplicación de autenticación
+ilia-passkey-name = Nombre de la llave
+ilia-passkey-name-help = Opcional, por ejemplo «YubiKey del llavero» o «MacBook». Hasta 64 caracteres.
+ilia-passkey-default-security-key = Llave de seguridad { $n }
+ilia-passkey-default-device = Llave de acceso { $n }
+ilia-passkey-register-help = Pulsa un botón y sigue a tu navegador: inserta y toca la llave de seguridad, o confirma con Touch ID, Face ID, Windows Hello o tu teléfono.
+ilia-passkey-exists = Esta llave ya está registrada.
+ilia-mfa-recovery-help = Guarda estos códigos de recuperación en un lugar seguro; solo se muestran una vez. Cada código sustituye a una llave de acceso o a un código de la aplicación en un inicio de sesión. Los códigos nuevos sustituyen a todos los anteriores.
+ilia-mfa-status-on = La autenticación en dos pasos está activada.
+ilia-mfa-status-off = La autenticación en dos pasos está desactivada.
+ilia-mfa-setup-intro = Añade un segundo paso a cada inicio de sesión: una llave de acceso o de seguridad (YubiKey, Touch ID, Face ID, Windows Hello, tu teléfono) o una aplicación de autenticación.
+ilia-passkey-list = Llaves de acceso y llaves de seguridad
+ilia-passkey-none = Todavía no hay llaves de acceso ni de seguridad.
+ilia-passkey-kind-hardware = Llave física
+ilia-passkey-kind-synced = Llave de acceso sincronizada
+ilia-passkey-added = Añadida el { $date }
+ilia-passkey-last-used = Último uso: { $date }
+ilia-passkey-never-used = Aún sin usar
+ilia-passkey-other-site = Registrada para { $rp_id }; no funciona en esta dirección del sitio.
+ilia-passkey-rename = Cambiar nombre
+ilia-passkey-delete = Eliminar
+ilia-passkey-add = Añadir una llave de acceso o de seguridad
+ilia-passkey-new-name = Nombre nuevo
+ilia-passkey-limit = Has alcanzado el número máximo de llaves ({ $max }). Elimina una para añadir otra.
+ilia-passkey-backup-advice = Añade una segunda llave y guárdala en un lugar seguro, para que perder una llave no te deje sin acceso.
+ilia-passkey-unavailable = Las llaves de acceso están desactivadas: la dirección pública del servidor (CALRS_BASE_URL) no es una dirección https://. Consulta al administrador. Las llaves añadidas antes siguen en la lista y se pueden eliminar.
+ilia-mfa-totp-title = Aplicación de autenticación
+ilia-mfa-totp-on = Hay una aplicación de autenticación configurada.
+ilia-mfa-totp-off = No hay ninguna aplicación de autenticación configurada.
+ilia-mfa-totp-add = Configurar aplicación de autenticación
+ilia-mfa-totp-remove = Quitar aplicación de autenticación
+ilia-mfa-recovery-title = Códigos de recuperación
+ilia-mfa-recovery-left =
+    { $count ->
+        [one] Queda { $count } código de recuperación
+       *[other] Quedan { $count } códigos de recuperación
+    }
+ilia-mfa-last-factor = La autenticación en dos pasos es obligatoria, así que no se puede quitar tu último método de inicio de sesión. Añade otro primero.
+ilia-mfa-last-factor-off = Este es tu último método: si lo quitas, la autenticación en dos pasos se desactiva y se borran tus códigos de recuperación.
+ilia-mfa-changes-help = Cada cambio aquí requiere tu contraseña y una llave de acceso o un código, y cierra tus otras sesiones.
+ilia-mfa-confirm-title = Confirma que eres tú
+ilia-mfa-confirm-help = Introduce tu contraseña y confirma con una llave de acceso o un código.
+ilia-passkey-confirm = Confirmar con llave de acceso
+ilia-mfa-confirm-code = Confirmar con código
+ilia-mfa-action-passkey-add = Vas a añadir una llave de acceso o de seguridad.
+ilia-mfa-action-passkey-rename = Vas a cambiar el nombre de la llave «{ $name }».
+ilia-mfa-action-passkey-delete = Vas a eliminar la llave «{ $name }».
+ilia-mfa-action-totp-add = Vas a configurar una aplicación de autenticación.
+ilia-mfa-action-totp-remove = Vas a quitar la aplicación de autenticación.
+ilia-mfa-action-regenerate = Vas a sustituir todos los códigos de recuperación.
+ilia-mfa-action-policy = Vas a establecer la política de dos pasos de las cuentas locales en:
+ilia-mfa-policy-continue = Continuar

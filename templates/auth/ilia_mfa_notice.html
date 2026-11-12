@@ -1,0 +1,2 @@
+{# ilia fork: why a passkey or MFA change was refused. #}
+{% if notice == "last_factor" %}{{ t("ilia-mfa-last-factor") }}{% elif notice == "limit" %}{{ t("ilia-passkey-limit", max=10) }}{% elif notice == "exists" %}{{ t("ilia-passkey-exists") }}{% elif notice == "passkey" %}{{ t("ilia-passkey-invalid") }}{% else %}{{ t("mfa-invalid") }}{% endif %}

@@ -42,6 +42,8 @@ mod trusted_proxies;
 mod tzid;
 mod utils;
 mod web;
+// ilia fork: passkeys and security keys (docs/passkeys-plan.md).
+mod webauthn;
 mod windows_zones;
 
 use anyhow::Result;

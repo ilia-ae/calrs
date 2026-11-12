@@ -2056,3 +2056,77 @@ tg-host-attendee-email = E-kiri osalejalt { $sender } külalise { $guest } ({ $e
 tg-host-other-email = E-kiri teiselt aadressilt, mitte külaliselt: { $sender }, külalise { $guest } ({ $email }) broneeringu vestluses, kohtumise { $event } kohta, { $when }:
 booking-blocked-body-system = Korraldaja nõuab vähemalt { $minutes } minutit etteteatamist. Kui sa ei saa osaleda, kirjuta aadressil <a href="{ $href }">{ $address }</a>.
 booking-blocked-body-no-reply = Korraldaja nõuab vähemalt { $minutes } minutit etteteatamist. Kui sa ei saa osaleda, anna korraldajale muul viisil teada.
+
+## ilia fork: passkeys and security keys (docs/passkeys-plan.md)
+
+ilia-passkey-sign-in = Logi sisse pääsuvõtmega
+ilia-mfa-login-help-passkey = Kinnita see sisselogimine oma pääsuvõtme või turvavõtmega. Sisselogimine aegub 10 minuti pärast.
+ilia-mfa-use-totp = Kasuta rakenduse koodi
+ilia-mfa-use-recovery = Kasuta taastekoodi
+ilia-mfa-use-passkey = Kasuta pääsuvõtit
+ilia-mfa-use-passkey-instead = Kasuta selle asemel pääsuvõtit või turvavõtit
+ilia-mfa-totp-login-help = Sisesta oma autentimisrakenduse kuuekohaline kood. Sisselogimine aegub 10 minuti pärast.
+ilia-mfa-recovery-code = Taastekood
+ilia-mfa-recovery-login-help = Sisesta üks salvestatud taastekoodidest. Iga kood töötab ainult üks kord. Sisselogimine aegub 10 minuti pärast.
+ilia-passkey-unsupported = See brauser ei toeta pääsuvõtmeid ega turvavõtmeid. Vali allpool mõni muu viis või ava see leht uuemas brauseris.
+ilia-passkey-noscript = Pääsuvõtmed vajavad JavaScripti. Lülita see selle saidi jaoks sisse või vali allpool mõni muu viis.
+ilia-passkey-cancelled = Päring tühistati või aegus. Proovi uuesti või vali mõni muu viis.
+ilia-passkey-invalid = Pääsuvõtit või turvavõtit ei õnnestunud kontrollida või päring aegus. Proovi uuesti või vali mõni muu viis.
+ilia-passkey-key-type = See brauser ei oska seda tüüpi võtit lugeda, seega ei saa seda siin lisada. Proovi mõnda muud brauserit, näiteks Firefoxi või Chrome’i uusimat versiooni, või vali mõni muu viis.
+ilia-passkey-wrong-site = Pääsuvõtmed töötavad ainult aadressil { $origin }. Ava see leht seal ja proovi uuesti või vali mõni muu viis.
+ilia-mfa-enroll-help = Vali, millega kinnitad iga sisselogimist. Kõige turvalisem on pääsuvõti või turvavõti: see töötab ainult sellel saidil, nii et lehe võltskoopia ei saa seda kasutada.
+ilia-passkey-add-security-key = Lisa turvavõti
+ilia-passkey-add-device = Lisa pääsuvõti selles seadmes või telefonis
+ilia-passkey-kinds-help = Turvavõti on USB- või NFC-võti, näiteks YubiKey. Pääsuvõti selles seadmes või telefonis kasutab Touch ID-d, Face ID-d, Windows Hello’d või telefoni ekraanilukku ja seda saab sünkroonida sinu teiste seadmetega.
+ilia-mfa-use-app-instead = Kasuta selle asemel autentimisrakendust
+ilia-passkey-name = Võtme nimi
+ilia-passkey-name-help = Valikuline, näiteks „YubiKey võtmekimbus“ või „MacBook“. Kuni 64 märki.
+ilia-passkey-default-security-key = Turvavõti { $n }
+ilia-passkey-default-device = Pääsuvõti { $n }
+ilia-passkey-register-help = Vajuta nuppu ja järgi brauseri juhiseid: sisesta turvavõti ja puuduta seda või kinnita Touch ID, Face ID, Windows Hello või telefoniga.
+ilia-passkey-exists = See võti on juba registreeritud.
+ilia-mfa-recovery-help = Hoia neid taastekoode turvalises kohas; neid näidatakse ainult üks kord. Iga kood asendab ühel sisselogimisel pääsuvõtit või rakenduse koodi. Uued koodid asendavad kõik varasemad.
+ilia-mfa-status-on = Kaheastmeline autentimine on sees.
+ilia-mfa-status-off = Kaheastmeline autentimine on väljas.
+ilia-mfa-setup-intro = Lisa igale sisselogimisele teine samm: pääsuvõti või turvavõti (YubiKey, Touch ID, Face ID, Windows Hello, sinu telefon) või autentimisrakendus.
+ilia-passkey-list = Pääsuvõtmed ja turvavõtmed
+ilia-passkey-none = Pääsuvõtmeid ega turvavõtmeid veel pole.
+ilia-passkey-kind-hardware = Riistvaravõti
+ilia-passkey-kind-synced = Sünkroonitud pääsuvõti
+ilia-passkey-added = Lisatud { $date }
+ilia-passkey-last-used = Viimati kasutatud { $date }
+ilia-passkey-never-used = Pole veel kasutatud
+ilia-passkey-other-site = Registreeritud aadressile { $rp_id }; sellel saidi aadressil see ei tööta.
+ilia-passkey-rename = Nimeta ümber
+ilia-passkey-delete = Eemalda
+ilia-passkey-add = Lisa pääsuvõti või turvavõti
+ilia-passkey-new-name = Uus nimi
+ilia-passkey-limit = Oled jõudnud võtmete ülempiirini ({ $max }). Eemalda üks, et uus lisada.
+ilia-passkey-backup-advice = Lisa teine võti ja hoia seda turvalises kohas, et ühe võtme kaotamine sind välja ei lukustaks.
+ilia-passkey-unavailable = Pääsuvõtmed on välja lülitatud: serveri avalik aadress (CALRS_BASE_URL) ei ole https://-aadress. Pöördu administraatori poole. Varem lisatud võtmed on loendis ja neid saab eemaldada.
+ilia-mfa-totp-title = Autentimisrakendus
+ilia-mfa-totp-on = Autentimisrakendus on seadistatud.
+ilia-mfa-totp-off = Autentimisrakendust pole seadistatud.
+ilia-mfa-totp-add = Seadista autentimisrakendus
+ilia-mfa-totp-remove = Eemalda autentimisrakendus
+ilia-mfa-recovery-title = Taastekoodid
+ilia-mfa-recovery-left =
+    { $count ->
+        [one] Alles on { $count } taastekood
+       *[other] Alles on { $count } taastekoodi
+    }
+ilia-mfa-last-factor = Kaheastmeline autentimine on kohustuslik, seega ei saa sinu viimast sisselogimisviisi eemaldada. Lisa enne mõni muu.
+ilia-mfa-last-factor-off = See on sinu viimane viis: selle eemaldamine lülitab kaheastmelise autentimise välja ja kustutab sinu taastekoodid.
+ilia-mfa-changes-help = Iga muudatus siin nõuab sinu parooli ja pääsuvõtit või koodi ning logib välja sinu teised seansid.
+ilia-mfa-confirm-title = Kinnita, et see oled sina
+ilia-mfa-confirm-help = Sisesta oma parool ja kinnita siis pääsuvõtme või koodiga.
+ilia-passkey-confirm = Kinnita pääsuvõtmega
+ilia-mfa-confirm-code = Kinnita koodiga
+ilia-mfa-action-passkey-add = Lisad pääsuvõtme või turvavõtme.
+ilia-mfa-action-passkey-rename = Nimetad ümber võtme „{ $name }“.
+ilia-mfa-action-passkey-delete = Eemaldad võtme „{ $name }“.
+ilia-mfa-action-totp-add = Seadistad autentimisrakenduse.
+ilia-mfa-action-totp-remove = Eemaldad autentimisrakenduse.
+ilia-mfa-action-regenerate = Asendad kõik taastekoodid.
+ilia-mfa-action-policy = Määrad kohalike kontode kaheastmelise autentimise reegliks:
+ilia-mfa-policy-continue = Jätka

@@ -37,7 +37,10 @@ Passwords are hashed with **Argon2** (via the `argon2` crate with `password-hash
 ### Two-factor authentication (TOTP)
 
 Local accounts can enable two-factor authentication in **Profile & Settings >
-Manage two-factor authentication**. Confirm your password, scan the QR code with
+Manage two-factor authentication**. In this fork the second step can also be a
+passkey or a security key instead of an authenticator app; see
+[Passkeys and security keys](#passkeys-and-security-keys-ilia-fork). For the
+authenticator app, confirm your password, scan the QR code with
 an authenticator app (or enter the displayed key manually), then enter its
 six-digit code. Setup expires after 10 minutes. The authenticator uses SHA-1,
 six digits, and a 30-second interval; keep the server and phone clocks in sync.
@@ -69,7 +72,8 @@ impersonating them.
 
 In **Admin > Two-factor authentication**, set the local account policy to
 **Required**. Local administrators must enroll first and confirm policy changes
-with their password and a code. OIDC administrators authenticate through their
+with their password and a code (in this fork: or a passkey, on the "Confirm it's
+you" page that **Continue** opens). OIDC administrators authenticate through their
 identity provider instead, and change the policy without signing in again, so
 their account's protection at the identity provider is what guards it.
 
@@ -98,11 +102,104 @@ calrs user reset-mfa alice@example.com
 ```
 
 Use the same data directory as the server (`--data-dir` or `CALRS_DATA_DIR`).
-This removes the user's authenticator and recovery codes and revokes their
-sessions and pending login challenges. It does not change their password or the
+This removes the user's authenticator, passkeys and security keys (ilia fork)
+and recovery codes, and revokes their sessions and pending login challenges. It does not change their password or the
 instance policy. If MFA is required, the user must enroll again at next login.
 Back up the instance's `secret.key` together with the database: TOTP secrets use
 the same encryption key as other stored credentials.
+
+### Passkeys and security keys (ilia fork)
+
+A local account's second step can be a **passkey** instead of, or next to, an
+authenticator app:
+
+- a **security key** such as a YubiKey (USB or NFC, FIDO2 or U2F);
+- a **passkey on this device or phone**: Touch ID, Face ID, Windows Hello, an
+  Android phone, or a passkey synced by iCloud Keychain, Google Password
+  Manager or a password manager.
+
+A passkey is the safest choice: the browser only uses it on the site it was
+registered for, so a look-alike page that relays your password cannot get the
+second step from it, while it can ask for a six-digit code. Your fingerprint or
+face never leaves your device; calrs stores only the key's public half.
+
+#### Requirements
+
+Passkeys are on only when `CALRS_BASE_URL` is set to an `https://` address with
+a host name, for example `https://cal.example.com` (`http://localhost:<port>` is
+allowed for development). The host name, here `cal.example.com`, is the
+"relying party ID" every key is bound to, and the browser's origin must match
+`CALRS_BASE_URL` exactly. The base URL saved in the admin panel is not used for
+this, so a web form can never move the binding. Without a usable
+`CALRS_BASE_URL` the passkey buttons are hidden and the passkey routes answer
+404; keys already registered are still listed and can be removed with a code.
+
+**Changing the public address** (another host name, not only another path)
+makes every registered key unusable at the new address: the settings page
+marks it "Registered for" the old host name. Users then sign in with the authenticator app or a
+recovery code, remove the old key and add it again. Keep an authenticator app
+or the recovery codes when you plan such a move.
+
+The browser needs WebAuthn with `getPublicKey()` and JavaScript for this site.
+Without them the page says so and offers the code methods. calrs asks every
+new key for an ES256 (P-256) key pair first, which every current browser can
+read, so a YubiKey or another security key also registers in Safari. A key
+that offers only Ed25519 or RSA cannot be added in Safari, whose
+`getPublicKey()` returns nothing for those types: the page says the browser
+cannot read this type of key, and another browser (Firefox, Chrome) works.
+
+Open the site at the address in `CALRS_BASE_URL` exactly: on any other host
+name for the same server (a `www.` alias, say) the browser refuses the key, and
+the page says where passkeys work. A sign-in started with the password stays
+valid for 10 minutes, and its passkey request with it.
+
+#### Signing in
+
+After the password, the page leads with **Sign in with passkey**. Press it and
+follow the browser: touch the security key (and enter its PIN if it has one),
+or confirm with Touch ID, Face ID, Windows Hello or your phone. Below it,
+**Use authenticator code** (when an authenticator app is set up) and **Use
+recovery code** switch to a code field; both work without JavaScript. A failed
+or cancelled passkey does not count toward the wrong-code limit, so someone who
+knows your password cannot lock you out of your key by entering wrong codes.
+
+#### Setting it up
+
+With no second step yet, **Set up two-factor authentication** asks for your
+password, then offers **Add a security key** and **Add a passkey on this device
+or phone**, or **Use an authenticator app instead**. The key's name is
+optional ("Security key 1" or "Passkey 1" is used when it is empty, up to 64
+characters). The ten recovery codes are shown once, after this first step; a
+recovery code replaces a passkey or an authenticator code for one sign-in. When
+MFA is required, the same choice appears at the next login.
+
+#### Managing keys
+
+**Manage two-factor authentication** lists every key with its name, its kind
+(**Hardware key** for a key bound to one device, **Synced passkey** for one your
+devices share), when it was added and last used. From there you can add a key
+(**Add a security key** or **Add a passkey on this device or phone**), rename or
+remove a key, set up or remove the authenticator app, and generate new recovery
+codes. Every change first opens **Confirm it's you**: your password, then a
+passkey (or an authenticator or recovery code). Each change signs out your
+other sessions. Up to 10 keys can be registered; register a second key and keep
+it somewhere safe, so that losing one does not lock you out.
+
+While MFA is required, your last method (the last key, or the authenticator
+app when no key is left) cannot be removed; add another one first. Nor can the
+last method that works at this address: a key registered for another host
+name, or any key while passkeys are off, does not count for that, so the
+authenticator app stays while it is the only working method (such a stale key
+can still be removed). Under an
+optional policy, removing the last method turns two-factor authentication off
+and deletes the recovery codes.
+
+A security key whose signature counter goes backwards (a sign of a cloned key)
+is refused and logged as "possible cloned authenticator"; remove it and add a
+new one. Synced passkeys report no counter and are not affected.
+
+The administrator's MFA policy counts a passkey like an authenticator app:
+**Required** is met by either. OIDC accounts are unaffected.
 
 ### User management (CLI)
 

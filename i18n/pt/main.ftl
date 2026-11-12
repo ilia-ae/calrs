@@ -2056,3 +2056,77 @@ tg-host-attendee-email = E-mail de { $sender }, participante adicional da reserv
 tg-host-other-email = E-mail de outro endereço, não o do convidado: { $sender }, na conversa da reserva de { $guest } ({ $email }) sobre { $event }, { $when }:
 booking-blocked-body-system = O anfitrião exige pelo menos { $minutes } minutos de antecedência. Se não puder comparecer, escreva para <a href="{ $href }">{ $address }</a>.
 booking-blocked-body-no-reply = O anfitrião exige pelo menos { $minutes } minutos de antecedência. Se não puder comparecer, avise o anfitrião de outra forma.
+
+## ilia fork: passkeys and security keys (docs/passkeys-plan.md)
+
+ilia-passkey-sign-in = Entrar com chave de acesso
+ilia-mfa-login-help-passkey = Confirme este acesso com sua chave de acesso ou chave de segurança. O acesso expira em 10 minutos.
+ilia-mfa-use-totp = Usar código do aplicativo
+ilia-mfa-use-recovery = Usar código de recuperação
+ilia-mfa-use-passkey = Usar chave de acesso
+ilia-mfa-use-passkey-instead = Usar uma chave de acesso ou de segurança
+ilia-mfa-totp-login-help = Digite o código de seis dígitos do seu aplicativo autenticador. O acesso expira em 10 minutos.
+ilia-mfa-recovery-code = Código de recuperação
+ilia-mfa-recovery-login-help = Digite um dos códigos de recuperação que você salvou. Cada código funciona uma única vez. O acesso expira em 10 minutos.
+ilia-passkey-unsupported = Este navegador não aceita chaves de acesso nem chaves de segurança. Escolha outro método abaixo ou abra esta página em um navegador atualizado.
+ilia-passkey-noscript = Chaves de acesso precisam de JavaScript. Ative-o para este site ou escolha outro método abaixo.
+ilia-passkey-cancelled = A solicitação foi cancelada ou expirou. Tente de novo ou escolha outro método.
+ilia-passkey-invalid = Não foi possível verificar a chave de acesso ou a chave de segurança, ou a solicitação expirou. Tente de novo ou escolha outro método.
+ilia-passkey-key-type = Este navegador não consegue ler este tipo de chave, então ela não pode ser adicionada aqui. Tente outro navegador, como uma versão atualizada do Firefox ou do Chrome, ou escolha outro método.
+ilia-passkey-wrong-site = As chaves de acesso só funcionam em { $origin }. Abra esta página nesse endereço e tente de novo, ou escolha outro método.
+ilia-mfa-enroll-help = Escolha como você vai confirmar cada acesso. Uma chave de acesso ou de segurança é a opção mais segura: ela só funciona neste site, então uma cópia falsa da página não consegue usá-la.
+ilia-passkey-add-security-key = Adicionar uma chave de segurança
+ilia-passkey-add-device = Adicionar uma chave de acesso neste dispositivo ou celular
+ilia-passkey-kinds-help = Uma chave de segurança é uma chave USB ou NFC, como uma YubiKey. Uma chave de acesso neste dispositivo ou celular usa Touch ID, Face ID, Windows Hello ou o bloqueio de tela do celular e pode ser sincronizada com seus outros dispositivos.
+ilia-mfa-use-app-instead = Usar um aplicativo autenticador
+ilia-passkey-name = Nome da chave
+ilia-passkey-name-help = Opcional, por exemplo “YubiKey do chaveiro” ou “MacBook”. Até 64 caracteres.
+ilia-passkey-default-security-key = Chave de segurança { $n }
+ilia-passkey-default-device = Chave de acesso { $n }
+ilia-passkey-register-help = Toque em um botão e siga o navegador: insira e toque a chave de segurança, ou confirme com Touch ID, Face ID, Windows Hello ou seu celular.
+ilia-passkey-exists = Esta chave já está registrada.
+ilia-mfa-recovery-help = Guarde estes códigos de recuperação em um lugar seguro; eles aparecem só uma vez. Cada código substitui uma chave de acesso ou um código do aplicativo em um acesso. Novos códigos substituem todos os anteriores.
+ilia-mfa-status-on = A autenticação em dois fatores está ativada.
+ilia-mfa-status-off = A autenticação em dois fatores está desativada.
+ilia-mfa-setup-intro = Adicione uma segunda etapa a cada acesso: uma chave de acesso ou de segurança (YubiKey, Touch ID, Face ID, Windows Hello, seu celular) ou um aplicativo autenticador.
+ilia-passkey-list = Chaves de acesso e chaves de segurança
+ilia-passkey-none = Nenhuma chave de acesso ou de segurança ainda.
+ilia-passkey-kind-hardware = Chave física
+ilia-passkey-kind-synced = Chave de acesso sincronizada
+ilia-passkey-added = Adicionada em { $date }
+ilia-passkey-last-used = Último uso em { $date }
+ilia-passkey-never-used = Ainda não usada
+ilia-passkey-other-site = Registrada para { $rp_id }; não funciona neste endereço do site.
+ilia-passkey-rename = Renomear
+ilia-passkey-delete = Remover
+ilia-passkey-add = Adicionar uma chave de acesso ou de segurança
+ilia-passkey-new-name = Novo nome
+ilia-passkey-limit = Você atingiu o número máximo de chaves ({ $max }). Remova uma para adicionar outra.
+ilia-passkey-backup-advice = Adicione uma segunda chave e guarde-a em um lugar seguro, para que perder uma chave não bloqueie seu acesso.
+ilia-passkey-unavailable = As chaves de acesso estão desativadas: o endereço público do servidor (CALRS_BASE_URL) não é um endereço https://. Fale com o administrador. As chaves já adicionadas continuam na lista e podem ser removidas.
+ilia-mfa-totp-title = Aplicativo autenticador
+ilia-mfa-totp-on = Um aplicativo autenticador está configurado.
+ilia-mfa-totp-off = Nenhum aplicativo autenticador configurado.
+ilia-mfa-totp-add = Configurar aplicativo autenticador
+ilia-mfa-totp-remove = Remover aplicativo autenticador
+ilia-mfa-recovery-title = Códigos de recuperação
+ilia-mfa-recovery-left =
+    { $count ->
+        [one] Resta { $count } código de recuperação
+       *[other] Restam { $count } códigos de recuperação
+    }
+ilia-mfa-last-factor = A autenticação em dois fatores é obrigatória, então seu último método de acesso não pode ser removido. Adicione outro primeiro.
+ilia-mfa-last-factor-off = Este é seu último método: removê-lo desativa a autenticação em dois fatores e apaga seus códigos de recuperação.
+ilia-mfa-changes-help = Cada alteração aqui exige sua senha e uma chave de acesso ou um código, e encerra suas outras sessões.
+ilia-mfa-confirm-title = Confirme que é você
+ilia-mfa-confirm-help = Digite sua senha e confirme com uma chave de acesso ou um código.
+ilia-passkey-confirm = Confirmar com chave de acesso
+ilia-mfa-confirm-code = Confirmar com código
+ilia-mfa-action-passkey-add = Você está adicionando uma chave de acesso ou de segurança.
+ilia-mfa-action-passkey-rename = Você está renomeando a chave “{ $name }”.
+ilia-mfa-action-passkey-delete = Você está removendo a chave “{ $name }”.
+ilia-mfa-action-totp-add = Você está configurando um aplicativo autenticador.
+ilia-mfa-action-totp-remove = Você está removendo o aplicativo autenticador.
+ilia-mfa-action-regenerate = Você está substituindo todos os códigos de recuperação.
+ilia-mfa-action-policy = Você está definindo a política de dois fatores das contas locais como:
+ilia-mfa-policy-continue = Continuar

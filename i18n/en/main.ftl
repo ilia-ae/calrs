@@ -2058,3 +2058,77 @@ tg-host-attendee-email = Email from { $sender }, an additional attendee of the b
 tg-host-other-email = Email from another address, not the guest's: { $sender }, in the thread of the booking with { $guest } ({ $email }) about { $event }, { $when }:
 booking-blocked-body-system = The host requires at least { $minutes } minutes of notice. If you cannot attend, please write to <a href="{ $href }">{ $address }</a>.
 booking-blocked-body-no-reply = The host requires at least { $minutes } minutes of notice. If you cannot attend, please let the host know another way.
+
+## ilia fork: passkeys and security keys (docs/passkeys-plan.md)
+
+ilia-passkey-sign-in = Sign in with passkey
+ilia-mfa-login-help-passkey = Confirm this sign-in with your passkey or security key. The sign-in expires after 10 minutes.
+ilia-mfa-use-totp = Use authenticator code
+ilia-mfa-use-recovery = Use recovery code
+ilia-mfa-use-passkey = Use passkey
+ilia-mfa-use-passkey-instead = Use a passkey or security key instead
+ilia-mfa-totp-login-help = Enter the six-digit code from your authenticator app. The sign-in expires after 10 minutes.
+ilia-mfa-recovery-code = Recovery code
+ilia-mfa-recovery-login-help = Enter one of the recovery codes you saved. Each code works only once. The sign-in expires after 10 minutes.
+ilia-passkey-unsupported = This browser cannot use passkeys or security keys. Choose another method below, or open this page in an up-to-date browser.
+ilia-passkey-noscript = Passkeys need JavaScript. Turn it on for this site, or choose another method below.
+ilia-passkey-cancelled = The request was cancelled or timed out. Try again, or choose another method.
+ilia-passkey-invalid = The passkey or security key could not be verified, or this request expired. Try again, or choose another method.
+ilia-passkey-key-type = This browser cannot read this type of key, so it cannot be added here. Try another browser, such as an up-to-date Firefox or Chrome, or choose another method.
+ilia-passkey-wrong-site = Passkeys work only at { $origin }. Open this page at that address and try again, or choose another method.
+ilia-mfa-enroll-help = Choose how you will confirm each sign-in. A passkey or security key is the safest choice: it works only on this site, so a fake copy of the page cannot use it.
+ilia-passkey-add-security-key = Add a security key
+ilia-passkey-add-device = Add a passkey on this device or phone
+ilia-passkey-kinds-help = A security key is a USB or NFC key such as a YubiKey. A passkey on this device or phone uses Touch ID, Face ID, Windows Hello or the phone’s screen lock, and may be synced to your other devices.
+ilia-mfa-use-app-instead = Use an authenticator app instead
+ilia-passkey-name = Key name
+ilia-passkey-name-help = Optional, for example “YubiKey on keyring” or “MacBook”. Up to 64 characters.
+ilia-passkey-default-security-key = Security key { $n }
+ilia-passkey-default-device = Passkey { $n }
+ilia-passkey-register-help = Press a button and follow your browser: insert and touch the security key, or confirm with Touch ID, Face ID, Windows Hello or your phone.
+ilia-passkey-exists = This key is already registered.
+ilia-mfa-recovery-help = Save these recovery codes somewhere safe; they are shown only once. Each code replaces a passkey or an authenticator code for one sign-in. New codes replace all previous ones.
+ilia-mfa-status-on = Two-factor authentication is on.
+ilia-mfa-status-off = Two-factor authentication is off.
+ilia-mfa-setup-intro = Add a second step to every sign-in: a passkey or security key (YubiKey, Touch ID, Face ID, Windows Hello, your phone), or an authenticator app.
+ilia-passkey-list = Passkeys and security keys
+ilia-passkey-none = No passkeys or security keys yet.
+ilia-passkey-kind-hardware = Hardware key
+ilia-passkey-kind-synced = Synced passkey
+ilia-passkey-added = Added { $date }
+ilia-passkey-last-used = Last used { $date }
+ilia-passkey-never-used = Not used yet
+ilia-passkey-other-site = Registered for { $rp_id }; it does not work at this site address.
+ilia-passkey-rename = Rename
+ilia-passkey-delete = Remove
+ilia-passkey-add = Add a passkey or security key
+ilia-passkey-new-name = New name
+ilia-passkey-limit = You have reached the maximum number of keys ({ $max }). Remove one to add another.
+ilia-passkey-backup-advice = Add a second key and keep it somewhere safe, so that losing one key does not lock you out.
+ilia-passkey-unavailable = Passkeys are off: the server’s public address (CALRS_BASE_URL) is not an https:// address. Ask the administrator. Keys added before are listed and can be removed.
+ilia-mfa-totp-title = Authenticator app
+ilia-mfa-totp-on = An authenticator app is set up.
+ilia-mfa-totp-off = No authenticator app is set up.
+ilia-mfa-totp-add = Set up authenticator app
+ilia-mfa-totp-remove = Remove authenticator app
+ilia-mfa-recovery-title = Recovery codes
+ilia-mfa-recovery-left =
+    { $count ->
+        [one] { $count } recovery code left
+       *[other] { $count } recovery codes left
+    }
+ilia-mfa-last-factor = Two-factor authentication is required, so your last sign-in method cannot be removed. Add another one first.
+ilia-mfa-last-factor-off = This is your last method: removing it turns two-factor authentication off and deletes your recovery codes.
+ilia-mfa-changes-help = Every change here needs your password and a passkey or code, and signs out your other sessions.
+ilia-mfa-confirm-title = Confirm it’s you
+ilia-mfa-confirm-help = Enter your password, then confirm with a passkey or a code.
+ilia-passkey-confirm = Confirm with passkey
+ilia-mfa-confirm-code = Confirm with code
+ilia-mfa-action-passkey-add = You are adding a passkey or security key.
+ilia-mfa-action-passkey-rename = You are renaming the key “{ $name }”.
+ilia-mfa-action-passkey-delete = You are removing the key “{ $name }”.
+ilia-mfa-action-totp-add = You are setting up an authenticator app.
+ilia-mfa-action-totp-remove = You are removing the authenticator app.
+ilia-mfa-action-regenerate = You are replacing all recovery codes.
+ilia-mfa-action-policy = You are setting the two-factor policy for local accounts to:
+ilia-mfa-policy-continue = Continue

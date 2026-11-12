@@ -79,6 +79,12 @@ base64 = "0.22"
 subtle = "2"
 totp-rs = { version = "6", default-features = false, features = ["std", "qr", "zeroize"] }
 openidconnect = { version = "4.0.1", default-features = false, features = ["reqwest", "rustls-tls"] }
+# ilia fork: passkeys (src/webauthn). Already in the build through
+# openidconnect with these versions and features; naming them adds no crate
+# and no feature, only the root's own edges in Cargo.lock.
+p256 = "0.13"
+ed25519-dalek = { version = "2", features = ["pkcs8"] }
+rsa = "0.9"
 iana-time-zone = "0.1.65"
 urlencoding = "2"
 # ilia fork: QR code of the TON payment link (already in Cargo.lock via totp-rs).

@@ -2058,3 +2058,77 @@ tg-host-attendee-email = E-mail van { $sender }, extra deelnemer aan de boeking 
 tg-host-other-email = E-mail van een ander adres, niet dat van de gast: { $sender }, in het gesprek over de boeking van { $guest } ({ $email }) over { $event }, { $when }:
 booking-blocked-body-system = De organisator vraagt minstens { $minutes } minuten van tevoren bericht. Kun je niet aanwezig zijn? Schrijf dan naar <a href="{ $href }">{ $address }</a>.
 booking-blocked-body-no-reply = De organisator vraagt minstens { $minutes } minuten van tevoren bericht. Kun je niet aanwezig zijn? Laat het de organisator dan op een andere manier weten.
+
+## ilia fork: passkeys and security keys (docs/passkeys-plan.md)
+
+ilia-passkey-sign-in = Inloggen met passkey
+ilia-mfa-login-help-passkey = Bevestig deze aanmelding met je passkey of beveiligingssleutel. De aanmelding verloopt na 10 minuten.
+ilia-mfa-use-totp = Code uit de app gebruiken
+ilia-mfa-use-recovery = Herstelcode gebruiken
+ilia-mfa-use-passkey = Passkey gebruiken
+ilia-mfa-use-passkey-instead = In plaats daarvan een passkey of beveiligingssleutel gebruiken
+ilia-mfa-totp-login-help = Voer de zescijferige code uit je authenticator-app in. De aanmelding verloopt na 10 minuten.
+ilia-mfa-recovery-code = Herstelcode
+ilia-mfa-recovery-login-help = Voer een van de herstelcodes in die je hebt bewaard. Elke code werkt maar één keer. De aanmelding verloopt na 10 minuten.
+ilia-passkey-unsupported = Deze browser ondersteunt geen passkeys of beveiligingssleutels. Kies hieronder een andere methode of open deze pagina in een actuele browser.
+ilia-passkey-noscript = Passkeys hebben JavaScript nodig. Zet het aan voor deze site of kies hieronder een andere methode.
+ilia-passkey-cancelled = Het verzoek is geannuleerd of verlopen. Probeer het opnieuw of kies een andere methode.
+ilia-passkey-invalid = De passkey of beveiligingssleutel kon niet worden gecontroleerd, of het verzoek is verlopen. Probeer het opnieuw of kies een andere methode.
+ilia-passkey-key-type = Deze browser kan dit type sleutel niet lezen, dus hij kan hier niet worden toegevoegd. Probeer een andere browser, zoals een actuele versie van Firefox of Chrome, of kies een andere methode.
+ilia-passkey-wrong-site = Passkeys werken alleen op { $origin }. Open deze pagina daar en probeer het opnieuw, of kies een andere methode.
+ilia-mfa-enroll-help = Kies hoe je elke aanmelding bevestigt. Een passkey of beveiligingssleutel is de veiligste keuze: die werkt alleen op deze site, dus een nagemaakte kopie van de pagina kan hem niet gebruiken.
+ilia-passkey-add-security-key = Beveiligingssleutel toevoegen
+ilia-passkey-add-device = Passkey op dit apparaat of deze telefoon toevoegen
+ilia-passkey-kinds-help = Een beveiligingssleutel is een USB- of NFC-sleutel, zoals een YubiKey. Een passkey op dit apparaat of deze telefoon gebruikt Touch ID, Face ID, Windows Hello of de schermvergrendeling van de telefoon en kan worden gesynchroniseerd met je andere apparaten.
+ilia-mfa-use-app-instead = In plaats daarvan een authenticator-app gebruiken
+ilia-passkey-name = Naam van de sleutel
+ilia-passkey-name-help = Optioneel, bijvoorbeeld ‘YubiKey aan sleutelbos’ of ‘MacBook’. Maximaal 64 tekens.
+ilia-passkey-default-security-key = Beveiligingssleutel { $n }
+ilia-passkey-default-device = Passkey { $n }
+ilia-passkey-register-help = Druk op een knop en volg je browser: steek de beveiligingssleutel in en raak hem aan, of bevestig met Touch ID, Face ID, Windows Hello of je telefoon.
+ilia-passkey-exists = Deze sleutel is al geregistreerd.
+ilia-mfa-recovery-help = Bewaar deze herstelcodes op een veilige plek; ze worden maar één keer getoond. Elke code vervangt bij één aanmelding een passkey of een code uit de app. Nieuwe codes vervangen alle vorige.
+ilia-mfa-status-on = Tweestapsverificatie staat aan.
+ilia-mfa-status-off = Tweestapsverificatie staat uit.
+ilia-mfa-setup-intro = Voeg aan elke aanmelding een tweede stap toe: een passkey of beveiligingssleutel (YubiKey, Touch ID, Face ID, Windows Hello, je telefoon) of een authenticator-app.
+ilia-passkey-list = Passkeys en beveiligingssleutels
+ilia-passkey-none = Nog geen passkeys of beveiligingssleutels.
+ilia-passkey-kind-hardware = Hardwaresleutel
+ilia-passkey-kind-synced = Gesynchroniseerde passkey
+ilia-passkey-added = Toegevoegd op { $date }
+ilia-passkey-last-used = Laatst gebruikt op { $date }
+ilia-passkey-never-used = Nog niet gebruikt
+ilia-passkey-other-site = Geregistreerd voor { $rp_id }; werkt niet op dit adres van de site.
+ilia-passkey-rename = Hernoemen
+ilia-passkey-delete = Verwijderen
+ilia-passkey-add = Passkey of beveiligingssleutel toevoegen
+ilia-passkey-new-name = Nieuwe naam
+ilia-passkey-limit = Je hebt het maximumaantal sleutels bereikt ({ $max }). Verwijder er een om een andere toe te voegen.
+ilia-passkey-backup-advice = Voeg een tweede sleutel toe en bewaar die op een veilige plek, zodat je niet buitengesloten raakt als je er een kwijtraakt.
+ilia-passkey-unavailable = Passkeys staan uit: het openbare adres van de server (CALRS_BASE_URL) is geen https://-adres. Vraag het de beheerder. Eerder toegevoegde sleutels staan in de lijst en kunnen worden verwijderd.
+ilia-mfa-totp-title = Authenticator-app
+ilia-mfa-totp-on = Er is een authenticator-app ingesteld.
+ilia-mfa-totp-off = Er is geen authenticator-app ingesteld.
+ilia-mfa-totp-add = Authenticator-app instellen
+ilia-mfa-totp-remove = Authenticator-app verwijderen
+ilia-mfa-recovery-title = Herstelcodes
+ilia-mfa-recovery-left =
+    { $count ->
+        [one] Nog { $count } herstelcode over
+       *[other] Nog { $count } herstelcodes over
+    }
+ilia-mfa-last-factor = Tweestapsverificatie is verplicht, dus je laatste aanmeldmethode kan niet worden verwijderd. Voeg eerst een andere toe.
+ilia-mfa-last-factor-off = Dit is je laatste methode: als je die verwijdert, gaat tweestapsverificatie uit en worden je herstelcodes gewist.
+ilia-mfa-changes-help = Elke wijziging hier vraagt om je wachtwoord en een passkey of code, en meldt je andere sessies af.
+ilia-mfa-confirm-title = Bevestig dat jij het bent
+ilia-mfa-confirm-help = Voer je wachtwoord in en bevestig daarna met een passkey of een code.
+ilia-passkey-confirm = Bevestigen met passkey
+ilia-mfa-confirm-code = Bevestigen met code
+ilia-mfa-action-passkey-add = Je voegt een passkey of beveiligingssleutel toe.
+ilia-mfa-action-passkey-rename = Je hernoemt de sleutel ‘{ $name }’.
+ilia-mfa-action-passkey-delete = Je verwijdert de sleutel ‘{ $name }’.
+ilia-mfa-action-totp-add = Je stelt een authenticator-app in.
+ilia-mfa-action-totp-remove = Je verwijdert de authenticator-app.
+ilia-mfa-action-regenerate = Je vervangt alle herstelcodes.
+ilia-mfa-action-policy = Je stelt het tweestapsbeleid voor lokale accounts in op:
+ilia-mfa-policy-continue = Doorgaan

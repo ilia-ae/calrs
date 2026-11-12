@@ -2117,3 +2117,79 @@ tg-host-attendee-email = E-mail od { $sender }, dodatkowego uczestnika rezerwacj
 tg-host-other-email = E-mail z innego adresu, nie gościa: { $sender }, w wątku rezerwacji gościa { $guest } ({ $email }) w sprawie { $event }, { $when }:
 booking-blocked-body-system = Gospodarz wymaga co najmniej { $minutes } minut wyprzedzenia. Jeśli nie możesz się pojawić, napisz na <a href="{ $href }">{ $address }</a>.
 booking-blocked-body-no-reply = Gospodarz wymaga co najmniej { $minutes } minut wyprzedzenia. Jeśli nie możesz się pojawić, daj znać gospodarzowi w inny sposób.
+
+## ilia fork: passkeys and security keys (docs/passkeys-plan.md)
+
+ilia-passkey-sign-in = Zaloguj się kluczem dostępu
+ilia-mfa-login-help-passkey = Potwierdź to logowanie kluczem dostępu lub kluczem bezpieczeństwa. Logowanie wygasa po 10 minutach.
+ilia-mfa-use-totp = Użyj kodu z aplikacji
+ilia-mfa-use-recovery = Użyj kodu odzyskiwania
+ilia-mfa-use-passkey = Użyj klucza dostępu
+ilia-mfa-use-passkey-instead = Zamiast tego użyj klucza dostępu lub klucza bezpieczeństwa
+ilia-mfa-totp-login-help = Wpisz sześciocyfrowy kod z aplikacji uwierzytelniającej. Logowanie wygasa po 10 minutach.
+ilia-mfa-recovery-code = Kod odzyskiwania
+ilia-mfa-recovery-login-help = Wpisz jeden z zapisanych kodów odzyskiwania. Każdy kod działa tylko raz. Logowanie wygasa po 10 minutach.
+ilia-passkey-unsupported = Ta przeglądarka nie obsługuje kluczy dostępu ani kluczy bezpieczeństwa. Wybierz inną metodę poniżej albo otwórz tę stronę w aktualnej przeglądarce.
+ilia-passkey-noscript = Klucze dostępu wymagają JavaScriptu. Włącz go dla tej witryny albo wybierz inną metodę poniżej.
+ilia-passkey-cancelled = Żądanie zostało anulowane lub wygasło. Spróbuj ponownie albo wybierz inną metodę.
+ilia-passkey-invalid = Nie udało się zweryfikować klucza dostępu lub klucza bezpieczeństwa albo żądanie wygasło. Spróbuj ponownie albo wybierz inną metodę.
+ilia-passkey-key-type = Ta przeglądarka nie potrafi odczytać klucza tego typu, więc nie można go tu dodać. Spróbuj innej przeglądarki, na przykład aktualnej wersji Firefoksa lub Chrome, albo wybierz inną metodę.
+ilia-passkey-wrong-site = Klucze dostępu działają tylko pod adresem { $origin }. Otwórz tę stronę pod tym adresem i spróbuj ponownie albo wybierz inną metodę.
+ilia-mfa-enroll-help = Wybierz, czym będziesz potwierdzać każde logowanie. Najbezpieczniejszy jest klucz dostępu lub klucz bezpieczeństwa: działa tylko w tej witrynie, więc fałszywa kopia strony nie może go użyć.
+ilia-passkey-add-security-key = Dodaj klucz bezpieczeństwa
+ilia-passkey-add-device = Dodaj klucz dostępu na tym urządzeniu lub telefonie
+ilia-passkey-kinds-help = Klucz bezpieczeństwa to klucz USB lub NFC, na przykład YubiKey. Klucz dostępu na tym urządzeniu lub telefonie korzysta z Touch ID, Face ID, Windows Hello lub blokady ekranu telefonu i może być synchronizowany z innymi twoimi urządzeniami.
+ilia-mfa-use-app-instead = Zamiast tego użyj aplikacji uwierzytelniającej
+ilia-passkey-name = Nazwa klucza
+ilia-passkey-name-help = Opcjonalnie, na przykład „YubiKey przy kluczach” albo „MacBook”. Do 64 znaków.
+ilia-passkey-default-security-key = Klucz bezpieczeństwa { $n }
+ilia-passkey-default-device = Klucz dostępu { $n }
+ilia-passkey-register-help = Naciśnij przycisk i postępuj zgodnie z przeglądarką: włóż klucz bezpieczeństwa i dotknij go albo potwierdź przez Touch ID, Face ID, Windows Hello lub telefon.
+ilia-passkey-exists = Ten klucz jest już zarejestrowany.
+ilia-mfa-recovery-help = Zapisz te kody odzyskiwania w bezpiecznym miejscu; są wyświetlane tylko raz. Każdy kod zastępuje klucz dostępu lub kod z aplikacji przy jednym logowaniu. Nowe kody zastępują wszystkie poprzednie.
+ilia-mfa-status-on = Uwierzytelnianie dwuskładnikowe jest włączone.
+ilia-mfa-status-off = Uwierzytelnianie dwuskładnikowe jest wyłączone.
+ilia-mfa-setup-intro = Dodaj drugi krok do każdego logowania: klucz dostępu lub klucz bezpieczeństwa (YubiKey, Touch ID, Face ID, Windows Hello, telefon) albo aplikację uwierzytelniającą.
+ilia-passkey-list = Klucze dostępu i klucze bezpieczeństwa
+ilia-passkey-none = Nie ma jeszcze kluczy dostępu ani kluczy bezpieczeństwa.
+ilia-passkey-kind-hardware = Klucz sprzętowy
+ilia-passkey-kind-synced = Synchronizowany klucz dostępu
+ilia-passkey-added = Dodano { $date }
+ilia-passkey-last-used = Ostatnio użyty { $date }
+ilia-passkey-never-used = Jeszcze nieużywany
+ilia-passkey-other-site = Zarejestrowany dla { $rp_id }; nie działa pod tym adresem witryny.
+ilia-passkey-rename = Zmień nazwę
+ilia-passkey-delete = Usuń
+ilia-passkey-add = Dodaj klucz dostępu lub klucz bezpieczeństwa
+ilia-passkey-new-name = Nowa nazwa
+ilia-passkey-limit = Osiągnięto maksymalną liczbę kluczy ({ $max }). Usuń jeden, aby dodać kolejny.
+ilia-passkey-backup-advice = Dodaj drugi klucz i przechowuj go w bezpiecznym miejscu, aby utrata jednego klucza nie odcięła ci dostępu.
+ilia-passkey-unavailable = Klucze dostępu są wyłączone: publiczny adres serwera (CALRS_BASE_URL) nie jest adresem https://. Skontaktuj się z administratorem. Dodane wcześniej klucze są na liście i można je usunąć.
+ilia-mfa-totp-title = Aplikacja uwierzytelniająca
+ilia-mfa-totp-on = Aplikacja uwierzytelniająca jest skonfigurowana.
+ilia-mfa-totp-off = Brak skonfigurowanej aplikacji uwierzytelniającej.
+ilia-mfa-totp-add = Skonfiguruj aplikację uwierzytelniającą
+ilia-mfa-totp-remove = Usuń aplikację uwierzytelniającą
+ilia-mfa-recovery-title = Kody odzyskiwania
+ilia-mfa-recovery-left =
+    { $count ->
+        [one] Został { $count } kod odzyskiwania
+        [few] Zostały { $count } kody odzyskiwania
+        [many] Zostało { $count } kodów odzyskiwania
+       *[other] Zostało { $count } kodu odzyskiwania
+    }
+ilia-mfa-last-factor = Uwierzytelnianie dwuskładnikowe jest obowiązkowe, więc nie można usunąć ostatniej metody logowania. Najpierw dodaj inną.
+ilia-mfa-last-factor-off = To twoja ostatnia metoda: jej usunięcie wyłączy uwierzytelnianie dwuskładnikowe i usunie twoje kody odzyskiwania.
+ilia-mfa-changes-help = Każda zmiana tutaj wymaga hasła oraz klucza dostępu lub kodu i wylogowuje twoje pozostałe sesje.
+ilia-mfa-confirm-title = Potwierdź, że to ty
+ilia-mfa-confirm-help = Wpisz hasło, a potem potwierdź kluczem dostępu lub kodem.
+ilia-passkey-confirm = Potwierdź kluczem dostępu
+ilia-mfa-confirm-code = Potwierdź kodem
+ilia-mfa-action-passkey-add = Dodajesz klucz dostępu lub klucz bezpieczeństwa.
+ilia-mfa-action-passkey-rename = Zmieniasz nazwę klucza „{ $name }”.
+ilia-mfa-action-passkey-delete = Usuwasz klucz „{ $name }”.
+ilia-mfa-action-totp-add = Konfigurujesz aplikację uwierzytelniającą.
+ilia-mfa-action-totp-remove = Usuwasz aplikację uwierzytelniającą.
+ilia-mfa-action-regenerate = Zastępujesz wszystkie kody odzyskiwania.
+ilia-mfa-action-policy = Ustawiasz zasadę uwierzytelniania dwuskładnikowego dla kont lokalnych na:
+ilia-mfa-policy-continue = Kontynuuj

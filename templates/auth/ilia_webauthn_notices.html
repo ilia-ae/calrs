@@ -1,0 +1,9 @@
+{# ilia fork: what the passkey buttons can report; webauthn.js shows them, the text stays in Fluent. #}
+<noscript><p class="error notice">{{ t("ilia-passkey-noscript") }}</p></noscript>
+<p class="error notice" role="alert" data-webauthn-unsupported hidden>{{ t("ilia-passkey-unsupported") }}</p>
+<p class="error notice" role="alert" data-webauthn-cancelled hidden>{{ t("ilia-passkey-cancelled") }}</p>
+<p class="error notice" role="alert" data-webauthn-exists hidden>{{ t("ilia-passkey-exists") }}</p>
+<p class="error notice" role="alert" data-webauthn-key-type hidden>{{ t("ilia-passkey-key-type") }}</p>
+{% if passkey_origin %}<p class="error notice" role="alert" data-webauthn-wrong-site hidden>{{ t("ilia-passkey-wrong-site", origin=passkey_origin) }}</p>{% endif %}
+<script type="application/json" id="webauthn-options">{{ options|tojson }}</script>
+<script src="/static/webauthn.js" defer></script>

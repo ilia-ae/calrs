@@ -16,6 +16,63 @@ one neighboring interval in either direction. Previously accepted intervals
 cannot be reused. TOTP protects against a stolen password alone; it is not
 phishing-resistant. See [MFA setup and recovery](authentication.md#two-factor-authentication-totp).
 
+### Passkeys and security keys (ilia fork)
+
+A passkey or security key (WebAuthn) can be the second factor instead of, or
+next to, TOTP. Used at sign-in it is phishing-resistant: the browser signs the
+origin it is on, and the server accepts only its own. See
+[Passkeys and security keys](authentication.md#passkeys-and-security-keys-ilia-fork).
+
+- **Verifier.** A minimal relying-party verifier of the fork's own
+  (`src/webauthn/verify.rs`, no I/O, no panics on any input, checked step by
+  step against WebAuthn Level 3 §7.1 and §7.2 and its §16 test vectors). It
+  adds no crate: `p256`, `ed25519-dalek` and `rsa` were already in the build
+  through `openidconnect`, with the same versions and features.
+- **Relying party.** The RP ID and the origin come only from the
+  `CALRS_BASE_URL` environment variable (an `https://` URL with a host name, or
+  `http://localhost` for development), never from `Host` or `X-Forwarded-*`
+  and never from the admin-editable base URL. The origin in `clientDataJSON`
+  must equal it exactly; `crossOrigin: true` and any `topOrigin` are refused,
+  as is an `rpIdHash` for another RP ID. Without a usable value the feature is
+  off and its routes answer 404.
+- **Parameters.** Attestation `none`; algorithms Ed25519 (-8), ES256 (-7) and
+  RS256 (-257, RSA keys of 2048 to 4096 bits), and the declared algorithm must
+  match the key; user presence required; user verification `preferred`
+  (recorded, not required, since the password is the first factor). Size caps
+  on every field are checked before decoding.
+- **Simplification.** The server does not parse the CBOR `attestationObject`:
+  with attestation `none` nothing signs the registration, so the key comes
+  from the browser's `getPublicKey()` (SPKI) and the authenticator data from
+  `getAuthenticatorData()`, as §5.2.1.1 provides. The credential ID in the
+  authenticator data must equal the one the browser reports.
+- **Ceremonies.** 32 random bytes from `OsRng` per challenge, stored only as a
+  SHA-256 hash, valid at most 10 minutes (as long as the sign-in it belongs
+  to; the browser waits 5 minutes for the key after a press), single use (deleted when the answer
+  arrives, even when it fails), and bound to the pending login challenge or,
+  in the settings, to the session and the current password hash. Revoking a
+  user's access (suspension, password change, any MFA change) ends them.
+- **Counter and backup flags.** The signature counter is updated with a
+  compare-and-swap in the same transaction that issues the session; a counter
+  that does not grow (unless both are 0, as synced passkeys report) is refused
+  and logged as a possible clone. Backup eligibility is fixed at registration,
+  and backup state without eligibility is refused. Both are shown to the user
+  as "Hardware key" or "Synced passkey".
+- **What is stored.** The public key, the counter, the flags, the transports
+  and the name. A copy of the database cannot be used to sign in with a key.
+- **Attempts.** A passkey at sign-in takes nothing from the wrong-code limit,
+  since a signature cannot be guessed; every refusal is logged with the account,
+  the client address and a reason code. Every settings or policy form that
+  checks the password still counts an attempt.
+- **Changes.** Adding, renaming or removing a key, adding or removing TOTP and
+  replacing the recovery codes all need the password and a current factor, and
+  sign out the user's other sessions. The last factor cannot be removed while
+  MFA is required. `calrs user reset-mfa` removes keys too.
+- **Browser side.** `/static/webauthn.js` is a same-origin file with no inline
+  handlers; the options travel in a `<script type="application/json">` block
+  and the answer goes back in an ordinary form POST, so the CSP and
+  `Permissions-Policy` are unchanged (the `publickey-credentials-*` features
+  default to `self`).
+
 ## Rate limiting
 
 Login attempts are rate-limited per IP address:

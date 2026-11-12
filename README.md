@@ -181,6 +181,7 @@ Each team member's CalDAV calendars are checked for conflicts. The availability 
 
 - **Local accounts** — email/password with Argon2 hashing, server-side sessions, HttpOnly cookies
 - **Two-factor authentication** — optional TOTP for local accounts, recovery codes, and an admin policy requiring enrollment; OIDC MFA remains delegated to the identity provider. See [setup and recovery](docs/src/authentication.md#two-factor-authentication-totp)
+- **Passkeys and security keys** (ilia fork) — a YubiKey or another security key, Touch ID, Face ID, Windows Hello or a synced passkey as the second step, instead of or next to the authenticator app; phishing-resistant, several keys per user, recovery codes for key-only accounts, and no new dependency. Needs `CALRS_BASE_URL` on `https://`. See [passkeys](docs/src/authentication.md#passkeys-and-security-keys-ilia-fork)
 - **OIDC / SSO** — OpenID Connect via Keycloak, Authentik, etc. (authorization code + PKCE, auto-discovery)
 - **User roles** — admin/user, first registered user becomes admin
 - **Registration controls** — enable/disable open registration, restrict by email domain

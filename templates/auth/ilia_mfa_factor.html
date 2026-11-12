@@ -1,0 +1,25 @@
+{# ilia fork: the passkey view of the MFA challenge (docs/passkeys-plan.md §4.3, §4.4). #}
+<div class="ilia-mfa">
+{% include "auth/ilia_mfa_style.html" %}
+{% if mode == "login" %}
+  <p>{{ t("ilia-mfa-login-help-passkey") }}</p>
+  <form method="post" action="/auth/mfa/passkey" id="webauthn-form">
+    <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+    {% with create = false %}{% include "auth/ilia_webauthn_fields.html" %}{% endwith %}
+    <button type="button" class="btn btn-passkey" data-webauthn="get" data-form="webauthn-form" hidden>{{ t("ilia-passkey-sign-in") }}</button>
+  </form>
+  {% include "auth/ilia_webauthn_notices.html" %}
+  {% if has_totp %}<a class="btn btn-secondary" href="/auth/mfa?method=totp">{{ t("ilia-mfa-use-totp") }}</a>{% endif %}
+  <a class="btn btn-secondary" href="/auth/mfa?method=recovery">{{ t("ilia-mfa-use-recovery") }}</a>
+{% else %}
+  <p>{{ t("ilia-mfa-enroll-help") }}</p>
+  <form method="post" action="/auth/mfa/passkey/enroll" id="webauthn-form">
+    <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+    {% with create = true %}{% include "auth/ilia_webauthn_fields.html" %}{% endwith %}
+    {% include "auth/ilia_passkey_name.html" %}
+  </form>
+  {% include "auth/ilia_webauthn_notices.html" %}
+  <a class="btn btn-secondary" href="/auth/mfa?method=totp">{{ t("ilia-mfa-use-app-instead") }}</a>
+{% endif %}
+  <p style="margin-top: 1rem;"><a href="/auth/login">{{ t("mfa-restart") }}</a></p>
+</div>

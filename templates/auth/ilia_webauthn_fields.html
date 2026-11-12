@@ -1,0 +1,12 @@
+{# ilia fork: the hidden fields webauthn.js fills; `create` adds the registration ones. #}
+<input type="hidden" name="credential_id" value="">
+<input type="hidden" name="client_data" value="">
+<input type="hidden" name="authenticator_data" value="">
+{% if create %}
+<input type="hidden" name="public_key" value="">
+<input type="hidden" name="algorithm" value="">
+<input type="hidden" name="transports" value="">
+{% else %}
+<input type="hidden" name="signature" value="">
+<input type="hidden" name="user_handle" value="">
+{% endif %}

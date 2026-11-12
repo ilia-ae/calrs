@@ -174,6 +174,9 @@ pub struct AppState {
     pub german_formal: std::sync::atomic::AtomicBool,
     /// ilia fork: TON payments, `None` inside when not configured.
     pub(crate) ton: ton_pay::TonSlot,
+    /// ilia fork: passkeys' RP ID and origin, from `CALRS_BASE_URL` only;
+    /// `None` turns passkeys off (docs/passkeys-plan.md).
+    pub(crate) passkeys: Option<crate::webauthn::Rp>,
 }
 
 // --- CSRF protection (double-submit cookie pattern) ---
@@ -755,6 +758,7 @@ pub(crate) async fn build_state(
         csp_baseline: build_csp(&None),
         german_formal: std::sync::atomic::AtomicBool::new(initial_german_formal),
         ton: ton_pay::TonSlot::from_env(),
+        passkeys: crate::webauthn::Rp::from_env(),
     })
 }
 
@@ -763,6 +767,8 @@ pub(crate) fn router(state: Arc<AppState>) -> Router {
     Router::new()
         .merge(crate::auth::auth_router())
         .merge(crate::mfa::router())
+        // ilia fork: passkeys and security keys (docs/passkeys-plan.md).
+        .merge(crate::webauthn::flows::router())
         // ilia fork: the TON payment page and the dashboard waive.
         .merge(ton_pay::router())
         .merge(telegram::router())

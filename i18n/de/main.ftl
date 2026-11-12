@@ -2056,3 +2056,77 @@ tg-host-attendee-email = E-Mail von { $sender }, weiterer Teilnehmer der Buchung
 tg-host-other-email = E-Mail von einer anderen Adresse, nicht der des Gastes: { $sender }, im Verlauf der Buchung von { $guest } ({ $email }) zu { $event }, { $when }:
 booking-blocked-body-system = Der Gastgeber verlangt mindestens { $minutes } Minuten Vorlaufzeit. Falls du nicht teilnehmen kannst, schreib bitte an <a href="{ $href }">{ $address }</a>.
 booking-blocked-body-no-reply = Der Gastgeber verlangt mindestens { $minutes } Minuten Vorlaufzeit. Falls du nicht teilnehmen kannst, gib dem Gastgeber bitte auf anderem Weg Bescheid.
+
+## ilia fork: passkeys and security keys (docs/passkeys-plan.md)
+
+ilia-passkey-sign-in = Mit Passkey anmelden
+ilia-mfa-login-help-passkey = Bestätige diese Anmeldung mit deinem Passkey oder Sicherheitsschlüssel. Die Anmeldung läuft nach 10 Minuten ab.
+ilia-mfa-use-totp = Authenticator-Code verwenden
+ilia-mfa-use-recovery = Wiederherstellungscode verwenden
+ilia-mfa-use-passkey = Passkey verwenden
+ilia-mfa-use-passkey-instead = Stattdessen einen Passkey oder Sicherheitsschlüssel verwenden
+ilia-mfa-totp-login-help = Gib den sechsstelligen Code aus deiner Authenticator-App ein. Die Anmeldung läuft nach 10 Minuten ab.
+ilia-mfa-recovery-code = Wiederherstellungscode
+ilia-mfa-recovery-login-help = Gib einen deiner gespeicherten Wiederherstellungscodes ein. Jeder Code funktioniert nur einmal. Die Anmeldung läuft nach 10 Minuten ab.
+ilia-passkey-unsupported = Dieser Browser unterstützt keine Passkeys oder Sicherheitsschlüssel. Wähle unten eine andere Methode oder öffne diese Seite in einem aktuellen Browser.
+ilia-passkey-noscript = Passkeys brauchen JavaScript. Aktiviere es für diese Website oder wähle unten eine andere Methode.
+ilia-passkey-cancelled = Die Anfrage wurde abgebrochen oder ist abgelaufen. Versuche es erneut oder wähle eine andere Methode.
+ilia-passkey-invalid = Der Passkey oder Sicherheitsschlüssel konnte nicht überprüft werden, oder die Anfrage ist abgelaufen. Versuche es erneut oder wähle eine andere Methode.
+ilia-passkey-key-type = Dieser Browser kann diesen Schlüsseltyp nicht lesen, daher lässt sich der Schlüssel hier nicht hinzufügen. Versuche es mit einem anderen Browser, etwa einem aktuellen Firefox oder Chrome, oder wähle eine andere Methode.
+ilia-passkey-wrong-site = Passkeys funktionieren nur unter { $origin }. Öffne diese Seite dort und versuche es erneut, oder wähle eine andere Methode.
+ilia-mfa-enroll-help = Wähle, womit du jede Anmeldung bestätigst. Am sichersten ist ein Passkey oder Sicherheitsschlüssel: Er funktioniert nur auf dieser Website, eine gefälschte Kopie der Seite kann ihn nicht nutzen.
+ilia-passkey-add-security-key = Sicherheitsschlüssel hinzufügen
+ilia-passkey-add-device = Passkey auf diesem Gerät oder Telefon hinzufügen
+ilia-passkey-kinds-help = Ein Sicherheitsschlüssel ist ein USB- oder NFC-Schlüssel wie ein YubiKey. Ein Passkey auf diesem Gerät oder Telefon nutzt Touch ID, Face ID, Windows Hello oder die Bildschirmsperre des Telefons und kann mit anderen Geräten synchronisiert werden.
+ilia-mfa-use-app-instead = Stattdessen eine Authenticator-App verwenden
+ilia-passkey-name = Name des Schlüssels
+ilia-passkey-name-help = Optional, zum Beispiel „YubiKey am Schlüsselbund“ oder „MacBook“. Bis zu 64 Zeichen.
+ilia-passkey-default-security-key = Sicherheitsschlüssel { $n }
+ilia-passkey-default-device = Passkey { $n }
+ilia-passkey-register-help = Klicke auf eine Schaltfläche und folge deinem Browser: Stecke den Sicherheitsschlüssel ein und berühre ihn, oder bestätige mit Touch ID, Face ID, Windows Hello oder deinem Telefon.
+ilia-passkey-exists = Dieser Schlüssel ist bereits registriert.
+ilia-mfa-recovery-help = Bewahre diese Wiederherstellungscodes sicher auf; sie werden nur einmal angezeigt. Jeder Code ersetzt bei einer Anmeldung einen Passkey oder einen Authenticator-Code. Neue Codes ersetzen alle bisherigen.
+ilia-mfa-status-on = Die Zwei-Faktor-Authentifizierung ist aktiviert.
+ilia-mfa-status-off = Die Zwei-Faktor-Authentifizierung ist deaktiviert.
+ilia-mfa-setup-intro = Füge jeder Anmeldung einen zweiten Schritt hinzu: einen Passkey oder Sicherheitsschlüssel (YubiKey, Touch ID, Face ID, Windows Hello, dein Telefon) oder eine Authenticator-App.
+ilia-passkey-list = Passkeys und Sicherheitsschlüssel
+ilia-passkey-none = Noch keine Passkeys oder Sicherheitsschlüssel.
+ilia-passkey-kind-hardware = Hardware-Schlüssel
+ilia-passkey-kind-synced = Synchronisierter Passkey
+ilia-passkey-added = Hinzugefügt am { $date }
+ilia-passkey-last-used = Zuletzt verwendet am { $date }
+ilia-passkey-never-used = Noch nicht verwendet
+ilia-passkey-other-site = Registriert für { $rp_id }; unter dieser Adresse funktioniert er nicht.
+ilia-passkey-rename = Umbenennen
+ilia-passkey-delete = Entfernen
+ilia-passkey-add = Passkey oder Sicherheitsschlüssel hinzufügen
+ilia-passkey-new-name = Neuer Name
+ilia-passkey-limit = Du hast die Höchstzahl an Schlüsseln erreicht ({ $max }). Entferne einen, um einen neuen hinzuzufügen.
+ilia-passkey-backup-advice = Füge einen zweiten Schlüssel hinzu und bewahre ihn sicher auf, damit du dich bei Verlust eines Schlüssels nicht aussperrst.
+ilia-passkey-unavailable = Passkeys sind deaktiviert: Die öffentliche Adresse des Servers (CALRS_BASE_URL) ist keine https://-Adresse. Wende dich an den Administrator. Bereits hinzugefügte Schlüssel werden aufgelistet und können entfernt werden.
+ilia-mfa-totp-title = Authenticator-App
+ilia-mfa-totp-on = Eine Authenticator-App ist eingerichtet.
+ilia-mfa-totp-off = Keine Authenticator-App eingerichtet.
+ilia-mfa-totp-add = Authenticator-App einrichten
+ilia-mfa-totp-remove = Authenticator-App entfernen
+ilia-mfa-recovery-title = Wiederherstellungscodes
+ilia-mfa-recovery-left =
+    { $count ->
+        [one] { $count } Wiederherstellungscode übrig
+       *[other] { $count } Wiederherstellungscodes übrig
+    }
+ilia-mfa-last-factor = Die Zwei-Faktor-Authentifizierung ist vorgeschrieben, daher kann deine letzte Anmeldemethode nicht entfernt werden. Füge zuerst eine weitere hinzu.
+ilia-mfa-last-factor-off = Das ist deine letzte Methode: Wenn du sie entfernst, wird die Zwei-Faktor-Authentifizierung deaktiviert und deine Wiederherstellungscodes werden gelöscht.
+ilia-mfa-changes-help = Jede Änderung hier erfordert dein Passwort und einen Passkey oder Code und meldet deine anderen Sitzungen ab.
+ilia-mfa-confirm-title = Bestätige, dass du es bist
+ilia-mfa-confirm-help = Gib dein Passwort ein und bestätige dann mit einem Passkey oder einem Code.
+ilia-passkey-confirm = Mit Passkey bestätigen
+ilia-mfa-confirm-code = Mit Code bestätigen
+ilia-mfa-action-passkey-add = Du fügst einen Passkey oder Sicherheitsschlüssel hinzu.
+ilia-mfa-action-passkey-rename = Du benennst den Schlüssel „{ $name }“ um.
+ilia-mfa-action-passkey-delete = Du entfernst den Schlüssel „{ $name }“.
+ilia-mfa-action-totp-add = Du richtest eine Authenticator-App ein.
+ilia-mfa-action-totp-remove = Du entfernst die Authenticator-App.
+ilia-mfa-action-regenerate = Du ersetzt alle Wiederherstellungscodes.
+ilia-mfa-action-policy = Du setzt die Zwei-Faktor-Richtlinie für lokale Konten auf:
+ilia-mfa-policy-continue = Weiter
