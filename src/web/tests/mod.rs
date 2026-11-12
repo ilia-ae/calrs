@@ -6,6 +6,13 @@ use super::*;
 
 mod admin;
 mod agent;
+// ilia fork: `calrs config apply` (docs/apply-schema.md).
+mod apply_event_types;
+mod apply_profile;
+mod apply_roundtrip;
+mod apply_site;
+mod apply_support;
+mod apply_txn;
 mod auth_pages;
 mod availability;
 mod booking;

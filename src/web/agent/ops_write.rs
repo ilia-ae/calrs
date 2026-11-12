@@ -54,13 +54,13 @@ const GUESTS_MAX: i64 = 100;
 const FOLLOWING_MAX: i64 = 200;
 /// What the web's new event type form starts with (`new_event_type_form`):
 /// a reminder a day before and an hour's notice.
-const NEW_FORM_REMINDER_MINUTES: i64 = 24 * 60;
-const NEW_FORM_MIN_NOTICE_MIN: i64 = 60;
+pub(crate) const NEW_FORM_REMINDER_MINUTES: i64 = 24 * 60;
+pub(crate) const NEW_FORM_MIN_NOTICE_MIN: i64 = 60;
 /// How free text appears in the audit: that it is there, not what it says.
 const TEXT: &str = "(text)";
 
 /// One `availability_rules` row: day of week (0 is Sunday), start, end.
-type Rule = (i32, String, String);
+pub(crate) type Rule = (i32, String, String);
 
 /// Who is writing: the shared context, the session (for the audit) and the
 /// acting admin.
@@ -169,7 +169,7 @@ fn check_range(field: &str, value: i64, min: i64, max: i64) -> Result<i64, ToolE
 
 /// A slug exactly as the web form would store it: lowercase letters, digits
 /// and dashes, with at least one letter or digit.
-fn check_slug(field: &str, slug: &str) -> Result<String, ToolError> {
+pub(crate) fn check_slug(field: &str, slug: &str) -> Result<String, ToolError> {
     let valid = !slug.is_empty()
         && slug.len() <= SLUG_MAX
         && slug
@@ -341,7 +341,7 @@ fn hhmm(time: NaiveTime) -> String {
 /// at most `WINDOWS_PER_DAY` windows a day, each start before its end, no
 /// two overlapping. A week with no window at all is refused: the web form
 /// would quietly fill it with the owner's default hours.
-fn weekly_rules(field: &str, days: &[DayHoursIn]) -> Result<Vec<Rule>, ToolError> {
+pub(crate) fn weekly_rules(field: &str, days: &[DayHoursIn]) -> Result<Vec<Rule>, ToolError> {
     let mut seen = Vec::new();
     let mut rules = Vec::new();
     for (i, day) in days.iter().enumerate() {
@@ -395,7 +395,7 @@ fn weekly_rules(field: &str, days: &[DayHoursIn]) -> Result<Vec<Rule>, ToolError
 
 /// Rules in the web form's `avail_schedule` format, as the edit page
 /// writes it: `1:09:00-12:00,13:00-17:00;2:09:00-17:00`.
-fn schedule_string(rules: &[Rule]) -> String {
+pub(crate) fn schedule_string(rules: &[Rule]) -> String {
     build_avail_schedule(rules)
 }
 
@@ -497,7 +497,7 @@ fn form_error(key: &str) -> ToolError {
 /// The web form's own checks, which its handler would answer with the form
 /// page again. Run first, so the model learns the reason; they also catch
 /// stored values the web form no longer accepts.
-async fn web_form_checks(
+pub(crate) async fn web_form_checks(
     pool: &SqlitePool,
     me: &User,
     et_id: Option<&str>,
@@ -578,46 +578,46 @@ fn changed_meanwhile() -> ToolError {
 
 /// Everything the event type edit page shows and posts back, as stored.
 #[derive(Clone, Debug)]
-struct EditState {
-    slug: String,
-    title: String,
-    description: Option<String>,
-    duration_min: i64,
-    slot_interval_min: Option<i64>,
-    buffer_before: Option<i64>,
-    buffer_after: Option<i64>,
-    min_notice_min: Option<i64>,
-    requires_confirmation: bool,
-    pending_blocks_slot: bool,
-    pending_expiry_hours: Option<i64>,
-    visibility: String,
-    location_type: String,
-    location_value: Option<String>,
-    meeting_pattern_override: Option<String>,
+pub(crate) struct EditState {
+    pub(crate) slug: String,
+    pub(crate) title: String,
+    pub(crate) description: Option<String>,
+    pub(crate) duration_min: i64,
+    pub(crate) slot_interval_min: Option<i64>,
+    pub(crate) buffer_before: Option<i64>,
+    pub(crate) buffer_after: Option<i64>,
+    pub(crate) min_notice_min: Option<i64>,
+    pub(crate) requires_confirmation: bool,
+    pub(crate) pending_blocks_slot: bool,
+    pub(crate) pending_expiry_hours: Option<i64>,
+    pub(crate) visibility: String,
+    pub(crate) location_type: String,
+    pub(crate) location_value: Option<String>,
+    pub(crate) meeting_pattern_override: Option<String>,
     /// Its own timezone; `None` follows the owner's.
-    timezone: Option<String>,
-    booking_horizon_days: Option<i64>,
-    bookable_from: Option<String>,
-    bookable_until: Option<String>,
-    reminder_minutes: Option<i64>,
-    max_additional_guests: i64,
-    first_slot_only: bool,
-    default_calendar_view: String,
-    week_start: Option<String>,
-    cancel_notice_min: Option<i64>,
-    reschedule_notice_min: Option<i64>,
-    sms_phone_mode: String,
-    scheduling_mode: String,
-    resource_scheduling_mode: String,
-    enabled: bool,
-    weekly_hours: Vec<Rule>,
-    calendar_ids: Vec<String>,
-    resource_ids: Vec<String>,
-    frequency_limits: Vec<(i64, String, bool)>,
+    pub(crate) timezone: Option<String>,
+    pub(crate) booking_horizon_days: Option<i64>,
+    pub(crate) bookable_from: Option<String>,
+    pub(crate) bookable_until: Option<String>,
+    pub(crate) reminder_minutes: Option<i64>,
+    pub(crate) max_additional_guests: i64,
+    pub(crate) first_slot_only: bool,
+    pub(crate) default_calendar_view: String,
+    pub(crate) week_start: Option<String>,
+    pub(crate) cancel_notice_min: Option<i64>,
+    pub(crate) reschedule_notice_min: Option<i64>,
+    pub(crate) sms_phone_mode: String,
+    pub(crate) scheduling_mode: String,
+    pub(crate) resource_scheduling_mode: String,
+    pub(crate) enabled: bool,
+    pub(crate) weekly_hours: Vec<Rule>,
+    pub(crate) calendar_ids: Vec<String>,
+    pub(crate) resource_ids: Vec<String>,
+    pub(crate) frequency_limits: Vec<(i64, String, bool)>,
 }
 
 impl EditState {
-    async fn load(pool: &SqlitePool, et_id: &str) -> Result<Self, ToolError> {
+    pub(crate) async fn load(pool: &SqlitePool, et_id: &str) -> Result<Self, ToolError> {
         let row = sqlx::query(
             "SELECT slug, title, description, duration_min, slot_interval_min, buffer_before,
                     buffer_after, min_notice_min, requires_confirmation, pending_blocks_slot,
@@ -773,7 +773,7 @@ impl EditState {
     /// which keeps it NULL (`resolve_event_type_tz`). The pending section and
     /// the week start are sent only when they change: left out, the handler
     /// keeps what is stored.
-    fn form_fields(
+    pub(crate) fn form_fields(
         &self,
         followed_tz: &str,
         send_pending: bool,
@@ -854,7 +854,7 @@ impl EditState {
 
     /// Check `patch` and apply it. Returns the names of the settings it sets,
     /// changed or not.
-    async fn apply(
+    pub(crate) async fn apply(
         &mut self,
         pool: &SqlitePool,
         account_id: &str,

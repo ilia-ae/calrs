@@ -547,6 +547,8 @@ calrs config show                    Show current configuration
 calrs config smtp-test <email>       Send a test email
 calrs config auth                    Configure registration/domain restrictions
 calrs config general --company-link <url>  Set the link behind the logo
+calrs config apply --stdin [--dry-run]     Apply a settings document (JSON, calrs-apply-v1)
+calrs config apply --export [--user <email>]  Print the stored settings as such a document
 calrs config oidc                    Configure OIDC (SSO via Keycloak, etc.)
 calrs user list                      List users
 calrs user create                    Create a user

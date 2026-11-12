@@ -137,6 +137,9 @@ calrs config general [OPTIONS]      # Without options: show the current values
     --allow-private-hosts <HOSTS>   Hostnames allowed to resolve to private IPs (empty clears)
     --company-link <URL>            Link behind the logo on public pages (empty clears)
 
+calrs config apply --stdin [--dry-run]     # Apply a settings document read from stdin
+calrs config apply --export [--user <EMAIL>]   # Print the stored settings as a document
+
 calrs config oidc [OPTIONS]
     --issuer-url <URL>        OIDC issuer URL
     --client-id <ID>          Client ID
@@ -146,6 +149,45 @@ calrs config oidc [OPTIONS]
 ```
 
 `--company-link` is the setting of Admin → Company link and is checked the same way: only `http://` and `https://` links are accepted, anything else is an error and nothing is written. `calrs config dump` shows it as `auth.company_link`. A running `calrs serve` reads it at startup, so restart it to show a new link.
+
+#### Settings as code: `config apply` (ilia fork)
+
+`calrs config apply` reads one JSON document that declares the settings a deployment manages, applies it and prints one JSON line. The format is `calrs-apply-v1`; the full schema is in `docs/apply-schema.md` in the repository and a complete example is `docs/apply-example.json`.
+
+| Section | What it sets | Through |
+|---|---|---|
+| `profile` | Settings → Profile of the admin named by `user`: name, username, title, bio, booking email, timezone, language, public page language, week start, dynamic groups, resource lending, default weekly hours, and the avatar (a file already on the server and its SHA-256) | the profile form (`settings_save`) |
+| `site` | The admin panel: theme and custom colours, week start, German form of address, registration and allowed email domains, MFA policy, company link, Jitsi; OIDC, Google, captcha and meeting webhook can only be switched `"off"` (every field and secret cleared); the SMS policy | each card's own form |
+| `sources` | For an existing source (matched on `url` and `username`): the write calendar and the synced calendars, by display name | the local calendar list only; nothing connects to the server |
+| `event_types` | The admin's personal event types by slug, every field of the event type form, weekly hours (`null` follows the profile), frequency limits, Telegram guest mode, enabled; `prune` is `none` (default), `disable` or `delete` for the personal types the document leaves out | the event type form (`create_event_type`, `update_event_type`) |
+
+A key left out keeps its setting. `null` clears or inherits, where a setting may be empty; `""` is never accepted. Every object refuses unknown keys, so an older calrs given a newer document stops before writing anything. `base_url` and `allow_private_hosts` are not keys: they belong to the environment. No secret is accepted.
+
+Each value must already be in the form the web form stores it in: a value the form would rewrite or drop (an uppercase username, an unknown timezone, a colour that is not `#rrggbb`, a padded title, a slug with a space) is refused with its path. That is what makes a second run report no change.
+
+The whole run is one SQLite transaction on a single connection. `--dry-run` runs every check and every form, then rolls back, so its report is the one a run would print. `--export` opens the database read-only and prints the stored state in the same format; applying it changes nothing. A stored value no document can state (written by hand, say) leaves its key out of the export.
+
+Output, on stdout, one line:
+
+```json
+{"format":"calrs-apply-v1","dry_run":false,
+ "changed":[{"path":"site.theme","before":"default","after":"custom"},
+            {"path":"event_types[15min]","before":null,"after":"created"}],
+ "restart":true,"unmanaged":{"event_types":["old-call"]}}
+```
+
+- `changed` lists each setting that changed. A cleared secret shows as `"(secret set)"` changing to `null`, the avatar as `"sha256:<hex>"`.
+- `restart` is true when a value `calrs serve` reads only at startup changed (the theme and colours, the company link, the German form of address, Jitsi, captcha, meeting webhook): restart it.
+- `unmanaged.event_types` lists the admin's personal event types the document does not name, before any prune.
+
+Exit codes: `0` applied or nothing to change; `2` the document is invalid or a form refused it, nothing written; `1` an internal error, rolled back. The one exception to "rolled back": when the avatar cannot be moved into place after the commit, the message says the settings were written, the report line is still printed on stdout (so a script still sees `restart`), and the next run places the file. Otherwise errors go to stderr only.
+
+Run it with the release directory as the working directory (a refused form renders its page from `templates/`), and with `RUST_LOG=off`, since log lines also go to stdout:
+
+```
+cd /opt/calrs/current
+RUST_LOG=off calrs --data-dir /var/lib/calrs config apply --stdin --dry-run < settings.json
+```
 
 #### Relaying through a local MTA
 

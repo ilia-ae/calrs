@@ -1,5 +1,7 @@
 mod admin;
 pub(crate) mod agent;
+// ilia fork: `calrs config apply`, the settings as code (docs/apply-schema.md).
+pub(crate) mod apply;
 mod availability;
 mod booking;
 mod booking_actions;

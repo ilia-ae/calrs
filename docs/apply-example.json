@@ -1,0 +1,109 @@
+{
+  "format": "calrs-apply-v1",
+  "user": "mail@ilia.ae",
+  "profile": {
+    "name": "Ilia Arestov",
+    "username": "ilia",
+    "title": "Fractional CTO",
+    "bio": "Fractional CTO based in Dubai. 15 years in IT, 1000+ projects in 38 countries, 6 active patents in information security and big data.",
+    "booking_email": null,
+    "timezone": "Asia/Almaty",
+    "language": "ru",
+    "public_page_language": "visitor",
+    "week_start": null,
+    "allow_dynamic_group": false,
+    "lend_resource_write": false,
+    "weekly_hours": [
+      {"day": "mon", "windows": [{"start": "10:00", "end": "19:00"}]},
+      {"day": "tue", "windows": [{"start": "10:00", "end": "19:00"}]},
+      {"day": "wed", "windows": [{"start": "10:00", "end": "19:00"}]},
+      {"day": "thu", "windows": [{"start": "10:00", "end": "19:00"}]},
+      {"day": "fri", "windows": [{"start": "10:00", "end": "13:00"}, {"start": "14:00", "end": "19:00"}]}
+    ],
+    "avatar": {
+      "file": "/var/lib/calrs/managed/avatar",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  },
+  "site": {
+    "theme": "custom",
+    "custom": {
+      "accent": "#313131",
+      "accent_hover": "#111111",
+      "bg": "#f6f6f6",
+      "surface": "#ffffff",
+      "text": "#313131"
+    },
+    "week_start": "mon",
+    "german_formal": true,
+    "registration": false,
+    "allowed_email_domains": "ilia.ae",
+    "mfa_policy": "optional",
+    "company_link": "https://ilia.ae",
+    "jitsi": {"base_url": "https://meet.jit.si", "pattern": null, "display_name": "Jitsi Meet"},
+    "oidc": "off",
+    "google_oauth2": "off",
+    "captcha": "off",
+    "meeting_webhook": "off",
+    "sms_allow_all_users": false
+  },
+  "sources": [
+    {
+      "url": "https://mail.example.com/caldav/",
+      "username": "me@example.com",
+      "write_calendar": "Calendar",
+      "sync_calendars": ["Calendar", "Holidays"]
+    }
+  ],
+  "event_types": {
+    "prune": "none",
+    "items": [
+      {
+        "slug": "15min",
+        "title": "Free 15-minute CTO consultation",
+        "description": "A short call about your IT project. [About me](https://ilia.ae/en/about/)",
+        "duration_min": 15,
+        "slot_interval_min": null,
+        "buffer_before": 0,
+        "buffer_after": 15,
+        "min_notice_min": 240,
+        "requires_confirmation": false,
+        "pending_blocks_slot": true,
+        "pending_expiry_hours": 24,
+        "visibility": "public",
+        "location_type": "jitsi_auto",
+        "location_value": null,
+        "meeting_pattern_override": null,
+        "timezone": null,
+        "weekly_hours": null,
+        "booking_horizon_days": 14,
+        "bookable_from": null,
+        "bookable_until": null,
+        "reminder_minutes": 60,
+        "max_additional_guests": 1,
+        "first_slot_only": false,
+        "default_calendar_view": "month",
+        "week_start": null,
+        "cancel_notice_min": 120,
+        "reschedule_notice_min": 120,
+        "sms_phone_mode": "off",
+        "frequency_limits": [{"count": 4, "period": "day"}],
+        "telegram_guest_mode": "optional",
+        "enabled": true
+      },
+      {
+        "slug": "intro",
+        "title": "Introduction call",
+        "duration_min": 30,
+        "location_type": "custom",
+        "location_value": "The meeting link comes by email",
+        "visibility": "private",
+        "weekly_hours": [
+          {"day": "tue", "windows": [{"start": "15:00", "end": "17:00"}]}
+        ],
+        "telegram_guest_mode": "off",
+        "enabled": false
+      }
+    ]
+  }
+}

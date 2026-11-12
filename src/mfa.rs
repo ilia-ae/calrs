@@ -763,12 +763,7 @@ async fn policy_save(
             }
             clear_attempts(&mut tx, &admin.user.id).await?;
         }
-        sqlx::query("UPDATE auth_config SET mfa_required = ?, updated_at = datetime('now') WHERE id = 'singleton'")
-            .bind(mandatory).execute(&mut *tx).await?;
-        if mandatory {
-            sqlx::query("DELETE FROM sessions WHERE mfa_verified = 0 AND user_id IN (SELECT id FROM users WHERE auth_provider = 'local')")
-                .execute(&mut *tx).await?;
-        }
+        store_policy(&mut tx, mandatory).await?;
         tx.commit().await?;
         tracing::info!(admin = %admin.user.id, required = mandatory, "MFA policy changed");
         Ok(true)
@@ -778,6 +773,20 @@ async fn policy_save(
         Ok(false) => settings_error(&state, admin.lang),
         Err(e) => web::internal_error_response("MFA policy", &e),
     }
+}
+
+/// Store the enrollment policy and, when it becomes mandatory, end every local
+/// session that has not passed MFA. The caller has authorised the change and
+/// owns the transaction: `policy_save` after the password and code, and (ilia
+/// fork) `calrs config apply`, run by the server's OS user, on its own.
+pub(crate) async fn store_policy(conn: &mut SqliteConnection, mandatory: bool) -> Result<()> {
+    sqlx::query("UPDATE auth_config SET mfa_required = ?, updated_at = datetime('now') WHERE id = 'singleton'")
+        .bind(mandatory).execute(&mut *conn).await?;
+    if mandatory {
+        sqlx::query("DELETE FROM sessions WHERE mfa_verified = 0 AND user_id IN (SELECT id FROM users WHERE auth_provider = 'local')")
+            .execute(&mut *conn).await?;
+    }
+    Ok(())
 }
 
 /// Server-operator recovery. The policy remains in force, so the next local

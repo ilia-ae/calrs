@@ -84,6 +84,24 @@ pub enum ConfigCommands {
         #[arg(long)]
         auto_register: Option<bool>,
     },
+    /// ilia fork: apply a settings document (calrs-apply-v1) read from
+    /// stdin, or print the stored state in the same schema. Prints one JSON
+    /// line; exits 2 on an invalid or refused document, 1 on an internal
+    /// error, having written nothing (docs/apply-schema.md).
+    Apply {
+        /// Read the document from stdin
+        #[arg(long, required_unless_present = "export", conflicts_with = "export")]
+        stdin: bool,
+        /// Run every check and handler, report the changes, then roll back
+        #[arg(long, requires = "stdin")]
+        dry_run: bool,
+        /// Print the stored state as a document (opens the database read-only)
+        #[arg(long)]
+        export: bool,
+        /// Admin whose profile and event types are exported (default: the only enabled admin)
+        #[arg(long, requires = "export")]
+        user: Option<String>,
+    },
 }
 
 // ── Dump-specific structs (no secret fields) ──
@@ -953,6 +971,19 @@ pub async fn run(pool: &SqlitePool, key: &[u8; 32], cmd: ConfigCommands) -> Resu
                     println!("  A running `calrs serve` shows it after a restart.");
                 }
             }
+        }
+        ConfigCommands::Apply {
+            stdin: _,
+            dry_run,
+            export,
+            user,
+        } => {
+            let command = if export {
+                crate::web::apply::Command::Export { user }
+            } else {
+                crate::web::apply::Command::Apply { dry_run }
+            };
+            crate::web::apply::cli(pool, key, command).await?;
         }
         ConfigCommands::Dump { pretty } => {
             let output = build_dump_output(pool).await?;
