@@ -73,6 +73,12 @@ const MIN_SPACING: std::time::Duration = std::time::Duration::from_secs(2);
 /// finds it stale wakes it and waits for the step
 /// ([`TonRuntime::step_now`]).
 pub(crate) const IDLE_PRICED: std::time::Duration = std::time::Duration::from_secs(15 * 60);
+/// ilia fork: the longest step while a test booking's own (minutes long)
+/// timing runs (`store::open_debug_invoice`), whatever
+/// `CALRS_TON_POLL_SECS` says (its default is already 10 s), and after a
+/// transient indexer error too: a 2-minute window is then watched a dozen
+/// times. A 429, a rejected key or the wrong network keep their backoff.
+pub(crate) const DEBUG_POLL: std::time::Duration = std::time::Duration::from_secs(10);
 const SUPERVISOR_BACKOFF: std::time::Duration = std::time::Duration::from_secs(10);
 const SUPERVISOR_BACKOFF_MAX: std::time::Duration = std::time::Duration::from_secs(300);
 
@@ -362,7 +368,17 @@ pub(crate) async fn next_delay(
             }
             _ => {
                 let failures = rt.health().failures.clamp(1, 8);
-                StdDuration::from_secs((10u64 << (failures - 1)).min(120))
+                let backoff = StdDuration::from_secs((10u64 << (failures - 1)).min(120));
+                // ilia fork: a test booking's minutes-long timing is not
+                // left behind by a transient error (5xx, network, parse).
+                // A 429 keeps its backoff, as do the setup errors above.
+                if backoff > DEBUG_POLL
+                    && !matches!(err, StepError::Indexer(IndexerError::RateLimited))
+                    && store::open_debug_invoice(pool).await
+                {
+                    return DEBUG_POLL;
+                }
+                backoff
             }
         };
     }
@@ -371,7 +387,11 @@ pub(crate) async fn next_delay(
         return StdDuration::from_secs(1);
     }
     if store::active_invoices(pool).await {
-        return StdDuration::from_secs(rt.cfg.poll_secs);
+        let poll = StdDuration::from_secs(rt.cfg.poll_secs);
+        if poll > DEBUG_POLL && store::open_debug_invoice(pool).await {
+            return DEBUG_POLL;
+        }
+        return poll;
     }
     // A day after the last invoice, late payments are still noticed every
     // minute. With a price and no recent invoice, every 15 minutes: the
@@ -1340,6 +1360,8 @@ async fn release_one(
 /// code, the payment link, the creation time, the amount or what was paid,
 /// so a transfer for any earlier window still counts. None under capacity
 /// pressure (a refusal in the last hour), nor for a type whose price is off.
+/// A test booking's own timing (`store::debug_timing_sql`) renews by its
+/// rules instead of the site's (`DebugTiming::renewal`).
 pub(crate) async fn renew_due(pool: &SqlitePool, rt: &TonRuntime, now: DateTime<Utc>) -> usize {
     #[derive(sqlx::FromRow)]
     struct Due {
@@ -1353,17 +1375,20 @@ pub(crate) async fn renew_due(pool: &SqlitePool, rt: &TonRuntime, now: DateTime<
         renewals_max: i64,
         min_notice_min: i64,
         window_min: Option<i64>,
+        debug_timing: Option<String>,
     }
-    let due: Vec<Due> = match sqlx::query_as(
+    let due: Vec<Due> = match sqlx::query_as(&format!(
         "SELECT i.id, i.booking_id, i.start_at_utc, i.expires_at, i.settle_by, i.hard_deadline,
-                i.renewals, i.renewals_max, et.min_notice_min, p.window_min
+                i.renewals, i.renewals_max, et.min_notice_min, p.window_min,
+                {} AS debug_timing
          FROM ton_invoices i
          JOIN bookings b ON b.id = i.booking_id AND b.status = 'pending'
          JOIN event_types et ON et.id = i.event_type_id
          JOIN ton_prices p ON p.event_type_id = i.event_type_id AND p.enabled = 1
          WHERE i.status = 'open' AND i.network = ? AND i.expires_at <= ?
            AND i.renewals < i.renewals_max",
-    )
+        store::debug_timing_sql("i")
+    ))
     .bind(rt.cfg.network.as_str())
     .bind(stamp(now))
     .fetch_all(pool)
@@ -1403,16 +1428,20 @@ pub(crate) async fn renew_due(pool: &SqlitePool, rt: &TonRuntime, now: DateTime<
             settle_by,
             hard_deadline,
         };
-        let Some(new) = crate::ton::deadlines::renewal(
-            now,
-            start,
-            d.min_notice_min,
-            old,
-            d.renewals,
-            d.renewals_max,
-            renew,
-            rt.cfg.window_rules(d.window_min),
-        ) else {
+        let new = match store::parse_debug_timing(&d.id, d.debug_timing.as_deref()) {
+            Some(t) => t.renewal(now, start, d.min_notice_min, old, d.renewals),
+            None => crate::ton::deadlines::renewal(
+                now,
+                start,
+                d.min_notice_min,
+                old,
+                d.renewals,
+                d.renewals_max,
+                renew,
+                rt.cfg.window_rules(d.window_min),
+            ),
+        };
+        let Some(new) = new else {
             continue;
         };
         match renew_one(
@@ -1497,6 +1526,7 @@ async fn renew_one(
 
 /// Open invoices whose address was caught up in this step and whose
 /// `settle_by` plus the margin lies under the indexer's height: expired.
+/// The margin is the site's, or a test booking's own (`DebugTiming`).
 pub(crate) async fn expire_open(
     pool: &SqlitePool,
     rt: &TonRuntime,
@@ -1521,6 +1551,8 @@ pub(crate) async fn expire_open(
         let Some(settle_by) = parse_stamp(&inv.settle_by) else {
             continue;
         };
+        let margin = store::parse_debug_timing(&inv.id, inv.debug_timing.as_deref())
+            .map_or(margin, |t| Duration::minutes(t.margin_min));
         if height < (settle_by + margin).timestamp() {
             continue;
         }
@@ -1677,13 +1709,16 @@ pub(crate) async fn deliver_renewal_notices(
     };
     let margin = Duration::minutes(rt.cfg.expiry_margin_min);
     let height = i64::try_from(indexed_utime).unwrap_or(0);
-    for (invoice_id, address_raw, renewed_at) in rows {
+    for (invoice_id, address_raw, renewed_at, debug_timing) in rows {
         if !caught.contains(&address_raw) {
             continue;
         }
         let Some(renewed_at) = renewed_at.as_deref().and_then(parse_stamp) else {
             continue;
         };
+        // A test booking's own margin: its renewed window lasts minutes.
+        let margin = store::parse_debug_timing(&invoice_id, debug_timing.as_deref())
+            .map_or(margin, |t| Duration::minutes(t.margin_min));
         if height < (renewed_at + margin).timestamp() {
             continue;
         }

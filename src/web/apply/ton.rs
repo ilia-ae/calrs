@@ -35,6 +35,13 @@
 //!   serve` reads it on every request, so its change sets no `restart`.
 //!   It came after the marker below, which is kept as it was: an older
 //!   calrs refuses the key as unknown (exit 2, nothing written).
+//! - **`debug_booking_telegram`** (`settings::DEBUG_BOOKING_TELEGRAM`) is
+//!   the guest Telegram username the test booking page prefills when the
+//!   admin's linked chat has none: a string, bare (`"getmonolith"`, not
+//!   `"@getmonolith"`), checked like the booking form's field; `null` is
+//!   none, still owned. Read per request: no `restart`. It has its own
+//!   marker, [`DEBUG_BOOKING_TELEGRAM_SHAPE`], which the role checks before
+//!   it sends the key (an older calrs refuses it as unknown).
 
 use chrono::Utc;
 use serde_json::Value;
@@ -48,6 +55,13 @@ use crate::web::ton_pay::{settings as stored, store};
 /// older calrs refuses it as an unknown key). Keep it a literal.
 pub(crate) const TON_SETTINGS_SHAPE: &str =
     "site.ton: {window_min .. free_per_guest_days}, each a value or null (apply-owned)";
+
+/// The marker of a calrs that knows `site.ton.debug_booking_telegram`, as
+/// [`TON_SETTINGS_SHAPE`] is for the section: the role greps for this
+/// literal. It is part of the key's error message, so it is in the binary.
+/// Keep it a literal.
+pub(crate) const DEBUG_BOOKING_TELEGRAM_SHAPE: &str =
+    "site.ton.debug_booking_telegram: a Telegram username without @, or null";
 
 fn path(field: &str) -> String {
     format!("site.ton.{field}")
@@ -83,6 +97,19 @@ fn from_doc(key: &Key, value: &Value) -> Result<String, ApplyError> {
         (_, Value::Null) => return Ok(String::new()),
         (Kind::Bool, Value::Bool(b)) => return Ok(if *b { "1" } else { "0" }.to_string()),
         (Kind::Bool, _) => return Err(ApplyError::invalid(path, "must be true, false or null")),
+        (Kind::Telegram, Value::String(s)) if settings::canonical(key, s).is_err() => {
+            return Err(ApplyError::invalid(
+                path,
+                format!("{DEBUG_BOOKING_TELEGRAM_SHAPE} (4 to 32 Latin letters, digits and _)"),
+            ))
+        }
+        (Kind::Telegram, Value::String(s)) => s.clone(),
+        (Kind::Telegram, _) => {
+            return Err(ApplyError::invalid(
+                path,
+                format!("must be a string or null ({DEBUG_BOOKING_TELEGRAM_SHAPE})"),
+            ))
+        }
         (Kind::Int(_), Value::Number(n)) => match n.as_i64() {
             Some(n) => n.to_string(),
             None => return Err(ApplyError::invalid(path, "must be a whole number")),
@@ -182,7 +209,7 @@ pub(super) async fn apply(ctx: &mut Ctx, section: &TonSection) -> Result<(), App
             continue;
         };
         let value = |v: &Option<String>| to_doc(key, v.as_deref().unwrap_or(""));
-        if key.var == settings::DEBUG_BOOKING {
+        if settings::is_debug(key.var) {
             // Read per request by `calrs serve`: live, no restart.
             ctx.record(path(key.field), value(&c.before), value(&c.after));
         } else {
@@ -285,6 +312,21 @@ mod tests {
         assert_eq!(to_doc(k("debug_booking"), "1"), json!(true));
         assert_eq!(to_doc(k("debug_booking"), "0"), json!(false));
         assert_eq!(to_doc(k("debug_booking"), ""), Value::Null);
+        let tg = k("debug_booking_telegram");
+        assert_eq!(from_doc(tg, &json!("getmonolith")).unwrap(), "getmonolith");
+        assert_eq!(from_doc(tg, &json!(null)).unwrap(), "");
+        let e = from_doc(tg, &json!("@getmonolith")).unwrap_err();
+        assert!(e.to_string().contains("\"getmonolith\""), "{e}");
+        for bad in [json!("abc"), json!("get monolith"), json!(5), json!(true)] {
+            let e = from_doc(tg, &bad).unwrap_err();
+            assert!(
+                e.to_string().contains(DEBUG_BOOKING_TELEGRAM_SHAPE),
+                "{bad}: {e}"
+            );
+        }
+        assert!(from_doc(tg, &json!("")).is_err());
+        assert_eq!(to_doc(tg, "getmonolith"), json!("getmonolith"));
+        assert_eq!(to_doc(tg, ""), Value::Null);
         for f in [
             "window_min",
             "underpay_tolerance_ton",

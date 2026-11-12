@@ -29,7 +29,12 @@
 //!   computed the way the slot page computes them, and the guest form
 //!   prefilled from the admin's profile: name, and as email only the
 //!   admin's own sign-in or booking address (any other address is refused,
-//!   so nobody can book "as" someone else from here).
+//!   so nobody can book "as" someone else from here), and the guest
+//!   Telegram username ([`prefill_telegram`]): the username of the chat the
+//!   admin linked (`telegram_user_chats`), else the stored setting
+//!   `CALRS_DEBUG_BOOKING_TELEGRAM` (the Debug block's own form,
+//!   [`save_telegram`], or `config apply`, `site.ton.debug_booking_telegram`;
+//!   the environment wins and locks it, like the switch), else empty.
 //! - Submitting calls the public booking handler itself
 //!   (`handle_booking_for_user`) with the request's own headers: CSRF,
 //!   captcha, the per-IP limit, validation, the slot and window checks, the
@@ -43,7 +48,21 @@
 //!   `ilia_013_debug_bookings`), listed on the page, and cancelled by
 //!   "Cancel all my test bookings" through the dashboard's own cancel
 //!   (`cancel_booking`), only the admin's own test bookings.
-//! - "Telegram: deliver guest messages to my own linked Telegram chat": the
+//! - **Timing for this test booking** ([`TimingForm`]): "Normal" keeps the
+//!   site's settings; "Fast test" (`DebugTiming::FAST`: 3 minutes to pay,
+//!   one renewal of 3 minutes, a minute of grace and of margin) or custom
+//!   minutes (window, renewed window, renewals) replace them for this
+//!   booking's invoice only, so the owner can watch the window end, the
+//!   renewal ask again (Telegram, email), the window end again and the
+//!   booking be released, in minutes. The timing reaches the invoice only
+//!   through a task-local set around this page's own call of the booking
+//!   handler (`ton_pay::invoice::with_debug_timing`): a guest's form has no
+//!   way to set it. The invoice stores it (`ton_invoices.debug_timing`, migration
+//!   `ilia_014_debug_timing`), and the watcher honours it only for a booking
+//!   marked here. The list shows each booking's timing and, while its
+//!   invoice is open, a live countdown, refreshed in place every few seconds.
+//! - "Telegram: deliver guest messages to my own linked Telegram chat"
+//!   (ticked by default whenever it can be): the
 //!   booking's guest link row is linked to the chat the admin linked in
 //!   Profile & Settings → Telegram (`telegram_user_chats`), as if the admin
 //!   had opened the guest's deep link from it, and the usual welcome (or
@@ -61,8 +80,12 @@ pub(crate) const PATH: &str = "/dashboard/admin/debug-booking";
 pub(crate) const CANCEL_PATH: &str = "/dashboard/admin/debug-booking/cancel-all";
 /// The switch on the TON page.
 pub(crate) const TOGGLE_PATH: &str = "/dashboard/admin/ton/debug-booking";
+/// The guest Telegram username's form in the Debug block of the TON page.
+pub(crate) const TELEGRAM_PATH: &str = "/dashboard/admin/ton/debug-booking/telegram";
 /// The deployment variable (and the `ton_settings` key).
 pub(crate) const ENV: &str = crate::ton::settings::DEBUG_BOOKING;
+/// The prefilled guest Telegram username's variable (and key).
+pub(crate) const TELEGRAM_ENV: &str = crate::ton::settings::DEBUG_BOOKING_TELEGRAM;
 
 /// Free times offered on the page.
 const SLOTS: usize = 12;
@@ -173,6 +196,60 @@ pub(super) fn router() -> Router<Arc<AppState>> {
         .route(PATH, get(page).post(book))
         .route(CANCEL_PATH, post(cancel_all))
         .route(TOGGLE_PATH, post(toggle))
+        .route(TELEGRAM_PATH, post(save_telegram))
+}
+
+/// The stored debug rows (one read), for [`telegram_setting`].
+async fn debug_rows(state: &AppState) -> crate::ton::settings::DbValues {
+    let mut conn = match state.pool.acquire().await {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::warn!(error = %e, "debug booking: the settings could not be read");
+            return Default::default();
+        }
+    };
+    ton_pay::store::load_settings(&mut conn)
+        .await
+        .unwrap_or_else(|e| {
+            tracing::warn!(error = %e, "debug booking: the settings could not be read");
+            Default::default()
+        })
+}
+
+/// The stored guest Telegram username (environment > row > none).
+async fn telegram_setting(state: &AppState) -> crate::ton::settings::Resolved<Option<String>> {
+    let db = debug_rows(state).await;
+    let env = state.ton.env();
+    crate::ton::settings::debug_booking_telegram(&|k| env.get(k), &db)
+}
+
+/// Where the prefilled guest Telegram username came from.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum TelegramFrom {
+    /// The username of the chat the admin linked.
+    OwnChat,
+    /// `CALRS_DEBUG_BOOKING_TELEGRAM` (the Debug block, `config apply`, the
+    /// environment).
+    Setting,
+}
+
+/// The guest Telegram username the form opens with: the admin's linked
+/// chat's username, else the stored setting, else none.
+pub(crate) async fn prefill_telegram(
+    state: &AppState,
+    user_id: &str,
+) -> Option<(String, TelegramFrom)> {
+    let own = crate::telegram::store::user_chat(&state.pool, user_id)
+        .await
+        .and_then(|(u, _)| u)
+        .and_then(|u| crate::telegram::username::normalize(&u));
+    if let Some(u) = own {
+        return Some((u, TelegramFrom::OwnChat));
+    }
+    telegram_setting(state)
+        .await
+        .value
+        .map(|u| (u, TelegramFrom::Setting))
 }
 
 /// What the TON page shows in its Debug block.
@@ -188,6 +265,28 @@ pub(crate) async fn block(state: &AppState) -> minijinja::Value {
         env_value => env_value.trim(),
         path => PATH,
         toggle_path => TOGGLE_PATH,
+        telegram => telegram_block(state).await,
+    }
+}
+
+/// The guest Telegram username's part of the Debug block.
+async fn telegram_block(state: &AppState) -> minijinja::Value {
+    use crate::ton::settings::Source;
+    let env = state.ton.env();
+    let db = debug_rows(state).await;
+    let resolved = crate::ton::settings::debug_booking_telegram(&|k| env.get(k), &db);
+    let raw = match resolved.source {
+        Source::Env => env.get(TELEGRAM_ENV).unwrap_or_default(),
+        _ => db.value(TELEGRAM_ENV).unwrap_or_default().to_string(),
+    };
+    context! {
+        value => resolved.value.clone().unwrap_or_else(|| raw.trim().to_string()),
+        effective => resolved.value,
+        source => resolved.source.as_str(),
+        locked => matches!(resolved.source, Source::Env | Source::Apply),
+        var => TELEGRAM_ENV,
+        env_value => env.get(TELEGRAM_ENV).unwrap_or_default().trim(),
+        path => TELEGRAM_PATH,
     }
 }
 
@@ -273,6 +372,103 @@ pub(super) async fn toggle(
         "debug booking switched"
     );
     Redirect::to(&format!("{back}?debug={}", if now { "on" } else { "off" })).into_response()
+}
+
+#[derive(Deserialize)]
+pub(super) struct TelegramForm {
+    _csrf: Option<String>,
+    #[serde(default)]
+    debug_booking_telegram: String,
+}
+
+/// `POST /dashboard/admin/ton/debug-booking/telegram`: store the guest
+/// Telegram username the test booking page prefills (a `ton_settings` row
+/// owned by `panel`, audited; blank removes it), checked like the booking
+/// form's field, unless the environment or `config apply` owns it. Back to
+/// the TON page with `?debug=tg-saved|tg-same|tg-invalid|tg-locked`.
+pub(super) async fn save_telegram(
+    State(state): State<Arc<AppState>>,
+    admin: crate::auth::AdminUser,
+    viewer: crate::auth::OptionalAuthUser,
+    headers: HeaderMap,
+    Form(form): Form<TelegramForm>,
+) -> Response {
+    use crate::ton::settings::{self as ts, Owner, Source};
+    use ton_pay::settings as stored;
+    if let Err(resp) = verify_csrf_token(&headers, &form._csrf) {
+        return resp;
+    }
+    if viewer.impersonation.is_some() {
+        return impersonating(admin.lang);
+    }
+    let back = |notice: &str| {
+        Redirect::to(&format!(
+            "{}?debug={notice}#debug-block",
+            super::ton_pay::settings_page::PATH
+        ))
+        .into_response()
+    };
+    let Some(key) = ts::by_var(TELEGRAM_ENV) else {
+        return internal_error_response("debug booking: telegram key", &"missing");
+    };
+    let text = match ts::to_env(key, &form.debug_booking_telegram) {
+        Ok(t) => t,
+        Err(_) => return back("tg-invalid"),
+    };
+    let env = state.ton.env();
+    let env = |k: &str| env.get(k);
+    let mut tx = match state.pool.begin().await {
+        Ok(tx) => tx,
+        Err(e) => return internal_error_response("debug booking: begin", &e),
+    };
+    let before = match ton_pay::store::load_settings(&mut tx).await {
+        Ok(db) => db,
+        Err(e) => return internal_error_response("debug booking: read", &e),
+    };
+    if matches!(
+        ts::source(&env, &before, TELEGRAM_ENV),
+        Source::Env | Source::Apply
+    ) {
+        let _ = tx.rollback().await;
+        tracing::info!(
+            target: "calrs::audit",
+            actor = %admin.user.email,
+            "debug booking telegram username refused: locked"
+        );
+        return back("tg-locked");
+    }
+    let mut next = before.clone();
+    match text {
+        Some(t) => next.set(TELEGRAM_ENV, t, Owner::Panel),
+        None => next.remove(TELEGRAM_ENV),
+    }
+    let changes = stored::diff(&before, &next);
+    if changes.is_empty() {
+        let _ = tx.rollback().await;
+        return back("tg-same");
+    }
+    if let Err(e) = stored::write(
+        &mut tx,
+        &changes,
+        Some(&admin.user.id),
+        Owner::Panel,
+        Utc::now(),
+    )
+    .await
+    {
+        return internal_error_response("debug booking: write", &e);
+    }
+    if let Err(e) = tx.commit().await {
+        return internal_error_response("debug booking: commit", &e);
+    }
+    stored::log_changes(&changes, Some(&admin.user.id), Owner::Panel);
+    tracing::info!(
+        target: "calrs::audit",
+        actor = %admin.user.email,
+        set = next.value(TELEGRAM_ENV).is_some(),
+        "debug booking telegram username saved"
+    );
+    back("tg-saved")
 }
 
 // --- the TEST badge ---------------------------------------------------------
@@ -447,19 +643,31 @@ async fn next_slots(
         .collect()
 }
 
-/// The admin's test bookings, newest first, for the page.
+/// One test booking as the page lists it.
+#[derive(sqlx::FromRow)]
+struct ListedRow {
+    id: String,
+    title: String,
+    start_at: String,
+    status: String,
+    own_chat: i64,
+    invoice: Option<String>,
+    pay_token: Option<String>,
+    debug_timing: Option<String>,
+    expires_at: Option<String>,
+    settle_by: Option<String>,
+    renewals: Option<i64>,
+    renewals_max: Option<i64>,
+}
+
+/// The admin's test bookings, newest first, for the page: status, invoice,
+/// the timing it was made with and, while its invoice is open, its
+/// deadlines (unix seconds, for the page's countdown).
 async fn listed(pool: &SqlitePool, user_id: &str, tz: Tz, lang: &str) -> Vec<minijinja::Value> {
-    #[allow(clippy::type_complexity)]
-    let rows: Vec<(
-        String,
-        String,
-        String,
-        String,
-        i64,
-        Option<String>,
-        Option<String>,
-    )> = sqlx::query_as(
-        "SELECT b.id, et.title, b.start_at, b.status, d.telegram_own_chat, i.status, i.pay_token
+    let rows: Vec<ListedRow> = sqlx::query_as(
+        "SELECT b.id, et.title, b.start_at, b.status, d.telegram_own_chat AS own_chat,
+                i.status AS invoice, i.pay_token, i.debug_timing, i.expires_at, i.settle_by,
+                i.renewals, i.renewals_max
                FROM debug_bookings d
                JOIN bookings b ON b.id = d.booking_id
                JOIN event_types et ON et.id = b.event_type_id
@@ -477,27 +685,67 @@ async fn listed(pool: &SqlitePool, user_id: &str, tz: Tz, lang: &str) -> Vec<min
         Vec::new()
     });
     rows.into_iter()
-        .map(
-            |(id, title, start_at, status, own_chat, invoice, pay_token)| {
-                let when = crate::booking_time::local(&start_at, Tz::UTC, tz)
-                    .map(|t| t.format("%Y-%m-%d %H:%M").to_string())
-                    .unwrap_or(start_at);
-                let standing = matches!(status.as_str(), "pending" | "confirmed");
-                context! {
-                    id => id,
-                    title => title,
-                    when => when,
-                    status_label => status_label(lang, &status),
-                    status => status,
-                    invoice_label => invoice.as_deref().map(|i| invoice_label(lang, i)),
-                    invoice => invoice,
-                    // The payment page while the booking stands (the admin's own).
-                    pay_url => pay_token.filter(|_| standing).map(|t| format!("/booking/pay/{t}")),
-                    own_chat => own_chat != 0,
-                }
-            },
-        )
+        .map(|r| {
+            let when = crate::booking_time::local(&r.start_at, Tz::UTC, tz)
+                .map(|t| t.format("%Y-%m-%d %H:%M").to_string())
+                .unwrap_or(r.start_at);
+            let standing = matches!(r.status.as_str(), "pending" | "confirmed");
+            let open = r.invoice.as_deref() == Some("open") && r.status == "pending";
+            let unix = |s: &Option<String>| {
+                s.as_deref()
+                    .and_then(ton_pay::parse_stamp)
+                    .map(|t| t.timestamp())
+            };
+            let local = |s: &Option<String>| {
+                s.as_deref()
+                    .and_then(ton_pay::parse_stamp)
+                    .map(|t| t.with_timezone(&tz).format("%H:%M:%S").to_string())
+            };
+            let timing = r
+                .debug_timing
+                .as_deref()
+                .and_then(crate::ton::deadlines::DebugTiming::parse);
+            context! {
+                id => r.id,
+                title => r.title,
+                when => when,
+                status_label => status_label(lang, &r.status),
+                status => r.status,
+                invoice_label => r.invoice.as_deref().map(|i| invoice_label(lang, i)),
+                invoice => r.invoice,
+                // The payment page while the booking stands (the admin's own).
+                pay_url => r.pay_token.filter(|_| standing).map(|t| format!("/booking/pay/{t}")),
+                own_chat => r.own_chat != 0,
+                timing => r.invoice.is_some().then(|| timing_label(lang, timing)),
+                fast => timing.is_some(),
+                // Still moving: the page refreshes the list while one is.
+                // Pending whatever the invoice says: an expired (or paid)
+                // invoice leaves the booking pending until calrs's sweep
+                // (or the confirmation) moves it, which the owner watches.
+                live => r.status == "pending",
+                open => open,
+                expires_unix => open.then(|| unix(&r.expires_at)).flatten(),
+                settle_unix => open.then(|| unix(&r.settle_by)).flatten(),
+                expires_local => local(&r.expires_at),
+                settle_local => local(&r.settle_by),
+                renewals => r.renewals.unwrap_or(0),
+                renewals_max => r.renewals_max.unwrap_or(0),
+            }
+        })
         .collect()
+}
+
+/// A test booking's timing as the page shows it.
+fn timing_label(lang: &str, timing: Option<crate::ton::deadlines::DebugTiming>) -> String {
+    let Some(t) = timing else {
+        return crate::i18n::translate(lang, "dbg-timing-site", None);
+    };
+    let mut args = fluent_bundle::FluentArgs::new();
+    args.set("window", t.window_min);
+    args.set("renewals", t.renewals_max);
+    args.set("renew", t.renew_window_min);
+    args.set("grace", t.grace_min);
+    crate::i18n::translate(lang, "dbg-timing-summary", Some(&args))
 }
 
 /// A booking status as the page shows it.
@@ -564,7 +812,61 @@ struct Kept {
     email: Option<String>,
     telegram: Option<String>,
     notes: Option<String>,
-    own_chat: bool,
+    /// The Telegram box as posted; `None`: ticked whenever it can be.
+    own_chat: Option<bool>,
+    timing: TimingForm,
+}
+
+/// "Timing for this test booking", as the form posts it: `timing` is
+/// `normal` (the site's settings), `fast` (`DebugTiming::FAST`) or
+/// `custom` (`t_window`, `t_renew_window`, `t_renewals`; a blank one is the
+/// fast value).
+#[derive(Clone, Debug, Default, Deserialize)]
+pub(super) struct TimingForm {
+    #[serde(default)]
+    timing: Option<String>,
+    #[serde(default)]
+    t_window: Option<String>,
+    #[serde(default)]
+    t_renew_window: Option<String>,
+    #[serde(default)]
+    t_renewals: Option<String>,
+}
+
+impl TimingForm {
+    /// The test booking's own timing: `Ok(None)` for the site's settings,
+    /// `Err` for an unknown choice or a custom value out of bounds.
+    pub(crate) fn timing(&self) -> Result<Option<crate::ton::deadlines::DebugTiming>, ()> {
+        use crate::ton::deadlines::DebugTiming;
+        match self.timing.as_deref().map(str::trim).unwrap_or("") {
+            "" | "normal" => Ok(None),
+            "fast" => Ok(Some(DebugTiming::FAST)),
+            "custom" => {
+                let num = |v: &Option<String>, fast: i64| match v.as_deref().map(str::trim) {
+                    None | Some("") => Ok(fast),
+                    Some(v) => v.parse::<i64>().map_err(|_| ()),
+                };
+                let f = DebugTiming::FAST;
+                DebugTiming::custom(
+                    num(&self.t_window, f.window_min)?,
+                    num(&self.t_renew_window, f.renew_window_min)?,
+                    num(&self.t_renewals, f.renewals_max)?,
+                )
+                .map(Some)
+                .ok_or(())
+            }
+            _ => Err(()),
+        }
+    }
+
+    /// The choice to show again (`normal` unless one was posted).
+    fn choice(&self) -> &str {
+        match self.timing.as_deref().map(str::trim) {
+            Some("fast") => "fast",
+            Some("custom") => "custom",
+            _ => "normal",
+        }
+    }
 }
 
 /// The 403 for an admin who is impersonating someone.
@@ -645,7 +947,7 @@ async fn render(
     let selected = chosen(&types, kept.et.as_deref());
     let telegram_on = crate::telegram::enabled();
     let own_chat = crate::telegram::store::user_chat(&state.pool, &user.id).await;
-    let own_username = own_chat.as_ref().and_then(|(u, _)| u.clone());
+    let prefill = prefill_telegram(state, &user.id).await;
     let emails = own_emails(user);
     let email = kept
         .email
@@ -657,7 +959,18 @@ async fn render(
                 .filter(|b| emails.contains(b))
                 .unwrap_or_else(|| user.email.clone())
         });
-    let telegram = kept.telegram.clone().or_else(|| own_username.clone());
+    // What was posted, else the linked chat's username, else the setting.
+    let telegram = kept
+        .telegram
+        .clone()
+        .or_else(|| prefill.as_ref().map(|(u, _)| u.clone()));
+    let telegram_from = match (&kept.telegram, &prefill) {
+        (None, Some((_, TelegramFrom::OwnChat))) => Some("chat"),
+        (None, Some((_, TelegramFrom::Setting))) => Some("setting"),
+        _ => None,
+    };
+    let own_chat_ok = telegram_on && own_chat.is_some();
+    let fast = crate::ton::deadlines::DebugTiming::FAST;
     let (selected_ctx, slots) = match selected {
         Some(t) => {
             let slots = next_slots(state, &user.id, &t.id, tz).await;
@@ -740,11 +1053,30 @@ async fn render(
             emails => emails,
             email => email,
             telegram => telegram,
+            telegram_from => telegram_from,
             notes => kept.notes.unwrap_or_else(|| crate::i18n::translate(lang, "dbg-notes-default", None)),
             telegram_on => telegram_on,
             own_chat_linked => own_chat.is_some(),
             own_chat_label => own_chat_label,
-            own_chat_checked => kept.own_chat,
+            // Ticked by default whenever it can be (the owner's choice).
+            own_chat_checked => own_chat_ok && kept.own_chat.unwrap_or(true),
+            timing => kept.timing.choice(),
+            t_window => kept.timing.t_window.clone().filter(|v| !v.trim().is_empty()),
+            t_renew_window => kept.timing.t_renew_window.clone().filter(|v| !v.trim().is_empty()),
+            t_renewals => kept.timing.t_renewals.clone().filter(|v| !v.trim().is_empty()),
+            fast => context! {
+                window => fast.window_min,
+                renew => fast.renew_window_min,
+                renewals => fast.renewals_max,
+                grace => fast.grace_min,
+                margin => fast.margin_min,
+            },
+            timing_bounds => context! {
+                window_min => crate::ton::deadlines::DEBUG_WINDOW_MIN,
+                window_max => crate::ton::deadlines::DEBUG_WINDOW_MAX,
+                renew_max => crate::ton::deadlines::DEBUG_RENEW_WINDOW_MAX,
+                renewals_max => crate::ton::deadlines::DEBUG_RENEWALS_MAX,
+            },
             has_username => user.username.is_some(),
             captcha_on => state.captcha_config.read().await.is_some(),
             ton_on => state.ton.get().is_some(),
@@ -774,6 +1106,8 @@ pub(super) struct DebugForm {
     notes: Option<String>,
     #[serde(default)]
     own_chat: Option<String>,
+    #[serde(flatten)]
+    timing: TimingForm,
 }
 
 impl DebugForm {
@@ -791,7 +1125,8 @@ impl DebugForm {
             email: Some(self.email.clone()),
             telegram: self.telegram.clone(),
             notes: self.notes.clone(),
-            own_chat: self.own_chat(),
+            own_chat: Some(self.own_chat()),
+            timing: self.timing.clone(),
         }
     }
 }
@@ -894,6 +1229,19 @@ pub(super) async fn book(
         )
         .await;
     }
+    // The test booking's own invoice timing (only priced types have one).
+    let Ok(timing) = form.timing.timing() else {
+        let kept = refuse("dbg-err-timing");
+        return render(
+            &state,
+            &admin,
+            kept,
+            None,
+            StatusCode::BAD_REQUEST,
+            &client_ip,
+        )
+        .await;
+    };
 
     // A private or internal type: a one-time invite for the admin's own
     // address, as the owner would make one in the dashboard.
@@ -951,14 +1299,19 @@ pub(super) async fn book(
     let since = (Utc::now() - Duration::seconds(1))
         .format("%Y-%m-%d %H:%M:%S")
         .to_string();
-    let resp = handle_booking_for_user(
+    let call = handle_booking_for_user(
         State(state.clone()),
         headers.clone(),
         Path((username, et.slug.clone())),
         Query(EmbedParams::default()),
         Form(guest_form),
-    )
-    .await;
+    );
+    // The timing reaches the invoice through a task-local around this call
+    // only: nothing a guest posts can set it.
+    let resp = match timing {
+        Some(t) => ton_pay::invoice::with_debug_timing(t, call).await,
+        None => call.await,
+    };
 
     // Only the status and the redirect are read: a `&Response` held across
     // the queries would make this handler's future not `Send`.
@@ -990,6 +1343,7 @@ pub(super) async fn book(
             event_type = %et.slug,
             slot = %form.slot,
             status = status.as_u16(),
+            timing = timing.map(|t| t.text()).as_deref().unwrap_or("site"),
             "debug booking refused by the booking path"
         );
         return resp;
@@ -1026,6 +1380,7 @@ pub(super) async fn book(
         slot = %form.slot,
         telegram_own_chat_asked = own_chat,
         telegram_own_chat = routed,
+        timing = timing.map(|t| t.text()).as_deref().unwrap_or("site"),
         "debug booking created"
     );
     if own_chat && !routed {

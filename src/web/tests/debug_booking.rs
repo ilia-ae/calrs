@@ -731,9 +731,14 @@ async fn the_switch_on_the_ton_page_is_live_and_audited() {
     assert!(block.contains(&format!(r#"action="{TOGGLE_PATH}""#)));
     assert!(block.contains(r#"name="on" value="1""#));
     assert!(block.contains(r#"role="switch" aria-checked="false""#));
+    // A plain card on the TON page: the hazard frame is only on the test page itself.
     assert!(
-        page.contains(r#"class="card dbg-hazard" id="debug-block""#),
-        "styled as debug"
+        page.contains(r#"class="card" id="debug-block""#),
+        "a plain card"
+    );
+    assert!(
+        !block.contains("dbg-hazard") && !block.contains("dbg-banner"),
+        "{block}"
     );
     assert!(!block.contains("disabled"), "not locked");
     assert!(!block.contains(r#"id="debug-open""#));
@@ -1020,7 +1025,7 @@ fn the_texts_around_the_switch_say_what_it_does() {
         .expect("the site.ton paragraph");
     assert!(
         para.contains(
-            "(except `debug_booking`, which is read on every request and takes effect at once)"
+            "(except `debug_booking` and `debug_booking_telegram`, which are read on every request and take effect at once)"
         ),
         "{para}"
     );
@@ -1028,4 +1033,574 @@ fn the_texts_around_the_switch_say_what_it_does() {
     let ru = crate::i18n::translate("ru", "dbg-no-slots", None);
     assert_eq!(ru, "В ближайший 31 день нет свободного времени.");
     assert!(!ru.contains("ближайшие 31 день"));
+}
+
+// --- the prefilled guest Telegram username ------------------------------------
+
+/// The username's row: (value, owner).
+async fn telegram_row(e: &Env) -> Option<(String, String)> {
+    sqlx::query_as(
+        "SELECT value, owner FROM ton_settings WHERE key = 'CALRS_DEBUG_BOOKING_TELEGRAM'",
+    )
+    .fetch_optional(&e.pool)
+    .await
+    .unwrap()
+}
+
+fn telegram_value(page: &str) -> &str {
+    page.split(r#"name="telegram" value=""#)
+        .nth(1)
+        .and_then(|rest| rest.split('"').next())
+        .expect("the Telegram field")
+}
+
+fn telegram_from(page: &str) -> &str {
+    page.split(r#"id="dbg-telegram-from" data-from=""#)
+        .nth(1)
+        .and_then(|rest| rest.split('"').next())
+        .expect("where the username came from")
+}
+
+/// The owner's "I asked you to fill it in": the guest Telegram username is
+/// the linked chat's username, else the stored setting (the Debug block of
+/// the TON page, audited; `config apply` locks it), else empty.
+#[tokio::test]
+async fn the_guest_telegram_username_is_the_chats_then_the_settings() {
+    use crate::web::debug_booking::TELEGRAM_PATH;
+    let e = env_on().await;
+    crate::telegram::store::save_event_type_mode(&e.pool, &e.et_id, "required")
+        .await
+        .unwrap();
+    let admin = e.session().await;
+    // Nothing known: empty, and the page says where to set one.
+    let (_, page) = e.get_as(PATH, &admin).await;
+    assert_eq!(telegram_value(&page), "");
+    assert_eq!(telegram_from(&page), "");
+    assert!(page.contains(&crate::i18n::translate("en", "dbg-telegram-none", None)));
+    assert!(page.contains(r#"name="telegram" value="" maxlength="64" autocomplete="off""#));
+
+    // Set in the Debug block, as the booking form takes it.
+    let resp = e
+        .post_as(
+            TELEGRAM_PATH,
+            &admin,
+            &format!("_csrf={CSRF}&debug_booking_telegram=%40getmonolith"),
+        )
+        .await;
+    assert_eq!(resp.status(), axum::http::StatusCode::SEE_OTHER);
+    assert_eq!(
+        location(&resp),
+        format!("{TON_PAGE}?debug=tg-saved#debug-block")
+    );
+    assert_eq!(
+        telegram_row(&e).await,
+        Some(("getmonolith".into(), "panel".into()))
+    );
+    let audited: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM ton_settings_audit WHERE key = 'CALRS_DEBUG_BOOKING_TELEGRAM' AND source = 'panel'",
+    )
+    .fetch_one(&e.pool)
+    .await
+    .unwrap();
+    assert_eq!(audited, 1);
+    let (_, page) = e.get_as(PATH, &admin).await;
+    assert_eq!(telegram_value(&page), "getmonolith");
+    assert_eq!(telegram_from(&page), "setting");
+    let (_, ton) = e.get_as(TON_PAGE, &admin).await;
+    let block = debug_block(&ton);
+    assert!(
+        block.contains(r#"name="debug_booking_telegram" value="getmonolith""#),
+        "{block}"
+    );
+    // The same again, or not a username: nothing changes.
+    let same = e
+        .post_as(
+            TELEGRAM_PATH,
+            &admin,
+            &format!("_csrf={CSRF}&debug_booking_telegram=getmonolith"),
+        )
+        .await;
+    assert!(location(&same).contains("debug=tg-same"));
+    for bad in ["abc", "get+monolith", "1getmonolith"] {
+        let resp = e
+            .post_as(
+                TELEGRAM_PATH,
+                &admin,
+                &format!("_csrf={CSRF}&debug_booking_telegram={bad}"),
+            )
+            .await;
+        assert!(location(&resp).contains("debug=tg-invalid"), "{bad}");
+    }
+    assert_eq!(telegram_row(&e).await.unwrap().0, "getmonolith");
+
+    // A linked chat's username comes first.
+    sqlx::query(
+        "INSERT INTO telegram_user_chats (user_id, chat_id, telegram_username)
+         SELECT id, ?, 'host_tg' FROM users WHERE username = 'testuser'",
+    )
+    .bind(HOST_CHAT)
+    .execute(&e.pool)
+    .await
+    .unwrap();
+    let (_, page) = e.get_as(PATH, &admin).await;
+    assert_eq!(telegram_value(&page), "host_tg");
+    assert_eq!(telegram_from(&page), "chat");
+    // A chat without a username: the setting again.
+    sqlx::query("UPDATE telegram_user_chats SET telegram_username = NULL")
+        .execute(&e.pool)
+        .await
+        .unwrap();
+    let (_, page) = e.get_as(PATH, &admin).await;
+    assert_eq!(telegram_value(&page), "getmonolith");
+    // What was posted wins on a refused POST.
+    let resp = e
+        .post_as(
+            PATH,
+            &admin,
+            &form("&telegram=typed_name").replace("et=test-meeting", "et=nope"),
+        )
+        .await;
+    assert_eq!(resp.status(), axum::http::StatusCode::BAD_REQUEST);
+    let page = unescape(&body_string(resp).await);
+    assert_eq!(telegram_value(&page), "typed_name");
+
+    // Owned by config apply: locked on the TON page, refused by its form.
+    sqlx::query(
+        "UPDATE ton_settings SET owner = 'apply' WHERE key = 'CALRS_DEBUG_BOOKING_TELEGRAM'",
+    )
+    .execute(&e.pool)
+    .await
+    .unwrap();
+    let resp = e
+        .post_as(
+            TELEGRAM_PATH,
+            &admin,
+            &format!("_csrf={CSRF}&debug_booking_telegram="),
+        )
+        .await;
+    assert!(location(&resp).contains("debug=tg-locked"));
+    assert_eq!(
+        telegram_row(&e).await,
+        Some(("getmonolith".into(), "apply".into()))
+    );
+    let (_, ton) = e.get_as(TON_PAGE, &admin).await;
+    let block = debug_block(&ton);
+    assert!(block.contains(r#"id="debug-telegram-locked""#), "{block}");
+    assert!(block.contains("site.ton.debug_booking_telegram"));
+    let (_, page) = e.get_as(PATH, &admin).await;
+    assert_eq!(telegram_value(&page), "getmonolith");
+
+    // Blank on the page's own row: removed (none again).
+    sqlx::query(
+        "UPDATE ton_settings SET owner = 'panel' WHERE key = 'CALRS_DEBUG_BOOKING_TELEGRAM'",
+    )
+    .execute(&e.pool)
+    .await
+    .unwrap();
+    let resp = e
+        .post_as(
+            TELEGRAM_PATH,
+            &admin,
+            &format!("_csrf={CSRF}&debug_booking_telegram=+"),
+        )
+        .await;
+    assert!(location(&resp).contains("debug=tg-saved"));
+    assert_eq!(telegram_row(&e).await, None);
+    // CSRF, and never while impersonating: the same rules as the switch.
+    let resp = e
+        .app()
+        .oneshot(post_form(
+            TELEGRAM_PATH,
+            &admin,
+            CSRF,
+            "_csrf=wrong&debug_booking_telegram=getmonolith",
+        ))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), axum::http::StatusCode::FORBIDDEN);
+    assert_eq!(telegram_row(&e).await, None);
+    let audited = telegram_audit_count(&e).await;
+    let (member_id, _) = other_user(&e.pool, "imp@example.com", "user", "imp").await;
+    let req = axum::http::Request::builder()
+        .method("POST")
+        .uri(TELEGRAM_PATH)
+        .header(
+            "cookie",
+            format!("__Host-calrs_session={admin}; __Host-calrs_csrf={CSRF}; __Host-calrs_impersonate={member_id}"),
+        )
+        .header("content-type", "application/x-www-form-urlencoded")
+        .body(Body::from(format!(
+            "_csrf={CSRF}&debug_booking_telegram=getmonolith"
+        )))
+        .unwrap();
+    let resp = e.app().oneshot(req).await.unwrap();
+    assert_eq!(
+        resp.status(),
+        axum::http::StatusCode::FORBIDDEN,
+        "impersonating"
+    );
+    assert_eq!(telegram_row(&e).await, None, "nothing stored");
+    assert_eq!(telegram_audit_count(&e).await, audited, "nothing audited");
+}
+
+async fn telegram_audit_count(e: &Env) -> i64 {
+    sqlx::query_scalar(
+        "SELECT COUNT(*) FROM ton_settings_audit WHERE key = 'CALRS_DEBUG_BOOKING_TELEGRAM'",
+    )
+    .fetch_one(&e.pool)
+    .await
+    .unwrap()
+}
+
+/// "That should basically always be on": the Telegram box is ticked
+/// whenever it can be (Telegram on and a chat linked), and can be unticked.
+#[tokio::test]
+async fn the_own_chat_box_is_ticked_by_default() {
+    let _tg = fake::install_fake("ilia_test_bot").await;
+    let _lock = crate::test_support::ENV_LOCK.lock().await;
+    let _guard = crate::test_support::EnvGuard::new();
+    std::env::set_var("CALRS_BASE_URL", BASE);
+    let e = env_on().await;
+    let admin = e.session().await;
+    // No chat: not ticked, and disabled.
+    let (_, page) = e.get_as(PATH, &admin).await;
+    assert!(page.contains(r#"id="dbg-own-chat" disabled"#), "no chat");
+    sqlx::query(
+        "INSERT INTO telegram_user_chats (user_id, chat_id, telegram_username)
+         SELECT id, ?, 'host_tg' FROM users WHERE username = 'testuser'",
+    )
+    .bind(HOST_CHAT)
+    .execute(&e.pool)
+    .await
+    .unwrap();
+    let (_, page) = e.get_as(PATH, &admin).await;
+    assert!(
+        page.contains(r#"name="own_chat" value="1" id="dbg-own-chat" checked>"#),
+        "ticked by default"
+    );
+    // Unticked on a refused POST: shown unticked again.
+    let resp = e
+        .post_as(
+            PATH,
+            &admin,
+            &form("").replace("et=test-meeting", "et=nope"),
+        )
+        .await;
+    let page = unescape(&body_string(resp).await);
+    assert!(page.contains(r#"name="own_chat" value="1" id="dbg-own-chat">"#));
+    // Ticked on a refused POST: ticked again.
+    let resp = e
+        .post_as(
+            PATH,
+            &admin,
+            &form("&own_chat=1").replace("et=test-meeting", "et=nope"),
+        )
+        .await;
+    let page = unescape(&body_string(resp).await);
+    assert!(page.contains(r#"id="dbg-own-chat" checked>"#));
+}
+
+// --- the timing of a test booking ---------------------------------------------
+
+/// (debug_timing, created_at, expires_at, settle_by, hard_deadline,
+/// renewals, renewals_max) of a booking's invoice.
+type Timing = (
+    Option<String>,
+    chrono::DateTime<Utc>,
+    chrono::DateTime<Utc>,
+    chrono::DateTime<Utc>,
+    chrono::DateTime<Utc>,
+    i64,
+    i64,
+);
+
+async fn timing_of(e: &Env, bid: &str) -> Timing {
+    let (t, c, x, s, h, r, m): (Option<String>, String, String, String, String, i64, i64) =
+        sqlx::query_as(
+            "SELECT debug_timing, created_at, expires_at, settle_by, hard_deadline, renewals, renewals_max
+             FROM ton_invoices WHERE booking_id = ?",
+        )
+        .bind(bid)
+        .fetch_one(&e.pool)
+        .await
+        .unwrap();
+    let p = |s: &str| crate::web::ton_pay::parse_stamp(s).unwrap();
+    (t, p(&c), p(&x), p(&s), p(&h), r, m)
+}
+
+/// The debug page list's row for one booking.
+fn list_row<'a>(page: &'a str, bid: &str) -> &'a str {
+    page.split(&format!("data-booking=\"{bid}\""))
+        .nth(1)
+        .expect("the booking's row")
+        .split("</tr>")
+        .next()
+        .unwrap()
+}
+
+fn renewed_alerts(e: &Env) -> usize {
+    e.sink
+        .all()
+        .iter()
+        .filter(|a| matches!(a, TonAlert::Renewed { .. }))
+        .count()
+}
+
+/// The owner's test, in minutes: a "Fast test" booking's window ends, it
+/// is renewed once (the guest is asked to pay again), ends again, the
+/// invoice expires and calrs releases the booking; never paid by itself.
+/// A guest's booking made meanwhile keeps the site's timing throughout.
+#[tokio::test]
+async fn a_fast_test_booking_is_renewed_then_cancelled_unpaid() {
+    use crate::ton::deadlines::DebugTiming;
+    use crate::web::ton_pay::stamp;
+    let e = env_on().await;
+    let (guest, _) = e.book_http("guest@test.com", "11:00", "198.51.100.9").await;
+    let admin = e.session().await;
+    let resp = e.post_as(PATH, &admin, &form("&timing=fast")).await;
+    assert_eq!(resp.status(), axum::http::StatusCode::SEE_OTHER);
+    let (bid, _, _) = e.debug_rows().await.pop().unwrap();
+    let (text, created, expires, settle, hard, renewals, max) = timing_of(&e, &bid).await;
+    assert_eq!(text.as_deref(), Some(DebugTiming::FAST.text().as_str()));
+    assert_eq!(expires - created, Duration::minutes(3));
+    assert_eq!(settle - expires, Duration::minutes(1));
+    assert_eq!(hard - settle, Duration::minutes(10));
+    assert_eq!((renewals, max), (0, 1), "the site allows none here");
+    assert_eq!(pending_expires_at(&e.pool, &bid).await, Some(stamp(hard)));
+    let g = timing_of(&e, &guest).await;
+    assert_eq!(g.0, None);
+    assert_eq!(g.2 - g.1, Duration::minutes(30), "the site's window");
+
+    // The page shows the timing and the live deadline.
+    let (_, page) = e.get_as(PATH, &admin).await;
+    let row = list_row(&page, &bid);
+    assert!(row.contains(r#"data-live="1""#), "{row}");
+    assert!(row.contains(&format!("data-expires=\"{}\"", expires.timestamp())));
+    assert!(row.contains(&format!("data-settle=\"{}\"", settle.timestamp())));
+    assert!(row.contains("test: 3 min, renewals 1 × 3 min"), "{row}");
+    assert!(row.contains("renewed 0 of 1"), "{row}");
+
+    // The window ends: renewed for 3 more minutes, at the next step.
+    assert_eq!(e.step(expires - Duration::seconds(1)).await.renewed, 0);
+    let at = expires + Duration::seconds(5);
+    e.chain.height(at.timestamp() as u64);
+    let r = e.step(at).await;
+    assert_eq!((r.renewed, r.expired, r.confirmed), (1, 0, 0));
+    let (_, _, expires2, settle2, hard2, renewals, _) = timing_of(&e, &bid).await;
+    assert_eq!(expires2, at + Duration::minutes(3));
+    assert_eq!(settle2, at + Duration::minutes(4));
+    assert_eq!(hard2, at + Duration::minutes(14));
+    assert_eq!(renewals, 1);
+    assert_eq!(pending_expires_at(&e.pool, &bid).await, Some(stamp(hard2)));
+    // Asked to pay again once the indexer has read a minute past it (the
+    // debug margin), not the site's three.
+    assert_eq!(renewed_alerts(&e), 0);
+    let later = at + Duration::seconds(61);
+    e.chain.height(later.timestamp() as u64);
+    e.step(later).await;
+    assert_eq!(renewed_alerts(&e), 1);
+
+    // It ends again: no renewal left; expired a minute after settle_by.
+    let over = expires2 + Duration::seconds(5);
+    e.chain.height(over.timestamp() as u64);
+    let r = e.step(over).await;
+    assert_eq!((r.renewed, r.expired), (0, 0));
+    let end = settle2 + Duration::minutes(1);
+    e.chain.height(end.timestamp() as u64);
+    let r = e.step(end).await;
+    assert_eq!((r.expired, r.confirmed), (1, 0));
+    assert_eq!(e.inv(&bid).await.status, "expired");
+    assert_eq!(pending_expires_at(&e.pool, &bid).await, Some(stamp(end)));
+    // Expired but still pending until the sweep: the list keeps refreshing,
+    // so the owner sees the booking declined without reloading.
+    assert_eq!(booking_status(&e.pool, &bid).await, "pending");
+    let (_, page) = e.get_as(PATH, &admin).await;
+    let row = list_row(&page, &bid);
+    assert!(row.contains(r#"data-live="1""#), "{row}");
+    assert!(
+        !row.contains("data-expires="),
+        "no countdown once expired: {row}"
+    );
+    // calrs's own sweep cancels it (declined) and frees the time.
+    sweep_pending_requests(&e.pool, &[0u8; 32], end + Duration::seconds(30)).await;
+    assert_eq!(booking_status(&e.pool, &bid).await, "declined");
+    let (_, page) = e.get_as(PATH, &admin).await;
+    let row = list_row(&page, &bid);
+    assert!(row.contains(r#"data-live="0""#), "settled: {row}");
+    let resp = e.post_as(PATH, &admin, &form("&timing=fast")).await;
+    assert_eq!(
+        resp.status(),
+        axum::http::StatusCode::SEE_OTHER,
+        "the time is free again"
+    );
+
+    // The guest's booking: untouched, the site's window still running.
+    assert_eq!(booking_status(&e.pool, &guest).await, "pending");
+    let g2 = timing_of(&e, &guest).await;
+    assert_eq!((g2.2, g2.5), (g.2, 0));
+    assert_eq!(e.inv(&guest).await.status, "open");
+}
+
+/// Custom minutes are checked against their bounds; "Normal" (or nothing)
+/// is the site's timing, stored as none.
+#[tokio::test]
+async fn custom_timing_is_bounded_and_normal_is_the_sites() {
+    use crate::ton::deadlines::DebugTiming;
+    let e = env_on().await;
+    let admin = e.session().await;
+    for bad in [
+        "&timing=custom&t_window=1",
+        "&timing=custom&t_renew_window=1441",
+        "&timing=custom&t_renewals=6",
+        "&timing=custom&t_window=ten",
+        "&timing=slow",
+    ] {
+        let resp = e.post_as(PATH, &admin, &form(bad)).await;
+        assert_eq!(resp.status(), axum::http::StatusCode::BAD_REQUEST, "{bad}");
+        let page = unescape(&body_string(resp).await);
+        assert!(page.contains(&crate::i18n::translate("en", "dbg-err-timing", None)));
+        assert!(e.debug_rows().await.is_empty(), "{bad}");
+    }
+    let resp = e
+        .post_as(
+            PATH,
+            &admin,
+            &form("&timing=custom&t_window=5&t_renew_window=4&t_renewals=2"),
+        )
+        .await;
+    assert_eq!(resp.status(), axum::http::StatusCode::SEE_OTHER);
+    let (bid, _, _) = e.debug_rows().await.pop().unwrap();
+    let (text, created, expires, _, _, _, max) = timing_of(&e, &bid).await;
+    let want = DebugTiming::custom(5, 4, 2).unwrap();
+    assert_eq!(text.as_deref(), Some(want.text().as_str()));
+    assert_eq!((expires - created, max), (Duration::minutes(5), 2));
+
+    // Normal: the site's 30 minutes and no renewal (as configured here).
+    sqlx::query("UPDATE ton_invoices SET status = 'closed'")
+        .execute(&e.pool)
+        .await
+        .unwrap();
+    let body = form("&timing=normal").replace("T10%3A00", "T11%3A00");
+    let resp = e.post_as(PATH, &admin, &body).await;
+    assert_eq!(resp.status(), axum::http::StatusCode::SEE_OTHER);
+    let rows = e.debug_rows().await;
+    let normal = rows.iter().find(|r| r.0 != bid).unwrap().0.clone();
+    let (text, created, expires, _, _, _, max) = timing_of(&e, &normal).await;
+    assert_eq!(text, None);
+    assert_eq!((expires - created, max), (Duration::minutes(30), 0));
+    let (_, page) = e.get_as(PATH, &admin).await;
+    assert!(page.contains(r#"id="dbg-timing-normal" checked"#));
+    assert!(page.contains("site settings"));
+}
+
+/// Nothing a guest posts sets a timing, and a timing on an invoice whose
+/// booking is not a marked test booking (a hand edit) is never honoured.
+#[tokio::test]
+async fn a_guest_cannot_get_a_debug_timing() {
+    use crate::ton::deadlines::DebugTiming;
+    use crate::web::ton_pay::store;
+    let e = env_on().await;
+    let fast = urlencoding::encode(&DebugTiming::FAST.text()).into_owned();
+    let resp = e
+        .post_guest(
+            "/u/testuser/test-meeting/book",
+            &format!(
+                "&date={}&time=10:00&name=Guest&email=guest%40test.com&tz=UTC&timing=fast&t_window=3&debug_timing={fast}",
+                far_future_monday()
+            ),
+        )
+        .await;
+    assert_eq!(resp.status(), axum::http::StatusCode::SEE_OTHER);
+    let bid: String = sqlx::query_scalar("SELECT booking_id FROM ton_invoices")
+        .fetch_one(&e.pool)
+        .await
+        .unwrap();
+    let (text, created, expires, _, _, _, max) = timing_of(&e, &bid).await;
+    assert_eq!(text, None);
+    assert_eq!((expires - created, max), (Duration::minutes(30), 0));
+
+    // Written by hand on an unmarked booking: read as none.
+    sqlx::query("UPDATE ton_invoices SET debug_timing = ?")
+        .bind(DebugTiming::FAST.text())
+        .execute(&e.pool)
+        .await
+        .unwrap();
+    let row = store::invoice_for_booking(&e.pool, &bid)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(row.debug_timing, None);
+    assert!(!store::open_debug_invoice(&e.pool).await);
+    let r = e
+        .step(created + Duration::minutes(3) + Duration::seconds(5))
+        .await;
+    assert_eq!((r.renewed, r.expired), (0, 0));
+    assert_eq!(timing_of(&e, &bid).await.2, expires);
+}
+
+/// While a test booking's own timing runs, the watcher steps at least every
+/// 10 seconds whatever `CALRS_TON_POLL_SECS` says; otherwise as before.
+#[tokio::test]
+async fn the_watcher_keeps_up_with_a_fast_test_booking() {
+    let e = env_with(&[("CALRS_TON_POLL_SECS", "30")]).await;
+    on(&e).await;
+    let caught = watcher::StepReport {
+        caught_up: true,
+        ..Default::default()
+    };
+    let admin = e.session().await;
+    let (_guest, _) = e.book_http("guest@test.com", "11:00", "198.51.100.9").await;
+    let d = watcher::next_delay(&e.pool, &e.rt, &caught, e.now).await;
+    assert_eq!(d, std::time::Duration::from_secs(30));
+    let resp = e.post_as(PATH, &admin, &form("&timing=fast")).await;
+    assert_eq!(resp.status(), axum::http::StatusCode::SEE_OTHER);
+    let d = watcher::next_delay(&e.pool, &e.rt, &caught, e.now).await;
+    assert_eq!(d, watcher::DEBUG_POLL);
+    // Transient indexer errors do not stretch the step past DEBUG_POLL;
+    // a 429, a rejected key or the wrong network keep their backoff.
+    e.chain.edit(|c| {
+        c.fail_next = vec![
+            IndexerError::Server(502),
+            IndexerError::Network("timeout".into()),
+            IndexerError::Server(503),
+            IndexerError::Server(500),
+        ]
+    });
+    let mut failed = None;
+    for _ in 0..4 {
+        let r = e.step(e.now).await;
+        assert!(r.error.is_some(), "{r:?}");
+        failed = Some(r);
+    }
+    let failed = failed.unwrap();
+    assert!(e.rt.health().failures >= 4);
+    let d = watcher::next_delay(&e.pool, &e.rt, &failed, e.now).await;
+    assert_eq!(
+        d,
+        watcher::DEBUG_POLL,
+        "capped while a test invoice is open"
+    );
+    let limited = watcher::StepReport {
+        error: Some(watcher::StepError::Indexer(IndexerError::RateLimited)),
+        ..Default::default()
+    };
+    let d = watcher::next_delay(&e.pool, &e.rt, &limited, e.now).await;
+    assert!(d > watcher::DEBUG_POLL, "{d:?}");
+    let auth = watcher::StepReport {
+        error: Some(watcher::StepError::Indexer(IndexerError::Auth(401))),
+        ..Default::default()
+    };
+    let d = watcher::next_delay(&e.pool, &e.rt, &auth, e.now).await;
+    assert_eq!(d, std::time::Duration::from_secs(300));
+    sqlx::query(
+        "UPDATE ton_invoices SET status = 'expired' WHERE booking_id IN (SELECT booking_id FROM debug_bookings)",
+    )
+    .execute(&e.pool)
+    .await
+    .unwrap();
+    let d = watcher::next_delay(&e.pool, &e.rt, &caught, e.now).await;
+    assert_eq!(d, std::time::Duration::from_secs(30));
+    // No open test invoice: a guest's invoice keeps the usual backoff.
+    let d = watcher::next_delay(&e.pool, &e.rt, &failed, e.now).await;
+    assert!(d > watcher::DEBUG_POLL, "{d:?}");
 }

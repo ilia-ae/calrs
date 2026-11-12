@@ -49,15 +49,47 @@ pub fn compute(
     min_notice_min: i64,
     rules: WindowRules,
 ) -> Result<InvoiceTimes, TooLate> {
-    let grace = Duration::minutes(rules.grace_min.max(0));
-    let latest_expiry =
-        start - Duration::minutes(min_notice_min.max(0)) - grace - Duration::minutes(SAFETY_MIN);
-    let expires_at = (now + Duration::minutes(rules.window_min.max(0))).min(latest_expiry);
-    if expires_at - now < Duration::minutes(MIN_WINDOW_MIN) {
+    compute_with(now, start, min_notice_min, Rules::site(rules))
+}
+
+/// The rules [`compute`] and [`renewal`] apply, in one shape: the site's
+/// ([`Rules::site`]) or a debug booking's own ([`DebugTiming::rules`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Rules {
+    window_min: i64,
+    grace: Duration,
+    fuse: Duration,
+    /// The shortest window offered ([`MIN_WINDOW_MIN`] for the site).
+    min_window: Duration,
+}
+
+impl Rules {
+    fn site(rules: WindowRules) -> Self {
+        Self {
+            window_min: rules.window_min.max(0),
+            grace: Duration::minutes(rules.grace_min.max(0)),
+            fuse: Duration::hours(rules.fuse_hours.max(0)),
+            min_window: Duration::minutes(MIN_WINDOW_MIN),
+        }
+    }
+}
+
+fn compute_with(
+    now: DateTime<Utc>,
+    start: DateTime<Utc>,
+    min_notice_min: i64,
+    rules: Rules,
+) -> Result<InvoiceTimes, TooLate> {
+    let latest_expiry = start
+        - Duration::minutes(min_notice_min.max(0))
+        - rules.grace
+        - Duration::minutes(SAFETY_MIN);
+    let expires_at = (now + Duration::minutes(rules.window_min)).min(latest_expiry);
+    if expires_at - now < rules.min_window {
         return Err(TooLate);
     }
-    let settle_by = expires_at + grace;
-    let hard_deadline = (settle_by + Duration::hours(rules.fuse_hours.max(0))).min(start);
+    let settle_by = expires_at + rules.grace;
+    let hard_deadline = (settle_by + rules.fuse).min(start);
     Ok(InvoiceTimes {
         expires_at,
         settle_by,
@@ -96,25 +128,211 @@ pub fn renewal(
     renew: RenewalRules,
     rules: WindowRules,
 ) -> Option<InvoiceTimes> {
-    if now < old.expires_at || renewals >= renewals_max {
-        return None;
-    }
-    if start - now < Duration::hours(renew.min_lead_hours.max(0)) {
-        return None;
-    }
-    let half_left = (start - now).num_minutes() / 2;
-    let window_min = renew.window_min.min(half_left).max(rules.window_min.max(0));
-    let new = compute(
+    renewal_with(
         now,
         start,
         min_notice_min,
-        WindowRules {
+        old,
+        (renewals, renewals_max),
+        Duration::hours(renew.min_lead_hours.max(0)),
+        renew.window_min,
+        Rules::site(rules),
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn renewal_with(
+    now: DateTime<Utc>,
+    start: DateTime<Utc>,
+    min_notice_min: i64,
+    old: InvoiceTimes,
+    (renewals, renewals_max): (i64, i64),
+    min_lead: Duration,
+    renew_window_min: i64,
+    rules: Rules,
+) -> Option<InvoiceTimes> {
+    if now < old.expires_at || renewals >= renewals_max {
+        return None;
+    }
+    if start - now < min_lead {
+        return None;
+    }
+    let half_left = (start - now).num_minutes() / 2;
+    let window_min = renew_window_min.min(half_left).max(rules.window_min);
+    let new = compute_with(
+        now,
+        start,
+        min_notice_min,
+        Rules {
             window_min,
             ..rules
         },
     )
     .ok()?;
     (new.settle_by > old.settle_by && new.hard_deadline >= old.hard_deadline).then_some(new)
+}
+
+// --- the debug booking's own timing (ilia fork) ------------------------------
+
+/// ilia fork: the timing of one test booking made on the admin's debug
+/// booking page (`crate::web::debug_booking`), so the owner can watch a
+/// whole unpaid cycle in minutes: the window ends, it is renewed (the guest
+/// is asked to pay again), it ends again, the invoice expires and the
+/// booking is released. It replaces, for that booking's invoice only, the
+/// site's window, grace, fuse, renewal rules and expiry margin; it is set
+/// only by that page (never by a guest's form) and stored on the invoice
+/// (`ton_invoices.debug_timing`, [`DebugTiming::text`]).
+///
+/// It may go below the site's minimums, down to the bounds below, and
+/// keeps every other rule of [`compute`]: the window still ends
+/// [`SAFETY_MIN`] minutes plus the grace before the meeting's notice, the
+/// hard deadline never passes the start, and a renewal never shortens
+/// `settle_by` or the hard deadline.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DebugTiming {
+    /// The first payment window, minutes ([`DEBUG_WINDOW_MIN`] ..= 240).
+    pub window_min: i64,
+    /// A renewed window, minutes ([`DEBUG_WINDOW_MIN`] ..= 1440).
+    pub renew_window_min: i64,
+    /// Renewals before it expires (0 ..= 5).
+    pub renewals_max: i64,
+    /// A transfer sent this late still counts ([`DebugTiming::FAST`]: 1).
+    pub grace_min: i64,
+    /// The watcher expires it once the indexer is this far past
+    /// `settle_by`, and sends a renewal's notice once it is this far past
+    /// the renewal (the site's `CALRS_TON_EXPIRY_MARGIN_MIN`, at least 1).
+    pub margin_min: i64,
+    /// `hard_deadline = settle_by + fuse` (capped at the start): calrs's own
+    /// sweep frees the time then even if the watcher stops.
+    pub fuse_min: i64,
+}
+
+/// The shortest debug window (first or renewed): two minutes leave the
+/// watcher (a step every `CALRS_TON_POLL_SECS`, 10 by default) a dozen
+/// steps in the window and the guest time to send a transfer.
+pub const DEBUG_WINDOW_MIN: i64 = 2;
+/// The longest first window, as the site's (`CALRS_TON_WINDOW_MIN`).
+pub const DEBUG_WINDOW_MAX: i64 = 240;
+/// The longest renewed window, as the site's (`CALRS_TON_RENEW_WINDOW_MIN`).
+pub const DEBUG_RENEW_WINDOW_MAX: i64 = 1440;
+/// The most renewals, as the site's (`CALRS_TON_MAX_RENEWALS`).
+pub const DEBUG_RENEWALS_MAX: i64 = 5;
+
+impl DebugTiming {
+    /// "Fast test": 3 minutes to pay, one renewal of 3 minutes, then the
+    /// invoice expires; a minute of grace and of margin, a 10-minute fuse.
+    /// Unpaid, the booking is released about 9 minutes after it was made.
+    pub const FAST: Self = Self {
+        window_min: 3,
+        renew_window_min: 3,
+        renewals_max: 1,
+        grace_min: 1,
+        margin_min: 1,
+        fuse_min: 10,
+    };
+
+    /// The fast timing with the owner's own window, renewed window and
+    /// number of renewals, each checked against its bounds (`None`: out of
+    /// bounds).
+    pub fn custom(window_min: i64, renew_window_min: i64, renewals_max: i64) -> Option<Self> {
+        let t = Self {
+            window_min,
+            renew_window_min,
+            renewals_max,
+            ..Self::FAST
+        };
+        t.valid().then_some(t)
+    }
+
+    fn valid(&self) -> bool {
+        (DEBUG_WINDOW_MIN..=DEBUG_WINDOW_MAX).contains(&self.window_min)
+            && (DEBUG_WINDOW_MIN..=DEBUG_RENEW_WINDOW_MAX).contains(&self.renew_window_min)
+            && (0..=DEBUG_RENEWALS_MAX).contains(&self.renewals_max)
+            && (1..=60).contains(&self.grace_min)
+            && (1..=30).contains(&self.margin_min)
+            && (1..=48 * 60).contains(&self.fuse_min)
+    }
+
+    fn rules(&self) -> Rules {
+        Rules {
+            window_min: self.window_min,
+            grace: Duration::minutes(self.grace_min),
+            fuse: Duration::minutes(self.fuse_min),
+            min_window: Duration::minutes(DEBUG_WINDOW_MIN),
+        }
+    }
+
+    /// The first window's times, as [`compute`] with this timing.
+    pub fn compute(
+        &self,
+        now: DateTime<Utc>,
+        start: DateTime<Utc>,
+        min_notice_min: i64,
+    ) -> Result<InvoiceTimes, TooLate> {
+        compute_with(now, start, min_notice_min, self.rules())
+    }
+
+    /// A renewal, as [`renewal`] with this timing: no minimum lead before
+    /// the meeting (a window that fits before it is enough), the renewed
+    /// window [`Self::renew_window_min`] (at most half the time left, at
+    /// least the first window).
+    pub fn renewal(
+        &self,
+        now: DateTime<Utc>,
+        start: DateTime<Utc>,
+        min_notice_min: i64,
+        old: InvoiceTimes,
+        renewals: i64,
+    ) -> Option<InvoiceTimes> {
+        renewal_with(
+            now,
+            start,
+            min_notice_min,
+            old,
+            (renewals, self.renewals_max),
+            Duration::zero(),
+            self.renew_window_min,
+            self.rules(),
+        )
+    }
+
+    /// The stored form: `window=3,renew_window=3,renewals=1,grace=1,margin=1,fuse=10`.
+    pub fn text(&self) -> String {
+        format!(
+            "window={},renew_window={},renewals={},grace={},margin={},fuse={}",
+            self.window_min,
+            self.renew_window_min,
+            self.renewals_max,
+            self.grace_min,
+            self.margin_min,
+            self.fuse_min
+        )
+    }
+
+    /// [`Self::text`] read back; `None` for anything else (every key once,
+    /// in bounds), which the watcher treats as the site's rules.
+    pub fn parse(text: &str) -> Option<Self> {
+        let mut t = Self::FAST;
+        let mut seen = [false; 6];
+        for part in text.trim().split(',') {
+            let (k, v) = part.split_once('=')?;
+            let v: i64 = v.trim().parse().ok()?;
+            let (i, slot) = match k.trim() {
+                "window" => (0, &mut t.window_min),
+                "renew_window" => (1, &mut t.renew_window_min),
+                "renewals" => (2, &mut t.renewals_max),
+                "grace" => (3, &mut t.grace_min),
+                "margin" => (4, &mut t.margin_min),
+                "fuse" => (5, &mut t.fuse_min),
+                _ => return None,
+            };
+            if std::mem::replace(&mut seen[i], true) {
+                return None;
+            }
+            *slot = v;
+        }
+        (seen.iter().all(|s| *s) && t.valid()).then_some(t)
+    }
 }
 
 #[cfg(test)]
@@ -283,6 +501,93 @@ mod tests {
             compute(now, first - Duration::minutes(1), 60, RULES),
             Err(TooLate)
         );
+    }
+
+    /// The fast debug timing: 3 minutes, one renewal of 3, then expired;
+    /// below the site's minimums, never past the meeting's notice.
+    #[test]
+    fn the_fast_debug_timing_gives_minutes_not_hours() {
+        let now = t0();
+        let start = now + Duration::days(1);
+        let fast = DebugTiming::FAST;
+        let t = fast.compute(now, start, 60).unwrap();
+        assert_eq!(t.expires_at, now + Duration::minutes(3));
+        assert_eq!(t.settle_by, now + Duration::minutes(4));
+        assert_eq!(t.hard_deadline, now + Duration::minutes(14));
+        // The site would refuse a 3-minute window.
+        let site = WindowRules {
+            window_min: 3,
+            ..RULES
+        };
+        assert_eq!(compute(now, start, 60, site), Err(TooLate));
+        // Renewed once, at the end of the window, for 3 more minutes, and
+        // no lead before the meeting is asked (the site's is 24 hours).
+        let at = t.expires_at + Duration::seconds(5);
+        assert_eq!(
+            fast.renewal(at - Duration::seconds(6), start, 60, t, 0),
+            None
+        );
+        let r = fast.renewal(at, start, 60, t, 0).unwrap();
+        assert_eq!(r.expires_at, at + Duration::minutes(3));
+        assert_eq!(r.settle_by, at + Duration::minutes(4));
+        assert_eq!(r.hard_deadline, at + Duration::minutes(14));
+        assert!(r.settle_by > t.settle_by && r.hard_deadline >= t.hard_deadline);
+        // Then no more.
+        assert_eq!(fast.renewal(r.expires_at, start, 60, r, 1), None);
+        // The meeting's notice still bounds it: 60 notice + 1 grace + 5.
+        let near = now + Duration::minutes(68);
+        let t = fast.compute(now, near, 60).unwrap();
+        assert_eq!(t.expires_at, now + Duration::minutes(2));
+        assert!(t.settle_by < near - Duration::minutes(60));
+        assert!(t.hard_deadline <= near);
+        assert_eq!(
+            fast.compute(now, near - Duration::minutes(1), 60),
+            Err(TooLate)
+        );
+    }
+
+    #[test]
+    fn a_custom_debug_timing_is_bounded_and_round_trips() {
+        let t = DebugTiming::custom(5, 7, 2).unwrap();
+        assert_eq!(
+            (t.window_min, t.renew_window_min, t.renewals_max),
+            (5, 7, 2)
+        );
+        assert_eq!(
+            (t.grace_min, t.margin_min, t.fuse_min),
+            (1, 1, 10),
+            "the rest is fast"
+        );
+        for (w, r, n) in [
+            (1, 3, 1),
+            (241, 3, 1),
+            (3, 1, 1),
+            (3, 1441, 1),
+            (3, 3, 6),
+            (3, 3, -1),
+        ] {
+            assert_eq!(DebugTiming::custom(w, r, n), None, "{w} {r} {n}");
+        }
+        assert!(DebugTiming::custom(2, 2, 0).is_some());
+        assert!(DebugTiming::custom(240, 1440, 5).is_some());
+        let text = DebugTiming::FAST.text();
+        assert_eq!(
+            text,
+            "window=3,renew_window=3,renewals=1,grace=1,margin=1,fuse=10"
+        );
+        assert_eq!(DebugTiming::parse(&text), Some(DebugTiming::FAST));
+        assert_eq!(DebugTiming::parse(&t.text()), Some(t));
+        for bad in [
+            "",
+            "window=3",
+            "window=3,renew_window=3,renewals=1,grace=1,margin=1,fuse=10,window=4",
+            "window=1,renew_window=3,renewals=1,grace=1,margin=1,fuse=10",
+            "window=3,renew_window=3,renewals=1,grace=0,margin=1,fuse=10",
+            "window=3,renew_window=3,renewals=1,grace=1,margin=1,lead=0",
+            "window=x,renew_window=3,renewals=1,grace=1,margin=1,fuse=10",
+        ] {
+            assert_eq!(DebugTiming::parse(bad), None, "{bad:?}");
+        }
     }
 
     #[test]

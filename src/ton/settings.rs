@@ -21,6 +21,11 @@
 //! the TON page and stored, owned and audited exactly like the TON keys
 //! (one mechanism), but no TON parser reads it ([`debug_booking`] does),
 //! and unlike them it is read on every request: a change is live at once.
+//! Its companion [`DEBUG_BOOKING_TELEGRAM`] (`CALRS_DEBUG_BOOKING_TELEGRAM`,
+//! field `debug_booking_telegram`, a [`Kind::Telegram`]) is the guest
+//! Telegram username that page prefills when the admin's linked chat has
+//! none (the Debug block's own form, or `config apply`), resolved the same
+//! way ([`debug_booking_telegram`]). [`is_debug`] names both.
 //!
 //! A row whose value is empty means "the default, owned": `config apply`
 //! writes one for a key it declares as `null`, so the page keeps it locked.
@@ -119,6 +124,9 @@ pub enum Kind {
     Ladder,
     /// On or off, stored as `1` or `0` ([`parse_bool`]).
     Bool,
+    /// A Telegram username as the booking form's field takes it (`@name`,
+    /// `t.me/name`), stored bare (`name`).
+    Telegram,
 }
 
 /// A key the page and `config apply` may store.
@@ -140,7 +148,7 @@ impl Key {
             Kind::Pct(s) => bp_text(s.default_bp),
             Kind::Ladder => super::ladder::DEFAULT.to_string(),
             Kind::Bool => "off".to_string(),
-            Kind::Usd | Kind::Email => String::new(),
+            Kind::Usd | Kind::Email | Kind::Telegram => String::new(),
         }
     }
 }
@@ -148,6 +156,16 @@ impl Key {
 /// The test booking page's switch (`crate::web::debug_booking`): off by
 /// default; the environment, if set, wins and locks the toggle.
 pub const DEBUG_BOOKING: &str = "CALRS_DEBUG_BOOKING";
+/// The guest Telegram username the test booking page prefills when the
+/// admin's linked chat has no username: unset by default.
+pub const DEBUG_BOOKING_TELEGRAM: &str = "CALRS_DEBUG_BOOKING_TELEGRAM";
+
+/// The keys of the test booking page, not TON's: stored, owned and audited
+/// like the others, never part of the TON form and read per request (a
+/// change needs no restart).
+pub fn is_debug(var: &str) -> bool {
+    var == DEBUG_BOOKING || var == DEBUG_BOOKING_TELEGRAM
+}
 
 const fn key(var: &'static str, field: &'static str, kind: Kind) -> Key {
     Key { var, field, kind }
@@ -211,6 +229,11 @@ pub const SPECS: &[Key] = &[
         Kind::Int(cfg::FREE_PER_GUEST_DAYS),
     ),
     key(DEBUG_BOOKING, "debug_booking", Kind::Bool),
+    key(
+        DEBUG_BOOKING_TELEGRAM,
+        "debug_booking_telegram",
+        Kind::Telegram,
+    ),
 ];
 
 /// The variable names of [`SPECS`]: the only `ton_settings` keys read.
@@ -231,6 +254,7 @@ pub const KEYS: &[&str] = &[
     cfg::LADDER,
     cfg::FREE_PER_GUEST_DAYS.var,
     DEBUG_BOOKING,
+    DEBUG_BOOKING_TELEGRAM,
 ];
 
 pub fn by_var(var: &str) -> Option<&'static Key> {
@@ -337,6 +361,20 @@ pub fn debug_booking(env: &dyn Fn(&str) -> Option<String>, db: &DbValues) -> Res
     }
 }
 
+/// The guest Telegram username the test booking page prefills (bare, no
+/// `@`): the environment, else the stored row, else none. A value that is
+/// not a username is none, still from where it was set (locked there).
+pub fn debug_booking_telegram(
+    env: &dyn Fn(&str) -> Option<String>,
+    db: &DbValues,
+) -> Resolved<Option<String>> {
+    Resolved {
+        value: lookup(env, db, DEBUG_BOOKING_TELEGRAM)
+            .and_then(|v| crate::telegram::username::normalize(&v)),
+        source: source(env, db, DEBUG_BOOKING_TELEGRAM),
+    }
+}
+
 /// The key a [`ConfigError`] is about (its message names the variable).
 pub fn key_of_error(e: &ConfigError) -> Option<&'static Key> {
     SPECS.iter().find(|k| e.0.starts_with(k.var))
@@ -375,6 +413,12 @@ pub fn to_env(key: &Key, human: &str) -> Result<Option<String>, ConfigError> {
             Some(false) => "0".to_string(),
             None => return Err(ConfigError(format!("{}: on or off (1 or 0)", key.var))),
         },
+        Kind::Telegram => crate::telegram::username::normalize(human).ok_or_else(|| {
+            ConfigError(format!(
+                "{}: a Telegram username: a Latin letter, then letters, digits and _, 4 to 32 characters (@name or t.me/name also work)",
+                key.var
+            ))
+        })?,
     };
     Ok(Some(text))
 }
@@ -489,7 +533,7 @@ mod tests {
         for (k, spec) in KEYS.iter().zip(SPECS) {
             assert_eq!(*k, spec.var);
             // The test booking switch is the one key no TON parser reads.
-            assert!(cfg::VARS.contains(k) || *k == DEBUG_BOOKING, "{k}");
+            assert!(cfg::VARS.contains(k) || is_debug(k), "{k}");
         }
     }
 
@@ -608,6 +652,57 @@ mod tests {
         assert_eq!(to_human(k, "1"), "on");
         assert_eq!(canonical(k, "yes").unwrap().as_deref(), Some("on"));
         // No TON parser reads it: the tuning is valid either way.
+        assert!(validate(&no_env, &db).is_ok());
+    }
+
+    /// The prefilled guest Telegram username: env > DB > none, stored
+    /// bare, checked like the booking form's field.
+    #[test]
+    fn the_debug_telegram_username_resolves_like_the_others() {
+        let k = by_field("debug_booking_telegram").unwrap();
+        assert_eq!(k.var, DEBUG_BOOKING_TELEGRAM);
+        assert!(is_debug(k.var) && is_debug(DEBUG_BOOKING));
+        assert!(!is_debug(cfg::WINDOW_MIN.var));
+        assert_eq!(k.default_text(), "");
+        let none = debug_booking_telegram(&no_env, &DbValues::default());
+        assert_eq!((none.value, none.source), (None, Source::Default));
+        for (human, stored) in [
+            ("getmonolith", "getmonolith"),
+            ("@getmonolith", "getmonolith"),
+            (" https://t.me/getmonolith ", "getmonolith"),
+        ] {
+            assert_eq!(
+                to_env(k, human).unwrap().as_deref(),
+                Some(stored),
+                "{human}"
+            );
+        }
+        assert_eq!(to_env(k, " ").unwrap(), None);
+        for bad in ["abc", "1abc", "get monolith", "getmonolith_", "@"] {
+            let e = to_env(k, bad).unwrap_err();
+            assert!(e.0.starts_with(DEBUG_BOOKING_TELEGRAM), "{bad}: {e}");
+        }
+        assert_eq!(
+            canonical(k, "@getmonolith").unwrap().as_deref(),
+            Some("getmonolith")
+        );
+        let mut db = DbValues::default();
+        db.set(DEBUG_BOOKING_TELEGRAM, "getmonolith".into(), Owner::Apply);
+        let r = debug_booking_telegram(&no_env, &db);
+        assert_eq!(
+            (r.value.as_deref(), r.source),
+            (Some("getmonolith"), Source::Apply)
+        );
+        let env = |v: &str| (v == DEBUG_BOOKING_TELEGRAM).then(|| "@other_user".to_string());
+        let r = debug_booking_telegram(&env, &db);
+        assert_eq!(
+            (r.value.as_deref(), r.source),
+            (Some("other_user"), Source::Env)
+        );
+        let typo = |v: &str| (v == DEBUG_BOOKING_TELEGRAM).then(|| "no".to_string());
+        let r = debug_booking_telegram(&typo, &db);
+        assert_eq!((r.value, r.source), (None, Source::Env), "not a username");
+        // No TON parser reads it.
         assert!(validate(&no_env, &db).is_ok());
     }
 

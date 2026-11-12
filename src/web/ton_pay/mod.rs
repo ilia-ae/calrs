@@ -481,8 +481,9 @@ impl TonRuntime {
 }
 
 /// ilia fork: the `CALRS_TON_*` environment `calrs serve` started with,
-/// and `CALRS_DEBUG_BOOKING` (`crate::ton::settings::DEBUG_BOOKING`, the
-/// test booking switch stored with them), read once: the only environment
+/// and `CALRS_DEBUG_BOOKING` and `CALRS_DEBUG_BOOKING_TELEGRAM`
+/// (`crate::ton::settings::DEBUG_BOOKING`, `DEBUG_BOOKING_TELEGRAM`: the test
+/// booking switch and its guest Telegram username, stored with them), read once: the only environment
 /// the settings resolve against (it does not change while the process
 /// runs), and which secrets were really set from systemd credentials
 /// (names only, never a value).
@@ -496,7 +497,10 @@ impl EnvSnapshot {
     pub(crate) fn capture() -> Self {
         let vars = crate::ton::config::VARS
             .iter()
-            .chain(std::iter::once(&crate::ton::settings::DEBUG_BOOKING))
+            .chain([
+                &crate::ton::settings::DEBUG_BOOKING,
+                &crate::ton::settings::DEBUG_BOOKING_TELEGRAM,
+            ])
             .filter_map(|k| std::env::var(k).ok().map(|v| (k.to_string(), v)))
             .collect();
         Self {

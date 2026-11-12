@@ -368,3 +368,84 @@ async fn the_debug_switch_is_a_live_boolean() {
     env.apply(&ton_doc(json!({})), false).await.unwrap();
     assert_eq!(rows(&env).await.owner(DEBUG_BOOKING), None);
 }
+
+/// `site.ton.debug_booking_telegram`: the guest Telegram username the test
+/// booking page prefills, a bare username, owned and audited like the TON
+/// keys, live (no restart), round-tripped by the export; the binary carries
+/// its marker, which the role checks before sending it.
+#[tokio::test]
+async fn the_debug_telegram_username_is_a_live_string() {
+    use crate::ton::settings::{self, Source, DEBUG_BOOKING_TELEGRAM};
+    // The role greps for this literal (`DEBUG_BOOKING_TELEGRAM_SHAPE`).
+    const DEBUG_BOOKING_TELEGRAM_SHAPE: &str =
+        "site.ton.debug_booking_telegram: a Telegram username without @, or null";
+    let env = ApplyEnv::new().await;
+    let doc = ton_doc(json!({"debug_booking_telegram": "getmonolith"}));
+    let report = env.apply(&doc, false).await.unwrap();
+    assert_eq!(
+        report.changed,
+        [
+            change(
+                "site.ton.debug_booking_telegram",
+                Value::Null,
+                json!("getmonolith")
+            ),
+            change(
+                "site.ton.debug_booking_telegram.owner",
+                Value::Null,
+                json!("apply")
+            ),
+        ]
+    );
+    assert!(!report.restart, "read on every request");
+    let stored = rows(&env).await;
+    let none = |_: &str| None;
+    let r = settings::debug_booking_telegram(&none, &stored);
+    assert_eq!(
+        (r.value.as_deref(), r.source),
+        (Some("getmonolith"), Source::Apply)
+    );
+    let audit: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM ton_settings_audit WHERE source = 'apply' AND key = 'CALRS_DEBUG_BOOKING_TELEGRAM'",
+    )
+    .fetch_one(&env.pool)
+    .await
+    .unwrap();
+    assert_eq!(audit, 1);
+    let exported = env.export().await.unwrap();
+    let ton = exported.site.as_ref().unwrap().ton.clone().unwrap();
+    assert_eq!(
+        serde_json::to_value(&ton).unwrap(),
+        json!({"debug_booking_telegram": "getmonolith"})
+    );
+    let again = env
+        .apply(&serde_json::to_string(&exported).unwrap(), false)
+        .await
+        .unwrap();
+    assert_eq!(again.changed, []);
+
+    // Only the canonical, bare spelling; nothing is written otherwise.
+    let before = env.snapshot().await;
+    for bad in [json!("@getmonolith"), json!("abc"), json!(5), json!("")] {
+        let e = env
+            .apply(&ton_doc(json!({ "debug_booking_telegram": bad })), false)
+            .await
+            .unwrap_err();
+        assert!(
+            e.to_string().contains("site.ton.debug_booking_telegram"),
+            "{bad}: {e}"
+        );
+    }
+    assert_eq!(env.snapshot().await, before);
+    let e = env
+        .apply(&ton_doc(json!({"debug_booking_telegram": 5})), false)
+        .await
+        .unwrap_err();
+    assert!(e.to_string().contains(DEBUG_BOOKING_TELEGRAM_SHAPE), "{e}");
+
+    // Left out of a present section: back to the page with its value.
+    env.apply(&ton_doc(json!({})), false).await.unwrap();
+    let stored = rows(&env).await;
+    assert_eq!(stored.owner(DEBUG_BOOKING_TELEGRAM), Some(Owner::Panel));
+    assert_eq!(stored.value(DEBUG_BOOKING_TELEGRAM), Some("getmonolith"));
+}

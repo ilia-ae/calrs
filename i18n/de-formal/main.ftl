@@ -580,3 +580,7 @@ ton-admin-debug-locked-apply = Von config apply festgelegt (site.ton.debug_booki
 dbg-err-type = Wählen Sie einen der eigenen Termintypen.
 dbg-err-slot = Wählen Sie eine Zeit aus der Liste.
 dbg-own-chat-failed = Die Testbuchung wurde angelegt, aber die Nachrichten an den Gast konnten nicht in Ihren Telegram-Chat geleitet werden: Der Chat wurde getrennt, der Bot gestoppt oder der Link ist inzwischen abgelaufen. Die Buchung besteht und hält die Zeit frei: Öffnen Sie ihre Zahlungsseite in der Liste unten oder stornieren Sie sie.
+dbg-telegram-from-chat = Aus Ihrem verknüpften Telegram-Chat übernommen.
+dbg-err-timing = Wählen Sie die Fristen. Eigene Minuten: Fenster 2–240, verlängertes Fenster 2–1440, Verlängerungen 0–5.
+ton-admin-debug-tg-help = Wird auf der Testbuchungsseite vorausgefüllt, wenn Ihr verknüpfter Telegram-Chat keinen Benutzernamen hat (für Termintypen, die danach fragen). Ohne @; leer: keiner.
+ton-admin-debug-tg-locked-apply = Von config apply festgelegt (site.ton.debug_booking_telegram). Ändern Sie es im Dokument von config apply oder lassen Sie den Schlüssel weg, um es an diese Seite zu übergeben.

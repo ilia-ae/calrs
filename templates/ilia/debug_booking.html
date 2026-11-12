@@ -93,6 +93,10 @@
     <div class="form-group">
       <label for="dbg-telegram">{{ t("dbg-telegram-username") }}{% if selected.telegram_required %} <span class="hint">{{ t("dbg-telegram-required") }}</span>{% endif %}</label>
       <input id="dbg-telegram" name="telegram" value="{{ telegram or '' }}" maxlength="64" autocomplete="off" style="{{ field_style }}"{% if selected.telegram_required %} required{% endif %}>
+      <span id="dbg-telegram-from" data-from="{{ telegram_from or '' }}" style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">
+        {% if telegram_from == "chat" %}{{ t("dbg-telegram-from-chat") }}{% elif telegram_from == "setting" %}{{ t("dbg-telegram-from-setting") }}{% elif not telegram %}{{ t("dbg-telegram-none") }}{% endif %}
+        {% if telegram_from == "setting" or (not telegram_from and not telegram) %}<a href="/dashboard/admin/ton#debug-block">{{ t("nav-admin-ton") }}</a>{% endif %}
+      </span>
     </div>
     {% endif %}
     <div class="form-group">
@@ -110,6 +114,29 @@
         {% else %}{{ t("dbg-own-chat-not-linked") }} <a href="/dashboard/settings/telegram">{{ t("tg-settings-nav") }}</a>{% endif %}
       </span>
     </div>
+    {% if selected.priced %}
+    <fieldset class="form-group" id="dbg-timing" style="border: 1px solid var(--border); border-radius: var(--radius); padding: 0.5rem 0.75rem;">
+      <legend style="font-weight: 600; font-size: 0.9rem; padding: 0 0.25rem;">{{ t("dbg-timing") }}</legend>
+      <label style="display: flex; gap: 0.5rem; align-items: flex-start;">
+        <input type="radio" name="timing" value="normal" id="dbg-timing-normal"{% if timing == "normal" %} checked{% endif %}>
+        <span>{{ t("dbg-timing-normal") }}</span>
+      </label>
+      <label style="display: flex; gap: 0.5rem; align-items: flex-start;">
+        <input type="radio" name="timing" value="fast" id="dbg-timing-fast"{% if timing == "fast" %} checked{% endif %}>
+        <span>{{ t("dbg-timing-fast", window=fast.window, renewals=fast.renewals, renew=fast.renew, grace=fast.grace, margin=fast.margin) }}</span>
+      </label>
+      <label style="display: flex; gap: 0.5rem; align-items: flex-start;">
+        <input type="radio" name="timing" value="custom" id="dbg-timing-custom"{% if timing == "custom" %} checked{% endif %}>
+        <span>{{ t("dbg-timing-custom") }}</span>
+      </label>
+      <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; margin: 0.25rem 0 0 1.6rem;">
+        <label style="font-size: 0.85rem;">{{ t("dbg-timing-window") }}<br><input type="number" name="t_window" id="dbg-t-window" min="{{ timing_bounds.window_min }}" max="{{ timing_bounds.window_max }}" placeholder="{{ fast.window }}" value="{{ t_window or '' }}" style="width: 6rem; {{ field_style }}"></label>
+        <label style="font-size: 0.85rem;">{{ t("dbg-timing-renew-window") }}<br><input type="number" name="t_renew_window" id="dbg-t-renew-window" min="{{ timing_bounds.window_min }}" max="{{ timing_bounds.renew_max }}" placeholder="{{ fast.renew }}" value="{{ t_renew_window or '' }}" style="width: 6rem; {{ field_style }}"></label>
+        <label style="font-size: 0.85rem;">{{ t("dbg-timing-renewals") }}<br><input type="number" name="t_renewals" id="dbg-t-renewals" min="0" max="{{ timing_bounds.renewals_max }}" placeholder="{{ fast.renewals }}" value="{{ t_renewals or '' }}" style="width: 6rem; {{ field_style }}"></label>
+      </div>
+      <span style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-top: 0.4rem;">{{ t("dbg-timing-help", min=timing_bounds.window_min) }}</span>
+    </fieldset>
+    {% endif %}
     <p style="font-size: 0.85rem; color: var(--text-muted);">{{ t("dbg-test-note") }}</p>
     <button type="submit" class="btn"{% if not slots or not has_username %} disabled{% endif %}>{{ t("dbg-submit") }}</button>
   </form>
@@ -122,13 +149,14 @@
   {% if bookings %}
   <div style="overflow-x: auto;">
   <table style="width: 100%; font-size: 0.825rem; border-collapse: collapse;">
-    <tr><th style="text-align: left;">{{ t("dbg-col-when") }}</th><th style="text-align: left;">{{ t("dbg-col-type") }}</th><th style="text-align: left;">{{ t("dbg-col-status") }}</th><th style="text-align: left;">{{ t("dbg-col-payment") }}</th><th style="text-align: left;">{{ t("dbg-col-telegram") }}</th></tr>
+    <tr><th style="text-align: left;">{{ t("dbg-col-when") }}</th><th style="text-align: left;">{{ t("dbg-col-type") }}</th><th style="text-align: left;">{{ t("dbg-col-status") }}</th><th style="text-align: left;">{{ t("dbg-col-payment") }}</th><th style="text-align: left;">{{ t("dbg-col-timing") }}</th><th style="text-align: left;">{{ t("dbg-col-telegram") }}</th></tr>
     {% for b in bookings %}
-    <tr data-booking="{{ b.id }}" data-status="{{ b.status }}">
+    <tr data-booking="{{ b.id }}" data-status="{{ b.status }}" data-live="{{ '1' if b.live else '0' }}">
       <td style="padding: 0.2rem 0.5rem 0.2rem 0; white-space: nowrap;">{{ b.when }}</td>
       <td style="padding: 0.2rem 0.5rem 0.2rem 0;">{{ b.title }}</td>
       <td style="padding: 0.2rem 0.5rem 0.2rem 0;">{{ b.status_label }}</td>
-      <td style="padding: 0.2rem 0.5rem 0.2rem 0;">{% if b.invoice %}{{ b.invoice_label }}{% if b.pay_url %} · <a href="{{ b.pay_url }}">{{ t("dbg-open-pay") }}</a>{% endif %}{% else %}—{% endif %}</td>
+      <td style="padding: 0.2rem 0.5rem 0.2rem 0;">{% if b.invoice %}{{ b.invoice_label }}{% if b.pay_url %} · <a href="{{ b.pay_url }}">{{ t("dbg-open-pay") }}</a>{% endif %}{% if b.renewals_max %} · <span class="dbg-renewals">{{ t("dbg-renewals", n=b.renewals, max=b.renewals_max) }}</span>{% endif %}{% if b.open %}<br><span class="dbg-countdown" data-expires="{{ b.expires_unix }}" data-settle="{{ b.settle_unix }}" style="font-variant-numeric: tabular-nums;">{{ t("dbg-cd-until", expires=b.expires_local, settle=b.settle_local) }}</span>{% endif %}{% else %}—{% endif %}</td>
+      <td style="padding: 0.2rem 0.5rem 0.2rem 0;"{% if b.fast %} class="dbg-fast"{% endif %}>{{ b.timing or "—" }}</td>
       <td style="padding: 0.2rem 0;">{% if b.own_chat %}{{ t("dbg-own-chat-yes") }}{% else %}—{% endif %}</td>
     </tr>
     {% endfor %}
@@ -141,6 +169,58 @@
     <button type="submit" class="slot-btn" style="cursor: pointer; color: var(--error-text);"{% if not standing %} disabled{% endif %}>{{ t("dbg-cancel-all", count=standing) }}</button>
   </form>
   <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0.5rem 0 0;">{{ t("dbg-cancel-all-help") }}</p>
+  <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0.5rem 0 0;">{{ t("dbg-list-live") }}</p>
 </div>
+<script>
+// ilia fork: the countdown of each open test invoice, and the list
+// refreshed in place (the form is left as typed) while a booking moves.
+(function () {
+  var texts = {
+    pay: {{ t("dbg-cd-pay", time="__T__") | tojson }},
+    grace: {{ t("dbg-cd-grace", time="__T__") | tojson }},
+    wait: {{ t("dbg-cd-wait") | tojson }}
+  };
+  function mmss(s) {
+    s = Math.max(0, Math.floor(s));
+    var m = Math.floor(s / 60), r = s % 60;
+    return m + ":" + (r < 10 ? "0" : "") + r;
+  }
+  function tick() {
+    var now = Date.now() / 1000;
+    document.querySelectorAll("#debug-booking-list .dbg-countdown").forEach(function (el) {
+      var exp = Number(el.dataset.expires), settle = Number(el.dataset.settle);
+      if (!exp || !settle) return;
+      if (now < exp) el.textContent = texts.pay.replace("__T__", mmss(exp - now));
+      else if (now < settle) el.textContent = texts.grace.replace("__T__", mmss(settle - now));
+      else el.textContent = texts.wait;
+    });
+  }
+  function refresh() {
+    if (!document.querySelector('#debug-booking-list tr[data-live="1"]')) return;
+    fetch(window.location.pathname + window.location.search, { credentials: "same-origin" })
+      .then(function (r) { return r.ok ? r.text() : null; })
+      .then(function (html) {
+        if (!html) return;
+        var next = new DOMParser().parseFromString(html, "text/html").getElementById("debug-booking-list");
+        var here = document.getElementById("debug-booking-list");
+        if (!next || !here) return;
+        // The new forms need the CSRF field base.html adds on load.
+        var m = document.cookie.match(/(?:^|;\s*)__Host-calrs_csrf=([^;]+)/);
+        next.querySelectorAll('form[method="post"]').forEach(function (f) {
+          if (!m || f.querySelector('input[name="_csrf"]')) return;
+          var i = document.createElement("input");
+          i.type = "hidden"; i.name = "_csrf"; i.value = m[1];
+          f.appendChild(i);
+        });
+        here.replaceWith(next);
+        tick();
+      })
+      .catch(function () {});
+  }
+  tick();
+  setInterval(tick, 1000);
+  setInterval(refresh, 10000);
+})();
+</script>
 </div>
 {% endblock %}

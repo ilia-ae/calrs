@@ -25,7 +25,10 @@
 //! At the top, the Debug block: the test booking page's switch
 //! (`settings::DEBUG_BOOKING`, stored and audited with the keys above but
 //! never part of this form: its own POST is `debug_booking::toggle`) and,
-//! while on, the button to the page (`crate::web::debug_booking`).
+//! while on, the button to the page (`crate::web::debug_booking`); and the
+//! guest Telegram username that page prefills
+//! (`settings::DEBUG_BOOKING_TELEGRAM`, its own POST
+//! `debug_booking::save_telegram`).
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -102,8 +105,9 @@ pub(crate) fn merged(
     let mut next = before.clone();
     let mut errors = Errors::new();
     for key in settings::SPECS {
-        // The debug switch has its own form (`debug_booking::toggle`).
-        if key.var == settings::DEBUG_BOOKING {
+        // The debug keys have their own forms (`debug_booking::toggle`,
+        // `debug_booking::save_telegram`).
+        if settings::is_debug(key.var) {
             continue;
         }
         if matches!(
@@ -138,9 +142,17 @@ pub(crate) async fn page(
         .filter(|s| matches!(*s, "live" | "off" | "restart" | "invalid" | "none"));
     let mut view = View::stored(notice);
     view.debug_notice = query.get("debug").and_then(|d| {
-        ["on", "off", "locked"]
-            .into_iter()
-            .find(|k| *k == d.as_str())
+        [
+            "on",
+            "off",
+            "locked",
+            "tg-saved",
+            "tg-same",
+            "tg-invalid",
+            "tg-locked",
+        ]
+        .into_iter()
+        .find(|k| *k == d.as_str())
     });
     render(&state, &admin, view).await
 }
@@ -270,6 +282,7 @@ fn kind_name(kind: Kind) -> &'static str {
         Kind::Email => "email",
         Kind::Ladder => "ladder",
         Kind::Bool => "bool",
+        Kind::Telegram => "telegram",
     }
 }
 
@@ -506,7 +519,7 @@ mod tests {
         // The debug switch is the Debug block's, not a field of the form.
         let mut all: Vec<&str> = settings::SPECS
             .iter()
-            .filter(|k| k.var != settings::DEBUG_BOOKING)
+            .filter(|k| !settings::is_debug(k.var))
             .map(|k| k.field)
             .collect();
         all.sort_unstable();
@@ -556,6 +569,16 @@ mod tests {
             &[("debug_booking".to_string(), "on".to_string())].into(),
         );
         assert_eq!(next.value(settings::DEBUG_BOOKING), None);
+        let (next, _) = merged(
+            &env,
+            &before,
+            &[(
+                "debug_booking_telegram".to_string(),
+                "getmonolith".to_string(),
+            )]
+            .into(),
+        );
+        assert_eq!(next.value(settings::DEBUG_BOOKING_TELEGRAM), None);
         let (_, errors) = merged(
             &env,
             &before,

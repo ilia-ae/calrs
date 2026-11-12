@@ -14,12 +14,36 @@ use sqlx::{SqliteConnection, SqlitePool};
 
 use super::{stamp, store, watcher, TonRuntime, TARGET};
 use crate::ton::amount;
-use crate::ton::deadlines::{self, InvoiceTimes};
+use crate::ton::deadlines::{self, DebugTiming, InvoiceTimes};
 use crate::ton::ladder::{self, Ladder, Step};
 use crate::ton::rate::{AcceptedRate, RateRefusal};
 use crate::ton::reference;
 use crate::ton::Network;
 use crate::web::AppState;
+
+tokio::task_local! {
+    /// ilia fork: the timing the admin's debug booking page chose for the
+    /// test booking it is making (`crate::web::debug_booking`): set only
+    /// around that page's own call of the public booking handler
+    /// ([`with_debug_timing`]), so no guest's request can carry it. Read by
+    /// [`prepare`]; the invoice stores it (`ton_invoices.debug_timing`).
+    static DEBUG_TIMING: DebugTiming;
+}
+
+/// ilia fork: run `f` (the debug booking page's call of the public booking
+/// handler) with the test booking's own invoice timing.
+pub(crate) async fn with_debug_timing<F: std::future::Future>(
+    timing: DebugTiming,
+    f: F,
+) -> F::Output {
+    DEBUG_TIMING.scope(timing, f).await
+}
+
+/// The debug timing of the request being served, if the debug booking page
+/// set one.
+fn debug_timing() -> Option<DebugTiming> {
+    DEBUG_TIMING.try_with(|t| *t).ok()
+}
 
 /// Why a priced booking is not taken. Nothing is created in any case.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -137,8 +161,12 @@ pub(crate) struct PreparedInvoice {
     pub(crate) address_raw: String,
     pub(crate) limits: Limits,
     pub(crate) created_at: DateTime<Utc>,
-    /// Renewals this invoice may have (`CALRS_TON_MAX_RENEWALS` now).
+    /// Renewals this invoice may have (`CALRS_TON_MAX_RENEWALS` now, or
+    /// the debug timing's).
     pub(crate) renewals_max: i64,
+    /// ilia fork: a test booking's own timing (the debug booking page);
+    /// `None` for every other booking.
+    pub(crate) debug_timing: Option<DebugTiming>,
     /// ilia fork: priced by the ladder (its step at `n`, recounted inside
     /// the booking transaction); `None` for a fixed price.
     pub(crate) ladder: Option<LadderQuote>,
@@ -528,12 +556,16 @@ async fn prepare_priced(
             return Err(Refusal::Unavailable(e.to_string()));
         }
     }
-    let times = deadlines::compute(
-        now,
-        start_utc,
-        min_notice_min,
-        rt.cfg.window_rules(price.window_min),
-    )
+    let debug_timing = debug_timing();
+    let times = match debug_timing {
+        Some(t) => t.compute(now, start_utc, min_notice_min),
+        None => deadlines::compute(
+            now,
+            start_utc,
+            min_notice_min,
+            rt.cfg.window_rules(price.window_min),
+        ),
+    }
     .map_err(|_| Refusal::TooLate)?;
     let limits = Limits {
         per_email: rt.cfg.max_open_per_email,
@@ -623,7 +655,8 @@ async fn prepare_priced(
         address_raw: rt.cfg.address_raw.clone(),
         limits,
         created_at: now,
-        renewals_max: rt.cfg.max_renewals,
+        renewals_max: debug_timing.map_or(rt.cfg.max_renewals, |t| t.renewals_max),
+        debug_timing,
         ladder,
     })
 }
@@ -755,8 +788,8 @@ pub(crate) async fn open_invoice(
                  address_raw, event_title, start_at_utc, guest_email_norm, client_tag,
                  currency, price_usd_cents, rate_usd_micro, rate_sources, rate_at, amount_nano,
                  tolerance_nano, status, created_at, expires_at, settle_by, hard_deadline,
-                 renewals_max, pricing_mode, demand_n, quoted_nano)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?)",
+                 renewals_max, pricing_mode, demand_n, quoted_nano, debug_timing)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(&id)
         .bind(booking_id)
@@ -789,6 +822,7 @@ pub(crate) async fn open_invoice(
                 .and_then(|l| l.quoted.nano())
                 .and_then(amount::to_i64),
         )
+        .bind(p.debug_timing.map(|t| t.text()))
         .execute(&mut *conn)
         .await;
         match inserted {

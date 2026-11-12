@@ -481,10 +481,45 @@ pub(crate) struct InvoiceRow {
     pub(crate) expires_at: String,
     pub(crate) settle_by: String,
     pub(crate) hard_deadline: String,
+    /// ilia fork: a test booking's own timing ([`DEBUG_TIMING_SQL`]).
+    pub(crate) debug_timing: Option<String>,
 }
 
-const INVOICE_COLS: &str = "id, booking_id, network, address_raw, status, problem, amount_nano, \
-     tolerance_nano, paid_nano, excess_nano, created_at, expires_at, settle_by, hard_deadline";
+/// ilia fork: `ton_invoices.debug_timing` of an invoice whose booking is
+/// marked as a test (`debug_bookings`), else NULL: a timing on any other
+/// invoice (a hand edit) is never honoured. For a query over
+/// `ton_invoices` under its own name or the alias `i`; `{t}` is replaced.
+const DEBUG_TIMING_SQL: &str = "CASE WHEN EXISTS (SELECT 1 FROM debug_bookings d \
+     WHERE d.booking_id = {t}.booking_id) THEN {t}.debug_timing END";
+
+/// [`DEBUG_TIMING_SQL`] for the table (or alias) `t`.
+pub(crate) fn debug_timing_sql(t: &str) -> String {
+    DEBUG_TIMING_SQL.replace("{t}", t)
+}
+
+/// The test booking's own timing of an invoice row, read by
+/// [`debug_timing_sql`]; `None` for the site's rules (unset, or not a
+/// timing: logged).
+pub(crate) fn parse_debug_timing(
+    invoice_id: &str,
+    text: Option<&str>,
+) -> Option<crate::ton::deadlines::DebugTiming> {
+    let text = text?;
+    let parsed = crate::ton::deadlines::DebugTiming::parse(text);
+    if parsed.is_none() {
+        tracing::warn!(target: super::TARGET, invoice = %invoice_id, "a debug timing cannot be read; the site's rules apply");
+    }
+    parsed
+}
+
+fn invoice_cols() -> String {
+    format!(
+        "id, booking_id, network, address_raw, status, problem, amount_nano, \
+         tolerance_nano, paid_nano, excess_nano, created_at, expires_at, settle_by, hard_deadline, \
+         {} AS debug_timing",
+        debug_timing_sql("ton_invoices")
+    )
+}
 
 impl InvoiceRow {
     /// What the decision table needs. `None` for a row it cannot read,
@@ -506,7 +541,8 @@ pub(crate) async fn invoice_by_reference(
     reference: &str,
 ) -> Result<Option<InvoiceRow>, sqlx::Error> {
     sqlx::query_as::<_, InvoiceRow>(&format!(
-        "SELECT {INVOICE_COLS} FROM ton_invoices WHERE reference = ?"
+        "SELECT {} FROM ton_invoices WHERE reference = ?",
+        invoice_cols()
     ))
     .bind(reference)
     .fetch_optional(&mut *conn)
@@ -518,7 +554,8 @@ pub(crate) async fn invoice_for_booking(
     booking_id: &str,
 ) -> Result<Option<InvoiceRow>, sqlx::Error> {
     sqlx::query_as::<_, InvoiceRow>(&format!(
-        "SELECT {INVOICE_COLS} FROM ton_invoices WHERE booking_id = ?"
+        "SELECT {} FROM ton_invoices WHERE booking_id = ?",
+        invoice_cols()
     ))
     .bind(booking_id)
     .fetch_optional(pool)
@@ -531,7 +568,8 @@ pub(crate) async fn invoices_with_status(
     status: &str,
 ) -> Result<Vec<InvoiceRow>, sqlx::Error> {
     sqlx::query_as::<_, InvoiceRow>(&format!(
-        "SELECT {INVOICE_COLS} FROM ton_invoices WHERE status = ? AND network = ? ORDER BY created_at"
+        "SELECT {} FROM ton_invoices WHERE status = ? AND network = ? ORDER BY created_at",
+        invoice_cols()
     ))
     .bind(status)
     .bind(network.as_str())
@@ -875,13 +913,17 @@ pub(crate) async fn watched_addresses(
 
 /// ilia fork: open invoices, still owing, renewed since the guest was last
 /// told: (id, address_raw, renewed_at).
+/// Its rows: (invoice id, address, renewed_at, the test booking's own
+/// timing as [`debug_timing_sql`] reads it).
+#[allow(clippy::type_complexity)]
 pub(crate) async fn due_renewal_notices(
     pool: &SqlitePool,
-) -> Result<Vec<(String, String, Option<String>)>, sqlx::Error> {
-    sqlx::query_as(
-        "SELECT id, address_raw, renewed_at FROM ton_invoices
+) -> Result<Vec<(String, String, Option<String>, Option<String>)>, sqlx::Error> {
+    sqlx::query_as(&format!(
+        "SELECT id, address_raw, renewed_at, {} FROM ton_invoices
          WHERE status = 'open' AND renewal_notified < renewals AND paid_nano < amount_nano",
-    )
+        debug_timing_sql("ton_invoices")
+    ))
     .fetch_all(pool)
     .await
 }
@@ -908,6 +950,20 @@ pub(crate) async fn active_invoices(pool: &SqlitePool) -> bool {
     .await
     .map(|v| v != 0)
     .unwrap_or(true)
+}
+
+/// ilia fork: an open invoice of a test booking with its own timing exists
+/// (the watcher keeps to a short step while its minutes run).
+pub(crate) async fn open_debug_invoice(pool: &SqlitePool) -> bool {
+    sqlx::query_scalar::<_, i64>(&format!(
+        "SELECT EXISTS (SELECT 1 FROM ton_invoices i
+          WHERE i.status = 'open' AND ({}) IS NOT NULL)",
+        debug_timing_sql("i")
+    ))
+    .fetch_one(pool)
+    .await
+    .map(|v| v != 0)
+    .unwrap_or(false)
 }
 
 /// Claim a global alert of `kind` unless one went out in the last hour.

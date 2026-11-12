@@ -7,14 +7,15 @@
   <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 0;">{{ t("ton-admin-intro") }}</p>
 </div>
 
-{#- ilia fork: the debug switch and the test booking page (debug_booking.rs). -#}
+{#- ilia fork: the debug switch and the test booking page (debug_booking.rs). A plain card here: the
+    hazard frame and banner are only on the test booking page itself (owner, 2026-11-12). -#}
 {% include "ilia/debug_style.html" %}
-<div class="card dbg-hazard" id="debug-block" data-debug="{{ 'on' if debug.on else 'off' }}" data-source="{{ debug.source }}">
-  <div class="dbg-banner" style="margin: -0.25rem 0 0.75rem;"><span class="dbg-label">{{ t("ton-admin-debug-title") }}</span></div>
+<div class="card" id="debug-block" data-debug="{{ 'on' if debug.on else 'off' }}" data-source="{{ debug.source }}">
+  <h2>{{ t("ton-admin-debug-title") }}</h2>
   <p style="color: var(--text-secondary); font-size: 0.875rem; margin: 0 0 0.75rem;">{{ t("ton-admin-debug-intro") }}</p>
   {% if debug_notice %}
   <p id="debug-notice" data-notice="{{ debug_notice }}" style="font-size: 0.875rem; font-weight: 600; margin: 0 0 0.75rem;">
-    {% if debug_notice == "on" %}{{ t("ton-admin-debug-saved-on") }}{% elif debug_notice == "off" %}{{ t("ton-admin-debug-saved-off") }}{% else %}{{ t("ton-admin-debug-saved-locked") }}{% endif %}
+    {% if debug_notice == "on" %}{{ t("ton-admin-debug-saved-on") }}{% elif debug_notice == "off" %}{{ t("ton-admin-debug-saved-off") }}{% elif debug_notice == "tg-saved" %}{{ t("ton-admin-debug-tg-saved") }}{% elif debug_notice == "tg-same" %}{{ t("ton-admin-saved-none") }}{% elif debug_notice == "tg-invalid" %}{{ t("ton-admin-debug-tg-invalid") }}{% else %}{{ t("ton-admin-debug-saved-locked") }}{% endif %}
   </p>
   {% endif %}
   <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
@@ -32,6 +33,20 @@
     {% if debug.source == "env" %}{{ t("ton-admin-debug-locked-env", var=debug.var, value=debug.env_value) }}{% else %}{{ t("ton-admin-debug-locked-apply") }}{% endif %}
   </p>
   {% endif %}
+  {% set tg = debug.telegram %}
+  <form method="post" action="{{ tg.path }}" id="debug-telegram" data-source="{{ tg.source }}" style="margin: 0.9rem 0 0;">
+    <label for="debug-telegram-input" style="display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 0.25rem;">{{ t("ton-admin-debug-tg-label") }}</label>
+    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+      <input id="debug-telegram-input" name="debug_booking_telegram" value="{{ tg.value }}" maxlength="64" autocomplete="off" placeholder="getmonolith" style="flex: 1; min-width: 12rem; max-width: 20rem; padding: 0.4rem 0.5rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text);"{% if tg.locked %} disabled{% endif %}>
+      <button type="submit" class="slot-btn" style="cursor: pointer;"{% if tg.locked %} disabled{% endif %}>{{ t("ton-admin-debug-tg-save") }}</button>
+    </div>
+    <span style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">{{ t("ton-admin-debug-tg-help") }}</span>
+    {% if tg.locked %}
+    <span id="debug-telegram-locked" style="font-size: 0.8rem; color: var(--warning-text, #b45309); display: block; margin-top: 0.25rem;">
+      {% if tg.source == "env" %}{{ t("ton-admin-debug-locked-env", var=tg.var, value=tg.env_value) }}{% else %}{{ t("ton-admin-debug-tg-locked-apply") }}{% endif %}
+    </span>
+    {% endif %}
+  </form>
 </div>
 
 {% if notice %}
