@@ -174,7 +174,7 @@ mod tests {
     }
 
     #[test]
-    fn footer_credits_the_maker_calrs_and_links_the_source() {
+    fn footer_credits_the_maker_and_links_the_source() {
         let html = login_page(
             &footer(Some(SOURCE), Some("Ilia"), Some("https://ilia.ae")),
             "en",
@@ -182,8 +182,18 @@ mod tests {
         assert_eq!(
             footer_line(&html),
             format!(
-                r#"<div class="powered"><span class="made-by">Made by <a href="https://ilia.ae" target="_blank" rel="noopener noreferrer">Ilia</a> · based on <a href="https://cal.rs" target="_blank" rel="noopener noreferrer">calrs</a> · </span><a class="source-link" href="{SOURCE}" target="_blank" rel="noopener noreferrer">Source code</a></div>"#
+                r#"<div class="powered"><span class="made-by">Made by <a href="https://ilia.ae" target="_blank" rel="noopener noreferrer">Ilia</a> · based on </span><a class="source-link" href="{SOURCE}" target="_blank" rel="noopener noreferrer">source code</a></div>"#
             )
+        );
+    }
+
+    /// A maker but no source URL: the line still says what it is based on.
+    #[test]
+    fn footer_with_a_maker_and_no_source_credits_calrs() {
+        let html = login_page(&footer(None, Some("Ilia"), Some("https://ilia.ae")), "en");
+        assert_eq!(
+            footer_line(&html),
+            r#"<div class="powered"><span class="made-by">Made by <a href="https://ilia.ae" target="_blank" rel="noopener noreferrer">Ilia</a> · based on <a href="https://cal.rs" target="_blank" rel="noopener noreferrer">calrs</a></span></div>"#
         );
     }
 

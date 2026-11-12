@@ -538,10 +538,11 @@
   {% endif %}
   <div class="container">
     {% block content %}{% endblock %}
-    {#- ilia fork (src/web/ilia.rs): one line in English whatever the page language. The made-by
-        part is the footer block, hidden when embedded and left out by the dashboard; the AGPL
-        source link of the running version stays on every page. #}
-    <div class="powered">{% block footer %}<span class="made-by">{% if made_by_name %}Made by {% if made_by_url %}<a href="{{ made_by_url }}" target="_blank" rel="noopener noreferrer">{{ made_by_name }}</a>{% else %}{{ made_by_name }}{% endif %} · {% endif %}based on <a href="https://cal.rs" target="_blank" rel="noopener noreferrer">calrs</a>{% if source_url %} · {% endif %}</span>{% endblock %}{% if source_url %}<a class="source-link" href="{{ source_url }}" target="_blank" rel="noopener noreferrer">Source code</a>{% endif %}</div>
+    {#- ilia fork (src/web/ilia.rs): one line in English whatever the page language: "Made by <name>
+        · based on source code" (the link is the source of the running version), or without a
+        maker "based on calrs · Source code". The made-by part is the footer block, hidden when
+        embedded and left out by the dashboard; the AGPL source link stays on every page. #}
+    <div class="powered">{% block footer %}<span class="made-by">{% if made_by_name %}Made by {% if made_by_url %}<a href="{{ made_by_url }}" target="_blank" rel="noopener noreferrer">{{ made_by_name }}</a>{% else %}{{ made_by_name }}{% endif %} · based on {% if not source_url %}<a href="https://cal.rs" target="_blank" rel="noopener noreferrer">calrs</a>{% endif %}{% else %}based on <a href="https://cal.rs" target="_blank" rel="noopener noreferrer">calrs</a>{% if source_url %} · {% endif %}{% endif %}</span>{% endblock %}{% if source_url %}<a class="source-link" href="{{ source_url }}" target="_blank" rel="noopener noreferrer">{% if made_by_name %}source code{% else %}Source code{% endif %}</a>{% endif %}</div>
     {% block theme_toggle %}
     <button id="theme-toggle" type="button" title="{{ t('base-theme-toggle') }}" aria-label="{{ t('base-theme-toggle') }}" class="theme-pill">
       <span class="theme-pill-track">
