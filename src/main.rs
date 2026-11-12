@@ -225,6 +225,11 @@ async fn run(credentials: credentials::Report) -> Result<()> {
             tokio::spawn(web::run_reminder_loop(reminder_pool, reminder_key));
 
             let state = web::build_state(pool, data_dir, secret_key).await;
+            // ilia fork: `CALRS_EMBED_ORIGINS`, `*` when unset (upstream).
+            tracing::info!(
+                frame_ancestors = %state.embed_origins.describe(),
+                "embedded booking pages may be framed by these sites"
+            );
             let (stop_tx, stop_rx) = tokio::sync::watch::channel(false);
             let telegram =
                 telegram::spawn(state.pool.clone(), state.secret_key, stop_rx.clone()).await;
