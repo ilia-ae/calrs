@@ -70,13 +70,26 @@
   .ton-other summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
   .ton-other .ton-scan { margin-top: 0.75rem; }
 
+  /* Copy rows after BTCPay's copy field: label over the value on one line,
+     the address cut in the middle (start…end) so its tail stays readable,
+     an icon button that turns into a check. The whole value is in
+     data-value (copied) and in the two spans (read, selected by hand). */
   .ton-fields { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1.5rem; }
-  .ton-field { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 0.75rem; row-gap: 0.25rem; align-items: center; padding: 0.625rem 0.75rem 0.625rem 0.875rem; background: var(--surface-hover); border: 1px solid var(--border); border-radius: var(--radius); }
-  .ton-field .ton-label { grid-column: 1; grid-row: 1; }
-  .ton-field code { grid-column: 1; grid-row: 2; font-family: var(--mono); font-size: 0.9rem; line-height: 1.4; overflow-wrap: anywhere; user-select: all; -webkit-user-select: all; }
-  .ton-field .ton-copy { grid-column: 2; grid-row: 1 / 3; }
+  .ton-field { display: flex; align-items: center; gap: 0.5rem; padding: 0.625rem 0.5rem 0.625rem 0.875rem; background: var(--surface-hover); border: 1px solid var(--border); border-radius: var(--radius); }
+  .ton-field-body { display: flex; flex-direction: column; gap: 0.125rem; flex: 1; min-width: 0; }
+  .ton-value { display: flex; min-width: 0; font-family: var(--mono); font-size: 0.9375rem; line-height: 1.4; white-space: nowrap; cursor: copy; user-select: all; -webkit-user-select: all; }
+  .ton-value .tc-start { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .ton-value .tc-end { flex: none; }
   .ton-field-memo { border-color: var(--warn-border); box-shadow: inset 3px 0 0 var(--warn); }
-  .ton-field-memo code { font-size: 1.0625rem; font-weight: 600; }
+  .ton-field-memo .ton-value { font-size: 1.0625rem; font-weight: 600; letter-spacing: 0.02em; }
+  .ton-copy { flex: none; display: grid; place-items: center; width: 2.5rem; height: 2.5rem; border: 0; border-radius: 8px; background: transparent; color: var(--text-muted); cursor: pointer; transition: background-color 0.15s ease, color 0.15s ease; }
+  .ton-copy:hover { background: var(--surface); color: var(--text); }
+  .ton-copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .ton-copy svg { width: 1.125rem; height: 1.125rem; }
+  .ton-copy .ic-done { display: none; }
+  .ton-copy[data-copied] { color: var(--success); }
+  .ton-copy[data-copied] .ic-copy { display: none; }
+  .ton-copy[data-copied] .ic-done { display: block; }
   #ton-copy-status { text-align: center; color: var(--text-muted); font-size: 0.8125rem; min-height: 1.2em; margin: 0; }
 
   .ton-warn { margin-top: 0.5rem; padding: 0.875rem 1.125rem; border: 1px solid var(--warn-border); border-radius: var(--radius); background: var(--warn-bg); font-size: 0.875rem; line-height: 1.55; }
@@ -176,14 +189,18 @@
 
   <div class="ton-fields">
     <div class="ton-field">
-      <span class="ton-label">{{ t("ton-pay-address") }}</span>
-      <code id="ton-address">{{ address }}</code>
-      <button type="button" class="btn btn-secondary btn-sm btn-auto ton-copy" data-copy="ton-address" aria-label="{{ t('ton-pay-copy-address') }}" hidden>{{ t("ton-pay-copy") }}</button>
+      <div class="ton-field-body">
+        <span class="ton-label">{{ t("ton-pay-address") }}</span>
+        <code class="ton-value" id="ton-address" data-value="{{ address }}" title="{{ address }}"><span class="tc-start">{{ address[:-8] }}</span><span class="tc-end">{{ address[-8:] }}</span></code>
+      </div>
+      <button type="button" class="ton-copy" data-copy="ton-address" aria-label="{{ t('ton-pay-copy-address') }}" title="{{ t('ton-pay-copy') }}" hidden><svg class="ic-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2.5"/><path d="M5 15H4.5A1.5 1.5 0 0 1 3 13.5v-9A1.5 1.5 0 0 1 4.5 3h9A1.5 1.5 0 0 1 15 4.5V5"/></svg><svg class="ic-done" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>
     </div>
     <div class="ton-field ton-field-memo">
-      <span class="ton-label">{{ t("ton-pay-comment") }}</span>
-      <code id="ton-comment">{{ comment }}</code>
-      <button type="button" class="btn btn-secondary btn-sm btn-auto ton-copy" data-copy="ton-comment" aria-label="{{ t('ton-pay-copy-comment') }}" hidden>{{ t("ton-pay-copy") }}</button>
+      <div class="ton-field-body">
+        <span class="ton-label">{{ t("ton-pay-comment") }}</span>
+        <code class="ton-value" id="ton-comment" data-value="{{ comment }}">{{ comment }}</code>
+      </div>
+      <button type="button" class="ton-copy" data-copy="ton-comment" aria-label="{{ t('ton-pay-copy-comment') }}" title="{{ t('ton-pay-copy') }}" hidden><svg class="ic-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2.5"/><path d="M5 15H4.5A1.5 1.5 0 0 1 3 13.5v-9A1.5 1.5 0 0 1 4.5 3h9A1.5 1.5 0 0 1 15 4.5V5"/></svg><svg class="ic-done" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>
     </div>
     <p id="ton-copy-status" role="status" aria-live="polite"></p>
   </div>
@@ -233,19 +250,22 @@
     say(ok ? I18N.copied : I18N.manual);
   };
   document.querySelectorAll('.ton-copy').forEach(function (btn) {
+    var el = document.getElementById(btn.getAttribute('data-copy'));
+    if (!el) return;
     btn.hidden = false;
-    var label = btn.textContent, timer;
-    btn.addEventListener('click', function () {
-      var el = document.getElementById(btn.getAttribute('data-copy'));
-      if (!el) return;
-      var text = el.textContent.trim();
+    var timer;
+    var copy = function () {
+      var text = (el.getAttribute('data-value') || el.textContent).trim();
       if (!navigator.clipboard || !navigator.clipboard.writeText) { fallback(el); return; }
       navigator.clipboard.writeText(text).then(function () {
-        btn.textContent = I18N.copied; say(I18N.copied);
+        btn.setAttribute('data-copied', ''); say(I18N.copied);
         clearTimeout(timer);
-        timer = setTimeout(function () { btn.textContent = label; say(''); }, 1500);
+        timer = setTimeout(function () { btn.removeAttribute('data-copied'); say(''); }, 1500);
       }, function () { fallback(el); });
-    });
+    };
+    btn.addEventListener('click', copy);
+    // As on BTCPay's page, a tap on the value copies it too.
+    el.addEventListener('click', copy);
   });
   var left = document.getElementById('ton-left');
   if (left) {
