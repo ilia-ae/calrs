@@ -1604,3 +1604,302 @@ async fn the_watcher_keeps_up_with_a_fast_test_booking() {
     let d = watcher::next_delay(&e.pool, &e.rt, &failed, e.now).await;
     assert!(d > watcher::DEBUG_POLL, "{d:?}");
 }
+
+// --- the guest language ---------------------------------------------------
+
+/// The language select of the page, as `(code, selected)`.
+fn guest_lang_options(page: &str) -> Vec<(String, bool)> {
+    let select = page
+        .split(r#"<select id="dbg-guest-lang" name="guest_lang""#)
+        .nth(1)
+        .expect("the guest language select")
+        .split("</select>")
+        .next()
+        .unwrap();
+    select
+        .split("<option value=\"")
+        .skip(1)
+        .map(|o| {
+            let code = o.split('"').next().unwrap().to_string();
+            let head = o.split('>').next().unwrap();
+            (code, head.contains(" selected"))
+        })
+        .collect()
+}
+
+fn selected_guest_lang(page: &str) -> Option<String> {
+    let all = guest_lang_options(page);
+    let chosen: Vec<_> = all.iter().filter(|(_, s)| *s).collect();
+    assert!(chosen.len() <= 1, "{all:?}");
+    chosen.first().map(|(c, _)| c.clone())
+}
+
+#[tokio::test]
+async fn the_guest_language_is_the_admins_own_by_default() {
+    let e = env_on().await;
+    let admin = e.session().await;
+    // No saved language: the page's (here English, no Accept-Language).
+    let (_, page) = e.get_as(PATH, &admin).await;
+    let codes: Vec<String> = guest_lang_options(&page)
+        .into_iter()
+        .map(|(c, _)| c)
+        .collect();
+    let shipped: Vec<String> = crate::i18n::supported_with_labels()
+        .map(|(c, _)| c.to_string())
+        .collect();
+    assert_eq!(codes, shipped, "every shipped language, in order");
+    assert!(page.contains(r#"<option value="ru" lang="ru">Русский</option>"#));
+    assert_eq!(selected_guest_lang(&page).as_deref(), Some("en"));
+    // The page's language is the browser's while nothing is saved.
+    let req = axum::http::Request::builder()
+        .uri(PATH)
+        .header("cookie", format!("__Host-calrs_session={admin}"))
+        .header("accept-language", "it-IT,it;q=0.9")
+        .body(Body::empty())
+        .unwrap();
+    let page = unescape(&body_string(e.app().oneshot(req).await.unwrap()).await);
+    assert_eq!(selected_guest_lang(&page).as_deref(), Some("it"));
+    // The admin's saved interface language wins over the browser.
+    set_user_language(&e.pool, "test@example.com", "ru").await;
+    let (_, page) = e.get_as(PATH, &admin).await;
+    assert_eq!(selected_guest_lang(&page).as_deref(), Some("ru"));
+    assert!(page.contains(&crate::i18n::translate("ru", "dbg-guest-lang", None)));
+}
+
+/// The test type, free: the booking is confirmed at once and the guest gets
+/// the confirmation email.
+async fn free_env_on() -> Env {
+    let e = env_on().await;
+    sqlx::query("UPDATE ton_prices SET enabled = 0")
+        .execute(&e.pool)
+        .await
+        .unwrap();
+    e
+}
+
+async fn newest_booking(e: &Env) -> String {
+    sqlx::query_scalar("SELECT id FROM bookings ORDER BY created_at DESC, rowid DESC LIMIT 1")
+        .fetch_one(&e.pool)
+        .await
+        .unwrap()
+}
+
+#[tokio::test]
+async fn the_chosen_guest_language_is_stored_and_the_guest_emails_follow_it() {
+    let e = free_env_on().await;
+    let (port, mails) = spawn_capturing_mta().await;
+    use_capturing_mta(&e.pool, port).await;
+    // The owner's case: their interface in Russian, a browser in English.
+    set_user_language(&e.pool, "test@example.com", "ru").await;
+    let admin = e.session().await;
+    let req = post_form(PATH, &admin, CSRF, &form("&guest_lang=fr"));
+    let (mut parts, body) = req.into_parts();
+    parts
+        .headers
+        .insert("accept-language", "en-US,en;q=0.9".parse().unwrap());
+    let resp = e
+        .app()
+        .oneshot(axum::http::Request::from_parts(parts, body))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), axum::http::StatusCode::OK);
+    let bid = newest_booking(&e).await;
+    assert_eq!(booking_status(&e.pool, &bid).await, "confirmed");
+    assert_eq!(e.booking_col(&bid, "language").await.as_deref(), Some("fr"));
+    assert_eq!(e.debug_rows().await.len(), 1);
+    // The confirmation page the guest sees is in the guest's language.
+    let page = body_string(resp).await;
+    assert!(page.contains(r#"lang="fr""#), "{page}");
+
+    // The guest's email in French, the host's in the host's Russian (the
+    // admin is both, at the same address).
+    let all = settled_mails_to(&mails, "test@example.com").await;
+    let guest: Vec<&String> = all
+        .iter()
+        .filter(|m| {
+            m.contains(&crate::i18n::translate(
+                "fr",
+                "email-confirm-headline",
+                None,
+            ))
+        })
+        .collect();
+    assert_eq!(guest.len(), 1, "one guest confirmation in French: {all:#?}");
+    assert!(guest[0].contains(r#"<html lang="fr">"#), "{}", guest[0]);
+    assert!(!all.iter().any(|m| m.contains(&crate::i18n::translate(
+        "en",
+        "email-confirm-headline",
+        None
+    ))));
+    assert!(
+        all.iter().any(|m| m.contains(&crate::i18n::translate(
+            "ru",
+            "email-host-new-heading",
+            None
+        ))),
+        "{all:#?}"
+    );
+    // Read back later (a cancellation, a reminder): the stored language.
+    assert_eq!(
+        crate::email::stored_booking_language(&e.pool, &bid)
+            .await
+            .as_deref(),
+        Some("fr")
+    );
+
+    // The list shows it.
+    let (_, page) = e.get_as(PATH, &admin).await;
+    let row = list_row(&page, &bid);
+    assert!(row.contains(r#"data-lang="fr""#), "{row}");
+    assert!(row.contains("Français"), "{row}");
+
+    // No field posted: the admin's own language, not the browser's.
+    let body = form("").replace("T10%3A00", "T11%3A00");
+    let req = post_form(PATH, &admin, CSRF, &body);
+    let (mut parts, b) = req.into_parts();
+    parts
+        .headers
+        .insert("accept-language", "en-US,en;q=0.9".parse().unwrap());
+    let resp = e
+        .app()
+        .oneshot(axum::http::Request::from_parts(parts, b))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), axum::http::StatusCode::OK);
+    let second = newest_booking(&e).await;
+    assert_ne!(second, bid);
+    assert_eq!(
+        e.booking_col(&second, "language").await.as_deref(),
+        Some("ru")
+    );
+
+    // A visitor's own switcher pick on the admin's browser does not leak
+    // into the test booking either: the posted choice is what counts.
+    let body = form("&guest_lang=de-formal").replace("T10%3A00", "T12%3A00");
+    let req = axum::http::Request::builder()
+        .method("POST")
+        .uri(PATH)
+        .header(
+            "cookie",
+            format!("calrs_lang=it; __Host-calrs_session={admin}; __Host-calrs_csrf={CSRF}; calrs_lang=es"),
+        )
+        .header("content-type", "application/x-www-form-urlencoded")
+        .body(Body::from(body))
+        .unwrap();
+    let resp = e.app().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), axum::http::StatusCode::OK);
+    let third = newest_booking(&e).await;
+    assert_eq!(
+        e.booking_col(&third, "language").await.as_deref(),
+        Some("de-formal")
+    );
+}
+
+#[tokio::test]
+async fn an_unknown_guest_language_is_refused_before_booking() {
+    let e = env_on().await;
+    let admin = e.session().await;
+    for bad in ["xx", "fr-FR", "en%3B+calrs_lang%3Dru"] {
+        let resp = e
+            .post_as(PATH, &admin, &form(&format!("&guest_lang={bad}")))
+            .await;
+        assert_eq!(resp.status(), axum::http::StatusCode::BAD_REQUEST, "{bad}");
+        let page = unescape(&body_string(resp).await);
+        assert!(
+            page.contains(&crate::i18n::translate("en", "dbg-err-lang", None)),
+            "{bad}"
+        );
+    }
+    let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM bookings")
+        .fetch_one(&e.pool)
+        .await
+        .unwrap();
+    assert_eq!(n, 0);
+}
+
+/// A real guest's booking keeps the language of the guest's own page, with
+/// the debug page on and an admin's test booking in another language.
+#[tokio::test]
+async fn a_real_guests_booking_keeps_its_own_language() {
+    let e = free_env_on().await;
+    let admin = e.session().await;
+    set_user_language(&e.pool, "test@example.com", "ru").await;
+    let resp = e.post_as(PATH, &admin, &form("&guest_lang=fr")).await;
+    assert_eq!(resp.status(), axum::http::StatusCode::OK);
+    assert_eq!(
+        e.booking_col(&newest_booking(&e).await, "language")
+            .await
+            .as_deref(),
+        Some("fr")
+    );
+    let guest = |time: &str, cookie: Option<&str>| {
+        let b = axum::http::Request::builder()
+            .method("POST")
+            .uri("/u/testuser/test-meeting/book")
+            .header("content-type", "application/x-www-form-urlencoded")
+            .header("accept-language", "de-DE,de;q=0.9")
+            .header(
+                "cookie",
+                format!("__Host-calrs_csrf={CSRF}{}", cookie.unwrap_or("")),
+            );
+        b.body(Body::from(format!(
+            "_csrf={CSRF}&date={}&time={time}&name=Guest&email=guest%40test.com&tz=UTC&guest_lang=fr",
+            far_future_monday()
+        )))
+        .unwrap()
+    };
+    // The browser's German; a `guest_lang` a guest posts is ignored.
+    let resp = e.app().oneshot(guest("13:00", None)).await.unwrap();
+    assert_eq!(resp.status(), axum::http::StatusCode::OK);
+    let bid = newest_booking(&e).await;
+    assert_eq!(e.booking_col(&bid, "language").await.as_deref(), Some("de"));
+    assert!(!e.debug_rows().await.iter().any(|(b, _, _)| *b == bid));
+    // The guest's own switcher pick, as before.
+    let resp = e
+        .app()
+        .oneshot(guest("14:00", Some("; calrs_lang=pl")))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), axum::http::StatusCode::OK);
+    let bid = newest_booking(&e).await;
+    assert_eq!(e.booking_col(&bid, "language").await.as_deref(), Some("pl"));
+}
+
+#[tokio::test]
+async fn without_a_linked_chat_the_page_says_so_at_the_top() {
+    let _tg = fake::install_fake("ilia_test_bot").await;
+    let _lock = crate::test_support::ENV_LOCK.lock().await;
+    let _guard = crate::test_support::EnvGuard::new();
+    std::env::set_var("CALRS_BASE_URL", BASE);
+    let e = env_on().await;
+    let admin = e.session().await;
+    let (_, page) = e.get_as(PATH, &admin).await;
+    let notice = page
+        .split(r#"id="debug-booking-no-chat""#)
+        .nth(1)
+        .expect("the notice")
+        .split("</div>")
+        .next()
+        .unwrap();
+    assert!(notice.contains(&crate::i18n::translate("en", "dbg-no-chat-title", None)));
+    assert!(
+        notice.contains(r#"href="/dashboard/settings/telegram""#),
+        "{notice}"
+    );
+    // Above the form.
+    let at = |needle: &str| page.find(needle).unwrap();
+    assert!(at(r#"id="debug-booking-no-chat""#) < at(r#"id="debug-booking-form""#));
+    assert!(page.contains(r#"id="dbg-own-chat" disabled"#));
+
+    // Linked: no notice.
+    sqlx::query(
+        "INSERT INTO telegram_user_chats (user_id, chat_id, telegram_username)
+         SELECT id, ?, 'host_tg' FROM users WHERE username = 'testuser'",
+    )
+    .bind(HOST_CHAT)
+    .execute(&e.pool)
+    .await
+    .unwrap();
+    let (_, page) = e.get_as(PATH, &admin).await;
+    assert!(!page.contains(r#"id="debug-booking-no-chat""#));
+}

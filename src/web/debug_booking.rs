@@ -68,6 +68,19 @@
 //!   had opened the guest's deep link from it, and the usual welcome (or
 //!   `PaymentDue` for an unpaid invoice) is queued. The chat id stays in SQL
 //!   and is never read into a page or a log.
+//! - **Guest language** ([`guest_headers`]): the language the test guest
+//!   books in, chosen on the page (every bundled locale, by its own name;
+//!   by default the admin's own interface language, `users.language`, else
+//!   the page's). The forwarded request carries it as the switcher's
+//!   `calrs_lang` cookie (any other copy dropped, and the instance's
+//!   formal-German header too, so `de` stays `de`), which every booking page
+//!   reads first (`i18n::page_lang`), so the booking stores it as
+//!   `bookings.language` and the guest's pages, emails and Telegram messages
+//!   follow it; host emails keep each host's own language. Only this page's
+//!   copy of the headers changes: a guest's booking is untouched.
+//! - When Telegram is on and the admin has no linked chat, the page says at
+//!   the top that the own-chat option is unavailable and links to
+//!   Profile & Settings → Telegram.
 //! - One `calrs::audit` event per attempt and per cancel-all.
 
 use super::*;
@@ -650,6 +663,7 @@ struct ListedRow {
     title: String,
     start_at: String,
     status: String,
+    language: Option<String>,
     own_chat: i64,
     invoice: Option<String>,
     pay_token: Option<String>,
@@ -665,7 +679,7 @@ struct ListedRow {
 /// deadlines (unix seconds, for the page's countdown).
 async fn listed(pool: &SqlitePool, user_id: &str, tz: Tz, lang: &str) -> Vec<minijinja::Value> {
     let rows: Vec<ListedRow> = sqlx::query_as(
-        "SELECT b.id, et.title, b.start_at, b.status, d.telegram_own_chat AS own_chat,
+        "SELECT b.id, et.title, b.start_at, b.status, b.language, d.telegram_own_chat AS own_chat,
                 i.status AS invoice, i.pay_token, i.debug_timing, i.expires_at, i.settle_by,
                 i.renewals, i.renewals_max
                FROM debug_bookings d
@@ -711,6 +725,8 @@ async fn listed(pool: &SqlitePool, user_id: &str, tz: Tz, lang: &str) -> Vec<min
                 when => when,
                 status_label => status_label(lang, &r.status),
                 status => r.status,
+                language => r.language.as_deref().and_then(crate::i18n::supported_code),
+                language_label => r.language.as_deref().and_then(lang_label),
                 invoice_label => r.invoice.as_deref().map(|i| invoice_label(lang, i)),
                 invoice => r.invoice,
                 // The payment page while the booking stands (the admin's own).
@@ -733,6 +749,58 @@ async fn listed(pool: &SqlitePool, user_id: &str, tz: Tz, lang: &str) -> Vec<min
             }
         })
         .collect()
+}
+
+/// A bundled locale's own name ("Русский"), for the language select and
+/// the list.
+fn lang_label(code: &str) -> Option<&'static str> {
+    let code = code.trim();
+    crate::i18n::supported_with_labels()
+        .find(|(c, _)| *c == code)
+        .map(|(_, label)| label)
+}
+
+/// The language a test booking is made in when the form names none: the
+/// admin's own interface language (`users.language`, else the page's, as
+/// the `AdminUser` extractor resolved it).
+fn default_guest_lang(admin: &crate::auth::AdminUser) -> &'static str {
+    admin.lang
+}
+
+/// The guest language posted: `Ok(None)` when none was (the default
+/// applies), `Err` for a value calrs does not ship.
+fn posted_guest_lang(value: Option<&str>) -> Result<Option<&'static str>, ()> {
+    match value.map(str::trim).filter(|v| !v.is_empty()) {
+        None => Ok(None),
+        Some(v) => crate::i18n::supported_code(v).map(Some).ok_or(()),
+    }
+}
+
+/// This page's copy of the request headers for the booking handler, with
+/// the guest language as the switcher's pick (`calrs_lang`, which every
+/// booking page reads first): every other `calrs_lang` cookie is dropped,
+/// the other cookies (the CSRF one) are kept in one `Cookie` header, and
+/// the instance's formal-German header is removed so the stored language is
+/// exactly the one chosen (`de-formal` is chosen as itself).
+pub(crate) fn guest_headers(headers: &HeaderMap, lang: &'static str) -> HeaderMap {
+    let mut out = headers.clone();
+    let prefix = format!("{}=", crate::i18n::LANG_COOKIE);
+    let mut parts: Vec<String> = headers
+        .get_all(axum::http::header::COOKIE)
+        .iter()
+        .filter_map(|v| v.to_str().ok())
+        .flat_map(|s| s.split(';'))
+        .map(str::trim)
+        .filter(|p| !p.is_empty() && !p.starts_with(prefix.as_str()))
+        .map(str::to_string)
+        .collect();
+    parts.push(format!("{prefix}{lang}"));
+    out.remove(axum::http::header::COOKIE);
+    if let Ok(v) = axum::http::HeaderValue::from_str(&parts.join("; ")) {
+        out.insert(axum::http::header::COOKIE, v);
+    }
+    out.remove(crate::i18n::GERMAN_FORMAL_HEADER);
+    out
 }
 
 /// A test booking's timing as the page shows it.
@@ -815,6 +883,8 @@ struct Kept {
     /// The Telegram box as posted; `None`: ticked whenever it can be.
     own_chat: Option<bool>,
     timing: TimingForm,
+    /// The guest language as posted; `None`: [`default_guest_lang`].
+    guest_lang: Option<String>,
 }
 
 /// "Timing for this test booking", as the form posts it: `timing` is
@@ -970,6 +1040,20 @@ async fn render(
         _ => None,
     };
     let own_chat_ok = telegram_on && own_chat.is_some();
+    let guest_lang = kept
+        .guest_lang
+        .as_deref()
+        .and_then(crate::i18n::supported_code)
+        .unwrap_or_else(|| default_guest_lang(admin));
+    let guest_langs: Vec<minijinja::Value> = crate::i18n::supported_with_labels()
+        .map(|(code, label)| {
+            context! {
+                code => code,
+                label => label,
+                selected => code == guest_lang,
+            }
+        })
+        .collect();
     let fast = crate::ton::deadlines::DebugTiming::FAST;
     let (selected_ctx, slots) = match selected {
         Some(t) => {
@@ -1057,6 +1141,12 @@ async fn render(
             notes => kept.notes.unwrap_or_else(|| crate::i18n::translate(lang, "dbg-notes-default", None)),
             telegram_on => telegram_on,
             own_chat_linked => own_chat.is_some(),
+            // Telegram is on and the admin has no linked chat: the notice at
+            // the top of the page.
+            own_chat_missing => telegram_on && own_chat.is_none(),
+            telegram_settings_path => "/dashboard/settings/telegram",
+            guest_langs => guest_langs,
+            guest_lang => guest_lang,
             own_chat_label => own_chat_label,
             // Ticked by default whenever it can be (the owner's choice).
             own_chat_checked => own_chat_ok && kept.own_chat.unwrap_or(true),
@@ -1106,6 +1196,8 @@ pub(super) struct DebugForm {
     notes: Option<String>,
     #[serde(default)]
     own_chat: Option<String>,
+    #[serde(default)]
+    guest_lang: Option<String>,
     #[serde(flatten)]
     timing: TimingForm,
 }
@@ -1127,6 +1219,7 @@ impl DebugForm {
             notes: self.notes.clone(),
             own_chat: Some(self.own_chat()),
             timing: self.timing.clone(),
+            guest_lang: self.guest_lang.clone(),
         }
     }
 }
@@ -1243,6 +1336,21 @@ pub(super) async fn book(
         .await;
     };
 
+    // The language the test guest books in (the default: the admin's).
+    let Ok(guest_lang) = posted_guest_lang(form.guest_lang.as_deref()) else {
+        let kept = refuse("dbg-err-lang");
+        return render(
+            &state,
+            &admin,
+            kept,
+            None,
+            StatusCode::BAD_REQUEST,
+            &client_ip,
+        )
+        .await;
+    };
+    let guest_lang = guest_lang.unwrap_or_else(|| default_guest_lang(&admin));
+
     // A private or internal type: a one-time invite for the admin's own
     // address, as the owner would make one in the dashboard.
     let invite = if et.visibility != "public" {
@@ -1301,7 +1409,7 @@ pub(super) async fn book(
         .to_string();
     let call = handle_booking_for_user(
         State(state.clone()),
-        headers.clone(),
+        guest_headers(&headers, guest_lang),
         Path((username, et.slug.clone())),
         Query(EmbedParams::default()),
         Form(guest_form),
@@ -1343,6 +1451,7 @@ pub(super) async fn book(
             event_type = %et.slug,
             slot = %form.slot,
             status = status.as_u16(),
+            guest_lang,
             timing = timing.map(|t| t.text()).as_deref().unwrap_or("site"),
             "debug booking refused by the booking path"
         );
@@ -1380,6 +1489,7 @@ pub(super) async fn book(
         slot = %form.slot,
         telegram_own_chat_asked = own_chat,
         telegram_own_chat = routed,
+        guest_lang,
         timing = timing.map(|t| t.text()).as_deref().unwrap_or("site"),
         "debug booking created"
     );
@@ -1391,6 +1501,7 @@ pub(super) async fn book(
         let kept = Kept {
             warning: Some(crate::i18n::translate(lang, "dbg-own-chat-failed", None)),
             et: Some(et.slug.clone()),
+            guest_lang: Some(guest_lang.to_string()),
             ..Kept::default()
         };
         return render(&state, &admin, kept, None, StatusCode::OK, &client_ip).await;
@@ -1603,6 +1714,54 @@ mod tests {
         ] {
             assert_eq!(split_slot(bad), None, "{bad:?}");
         }
+    }
+
+    #[test]
+    fn the_guest_language_reaches_the_booking_as_the_switchers_pick() {
+        use axum::http::header::COOKIE;
+        let mut h = HeaderMap::new();
+        h.append(
+            COOKIE,
+            "calrs_lang=it; __Host-calrs_csrf=abc".parse().unwrap(),
+        );
+        h.append(
+            COOKIE,
+            "__Host-calrs_session=s; calrs_lang=es".parse().unwrap(),
+        );
+        h.insert("accept-language", "en-US".parse().unwrap());
+        h.insert(crate::i18n::GERMAN_FORMAL_HEADER, "1".parse().unwrap());
+        let out = guest_headers(&h, "de");
+        let cookies: Vec<_> = out.get_all(COOKIE).iter().collect();
+        assert_eq!(cookies.len(), 1);
+        assert_eq!(
+            cookies[0].to_str().unwrap(),
+            "__Host-calrs_csrf=abc; __Host-calrs_session=s; calrs_lang=de"
+        );
+        // Exactly the language chosen: no formal register added to `de`.
+        assert_eq!(crate::i18n::chosen_from_headers(&out), Some("de"));
+        assert_eq!(crate::i18n::detect_from_headers(&out), "de");
+        assert_eq!(crate::i18n::page_lang(Some("ru"), &out), "de");
+        assert_eq!(out.get("accept-language").unwrap(), "en-US");
+        // The original is untouched.
+        assert_eq!(crate::i18n::chosen_from_headers(&h), Some("it"));
+        // No cookie at all: just the pick.
+        let out = guest_headers(&HeaderMap::new(), "de-formal");
+        assert_eq!(out.get(COOKIE).unwrap(), "calrs_lang=de-formal");
+        assert_eq!(crate::i18n::detect_from_headers(&out), "de-formal");
+    }
+
+    #[test]
+    fn a_posted_guest_language_is_a_shipped_one_or_refused() {
+        assert_eq!(posted_guest_lang(None), Ok(None));
+        assert_eq!(posted_guest_lang(Some("  ")), Ok(None));
+        assert_eq!(posted_guest_lang(Some("ru")), Ok(Some("ru")));
+        assert_eq!(posted_guest_lang(Some(" fr ")), Ok(Some("fr")));
+        assert_eq!(posted_guest_lang(Some("de-formal")), Ok(Some("de-formal")));
+        for bad in ["xx", "fr-FR", "RU", "en; calrs_lang=ru"] {
+            assert_eq!(posted_guest_lang(Some(bad)), Err(()), "{bad}");
+        }
+        assert_eq!(lang_label("ru"), Some("Русский"));
+        assert_eq!(lang_label("xx"), None);
     }
 
     fn t(slug: &str, priced: bool) -> OwnType {
