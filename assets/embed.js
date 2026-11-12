@@ -4,6 +4,7 @@
  *   Calrs.inline({ selector, link, config })
  *   Calrs.floatingButton({ link, buttonText, buttonPosition, buttonColor, textColor, showIcon, config })
  *   Calrs.elementClick()
+ *   Calrs.autoInline()
  *
  * Where `link` is a full URL to a calrs booking page (e.g.
  * "https://cal.example.com/u/alice/intro") and `config` is an object with
@@ -11,12 +12,24 @@
  * | "dark"), and `brand` (hex color, with or without leading "#"). These end
  * up as query parameters on the iframe src and feed into the embed-mode
  * rendering on the calrs side.
+ *
+ * ilia fork: no inline script needed. On load, every element carrying
+ * `data-calrs-inline="<booking link>"` (and optionally `data-calrs-config`,
+ * the same JSON as for data-calrs-link) gets the inline widget, replacing
+ * the element's content, so a fallback link inside it shows only without
+ * JavaScript. A host page whose CSP has no 'unsafe-inline' can then embed
+ * with one <script src> alone. Links that are not http(s) are not loaded.
  */
 (function () {
   if (window.Calrs) return;
 
   function buildSrc(link, config) {
     if (!link) return 'about:blank';
+    // ilia fork: an iframe with a javascript: or data: src would run in (or
+    // look like) the host page; only http(s) booking links are loaded.
+    var parsed;
+    try { parsed = new URL(link, location.href); } catch (e) { return 'about:blank'; }
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return 'about:blank';
     // Drop any #fragment first: appending our query after it would fold the
     // params into the fragment, so embed=1/layout/theme/brand would be lost.
     var hashIdx = link.indexOf('#');
@@ -31,6 +44,13 @@
       }
     }
     return url;
+  }
+
+  function readConfig(el) {
+    var raw = el.getAttribute('data-calrs-config');
+    var cfg = {};
+    if (raw) { try { cfg = JSON.parse(raw); } catch (e) {} }
+    return cfg;
   }
 
   function originOf(url) {
@@ -176,19 +196,33 @@
         var el = ev.target.closest('[data-calrs-link]');
         if (!el) return;
         ev.preventDefault();
-        var raw = el.getAttribute('data-calrs-config');
-        var cfg = {};
-        if (raw) { try { cfg = JSON.parse(raw); } catch (e) {} }
-        openModal(el.getAttribute('data-calrs-link'), cfg);
+        openModal(el.getAttribute('data-calrs-link'), readConfig(el));
       });
+    },
+
+    // ilia fork: inline widgets declared in markup (see the header comment).
+    // Idempotent per element, so calling it again after adding markup only
+    // fills the new ones.
+    autoInline: function () {
+      var els = document.querySelectorAll('[data-calrs-inline]');
+      for (var i = 0; i < els.length; i++) {
+        var el = els[i];
+        if (el.getAttribute('data-calrs-ready') === '1') continue;
+        el.setAttribute('data-calrs-ready', '1');
+        Calrs.inline({ selector: el, link: el.getAttribute('data-calrs-inline'), config: readConfig(el) });
+      }
     }
   };
 
   window.Calrs = Calrs;
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function () { Calrs.elementClick(); });
-  } else {
+  function start() {
     Calrs.elementClick();
+    Calrs.autoInline();
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', start);
+  } else {
+    start();
   }
 })();

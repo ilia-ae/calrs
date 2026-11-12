@@ -29,6 +29,8 @@ mod dashboard;
 mod directory;
 mod duplicate_event_type;
 mod emails;
+// ilia fork: CALRS_EMBED_ORIGINS.
+mod embed_origins;
 mod event_types;
 mod fail_closed;
 mod format;

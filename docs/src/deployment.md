@@ -150,6 +150,7 @@ cal.example.com {
 | `CALRS_BASE_URL` | Public URL (required for OIDC callbacks and email action links) | `http://localhost:3000` |
 | `CALRS_ALLOW_PRIVATE_HOSTS` | Comma-separated hostnames or IP addresses allowed to resolve to private IPs for CalDAV/EWS (SSRF opt-out) | _(none)_ |
 | `CALRS_TRUSTED_PROXIES` | Addresses and CIDR ranges whose `X-Forwarded-For` is believed for rate limiting, or `none` (see [Security](security.md#trusted-proxies)) | loopback, private, ULA and link-local ranges |
+| `CALRS_EMBED_ORIGINS` | Sites that may frame the embedded booking pages (`?embed=1`): a comma or space separated list of origins (`https://example.org`), `none`, or `*` (ilia fork; see [Security](security.md#embedding)) | `*` (any site) |
 | `CALRS_SYNC_MIN_AGE` | Minimum time in seconds between two background syncs of the same calendar source, e.g. `900` for every 15 minutes. Booking pages still refresh a host's calendars on demand once they are 5 minutes old. Capped at `86400` (one day). A failing source is retried at this interval too, so the email warning its owner (sent after three failures) comes later: after about 30 minutes at `900` | `0` (the stalest source every minute) |
 | `RUST_LOG` | Log level filter | `calrs=info,tower_http=info` |
 | `CALRS_SMS_*` | SMS gateway configuration, overriding the admin panel; see [SMS Notifications](./sms.md#environment-variables) | _(none)_ |

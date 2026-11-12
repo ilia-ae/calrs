@@ -116,6 +116,21 @@ Booking submissions are rate-limited per IP address:
 - **10 attempts** per **5-minute window**
 - Applies to all booking handlers (user, team, and legacy)
 
+## Embedding
+
+Pages are sent with `frame-ancestors 'self'` and `X-Frame-Options: SAMEORIGIN`, so other sites cannot frame them. The exception is a public booking page (`/u/…`, `/team/…`, `/g/…`, a legacy `/{slug}` or `/{slug}/book`) asked for with `?embed=1`, which is what `embed.js` loads in its iframe: sign-in, the dashboard, token pages and the TON payment page stay unframeable whatever the query says.
+
+Which sites may frame an embedded booking page is `CALRS_EMBED_ORIGINS` (ilia fork), read once at startup and logged by `calrs serve`:
+
+- unset: any site (`frame-ancestors *`), as upstream;
+- `*`: the same, explicitly;
+- `none`: no other site; the page keeps `frame-ancestors 'self'` and `X-Frame-Options: SAMEORIGIN`;
+- a comma or space separated list of origins, such as `https://example.org https://www.example.org`: `frame-ancestors 'self'` plus exactly those (`'self'` keeps the embed code generator's preview working). An origin is `https://host[:port]` with no path, query, user info or wildcard; plain `http://` only for `localhost`, `127.0.0.1` and `.onion` hosts. At most 16.
+
+A value that does not parse, an empty one included, turns embedding off and logs `CALRS_EMBED_ORIGINS refused` with the reason: failing open would let every site frame the booking form. With a list, legacy browsers that read only `X-Frame-Options` still get `ALLOWALL`, since that header cannot name origins; every current browser follows `frame-ancestors` and ignores it.
+
+`embed.js` fills every element with `data-calrs-inline="<booking link>"` (optionally `data-calrs-config='{"theme":"auto"}'`) when it loads, so a host page can embed with one `<script src=".../embed.js" defer></script>` and no inline script, and its own CSP only needs this origin in `script-src` and `frame-src`. It loads only `http(s)` links.
+
 ## CSRF protection
 
 All POST forms are protected against cross-site request forgery using the **double-submit cookie** pattern:

@@ -462,6 +462,14 @@ The country is **seeded, not guessed**. Only an explicit BCP-47 region subtag co
 
 ---
 
+## Embed origins (ilia fork)
+
+**Concept:** upstream lets any site frame an embedded booking page (`?embed=1` on a booking surface, `is_embedded_booking_request`): `frame-ancestors *` and `X-Frame-Options: ALLOWALL`. `CALRS_EMBED_ORIGINS` (`src/web/embed_origins.rs`, read once into `AppState::embed_origins`, logged by `calrs serve`) narrows it: unset or `*` is upstream's `*`; `none` keeps `frame-ancestors 'self'` and `SAMEORIGIN`; a comma or space separated list gives `frame-ancestors 'self' <origins>`. An origin is `https://host[:port]` (lower-cased, deduplicated, at most 16), plain `http://` only for `localhost`, `127.0.0.1` and `.onion`; a path, query, user info, wildcard, quote or `;` is refused. A value that does not parse (empty included) is `Off` with an error log: fail closed. `csp_middleware` builds the directive and, whenever no other site may frame the response, turns an `ALLOWALL` from `html_response` back into `SAMEORIGIN`. The CSRF cookie stays `SameSite=None; Partitioned` for `?embed=1` either way (the double-submit check never relied on SameSite). `assets/embed.js` also fills `[data-calrs-inline]` elements on load (`Calrs.autoInline`, idempotent), so a host page embeds with one `<script src>` and no inline script, and `buildSrc` loads only `http(s)` links. Deployment fact, so environment only (not in `calrs config apply`). Tests: `embed_origins::tests` (parser), `src/web/tests/embed_origins.rs` (headers on every embeddable shape, non-embeddable paths, `none`, unset; the policy set through `Arc::get_mut` on `build_state`).
+
+**Upstream files touched:** `src/main.rs` (the startup log line), `src/web/mod.rs` (`mod embed_origins`, the `AppState` field, `build_state`, `csp_middleware`), `src/web/tests/mod.rs` (`mod embed_origins`), `assets/embed.js`, `docs/src/{security,deployment}.md`.
+
+---
+
 ## Optimize (ilia fork)
 
 **Measured first** (`src/web/tests/ton_perf.rs`, a child of the TON tests, every test `#[ignore]`, run alone: `cargo test --locked perf_ -- --ignored --nocapture --test-threads 1`): a seeded database (1 owner, 3 calendars, 5000 events over 18 months back and 6 ahead, 300 weekly masters with 10 EXDATEs and 5 moved instances each, 2000 bookings, a TON-priced and a USD-priced type, 200 invoices, 400 payments), `perf_explain_hot_paths` (captures every statement sqlx logs on the slot page, booking form, payment page and status, bookings dashboard, a message thread, a watcher step, the pending sweep and the sync pick, and prints its `EXPLAIN QUERY PLAN` and the full SCANs of growing tables), `perf_latency_and_size`, `perf_requests_per_hour` (the watcher's own loop on a simulated clock: steps and indexer calls an hour) and `perf_seed_db_file` (the databases `calrs serve` is measured on). Numbers: ilia-booking docs/operations.md, «Производительность».

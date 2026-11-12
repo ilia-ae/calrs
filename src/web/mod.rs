@@ -10,6 +10,8 @@ mod calendar_push;
 pub mod captcha;
 mod dashboard;
 mod directory;
+// ilia fork: which sites may frame the embedded booking pages.
+pub(crate) mod embed_origins;
 mod event_types;
 mod format;
 mod hosts;
@@ -177,6 +179,9 @@ pub struct AppState {
     /// ilia fork: passkeys' RP ID and origin, from `CALRS_BASE_URL` only;
     /// `None` turns passkeys off (docs/passkeys-plan.md).
     pub(crate) passkeys: Option<crate::webauthn::Rp>,
+    /// ilia fork: the sites an embedded booking page (`?embed=1`) may be
+    /// framed by, from `CALRS_EMBED_ORIGINS` (`embed_origins.rs`).
+    pub(crate) embed_origins: embed_origins::EmbedOrigins,
 }
 
 // --- CSRF protection (double-submit cookie pattern) ---
@@ -687,6 +692,23 @@ async fn csp_middleware(
     let booking_page = is_booking_form_path(request.uri().path());
     let embed_mode = is_embedded_booking_request(request.uri().path(), request.uri().query());
     let mut response = next.run(request).await;
+    // ilia fork: the allowed parents (`*` upstream, `CALRS_EMBED_ORIGINS`
+    // here); `None` when no other site may frame this response.
+    let frame_ancestors = state.embed_origins.frame_ancestors().filter(|_| embed_mode);
+    // ilia fork: when no other site may frame it, take back the `ALLOWALL`
+    // that `html_response` sets for `?embed=1`, so browsers that only read
+    // `X-Frame-Options` refuse the frame too.
+    if frame_ancestors.is_none()
+        && response
+            .headers()
+            .get(axum::http::header::X_FRAME_OPTIONS)
+            .is_some_and(|v| v == "ALLOWALL")
+    {
+        response.headers_mut().insert(
+            axum::http::header::X_FRAME_OPTIONS,
+            axum::http::HeaderValue::from_static("SAMEORIGIN"),
+        );
+    }
     if !response
         .headers()
         .contains_key(axum::http::header::CONTENT_SECURITY_POLICY)
@@ -696,14 +718,14 @@ async fn csp_middleware(
         } else {
             state.csp_baseline.clone()
         };
-        // In embed mode, swap the default `frame-ancestors 'self'` for `*` so
-        // the page can be loaded inside a third-party iframe. The replacement
-        // is safe because `build_csp` is the sole producer of the strict CSP
-        // string and always uses that exact directive.
-        let csp = if embed_mode {
-            strict.replace("frame-ancestors 'self'", "frame-ancestors *")
-        } else {
-            strict
+        // In embed mode, swap the default `frame-ancestors 'self'` for the
+        // allowed parents so the page can be loaded inside a third-party
+        // iframe. The replacement is safe because `build_csp` is the sole
+        // producer of the strict CSP string and always uses that exact
+        // directive.
+        let csp = match frame_ancestors {
+            Some(directive) => strict.replace("frame-ancestors 'self'", &directive),
+            None => strict,
         };
         if let Ok(val) = axum::http::HeaderValue::from_str(&csp) {
             response
@@ -759,6 +781,7 @@ pub(crate) async fn build_state(
         german_formal: std::sync::atomic::AtomicBool::new(initial_german_formal),
         ton: ton_pay::TonSlot::from_env(),
         passkeys: crate::webauthn::Rp::from_env(),
+        embed_origins: embed_origins::EmbedOrigins::from_env(),
     })
 }
 
