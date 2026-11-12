@@ -2194,3 +2194,12 @@ ilia-mfa-action-totp-remove = Usuwasz aplikację uwierzytelniającą.
 ilia-mfa-action-regenerate = Zastępujesz wszystkie kody odzyskiwania.
 ilia-mfa-action-policy = Ustawiasz zasadę uwierzytelniania dwuskładnikowego dla kont lokalnych na:
 ilia-mfa-policy-continue = Kontynuuj
+
+## ilia fork: the instance name (CALRS_BRAND_NAME) and the error page (src/web/error_page.rs)
+ilia-login-subtitle = Zaloguj się na swoje konto { $brand }
+ilia-register-subtitle = Zarejestruj nowe konto { $brand }
+ilia-error-not-found = Nie znaleziono
+ilia-error-not-found-body = Pod tym adresem nic nie ma. Sprawdź link.
+ilia-error-gone = Ten link jest już nieważny
+ilia-error-bad-request = Nieprawidłowe żądanie
+ilia-error-forbidden = Dostęp ograniczony

@@ -9,6 +9,8 @@
 mod auth;
 mod booking_time;
 mod booking_window;
+// ilia fork: the instance's own name in place of "calrs" (CALRS_BRAND_NAME).
+mod brand;
 // ilia fork: busy-only calendar storage.
 mod busy_only;
 mod caldav;

@@ -29,6 +29,8 @@ mod dashboard;
 mod directory;
 mod duplicate_event_type;
 mod emails;
+// ilia fork: real statuses, the error page and the instance name.
+mod error_page;
 mod event_types;
 mod fail_closed;
 mod format;

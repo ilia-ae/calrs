@@ -2133,3 +2133,12 @@ ilia-mfa-action-totp-remove = Je verwijdert de authenticator-app.
 ilia-mfa-action-regenerate = Je vervangt alle herstelcodes.
 ilia-mfa-action-policy = Je stelt het tweestapsbeleid voor lokale accounts in op:
 ilia-mfa-policy-continue = Doorgaan
+
+## ilia fork: the instance name (CALRS_BRAND_NAME) and the error page (src/web/error_page.rs)
+ilia-login-subtitle = Log in op je { $brand }-account
+ilia-register-subtitle = Registreer een nieuw { $brand }-account
+ilia-error-not-found = Niet gevonden
+ilia-error-not-found-body = Er is niets op dit adres. Controleer de link.
+ilia-error-gone = Deze link is niet meer geldig
+ilia-error-bad-request = Ongeldig verzoek
+ilia-error-forbidden = Toegang beperkt

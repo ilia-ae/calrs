@@ -28,6 +28,10 @@ pub use transport::*;
 /// Translate a Fluent message id with no arguments. Local helper so call
 /// sites stay readable.
 fn t(lang: &str, key: &str) -> String {
+    // ilia fork: the instance's name signs the emails (src/brand.rs).
+    if let (Some(brand), "email-signature") = (crate::brand::configured(), key) {
+        return crate::brand::email_signature(brand);
+    }
     crate::i18n::translate(lang, key, None)
 }
 

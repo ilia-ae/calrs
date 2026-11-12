@@ -342,7 +342,8 @@ async fn booking_with_invalid_cancel_token_shows_error() {
         .oneshot(get("/booking/cancel/invalid-token-123"))
         .await
         .unwrap();
-    assert_eq!(response.status(), 200);
+    // ilia fork: an unknown link is a 404 (src/web/error_page.rs).
+    assert_eq!(response.status(), 404);
     let body = body_string(response).await;
     assert!(
         body.contains("invalid") || body.contains("Invalid") || body.contains("expired"),
@@ -357,7 +358,8 @@ async fn booking_with_invalid_approve_token_shows_error() {
         .oneshot(get("/booking/approve/invalid-token-123"))
         .await
         .unwrap();
-    assert_eq!(response.status(), 200);
+    // ilia fork: an unknown link is a 404 (src/web/error_page.rs).
+    assert_eq!(response.status(), 404);
     let body = body_string(response).await;
     assert!(
         body.contains("invalid") || body.contains("Invalid") || body.contains("expired"),
@@ -372,7 +374,8 @@ async fn booking_with_invalid_reschedule_token_shows_error() {
         .oneshot(get("/booking/reschedule/invalid-token-123"))
         .await
         .unwrap();
-    assert_eq!(response.status(), 200);
+    // ilia fork: an unknown link is a 404 (src/web/error_page.rs).
+    assert_eq!(response.status(), 404);
     let body = body_string(response).await;
     assert!(
         body.contains("invalid") || body.contains("Invalid") || body.contains("expired"),

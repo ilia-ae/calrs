@@ -60,6 +60,8 @@ pub(super) fn render_html_email_in(
     actions: &[EmailAction],
 ) -> String {
     let sent_by = h(&t(lang, "email-footer-sent-by"));
+    // ilia fork: "Sent by <brand>" (src/brand.rs), else the cal.rs link.
+    let credit = crate::brand::email_credit_html(crate::brand::configured(), h);
     let lang = h(crate::i18n::html_lang(lang));
     let mut detail_rows = String::new();
     for (i, row) in rows.iter().enumerate() {
@@ -121,7 +123,7 @@ pub(super) fn render_html_email_in(
     <!-- Footer -->
     <tr><td style="padding:16px 28px;border-top:1px solid #f0f0f3;text-align:center;">
       <span style="font-size:12px;color:#9ca3af;">{sent_by} </span>
-      <a href="https://cal.rs" style="font-size:12px;color:#6b7280;font-weight:600;text-decoration:none;">calrs</a>
+      {credit}
     </td></tr>
   </table>
 </td></tr>

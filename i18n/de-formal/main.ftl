@@ -546,3 +546,8 @@ ilia-mfa-action-totp-add = Sie richten eine Authenticator-App ein.
 ilia-mfa-action-totp-remove = Sie entfernen die Authenticator-App.
 ilia-mfa-action-regenerate = Sie ersetzen alle Wiederherstellungscodes.
 ilia-mfa-action-policy = Sie setzen die Zwei-Faktor-Richtlinie für lokale Konten auf:
+
+## ilia fork: the instance name (CALRS_BRAND_NAME) and the error page (src/web/error_page.rs)
+ilia-login-subtitle = Melden Sie sich bei Ihrem { $brand }-Konto an
+ilia-register-subtitle = Registrieren Sie ein neues { $brand }-Konto
+ilia-error-not-found-body = Unter dieser Adresse gibt es nichts. Prüfen Sie den Link.

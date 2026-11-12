@@ -2196,3 +2196,12 @@ ilia-mfa-action-totp-remove = Вы отключаете приложение-а�
 ilia-mfa-action-regenerate = Вы заменяете все резервные коды.
 ilia-mfa-action-policy = Вы меняете правило двухфакторной аутентификации для локальных аккаунтов на:
 ilia-mfa-policy-continue = Продолжить
+
+## ilia fork: the instance name (CALRS_BRAND_NAME) and the error page (src/web/error_page.rs)
+ilia-login-subtitle = Войдите в свой аккаунт { $brand }
+ilia-register-subtitle = Создайте новый аккаунт { $brand }
+ilia-error-not-found = Не найдено
+ilia-error-not-found-body = По этому адресу ничего нет. Проверьте ссылку.
+ilia-error-gone = Ссылка больше не действует
+ilia-error-bad-request = Неверный запрос
+ilia-error-forbidden = Доступ ограничен

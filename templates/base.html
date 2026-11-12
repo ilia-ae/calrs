@@ -10,7 +10,10 @@
   {% else %}
   <meta name="color-scheme" content="light dark">
   {% endif %}
-  <title>{% block title %}calrs{% endblock %}</title>
+  {#- ilia fork (src/brand.rs): with CALRS_BRAND_NAME the tab says "<page> — ilia.ae" instead of
+      "<page> — calrs", whatever page set the title; without it the title is upstream's. #}
+  {%- set _page_title %}{% block title %}calrs{% endblock %}{% endset %}
+  <title>{% if not brand_name %}{{ _page_title }}{% elif _page_title == "calrs" %}{{ brand_name }}{% else %}{{ _page_title | replace(" — calrs", " — " ~ (brand_name | escape)) | safe }}{% endif %}</title>
   <link rel="icon" href="/favicon">
   <script>
   // Apply theme ASAP to avoid flash. In embed mode the parent controls theme

@@ -10,6 +10,8 @@ mod calendar_push;
 pub mod captcha;
 mod dashboard;
 mod directory;
+// ilia fork: real statuses and a styled page for bare errors.
+mod error_page;
 mod event_types;
 mod format;
 mod hosts;
@@ -732,6 +734,7 @@ pub(crate) async fn build_state(
     env.set_loader(minijinja::path_loader("templates"));
     crate::i18n::register(&mut env);
     ilia::register(&mut env, &ilia::Footer::from_env());
+    crate::brand::register(&mut env, crate::brand::configured());
 
     // Populate the process-global runtime-settings cache (base URL, private-host
     // allowlist) so synchronous readers and email/link builders see DB values.
@@ -1095,6 +1098,15 @@ pub(crate) fn router(state: Arc<AppState>) -> Router {
         .route("/{slug}/book", get(show_book_form).post(handle_booking))
         // ilia fork: `?lang=` (cookie and redirect) and the switcher's page.
         .layer(axum::middleware::from_fn(lang_switch::middleware))
+        // ilia fork: 404/410/403/400 and a styled page for upstream's bare
+        // error answers (src/web/error_page.rs). Right above the language
+        // switcher's layer, so the new page renders outside its page scope
+        // and shows no switcher (whose links would carry the request's path
+        // and query); every layer below still sets its headers on the page.
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            error_page::middleware,
+        ))
         .layer(TraceLayer::new_for_http())
         .layer(axum::middleware::from_fn(csrf_cookie_middleware))
         // Keep scheduling pages and their date/query variants out of search
@@ -1298,6 +1310,8 @@ fn render_booking_action_error_html_in(
     title: &str,
     message: &str,
 ) -> Html<String> {
+    // ilia fork: the status this title means (src/web/error_page.rs).
+    error_page::booking_error(lang, title);
     let tmpl = match state.templates.get_template("booking_action_error.html") {
         Ok(t) => t,
         Err(e) => return internal_error_html("internal", &e),

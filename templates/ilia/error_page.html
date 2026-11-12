@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{#- ilia fork (src/web/error_page.rs): the page for an unknown user, event type, team, link or
+    address, with a real status (404, 410, 403, 400). Shows the message upstream answered, or a
+    generic one, and nothing from the request. #}
+{% block title %}{{ title }} — calrs{% endblock %}
+{% block content %}
+<div class="logo">{% if company_link %}<a href="{{ company_link }}" target="_blank" rel="noopener noreferrer">{% endif %}<img src="/logo" alt="" onerror="this.closest('.logo').style.display='none'">{% if company_link %}</a>{% endif %}</div>
+<div class="card" style="text-align: center;">
+  <div class="check" style="background: var(--text-muted);">!</div>
+  <h1>{{ title }}</h1>
+  <p class="subtitle">{{ message }}</p>
+</div>
+{% endblock %}

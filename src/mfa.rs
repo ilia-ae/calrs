@@ -48,7 +48,7 @@ fn totp(secret: &str, email: &str) -> Result<Totp> {
     Ok(Builder::new()
         .with_secret(hex::decode(secret)?)
         .with_account_name(email.replace(':', "_"))
-        .with_issuer(Some("calrs"))
+        .with_issuer(Some(crate::brand::totp_issuer()))
         .build()?)
 }
 

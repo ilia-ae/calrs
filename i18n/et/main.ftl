@@ -2131,3 +2131,12 @@ ilia-mfa-action-totp-remove = Eemaldad autentimisrakenduse.
 ilia-mfa-action-regenerate = Asendad kõik taastekoodid.
 ilia-mfa-action-policy = Määrad kohalike kontode kaheastmelise autentimise reegliks:
 ilia-mfa-policy-continue = Jätka
+
+## ilia fork: the instance name (CALRS_BRAND_NAME) and the error page (src/web/error_page.rs)
+ilia-login-subtitle = Logi oma { $brand } kontole sisse
+ilia-register-subtitle = Registreeri uus { $brand } konto
+ilia-error-not-found = Ei leitud
+ilia-error-not-found-body = Sellel aadressil ei ole midagi. Kontrolli linki.
+ilia-error-gone = See link ei kehti enam
+ilia-error-bad-request = Vigane päring
+ilia-error-forbidden = Juurdepääs piiratud

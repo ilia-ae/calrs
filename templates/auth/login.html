@@ -7,7 +7,7 @@
 </style>
 <div class="card" style="margin-top: 3rem;">
   <h1>{{ t("login-heading") }}</h1>
-  <p class="subtitle">{{ t("login-subtitle") }}</p>
+  <p class="subtitle">{% if brand_name %}{{ t("ilia-login-subtitle", brand=brand_name) }}{% else %}{{ t("login-subtitle") }}{% endif %}</p>
 
   {% if error %}
   <div class="error">{{ error }}</div>

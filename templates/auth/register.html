@@ -3,7 +3,7 @@
 {% block content %}
 <div class="card" style="margin-top: 3rem;">
   <h1>{{ t("register-heading") }}</h1>
-  <p class="subtitle">{{ t("register-subtitle") }}</p>
+  <p class="subtitle">{% if brand_name %}{{ t("ilia-register-subtitle", brand=brand_name) }}{% else %}{{ t("register-subtitle") }}{% endif %}</p>
 
   {% if error %}
   <div class="error">{{ error }}</div>

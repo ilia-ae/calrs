@@ -2131,3 +2131,12 @@ ilia-mfa-action-totp-remove = Vous supprimez l’application d’authentificatio
 ilia-mfa-action-regenerate = Vous remplacez tous les codes de récupération.
 ilia-mfa-action-policy = Vous réglez la règle d’authentification à deux facteurs des comptes locaux sur :
 ilia-mfa-policy-continue = Continuer
+
+## ilia fork: the instance name (CALRS_BRAND_NAME) and the error page (src/web/error_page.rs)
+ilia-login-subtitle = Connectez-vous à votre compte { $brand }
+ilia-register-subtitle = Créez un nouveau compte { $brand }
+ilia-error-not-found = Introuvable
+ilia-error-not-found-body = Il n’y a rien à cette adresse. Vérifiez le lien.
+ilia-error-gone = Ce lien n’est plus valide
+ilia-error-bad-request = Requête invalide
+ilia-error-forbidden = Accès restreint
