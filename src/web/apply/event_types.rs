@@ -49,7 +49,11 @@ use crate::web::agent::dto;
 use crate::web::agent::error::ToolError;
 use crate::web::agent::ops_write::{self, EditState, Rule};
 use crate::web::event_types::EventTypeForm;
-use crate::web::ton_pay::{self, store::Price, PriceForm, PriceWrite};
+use crate::web::ton_pay::{
+    self,
+    store::{Price, Terms},
+    PriceForm, PriceWrite,
+};
 use axum::extract::{Path, State};
 use axum::response::IntoResponse;
 use serde::de::DeserializeOwned;
@@ -119,6 +123,13 @@ const OFF_FORM: [&str; 4] = ["timezone", "enabled", "ton_price", "telegram_guest
 /// literal, and used at runtime (the refusal of a price with neither or
 /// both amounts).
 pub(crate) const TON_PRICE_SHAPE: &str = "ton_price: null or {ton|usd, window_min, enabled}";
+
+/// ilia fork: the marker of a calrs whose `ton_price` also takes the
+/// demand ladder. Kept a literal and used at runtime, like
+/// [`TON_PRICE_SHAPE`] (which stays as it was, so the role's older check
+/// still matches).
+pub(crate) const TON_PRICE_LADDER_SHAPE: &str =
+    "ton_price: null or {ton|usd, window_min, enabled} or {ladder: true, window_min, enabled}";
 
 fn item_path(slug: &str) -> String {
     format!("event_types[{slug}]")
@@ -207,19 +218,20 @@ async fn stored_price(ctx: &Ctx, et_id: &str) -> Result<Option<TonPrice>, ApplyE
     let row = crate::web::agent::ops_ton::read_price(&mut conn, et_id)
         .await
         .map_err(read_error)?;
-    Ok(row.map(|(price, window_min, enabled)| price_item(price, window_min, enabled != 0)))
+    Ok(row.map(|(terms, window_min, enabled)| price_item(terms, window_min, enabled != 0)))
 }
 
 /// A price as the document states it, the amount as the form shows it.
-fn price_item(price: Price, window_min: Option<i64>, enabled: bool) -> TonPrice {
-    let amount = Some(price.amount());
-    let (ton, usd) = match price {
-        Price::Ton(_) => (amount, None),
-        Price::Usd(_) => (None, amount),
+fn price_item(terms: Terms, window_min: Option<i64>, enabled: bool) -> TonPrice {
+    let (ton, usd, ladder) = match terms {
+        Terms::Fixed(price @ Price::Ton(_)) => (Some(price.amount()), None, None),
+        Terms::Fixed(price @ Price::Usd(_)) => (None, Some(price.amount()), None),
+        Terms::Ladder => (None, None, Some(true)),
     };
     TonPrice {
         ton,
         usd,
+        ladder,
         window_min,
         enabled,
     }
@@ -336,11 +348,12 @@ struct Wanted {
 fn price_wanted(slug: &str, price: Option<&TonPrice>) -> Result<PriceWrite, ApplyError> {
     let path = at(slug, "ton_price");
     let window = price.and_then(|p| p.window_min).map(|w| w.to_string());
-    let (currency, amount) = match price.map(|p| (&p.ton, &p.usd)) {
-        None => (None, ""),
-        Some((Some(a), None)) => (Some("TON"), a.as_str()),
-        Some((None, Some(a))) => (Some("USD"), a.as_str()),
-        Some(_) => return Err(ApplyError::invalid(&path, TON_PRICE_SHAPE)),
+    let (currency, amount, mode) = match price.map(|p| (&p.ton, &p.usd, p.ladder)) {
+        None => (None, "", None),
+        Some((Some(a), None, None)) => (Some("TON"), a.as_str(), None),
+        Some((None, Some(a), None)) => (Some("USD"), a.as_str(), None),
+        Some((None, None, Some(true))) => (None, "", Some("ladder")),
+        Some(_) => return Err(ApplyError::invalid(&path, TON_PRICE_LADDER_SHAPE)),
     };
     let form = PriceForm {
         enabled: price.filter(|p| p.enabled).map(|_| "on"),
@@ -348,6 +361,7 @@ fn price_wanted(slug: &str, price: Option<&TonPrice>) -> Result<PriceWrite, Appl
         currency,
         window_min: window.as_deref(),
         guest_telegram: None,
+        mode,
     };
     ton_pay::validate_price_form(&form, None)
         .map_err(|key| ApplyError::invalid(&path, crate::i18n::translate("en", key, None)))?;
@@ -357,7 +371,14 @@ fn price_wanted(slug: &str, price: Option<&TonPrice>) -> Result<PriceWrite, Appl
             "the price section stores nothing for a valid price",
         )
     })?;
-    if let (Some(given), PriceWrite::Save { price: stored, .. }) = (price, write) {
+    if let (
+        Some(given),
+        PriceWrite::Save {
+            terms: Terms::Fixed(stored),
+            ..
+        },
+    ) = (price, write)
+    {
         if stored.amount() != amount {
             let key = if given.ton.is_some() { "ton" } else { "usd" };
             return Err(ApplyError::invalid(
@@ -614,13 +635,23 @@ fn check_item(item: &EventTypeItem) -> Result<(), ApplyError> {
         }
     }
     if let Some(Some(price)) = &item.ton_price {
-        match (&price.ton, &price.usd) {
-            (Some(amount), None) => check_text(&at(slug, "ton_price.ton"), amount, None)?,
-            (None, Some(amount)) => check_text(&at(slug, "ton_price.usd"), amount, None)?,
+        match (&price.ton, &price.usd, price.ladder) {
+            (Some(amount), None, None) => check_text(&at(slug, "ton_price.ton"), amount, None)?,
+            (None, Some(amount), None) => check_text(&at(slug, "ton_price.usd"), amount, None)?,
+            (None, None, Some(true)) => {}
+            (None, None, Some(false)) => {
+                return Err(ApplyError::invalid(
+                    at(slug, "ton_price.ladder"),
+                    "only true; for a fixed price give ton or usd and leave ladder out",
+                ))
+            }
             _ => {
                 return Err(ApplyError::invalid(
                     at(slug, "ton_price"),
-                    format!("give exactly one of ton and usd ({TON_PRICE_SHAPE})"),
+                    format!(
+                        "give exactly one of ton, usd and ladder: true ({TON_PRICE_LADDER_SHAPE}; \
+                         older form: {TON_PRICE_SHAPE})"
+                    ),
                 ))
             }
         }

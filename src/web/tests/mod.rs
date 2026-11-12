@@ -12,6 +12,7 @@ mod apply_profile;
 mod apply_roundtrip;
 mod apply_site;
 mod apply_support;
+mod apply_ton;
 mod apply_txn;
 mod auth_pages;
 mod availability;

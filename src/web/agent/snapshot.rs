@@ -35,6 +35,8 @@ pub(crate) const NOT_CONFIG_TABLES: &[&str] = &[
     "event_type_favorites",
     // ilia fork: money records of bookings, not configuration.
     "ton_invoices",
+    // ilia fork: free demand-ladder steps taken (the per-guest limit).
+    "ton_free_bookings",
 ];
 
 /// The configuration of one event type, as canonical text.

@@ -63,20 +63,82 @@ impl Price {
     }
 }
 
+/// How an event type is priced (ilia fork, the demand ladder): a fixed
+/// price, or the site-wide ladder (TON, the step of the owner's demand).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Terms {
+    Fixed(Price),
+    Ladder,
+}
+
+impl Terms {
+    /// From the `ton_prices` columns; `None` for a row the CHECKs would
+    /// not allow.
+    pub(crate) fn from_columns(
+        mode: &str,
+        currency: &str,
+        price_nano: Option<i64>,
+        price_usd_cents: Option<i64>,
+    ) -> Option<Self> {
+        match mode {
+            "fixed" => Price::from_columns(currency, price_nano, price_usd_cents).map(Self::Fixed),
+            "ladder" if currency == "TON" && price_nano.is_none() && price_usd_cents.is_none() => {
+                Some(Self::Ladder)
+            }
+            _ => None,
+        }
+    }
+
+    /// `(mode, currency, price_nano, price_usd_cents)` as stored.
+    pub(crate) fn columns(&self) -> (&'static str, &'static str, Option<i64>, Option<i64>) {
+        match self {
+            Self::Fixed(p) => {
+                let (currency, nano, cents) = p.columns();
+                ("fixed", currency, nano, cents)
+            }
+            Self::Ladder => ("ladder", "TON", None, None),
+        }
+    }
+
+    pub(crate) fn mode(&self) -> &'static str {
+        self.columns().0
+    }
+
+    pub(crate) fn currency(&self) -> &'static str {
+        self.columns().1
+    }
+
+    pub(crate) fn fixed(&self) -> Option<Price> {
+        match self {
+            Self::Fixed(p) => Some(*p),
+            Self::Ladder => None,
+        }
+    }
+}
+
 /// The price row of an event type, with what an invoice snapshots.
 #[derive(Clone, Debug, sqlx::FromRow)]
 pub(crate) struct PriceRow {
+    pub(crate) event_type_id: String,
+    pub(crate) mode: String,
     pub(crate) currency: String,
     pub(crate) price_nano: Option<i64>,
     pub(crate) price_usd_cents: Option<i64>,
     pub(crate) window_min: Option<i64>,
     pub(crate) is_team: i64,
     pub(crate) title: String,
+    /// The owner of the type's account: whose demand a ladder counts.
+    pub(crate) owner_user_id: Option<String>,
 }
 
 impl PriceRow {
-    pub(crate) fn price(&self) -> Option<Price> {
-        Price::from_columns(&self.currency, self.price_nano, self.price_usd_cents)
+    pub(crate) fn terms(&self) -> Option<Terms> {
+        Terms::from_columns(
+            &self.mode,
+            &self.currency,
+            self.price_nano,
+            self.price_usd_cents,
+        )
     }
 }
 
@@ -88,9 +150,11 @@ pub(crate) async fn price_for(
     event_type_id: &str,
 ) -> Result<Option<PriceRow>, sqlx::Error> {
     sqlx::query_as::<_, PriceRow>(
-        "SELECT p.currency, p.price_nano, p.price_usd_cents, p.window_min,
-                CASE WHEN et.team_id IS NULL THEN 0 ELSE 1 END AS is_team, et.title
+        "SELECT p.event_type_id, p.mode, p.currency, p.price_nano, p.price_usd_cents, p.window_min,
+                CASE WHEN et.team_id IS NULL THEN 0 ELSE 1 END AS is_team, et.title,
+                a.user_id AS owner_user_id
          FROM ton_prices p JOIN event_types et ON et.id = p.event_type_id
+         LEFT JOIN accounts a ON a.id = et.account_id
          WHERE p.event_type_id = ? AND p.enabled = 1",
     )
     .bind(event_type_id)
@@ -105,17 +169,18 @@ pub(crate) async fn price_for(
 pub(crate) async fn save_price(
     conn: &mut SqliteConnection,
     event_type_id: &str,
-    price: Price,
+    terms: Terms,
     window_min: Option<i64>,
     enabled: bool,
     now: DateTime<Utc>,
 ) -> Result<bool, sqlx::Error> {
-    let (currency, nano, cents) = price.columns();
+    let (mode, currency, nano, cents) = terms.columns();
     let existed: bool = sqlx::query_scalar::<_, i64>(
-        "UPDATE ton_prices SET currency = ?, price_nano = ?, price_usd_cents = ?,
+        "UPDATE ton_prices SET mode = ?, currency = ?, price_nano = ?, price_usd_cents = ?,
              window_min = ?, enabled = ?, updated_at = ?
          WHERE event_type_id = ? RETURNING 1",
     )
+    .bind(mode)
     .bind(currency)
     .bind(nano)
     .bind(cents)
@@ -134,11 +199,12 @@ pub(crate) async fn save_price(
         return Ok(false);
     }
     sqlx::query(
-        "INSERT INTO ton_prices (event_type_id, currency, price_nano, price_usd_cents,
+        "INSERT INTO ton_prices (event_type_id, mode, currency, price_nano, price_usd_cents,
              window_min, enabled, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)",
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(event_type_id)
+    .bind(mode)
     .bind(currency)
     .bind(nano)
     .bind(cents)
@@ -169,6 +235,134 @@ pub(crate) async fn any_enabled_usd_price(pool: &SqlitePool) -> bool {
     .await
     .map(|v| v != 0)
     .unwrap_or(false)
+}
+
+// --- the demand ladder (ilia fork) --------------------------------------------
+
+/// The demand `n` of `owner_user_id` at `now`: the bookings they host that
+/// start between now and the end of the booking horizon
+/// ([`crate::horizon::max_days_ahead`]), on every event type, confirmed
+/// (paid, waived and free ones) or pending without an unsettled invoice
+/// (free requests awaiting the owner's approval, free ladder steps
+/// included, and paid or waived bookings not confirmed yet).
+/// Not counted: payment holds (an open invoice; anyone could push the
+/// price up), cancelled and declined bookings, the past, the owner's
+/// calendar busy time, other users' bookings, and `exclude_booking_id`
+/// (the booking being made). "Hosts": the assigned member, else the
+/// owner of the event type, else (a collective team type) any member, as
+/// for busy time (`booking_time::user_busy_bookings`).
+///
+/// Runs on a caller's connection: inside the booking transaction, after
+/// its INSERT took the write lock, it sees every committed booking and
+/// none can commit meanwhile.
+pub(crate) async fn demand_n(
+    conn: &mut SqliteConnection,
+    owner_user_id: &str,
+    now: DateTime<Utc>,
+    exclude_booking_id: Option<&str>,
+) -> Result<i64, sqlx::Error> {
+    let until = now + chrono::Duration::days(crate::horizon::max_days_ahead());
+    let iso = |t: DateTime<Utc>| t.format("%Y-%m-%dT%H:%M:%S").to_string();
+    sqlx::query_scalar(
+        "SELECT COUNT(*) FROM bookings b
+         JOIN event_types et ON et.id = b.event_type_id
+         JOIN accounts a ON a.id = et.account_id
+         WHERE (b.assigned_user_id = ?
+                OR (b.assigned_user_id IS NULL AND a.user_id = ?)
+                OR (b.assigned_user_id IS NULL AND et.team_id IS NOT NULL AND EXISTS (
+                      SELECT 1 FROM team_members tm
+                      WHERE tm.team_id = et.team_id AND tm.user_id = ?)))
+           AND b.start_at >= ? AND b.start_at < ?
+           AND b.id != ?
+           AND (b.status = 'confirmed'
+                OR (b.status = 'pending'
+                    AND NOT EXISTS (SELECT 1 FROM ton_invoices ti WHERE ti.booking_id = b.id
+                                    AND ti.status NOT IN ('paid', 'confirmed', 'waived'))))",
+    )
+    .bind(owner_user_id)
+    .bind(owner_user_id)
+    .bind(owner_user_id)
+    .bind(iso(now))
+    .bind(iso(until))
+    .bind(exclude_booking_id.unwrap_or(""))
+    .fetch_one(&mut *conn)
+    .await
+}
+
+/// The TON settings stored in the database (`ton_settings`), the keys of
+/// [`crate::ton::settings::KEYS`] only. Read on a caller's connection.
+pub(crate) async fn load_settings(
+    conn: &mut SqliteConnection,
+) -> Result<crate::ton::settings::DbValues, sqlx::Error> {
+    let rows: Vec<(String, String, String)> =
+        sqlx::query_as("SELECT key, value, owner FROM ton_settings")
+            .fetch_all(&mut *conn)
+            .await?;
+    Ok(crate::ton::settings::DbValues(
+        rows.into_iter()
+            .filter(|(k, _, _)| crate::ton::settings::KEYS.contains(&k.as_str()))
+            .filter_map(|(k, v, o)| Some((k, (v, crate::ton::settings::Owner::parse(&o)?))))
+            .collect(),
+    ))
+}
+
+/// Who asks for a free ladder step: the per-guest limit matches any of
+/// these.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct FreeGuest {
+    pub(crate) email_norm: String,
+    /// The typed Telegram username, lower-cased without `@`.
+    pub(crate) telegram_norm: Option<String>,
+    pub(crate) client_tag: String,
+}
+
+/// A free step was taken by this guest (email, Telegram username or client
+/// network) since `since`, cancelled ones included.
+pub(crate) async fn free_step_taken(
+    conn: &mut SqliteConnection,
+    guest: &FreeGuest,
+    since: DateTime<Utc>,
+) -> Result<bool, sqlx::Error> {
+    sqlx::query_scalar::<_, i64>(
+        "SELECT EXISTS (SELECT 1 FROM ton_free_bookings
+                        WHERE created_at >= ?
+                          AND (email_norm = ? OR client_tag = ?
+                               OR (? IS NOT NULL AND telegram_norm = ?)))",
+    )
+    .bind(stamp(since))
+    .bind(&guest.email_norm)
+    .bind(&guest.client_tag)
+    .bind(&guest.telegram_norm)
+    .bind(&guest.telegram_norm)
+    .fetch_one(&mut *conn)
+    .await
+    .map(|v| v != 0)
+}
+
+/// Record a free step, inside the booking's transaction.
+pub(crate) async fn record_free_step(
+    conn: &mut SqliteConnection,
+    booking_id: &str,
+    event_type_id: &str,
+    guest: &FreeGuest,
+    demand_n: i64,
+    now: DateTime<Utc>,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "INSERT INTO ton_free_bookings (booking_id, event_type_id, email_norm, telegram_norm,
+             client_tag, demand_n, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)",
+    )
+    .bind(booking_id)
+    .bind(event_type_id)
+    .bind(&guest.email_norm)
+    .bind(&guest.telegram_norm)
+    .bind(&guest.client_tag)
+    .bind(demand_n)
+    .bind(stamp(now))
+    .execute(&mut *conn)
+    .await
+    .map(|_| ())
 }
 
 /// An invoice counts toward the daily budget once it received money or
@@ -238,6 +432,14 @@ pub(crate) async fn purge_client_tags(
     pool: &SqlitePool,
     now: DateTime<Utc>,
 ) -> Result<u64, sqlx::Error> {
+    // ilia fork: free ladder steps are kept as long as the longest
+    // per-guest limit, then forgotten.
+    sqlx::query("DELETE FROM ton_free_bookings WHERE created_at < ?")
+        .bind(stamp(
+            now - chrono::Duration::days(crate::ton::settings::FREE_PER_GUEST_DAYS_MAX + 1),
+        ))
+        .execute(pool)
+        .await?;
     sqlx::query(
         "UPDATE ton_invoices SET client_tag = NULL WHERE client_tag IS NOT NULL AND created_at < ?",
     )

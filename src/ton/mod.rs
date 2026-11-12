@@ -14,10 +14,12 @@ pub mod amount;
 pub mod config;
 pub mod deadlines;
 pub mod decide;
+pub mod ladder;
 pub mod link;
 pub mod qr;
 pub mod rate;
 pub mod reference;
+pub mod settings;
 pub mod toncenter;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

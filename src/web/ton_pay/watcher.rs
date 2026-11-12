@@ -250,31 +250,63 @@ pub(crate) async fn supervise(
         indexer_host = %rt.cfg.indexer_host(),
         "ton watcher: started"
     );
-    let mut backoff = base_backoff;
-    let mut crashes = 0u32;
-    loop {
-        let mut run_task = AbortOnDrop(tokio::spawn(run(state.clone(), rt.clone(), stop.clone())));
-        match (&mut run_task.0).await {
-            Ok(()) => return,
-            Err(e) if e.is_cancelled() => return,
-            Err(e) => {
-                crashes += 1;
-                tracing::error!(target: TARGET, error = %e, crashes, "ton watcher crashed, restarting");
-                if crashes >= 3 {
-                    raise(
-                        &rt,
-                        &state.pool,
-                        "watcher_crashed",
-                        &format!("crashes={crashes}"),
-                        Utc::now(),
-                    )
-                    .await;
+    // ilia fork: the admin page replaces the runtime with new settings
+    // (`TonSlot::apply_settings`); the loop then ends after its step and
+    // starts again on the new one.
+    let mut generation = state.ton.generation();
+    let mut rt = rt;
+    'runtime: loop {
+        let mut backoff = base_backoff;
+        let mut crashes = 0u32;
+        loop {
+            let (run_stop, run_stop_rx) = watch::channel(*stop.borrow());
+            let mut run_task =
+                AbortOnDrop(tokio::spawn(run(state.clone(), rt.clone(), run_stop_rx)));
+            let outcome = tokio::select! {
+                outcome = &mut run_task.0 => outcome,
+                _ = stopped(&mut stop) => {
+                    let _ = run_stop.send(true);
+                    let _ = (&mut run_task.0).await;
+                    return;
                 }
-                tokio::select! {
-                    _ = stopped(&mut stop) => return,
-                    _ = tokio::time::sleep(backoff) => {}
+                changed = generation.changed() => {
+                    let _ = run_stop.send(true);
+                    let _ = (&mut run_task.0).await;
+                    match (changed, state.ton.get()) {
+                        (Ok(()), Some(next)) => {
+                            // What the old loop's last step learned after
+                            // the swap (health, payments seen) carries over.
+                            next.take_over(&rt);
+                            rt = next;
+                            tracing::info!(target: TARGET, "ton watcher: restarted with new settings");
+                            continue 'runtime;
+                        }
+                        _ => return,
+                    }
                 }
-                backoff = (backoff * 2).min(SUPERVISOR_BACKOFF_MAX);
+            };
+            match outcome {
+                Ok(()) => return,
+                Err(e) if e.is_cancelled() => return,
+                Err(e) => {
+                    crashes += 1;
+                    tracing::error!(target: TARGET, error = %e, crashes, "ton watcher crashed, restarting");
+                    if crashes >= 3 {
+                        raise(
+                            &rt,
+                            &state.pool,
+                            "watcher_crashed",
+                            &format!("crashes={crashes}"),
+                            Utc::now(),
+                        )
+                        .await;
+                    }
+                    tokio::select! {
+                        _ = stopped(&mut stop) => return,
+                        _ = tokio::time::sleep(backoff) => {}
+                    }
+                    backoff = (backoff * 2).min(SUPERVISOR_BACKOFF_MAX);
+                }
             }
         }
     }

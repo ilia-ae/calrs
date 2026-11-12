@@ -1656,7 +1656,7 @@ async fn agent_sets_and_removes_an_event_type_price() {
     // A new price asks for the guest's Telegram.
     assert_eq!(
         out["price"],
-        json!({"currency": "USD", "ton": null, "usd": "40.50", "window_min": 20,
+        json!({"mode": "fixed", "currency": "USD", "ton": null, "usd": "40.50", "window_min": 20,
                "enabled": true, "guest_telegram": "required"})
     );
     assert_eq!(out["payments_enabled"], false);
@@ -1739,6 +1739,68 @@ async fn agent_sets_and_removes_an_event_type_price() {
     assert_eq!(failure(&team), "event type not found");
 }
 
+/// ilia fork: `mode: "ladder"` prices a type by the site's demand ladder
+/// (no amount), reads back as such, and refuses an amount alongside.
+#[tokio::test]
+async fn agent_sets_a_ladder_price() {
+    let fx = Fixture::new().await;
+    let mut client = fx.session(Role::Write).await;
+    let version = version_of(&mut client, "test-meeting").await;
+    let refused = client
+        .call(
+            "set_event_type_price",
+            json!({"slug": "test-meeting", "version": version, "mode": "ladder",
+                   "price_ton": "100"}),
+        )
+        .await;
+    assert!(failure(&refused).starts_with("invalid mode:"), "{refused}");
+    let set = client
+        .call(
+            "set_event_type_price",
+            json!({"slug": "test-meeting", "version": version, "mode": "ladder",
+                   "window_min": 30}),
+        )
+        .await;
+    let out = ok(&set).clone();
+    assert_eq!(out["changed"], true);
+    assert_eq!(
+        out["price"],
+        json!({"mode": "ladder", "currency": "TON", "ton": null, "usd": null,
+               "window_min": 30, "enabled": true, "guest_telegram": "required"})
+    );
+    let row: (String, String, Option<i64>, Option<i64>) = sqlx::query_as(
+        "SELECT mode, currency, price_nano, price_usd_cents FROM ton_prices
+         WHERE event_type_id = ?",
+    )
+    .bind(&fx.et_id)
+    .fetch_one(&fx.pool)
+    .await
+    .unwrap();
+    assert_eq!(row, ("ladder".to_string(), "TON".to_string(), None, None));
+    let read = client
+        .call("get_event_type", json!({"slug": "test-meeting"}))
+        .await;
+    assert_eq!(ok(&read)["price"]["mode"], "ladder");
+    // The same call again changes nothing; a fixed price replaces it.
+    let version = version_of(&mut client, "test-meeting").await;
+    let again = client
+        .call(
+            "set_event_type_price",
+            json!({"slug": "test-meeting", "version": version, "mode": "ladder",
+                   "window_min": 30}),
+        )
+        .await;
+    assert_eq!(ok(&again)["changed"], false, "{again}");
+    let fixed = client
+        .call(
+            "set_event_type_price",
+            json!({"slug": "test-meeting", "version": version, "price_ton": "50"}),
+        )
+        .await;
+    assert_eq!(ok(&fixed)["price"]["mode"], "fixed");
+    assert_eq!(ok(&fixed)["price"]["ton"], "50.00");
+}
+
 /// ilia fork: a price in TON, the default currency: the amount itself, no
 /// rate. A Telegram mode the owner lowered stays lowered.
 #[tokio::test]
@@ -1762,7 +1824,7 @@ async fn agent_sets_a_price_in_ton() {
     let out = ok(&set).clone();
     assert_eq!(
         out["price"],
-        json!({"currency": "TON", "ton": "100.00", "usd": null, "window_min": null,
+        json!({"mode": "fixed", "currency": "TON", "ton": "100.00", "usd": null, "window_min": null,
                "enabled": true, "guest_telegram": "optional"})
     );
     let row: (String, Option<i64>, Option<i64>) = sqlx::query_as(

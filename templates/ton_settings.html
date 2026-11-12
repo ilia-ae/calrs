@@ -1,0 +1,205 @@
+{% extends "dashboard_base.html" %}
+{#- ilia fork: the TON settings page (src/web/ton_pay/settings_page.rs). -#}
+{% block title %}{{ t("ton-admin-page-title") }} — calrs{% endblock %}
+{% block dashboard_content %}
+<div class="card">
+  <h1>{{ t("ton-admin-heading") }}</h1>
+  <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 0;">{{ t("ton-admin-intro") }}</p>
+</div>
+
+{% if notice %}
+<div class="card" id="ton-notice" data-notice="{{ notice }}" style="border-color: var(--accent);">
+  <div style="font-size: 0.9rem;">
+    {% if notice == "live" %}{{ t("ton-admin-saved-live") }}
+    {% elif notice == "off" %}{{ t("ton-admin-saved-off") }}
+    {% elif notice == "restart" %}{{ t("ton-admin-saved-restart") }}
+    {% elif notice == "invalid" %}{{ t("ton-admin-saved-invalid") }}
+    {% else %}{{ t("ton-admin-saved-none") }}{% endif %}
+  </div>
+</div>
+{% endif %}
+
+{% if has_errors %}
+<div class="card" style="border-color: var(--error-text); background: rgba(239, 68, 68, 0.05);">
+  <div class="error" style="color: var(--error-text); font-size: 0.9rem;"><strong>{{ t("ton-admin-errors") }}</strong>{% if general_error %} {{ general_error }}{% endif %}</div>
+</div>
+{% endif %}
+
+<!-- Status: read-only -->
+<div class="card" id="ton-status">
+  <h2>{{ t("ton-admin-status") }}</h2>
+  {% if status.on %}
+  <p style="color: var(--success-text, #15803d); font-weight: 600;">{{ t("ton-admin-status-on") }}</p>
+  {% else %}
+  <p style="color: var(--error-text); font-weight: 600;">{{ t("ton-admin-status-off") }}{% if status.disabled_reason %}: {{ status.disabled_reason }}{% endif %}</p>
+  {% endif %}
+  <table style="width: 100%; font-size: 0.875rem; border-collapse: collapse;">
+    <tr><td style="padding: 0.25rem 0.5rem 0.25rem 0; color: var(--text-muted);">{{ t("ton-admin-network") }}</td><td>{{ status.network or t("ton-admin-not-set") }}</td></tr>
+    {% if status.address %}
+    <tr><td style="padding: 0.25rem 0.5rem 0.25rem 0; color: var(--text-muted);">{{ t("ton-admin-address") }}</td><td style="word-break: break-all;"><code>{{ status.address }}</code></td></tr>
+    <tr><td style="padding: 0.25rem 0.5rem 0.25rem 0; color: var(--text-muted);">{{ t("ton-admin-address-raw") }}</td><td style="word-break: break-all;"><code>{{ status.address_raw }}</code></td></tr>
+    <tr><td style="padding: 0.25rem 0.5rem 0.25rem 0; color: var(--text-muted);">{{ t("ton-admin-indexer") }}</td><td>{{ status.indexer_host }}</td></tr>
+    <tr><td style="padding: 0.25rem 0.5rem 0.25rem 0; color: var(--text-muted);">{{ t("ton-admin-watcher") }}</td><td>{% if status.ready %}{{ t("ton-admin-watcher-not-ready", reason=status.ready) }}{% else %}{{ t("ton-admin-watcher-ready") }}{% endif %}{% if status.last_ok %} · {{ t("ton-admin-last-step") }} {{ status.last_ok }}{% endif %}</td></tr>
+    {% endif %}
+    <tr><td style="padding: 0.25rem 0.5rem 0.25rem 0; color: var(--text-muted);">{{ t("ton-admin-open-invoices") }}</td><td>{{ status.open_invoices }}</td></tr>
+    <tr><td style="padding: 0.25rem 0.5rem 0.25rem 0; color: var(--text-muted);">{{ t("ton-admin-api-key") }}</td><td data-secret="{{ status.api_key }}">{% if status.api_key == "credentials" %}{{ t("ton-admin-secret-credentials") }}{% elif status.api_key == "env" %}{{ t("ton-admin-secret-env") }}{% else %}{{ t("ton-admin-not-set") }}{% endif %}</td></tr>
+    <tr><td style="padding: 0.25rem 0.5rem 0.25rem 0; color: var(--text-muted);">{{ t("ton-admin-coingecko-key") }}</td><td data-secret="{{ status.coingecko_key }}">{% if status.coingecko_key == "credentials" %}{{ t("ton-admin-secret-credentials") }}{% elif status.coingecko_key == "env" %}{{ t("ton-admin-secret-env") }}{% else %}{{ t("ton-admin-not-set") }}{% endif %}</td></tr>
+  </table>
+  <p style="color: var(--text-muted); font-size: 0.825rem; margin: 0.75rem 0 0;">{{ t("ton-admin-env-only") }}</p>
+</div>
+
+<form method="post" action="/dashboard/admin/ton" id="ton-settings-form">
+{% for group in groups %}
+<div class="card" id="{{ group.id }}">
+  <h2>{{ group.title }}</h2>
+  {% for f in group.fields %}
+  <div class="form-group" data-field="{{ f.field }}" data-source="{{ f.source }}">
+    <label for="ton-{{ f.field }}">{{ f.label }}
+      {% if f.source == "env" %}<span class="hint" style="color: var(--warning-text, #b45309);">{{ t("ton-admin-src-env", var=f.var) }}</span>
+      {% elif f.source == "apply" %}<span class="hint" style="color: var(--warning-text, #b45309);">{{ t("ton-admin-src-apply") }}</span>
+      {% elif f.source == "panel" %}<span class="hint">{{ t("ton-admin-src-panel") }}</span>
+      {% else %}<span class="hint">{{ t("ton-admin-src-default") }}</span>{% endif %}
+    </label>
+    <input id="ton-{{ f.field }}" name="{{ f.field }}" value="{{ f.value }}"
+      {% if f.kind == "int" %}type="number" min="{{ f.min }}" max="{{ f.max }}"{% elif f.kind == "email" %}type="email"{% else %}type="text"{% endif %}
+      {% if f.kind in ["ton", "usd", "pct"] %}inputmode="decimal"{% endif %}
+      placeholder="{{ f.default }}"
+      {% if f.locked %}disabled readonly style="opacity: 0.6; cursor: not-allowed;"{% endif %}>
+    {% if f.error %}<span class="error" style="color: var(--error-text); font-size: 0.825rem; display: block; margin-top: 0.25rem;">{{ f.error }}</span>{% endif %}
+    <span style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">
+      {% if f.locked and f.source == "env" %}{{ t("ton-admin-locked-env", var=f.var) }}
+      {% elif f.locked %}{{ t("ton-admin-locked-apply") }}
+      {% elif f.default %}{{ t("ton-admin-default-hint", value=f.default) }}
+      {% else %}{{ t("ton-admin-blank-default") }}{% endif %}
+      <code>{{ f.var }}</code>
+    </span>
+    {% if f.field == "ladder" %}
+    <p style="font-size: 0.825rem; color: var(--text-muted); margin: 0.5rem 0 0;">{{ t("ton-admin-ladder-help") }}</p>
+    {% if not f.locked %}
+    <div id="ton-ladder-editor" hidden style="margin-top: 0.5rem;" data-row="{{ t('ton-admin-ladder-row') }}" data-remove="{{ t('ton-admin-ladder-remove') }}" data-free="{{ t('ton-admin-free') }}">
+      <div id="ton-ladder-rows"></div>
+      <button type="button" class="slot-btn" id="ton-ladder-add" style="cursor: pointer; margin-top: 0.5rem;">{{ t("ton-admin-ladder-add") }}</button>
+    </div>
+    {% endif %}
+    {% endif %}
+  </div>
+  {% endfor %}
+  {% if group.id == "pricing" %}
+  <h3 style="margin-top: 1rem;">{{ t("ton-admin-preview") }}</h3>
+  {% if previewing %}<p id="ton-previewing" style="font-size: 0.85rem; color: var(--accent);">{{ t("ton-admin-previewing") }}</p>{% endif %}
+  {% if ladder_error %}<p style="font-size: 0.85rem; color: var(--error-text);">{{ t("ton-admin-ladder-invalid", error=ladder_error) }}</p>{% endif %}
+  <div style="overflow-x: auto;">
+  <table id="ton-ladder-preview" style="font-size: 0.875rem; border-collapse: collapse;">
+    <tr><th style="text-align: left; padding: 0.25rem 1rem 0.25rem 0;">{{ t("ton-admin-preview-n") }}</th><th style="text-align: left; padding: 0.25rem 0;">{{ t("ton-admin-preview-price") }}</th></tr>
+    {% for row in preview %}
+    <tr><td style="padding: 0.2rem 1rem 0.2rem 0;">{% if row.or_more %}{{ t("ton-admin-preview-or-more", n=row.n) }}{% else %}{{ row.n }}{% endif %}</td><td>{{ row.price }}</td></tr>
+    {% endfor %}
+  </table>
+  </div>
+  <p id="ton-my-demand" style="font-size: 0.875rem; margin-top: 0.75rem;">{{ t("ton-admin-my-demand", n=my_n, price=my_price) }}</p>
+  <h3 style="margin-top: 1rem;">{{ t("ton-admin-types") }}</h3>
+  {% if types %}
+  <div style="overflow-x: auto;">
+  <table id="ton-types" style="width: 100%; font-size: 0.85rem; border-collapse: collapse;">
+    <tr><th style="text-align: left;">{{ t("ton-admin-type") }}</th><th style="text-align: left;">{{ t("ton-admin-type-owner") }}</th><th style="text-align: left;">{{ t("ton-admin-type-price") }}</th><th style="text-align: left;">{{ t("ton-admin-type-now") }}</th></tr>
+    {% for et in types %}
+    <tr data-mode="{{ et.mode }}">
+      <td style="padding: 0.2rem 0.5rem 0.2rem 0;">{{ et.title }} <span style="color: var(--text-muted);">/{{ et.slug }}</span></td>
+      <td style="padding: 0.2rem 0.5rem 0.2rem 0;">{{ et.owner }}</td>
+      <td style="padding: 0.2rem 0.5rem 0.2rem 0;">{{ et.price }}{% if not et.enabled %} <span style="color: var(--text-muted);">({{ t("ton-admin-type-off") }})</span>{% endif %}{% if et.at_or_below_ceiling %}<br><span style="color: var(--warning-text, #b45309); font-size: 0.8rem;">{{ t("ton-admin-type-below-ceiling") }}</span>{% endif %}</td>
+      <td style="padding: 0.2rem 0;">{{ et.now_price or "" }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  </div>
+  {% else %}
+  <p style="font-size: 0.85rem; color: var(--text-muted);">{{ t("ton-admin-types-none") }}</p>
+  {% endif %}
+  <div style="margin-top: 0.75rem;">
+    <button type="submit" name="action" value="preview" class="slot-btn" style="cursor: pointer;">{{ t("ton-admin-preview-button") }}</button>
+  </div>
+  {% endif %}
+</div>
+{% endfor %}
+<div class="card">
+  <button type="submit" name="action" value="save" class="btn">{{ t("ton-admin-save") }}</button>
+</div>
+</form>
+
+<div class="card" id="ton-audit">
+  <h2>{{ t("ton-admin-audit") }}</h2>
+  {% if audit %}
+  <div style="overflow-x: auto;">
+  <table style="width: 100%; font-size: 0.825rem; border-collapse: collapse;">
+    <tr><th style="text-align: left;">{{ t("ton-admin-audit-at") }}</th><th style="text-align: left;">{{ t("ton-admin-audit-who") }}</th><th style="text-align: left;">{{ t("ton-admin-audit-key") }}</th><th style="text-align: left;">{{ t("ton-admin-audit-change") }}</th></tr>
+    {% for a in audit %}
+    <tr>
+      <td style="padding: 0.2rem 0.5rem 0.2rem 0; white-space: nowrap;">{{ a.at }}</td>
+      <td style="padding: 0.2rem 0.5rem 0.2rem 0;">{% if a.source == "apply" %}{{ t("ton-admin-via-apply") }}{% else %}{{ a.actor }}{% endif %}</td>
+      <td style="padding: 0.2rem 0.5rem 0.2rem 0;"><code>{{ a.field }}</code></td>
+      <td style="padding: 0.2rem 0; word-break: break-all;">{{ a.before or t("ton-admin-audit-default") }} → {{ a.after or t("ton-admin-audit-default") }}{% if a.owner == "apply" %} ({{ t("ton-admin-via-apply") }}){% endif %}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  </div>
+  {% else %}
+  <p style="font-size: 0.85rem; color: var(--text-muted);">{{ t("ton-admin-audit-none") }}</p>
+  {% endif %}
+</div>
+
+<script>
+(function() {
+  // The ladder as rows ("from n bookings: price"), kept in step with the
+  // text field, which stays the value posted (and works without this).
+  var editor = document.getElementById('ton-ladder-editor');
+  var input = document.getElementById('ton-ladder');
+  if (!editor || !input || input.disabled) return;
+  var rows = document.getElementById('ton-ladder-rows');
+  var rowLabel = editor.getAttribute('data-row');
+  var free = editor.getAttribute('data-free');
+  function steps() {
+    var v = (input.value || input.placeholder || '').split(',');
+    return v.map(function(s) { return s.trim(); }).filter(function(s) { return s !== ''; });
+  }
+  function write() {
+    var vals = [];
+    rows.querySelectorAll('input').forEach(function(i) {
+      var v = i.value.trim();
+      if (v !== '') vals.push(v.toLowerCase() === free.toLowerCase() ? 'free' : v);
+    });
+    input.value = vals.join(',');
+  }
+  function draw(list) {
+    rows.innerHTML = '';
+    list.forEach(function(step, n) {
+      var row = document.createElement('div');
+      row.style.cssText = 'display: flex; gap: 0.5rem; align-items: center; margin-top: 0.25rem;';
+      var label = document.createElement('span');
+      label.style.cssText = 'min-width: 9rem; font-size: 0.85rem;';
+      label.textContent = rowLabel.replace('%1', String(n));
+      var field = document.createElement('input');
+      field.type = 'text';
+      field.value = step === 'free' ? free : step;
+      field.style.maxWidth = '8rem';
+      field.addEventListener('input', write);
+      var remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'slot-btn';
+      remove.textContent = editor.getAttribute('data-remove');
+      remove.addEventListener('click', function() { row.remove(); write(); draw(steps()); });
+      row.appendChild(label); row.appendChild(field); row.appendChild(remove);
+      rows.appendChild(row);
+    });
+  }
+  document.getElementById('ton-ladder-add').addEventListener('click', function() {
+    var list = steps();
+    list.push(list.length ? list[list.length - 1] : 'free');
+    input.value = list.join(',');
+    draw(list);
+  });
+  input.addEventListener('change', function() { draw(steps()); });
+  editor.hidden = false;
+  draw(steps());
+})();
+</script>
+{% endblock %}

@@ -56,9 +56,10 @@ const PROBLEMS: [&str; 8] = [
 
 // --- reads ---
 
-/// A `ton_prices` row as stored: currency, nanotons, cents, window,
+/// A `ton_prices` row as stored: mode, currency, nanotons, cents, window,
 /// enabled, and the type's guest Telegram mode.
 pub(crate) type PriceCols = (
+    Option<String>,
     Option<String>,
     Option<i64>,
     Option<i64>,
@@ -69,14 +70,17 @@ pub(crate) type PriceCols = (
 
 /// A `ton_prices` row as the tools show it; `None` without a row.
 pub(crate) fn price_out(cols: PriceCols) -> Option<PriceOut> {
-    let (currency, nano, cents, window_min, enabled, guest_mode) = cols;
-    let price = ton_pay::store::Price::from_columns(currency.as_deref()?, nano, cents)?;
-    let (ton, usd) = match price {
-        ton_pay::store::Price::Ton(n) => (Some(format_ton(n)), None),
-        ton_pay::store::Price::Usd(c) => (None, Some(format_usd_cents(u128::from(c)))),
+    let (mode, currency, nano, cents, window_min, enabled, guest_mode) = cols;
+    let terms =
+        ton_pay::store::Terms::from_columns(mode.as_deref()?, currency.as_deref()?, nano, cents)?;
+    let (ton, usd) = match terms.fixed() {
+        Some(ton_pay::store::Price::Ton(n)) => (Some(format_ton(n)), None),
+        Some(ton_pay::store::Price::Usd(c)) => (None, Some(format_usd_cents(u128::from(c)))),
+        None => (None, None),
     };
     Some(PriceOut {
-        currency: price.currency().to_string(),
+        mode: terms.mode().to_string(),
+        currency: terms.currency().to_string(),
         ton,
         usd,
         window_min,
@@ -90,7 +94,8 @@ pub(crate) fn price_out(cols: PriceCols) -> Option<PriceOut> {
 
 /// The `ton_prices` columns of [`PriceCols`] for event type `et.id`, as a
 /// SELECT list over `ton_prices p` joined to `event_types et`.
-pub(crate) const PRICE_COLS: &str = "p.currency, p.price_nano, p.price_usd_cents, p.window_min, \
+pub(crate) const PRICE_COLS: &str =
+    "p.mode, p.currency, p.price_nano, p.price_usd_cents, p.window_min, \
      p.enabled, (SELECT guest_mode FROM telegram_event_types WHERE event_type_id = et.id)";
 
 /// The price of event type `et_id`, switched on or not.
@@ -248,9 +253,24 @@ pub(crate) async fn approval_block(
 // --- set_event_type_price ---
 
 /// The price arguments, without echoing them: `price_ton` (the default
-/// currency) or `price_usd`, at most one; neither removes the price.
-fn check_price(args: &SetPriceArgs) -> Result<Option<ton_pay::store::Price>, ToolError> {
-    match (args.price_ton.as_deref(), args.price_usd.as_deref()) {
+/// currency) or `price_usd`, at most one; neither removes the price. ilia
+/// fork: `mode` `ladder` prices by the site's demand ladder, with neither
+/// amount.
+fn check_price(args: &SetPriceArgs) -> Result<Option<ton_pay::store::Terms>, ToolError> {
+    match args.mode.as_deref().map(str::trim) {
+        None | Some("fixed") => {}
+        Some("ladder") if args.price_ton.is_none() && args.price_usd.is_none() => {
+            return Ok(Some(ton_pay::store::Terms::Ladder))
+        }
+        Some("ladder") => {
+            return Err(ToolError::invalid(
+                "mode",
+                "the ladder sets the price by demand: leave price_ton and price_usd out",
+            ))
+        }
+        Some(_) => return Err(ToolError::invalid("mode", "fixed or ladder")),
+    }
+    let fixed = match (args.price_ton.as_deref(), args.price_usd.as_deref()) {
         (Some(_), Some(_)) => Err(ToolError::invalid(
             "price_ton",
             "give the price in TON (price_ton) or in US dollars (price_usd), not both",
@@ -275,7 +295,8 @@ fn check_price(args: &SetPriceArgs) -> Result<Option<ton_pay::store::Price>, Too
                 )
             }),
         (None, None) => Ok(None),
-    }
+    }?;
+    Ok(fixed.map(ton_pay::store::Terms::Fixed))
 }
 
 fn check_window(window: Option<i64>) -> Result<Option<i64>, ToolError> {
@@ -288,8 +309,8 @@ fn check_window(window: Option<i64>) -> Result<Option<i64>, ToolError> {
     }
 }
 
-/// The price row of `et_id` as (price, window, enabled).
-pub(crate) type PriceRow = (ton_pay::store::Price, Option<i64>, i64);
+/// The price row of `et_id` as (terms, window, enabled).
+pub(crate) type PriceRow = (ton_pay::store::Terms, Option<i64>, i64);
 
 /// The stored price of `et_id`, switched on or not; `None` without a row
 /// (or for one the CHECKs would not allow).
@@ -297,21 +318,24 @@ pub(crate) async fn read_price(
     conn: &mut sqlx::SqliteConnection,
     et_id: &str,
 ) -> Result<Option<PriceRow>, ToolError> {
-    let row: Option<(String, Option<i64>, Option<i64>, Option<i64>, i64)> = sqlx::query_as(
-        "SELECT currency, price_nano, price_usd_cents, window_min, enabled
+    #[allow(clippy::type_complexity)]
+    let row: Option<(String, String, Option<i64>, Option<i64>, Option<i64>, i64)> = sqlx::query_as(
+        "SELECT mode, currency, price_nano, price_usd_cents, window_min, enabled
          FROM ton_prices WHERE event_type_id = ?",
     )
     .bind(et_id)
     .fetch_optional(&mut *conn)
     .await
     .map_err(db("read the price"))?;
-    Ok(row.and_then(|(currency, nano, cents, window, enabled)| {
-        Some((
-            ton_pay::store::Price::from_columns(&currency, nano, cents)?,
-            window,
-            enabled,
-        ))
-    }))
+    Ok(
+        row.and_then(|(mode, currency, nano, cents, window, enabled)| {
+            Some((
+                ton_pay::store::Terms::from_columns(&mode, &currency, nano, cents)?,
+                window,
+                enabled,
+            ))
+        }),
+    )
 }
 
 fn price_audit(row: Option<&PriceRow>) -> Map<String, Value> {
@@ -320,9 +344,10 @@ fn price_audit(row: Option<&PriceRow>) -> Map<String, Value> {
         None => {
             map.insert("price".into(), Value::Null);
         }
-        Some((price, window, enabled)) => {
-            map.insert("currency".into(), json!(price.currency()));
-            map.insert("price".into(), json!(price.amount()));
+        Some((terms, window, enabled)) => {
+            map.insert("mode".into(), json!(terms.mode()));
+            map.insert("currency".into(), json!(terms.currency()));
+            map.insert("price".into(), json!(terms.fixed().map(|p| p.amount())));
             map.insert("window_min".into(), json!(window));
             map.insert("enabled".into(), json!(*enabled != 0));
         }
@@ -426,8 +451,8 @@ pub(crate) async fn set_event_type_price(
     let after: Option<PriceRow> = wanted.map(|price| (price, window, 1));
     if before != after {
         match after {
-            Some((price, window, _)) => {
-                ton_pay::store::save_price(&mut tx, &et_id, price, window, true, Utc::now())
+            Some((terms, window, _)) => {
+                ton_pay::store::save_price(&mut tx, &et_id, terms, window, true, Utc::now())
                     .await
                     .map_err(db("save the price"))?;
             }
@@ -458,6 +483,7 @@ pub(crate) async fn set_event_type_price(
         tracing::info!(
             target: ton_pay::TARGET,
             event_type_id = %et_id,
+            mode = wanted.map(|p| p.mode()).unwrap_or(""),
             currency = wanted.map(|p| p.currency()).unwrap_or(""),
             "event type price set through the agent"
         );
@@ -473,7 +499,10 @@ pub(crate) async fn set_event_type_price(
         &w.ctx.state,
         &et_id,
         after.is_some(),
-        matches!(wanted, Some(ton_pay::store::Price::Usd(_))),
+        matches!(
+            wanted,
+            Some(ton_pay::store::Terms::Fixed(ton_pay::store::Price::Usd(_)))
+        ),
     )
     .await;
     Ok(PriceChanged {
@@ -618,7 +647,7 @@ pub(crate) async fn waive_payment(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ton_pay::store::Price;
+    use ton_pay::store::{Price, Terms};
 
     fn args(ton: Option<&str>, usd: Option<&str>) -> SetPriceArgs {
         SetPriceArgs {
@@ -627,6 +656,7 @@ mod tests {
             price_ton: ton.map(str::to_string),
             price_usd: usd.map(str::to_string),
             window_min: None,
+            mode: None,
         }
     }
 
@@ -634,12 +664,30 @@ mod tests {
     fn prices_and_windows_are_checked_without_echo() {
         let usd = |v: &str| check_price(&args(None, Some(v)));
         let ton = |v: &str| check_price(&args(Some(v), None));
-        assert_eq!(usd("40").unwrap(), Some(Price::Usd(4000)));
-        assert_eq!(usd(" 40.5 ").unwrap(), Some(Price::Usd(4050)));
-        assert_eq!(usd("1").unwrap(), Some(Price::Usd(100)));
-        assert_eq!(usd("10000.00").unwrap(), Some(Price::Usd(1_000_000)));
-        assert_eq!(ton("100").unwrap(), Some(Price::Ton(100_000_000_000)));
-        assert_eq!(ton("12.50").unwrap(), Some(Price::Ton(12_500_000_000)));
+        let fixed = |p: Price| Some(Terms::Fixed(p));
+        assert_eq!(usd("40").unwrap(), fixed(Price::Usd(4000)));
+        assert_eq!(usd(" 40.5 ").unwrap(), fixed(Price::Usd(4050)));
+        assert_eq!(usd("1").unwrap(), fixed(Price::Usd(100)));
+        assert_eq!(usd("10000.00").unwrap(), fixed(Price::Usd(1_000_000)));
+        assert_eq!(ton("100").unwrap(), fixed(Price::Ton(100_000_000_000)));
+        assert_eq!(ton("12.50").unwrap(), fixed(Price::Ton(12_500_000_000)));
+        // ilia fork: the ladder takes no amount.
+        let mut ladder = args(None, None);
+        ladder.mode = Some("ladder".into());
+        assert_eq!(check_price(&ladder).unwrap(), Some(Terms::Ladder));
+        ladder.price_ton = Some("100".into());
+        assert!(check_price(&ladder)
+            .unwrap_err()
+            .message()
+            .starts_with("invalid mode:"));
+        let mut odd = args(Some("100"), None);
+        odd.mode = Some("auction".into());
+        assert!(check_price(&odd).is_err());
+        odd.mode = Some("fixed".into());
+        assert_eq!(
+            check_price(&odd).unwrap(),
+            fixed(Price::Ton(100_000_000_000))
+        );
         assert_eq!(check_price(&args(None, None)).unwrap(), None);
         assert!(check_price(&args(Some("100"), Some("40"))).is_err());
         for bad in ["0.99", "10000.01", "", "x", "-5", "4e1", "40.505", "40,00"] {
@@ -738,7 +786,15 @@ mod tests {
     #[test]
     fn a_price_row_reads_as_its_dto() {
         let cols = |c: Option<&str>, nano, cents, enabled| {
-            (c.map(str::to_string), nano, cents, Some(30), enabled, None)
+            (
+                Some("fixed".to_string()),
+                c.map(str::to_string),
+                nano,
+                cents,
+                Some(30),
+                enabled,
+                None,
+            )
         };
         assert!(price_out(cols(None, None, Some(4050), Some(1))).is_none());
         let p = price_out(cols(Some("USD"), None, Some(4050), Some(1))).unwrap();
@@ -752,5 +808,14 @@ mod tests {
             ("TON", Some("100.00"), None, false)
         );
         assert_eq!(p.guest_telegram.as_deref(), Some("off"));
+        assert_eq!(p.mode, "fixed");
+        // ilia fork: a ladder row has no amount.
+        let mut row = cols(Some("TON"), None, None, Some(1));
+        row.0 = Some("ladder".into());
+        let p = price_out(row).unwrap();
+        assert_eq!(
+            (p.mode.as_str(), p.currency.as_str(), p.ton, p.usd),
+            ("ladder", "TON", None, None)
+        );
     }
 }

@@ -265,6 +265,23 @@ Call sites use `crate::email::name` whatever file `name` lives in.
   `SAMEORIGIN` when no other site may frame the page. `assets/embed.js` fills
   `[data-calrs-inline]` elements on load. Tests in
   `src/web/tests/embed_origins.rs`.
+- **TON price by demand and TON settings** (ilia fork, docs/src/ton.md):
+  the pure rules in `src/ton/ladder.rs` (the ladder, `price(n)`,
+  `accepts`), `src/ton/config.rs` (`Tuning`, `TonConfig::resolve`) and
+  `src/ton/settings.rs` (the keys the page and apply may store, env > DB >
+  default, the one parser `to_env`); the demand count and the stored rows
+  in `src/web/ton_pay/store.rs` (`demand_n`, `load_settings`); the quote
+  and the recount inside the booking transaction in
+  `src/web/ton_pay/invoice.rs` (`prepare`, `open`) and `flow.rs`; the
+  public price line in `pricing.rs`; writes and the audit trail in
+  `src/web/ton_pay/settings.rs`; the admin page `/dashboard/admin/ton` in
+  `src/web/ton_pay/settings_page.rs` (`templates/ton_settings.html`); the
+  hot apply in `TonSlot::apply_settings` (a retuned `TonRuntime`, the
+  watcher's supervisor restarts on `TonSlot::generation`); the alert email
+  through `alerts::alert_email`; `config apply`'s `site.ton` in
+  `src/web/apply/ton.rs`. Migrations `ilia_011_ton_ladder.sql` and
+  `ilia_012_ton_settings_audit.sql`; tests in
+  `src/web/tests/{ton_ladder,ton_settings,apply_ton}.rs`.
 - **Captcha** (`src/web/captcha.rs`, CSP in `src/web/mod.rs`, widget in
   `templates/book.html`).
 - **Migrations** (`migrations/`, `src/db.rs`). A new file must also be added

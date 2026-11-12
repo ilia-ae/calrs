@@ -12,6 +12,7 @@
 - [Teams](./teams.md)
 - [Shared Resources](./resources.md)
 - [SMS Notifications](./sms.md)
+- [TON Payments (ilia fork)](./ton.md)
 - [Authentication](./authentication.md)
 - [Authentik (OIDC SSO)](./authentik.md)
 

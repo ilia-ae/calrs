@@ -72,3 +72,7 @@ SMS spends real money on a public form, so the card also warns when SMS is confi
 ## SMTP status
 
 Shows whether SMTP is configured and the current sender address. SMTP is configured via CLI (`calrs config smtp`) or by editing the database directly.
+
+## TON payments (ilia fork)
+
+**Admin → TON payments** (`/dashboard/admin/ton`, admins only) shows the state of TON payments and edits their tuning: the demand ladder and the free-step limit, invoice timing and renewals, the exchange-rate corridor and rules, and the alert email. The network, the wallet address, the indexer and the API keys are never edited here: they stay in the server's environment and systemd credentials, and the page only shows them (the address in both forms, the keys as set or not set). A field set in the environment or by `config apply` is read-only, with the reason. See [TON payments](ton.md).

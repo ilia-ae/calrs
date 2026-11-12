@@ -1108,6 +1108,93 @@ async fn exported_prices_apply_with_no_change() {
     assert_eq!(env.snapshot().await, before);
 }
 
+/// ilia fork: `ton_price: {ladder: true, window_min, enabled}` prices by
+/// the site's demand ladder; it round-trips through the export, a second
+/// run changes nothing, and malformed forms are refused before anything is
+/// written.
+#[tokio::test]
+async fn a_ladder_price_applies_exports_and_round_trips() {
+    let env = ApplyEnv::new().await;
+    let mut item = paid();
+    item["ton_price"] = json!({"ladder": true, "window_min": 20, "enabled": true});
+    let json = et_doc(json!([item]), None);
+    env.apply(&json, false).await.unwrap();
+    let mode: String = sqlx::query_scalar(
+        "SELECT p.mode FROM ton_prices p JOIN event_types et ON et.id = p.event_type_id
+         WHERE et.slug = 'cto-60'",
+    )
+    .fetch_one(&env.pool)
+    .await
+    .unwrap();
+    assert_eq!(mode, "ladder");
+    assert_eq!(
+        price(&env, "cto-60").await,
+        Some(("TON".into(), None, None, Some(20), 1))
+    );
+    assert!(env.apply(&json, false).await.unwrap().changed.is_empty());
+
+    // From a fixed price to the ladder and back is one change each.
+    let with = |price: Value| et_doc(json!([{"slug": "cto-60", "ton_price": price}]), None);
+    let report = env
+        .apply(&with(json!({"ton": "100.00"})), false)
+        .await
+        .unwrap();
+    assert_eq!(
+        report.changed,
+        vec![Change {
+            path: "event_types[cto-60].ton_price".into(),
+            before: json!({"ladder": true, "window_min": 20, "enabled": true}),
+            after: json!({"ton": "100.00", "window_min": null, "enabled": true}),
+        }]
+    );
+    env.apply(&with(json!({"ladder": true, "enabled": false})), false)
+        .await
+        .unwrap();
+    assert_eq!(
+        price(&env, "cto-60").await,
+        Some(("TON".into(), None, None, None, 0))
+    );
+
+    let exported = env.export().await.unwrap().event_types.unwrap();
+    let item = exported.items.iter().find(|i| i.slug == "cto-60").unwrap();
+    assert_eq!(
+        serde_json::to_value(&item.ton_price).unwrap(),
+        json!({"ladder": true, "window_min": null, "enabled": false})
+    );
+    let json = doc(json!({ "event_types": serde_json::to_value(&exported).unwrap() }));
+    let before = env.snapshot().await;
+    assert!(env.apply(&json, false).await.unwrap().changed.is_empty());
+    assert_eq!(env.snapshot().await, before);
+
+    for (value, path) in [
+        (
+            json!({"ladder": false}),
+            "event_types[cto-60].ton_price.ladder",
+        ),
+        (
+            json!({"ladder": true, "ton": "100.00"}),
+            "event_types[cto-60].ton_price",
+        ),
+        (
+            json!({"ladder": true, "usd": "500.00"}),
+            "event_types[cto-60].ton_price",
+        ),
+        (
+            json!({"ladder": true, "window_min": 5}),
+            "event_types[cto-60].ton_price",
+        ),
+        (json!({"ladder": null}), "(document)"),
+        (json!({"ladder": "yes"}), "(document)"),
+    ] {
+        refused(
+            &env,
+            &et_doc(json!([{"slug": "cto-60", "ton_price": value}]), None),
+            path,
+        )
+        .await;
+    }
+}
+
 // --- Sources ---
 
 /// A Kerio-like source of the admin with three calendars, one of them

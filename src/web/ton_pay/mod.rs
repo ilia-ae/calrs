@@ -14,6 +14,9 @@ pub(crate) mod alerts;
 pub(crate) mod flow;
 pub(crate) mod invoice;
 pub(crate) mod page;
+pub(crate) mod pricing;
+pub(crate) mod settings;
+pub(crate) mod settings_page;
 pub(crate) mod store;
 pub(crate) mod telegram;
 pub(crate) mod watcher;
@@ -36,12 +39,14 @@ pub(crate) use admin::{
 pub(in crate::web) use flow::{
     after_booking, approval_refused_for_token, approval_refused_page, booking_ended,
     guest_reschedule_refused, handle_expired_notice, open_for_booking, prepare_for_booking,
-    refuse_group,
+    refuse_group, start_of, Repost,
 };
+pub(in crate::web) use invoice::BookingAsk;
 pub(crate) use invoice::{approval_refused, cancel_is_quiet, is_priced, settled, unpaid};
 pub(crate) use watcher::spawn;
 
-/// The payment page, its status and actions, and the dashboard waive.
+/// The payment page, its status and actions, the dashboard waive, and
+/// the admin's TON settings page.
 pub(crate) fn router() -> axum::Router<Arc<AppState>> {
     use axum::routing::{get, post};
     axum::Router::new()
@@ -53,6 +58,10 @@ pub(crate) fn router() -> axum::Router<Arc<AppState>> {
         .route(
             "/dashboard/ton/waive/{booking_id}",
             get(admin::waive_form).post(admin::waive),
+        )
+        .route(
+            settings_page::PATH,
+            get(settings_page::page).post(settings_page::save),
         )
 }
 
@@ -247,6 +256,74 @@ impl TonRuntime {
         Self::new(cfg, Arc::new(indexer), Arc::new(rates), None)
     }
 
+    /// ilia fork: the same runtime with new settings (the admin page's
+    /// hot apply). The indexer, the rate sources, the alert sink and what
+    /// the watcher learned (health, bootstrap, the rate anchor, payments
+    /// seen, the last capacity refusal) carry over; the rate cache does
+    /// not, since the corridor may have changed. `None` when `cfg` names
+    /// another wallet, network or indexer: those are env-only and need a
+    /// restart (they never differ within one process).
+    pub(crate) fn retuned(&self, cfg: TonConfig) -> Option<TonRuntime> {
+        let same = cfg.network == self.cfg.network
+            && cfg.address_raw == self.cfg.address_raw
+            && cfg.api_url == self.cfg.api_url
+            && cfg.api_key == self.cfg.api_key
+            && cfg.poll_secs == self.cfg.poll_secs;
+        if !same {
+            return None;
+        }
+        let next = TonRuntime::new(
+            cfg,
+            self.indexer.clone(),
+            self.rates.clone(),
+            self.alerts.get().cloned(),
+        );
+        next.take_over(self);
+        // The supervisor runs the new runtime as soon as the old loop ends
+        // its step: until then it counts as running, so a booking in that
+        // gap finds an idle-but-well watcher (wakes it, waits for its
+        // step) instead of "not ready".
+        next.looping.store(
+            self.looping.load(std::sync::atomic::Ordering::Acquire),
+            std::sync::atomic::Ordering::Release,
+        );
+        Some(next)
+    }
+
+    /// ilia fork: carry over what `old`'s watcher learned (health, the
+    /// rate anchor, payments seen, bootstrap, the last capacity refusal).
+    /// At the swap ([`Self::retuned`]), and again by the supervisor once
+    /// the old loop has finished its last step, so what that step learned
+    /// after the swap is not lost. The health and the payments seen are
+    /// the old loop's (only a loop writes them, and the new runtime has
+    /// none yet); the newer rate anchor and capacity refusal are kept.
+    pub(crate) fn take_over(&self, old: &TonRuntime) {
+        use std::sync::atomic::Ordering;
+        if let Ok(mut h) = self.health.lock() {
+            *h = old.health();
+        }
+        let old_anchor = old.anchor.lock().ok().and_then(|a| *a);
+        if let Ok(mut a) = self.anchor.lock() {
+            let newer = match (*a, old_anchor) {
+                (Some(mine), Some(theirs)) if mine.1 >= theirs.1 => Some(mine),
+                (mine, None) => mine,
+                (_, theirs) => theirs,
+            };
+            *a = newer;
+        }
+        let old_seen = old.seen.lock().map(|s| s.clone()).unwrap_or_default();
+        if let Ok(mut seen) = self.seen.lock() {
+            *seen = old_seen;
+        }
+        if old.bootstrapped.load(Ordering::Acquire) {
+            self.bootstrapped.store(true, Ordering::Release);
+        }
+        self.capacity_refused_at.fetch_max(
+            old.capacity_refused_at.load(Ordering::Acquire),
+            Ordering::AcqRel,
+        );
+    }
+
     pub(crate) fn health(&self) -> Health {
         self.health.lock().map(|h| h.clone()).unwrap_or_default()
     }
@@ -403,11 +480,96 @@ impl TonRuntime {
     }
 }
 
+/// ilia fork: the `CALRS_TON_*` environment `calrs serve` started with,
+/// read once: the only environment the settings resolve against (it does
+/// not change while the process runs), and which secrets were really set
+/// from systemd credentials (names only, never a value).
+#[derive(Clone, Debug, Default)]
+pub(crate) struct EnvSnapshot {
+    vars: HashMap<String, String>,
+    credentials: std::collections::HashSet<String>,
+}
+
+impl EnvSnapshot {
+    pub(crate) fn capture() -> Self {
+        let vars = crate::ton::config::VARS
+            .iter()
+            .filter_map(|k| std::env::var(k).ok().map(|v| (k.to_string(), v)))
+            .collect();
+        Self {
+            vars,
+            credentials: Default::default(),
+        }
+        .loaded_from(crate::credentials::loaded_names())
+    }
+
+    /// Mark the names `credentials::load_into_env` loaded
+    /// (`Outcome::Loaded`); a credential file of a variable that was
+    /// already set was not read, so that one stays "env".
+    pub(crate) fn loaded_from(mut self, loaded: &[&str]) -> Self {
+        self.credentials = crate::ton::config::VARS
+            .iter()
+            .filter(|k| loaded.contains(k))
+            .map(|k| k.to_string())
+            .collect();
+        self
+    }
+
+    #[cfg(test)]
+    pub(crate) fn of(vars: &[(&str, &str)]) -> Self {
+        Self {
+            vars: vars
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
+            credentials: Default::default(),
+        }
+    }
+
+    pub(crate) fn get(&self, var: &str) -> Option<String> {
+        self.vars.get(var).cloned()
+    }
+
+    /// A secret's state for the page: set from systemd credentials, set in
+    /// the environment, or not set.
+    pub(crate) fn secret_state(&self, var: &str) -> &'static str {
+        let set = self.vars.get(var).is_some_and(|v| !v.trim().is_empty());
+        if set && self.credentials.contains(var) {
+            "credentials"
+        } else if set {
+            "env"
+        } else {
+            "unset"
+        }
+    }
+}
+
+/// What saving the settings did to the running payments.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum Applied {
+    /// The new settings run now; the watcher restarts after its step.
+    Live,
+    /// Payments are off (`CALRS_TON_NETWORK` unset): stored for later.
+    Off,
+    /// Payments are off for a reason the settings no longer have, or the
+    /// wallet would change: they take effect after a restart.
+    RestartNeeded,
+    /// The merged settings are invalid (only when the environment itself
+    /// is): nothing changed in the running payments.
+    Invalid(String),
+}
+
 /// `AppState.ton`: the runtime when payments are configured, else `None`.
 pub(crate) struct TonSlot {
     runtime: std::sync::RwLock<Option<Arc<TonRuntime>>>,
     /// Why payments are off, for the log and status (no secrets).
     disabled: std::sync::RwLock<Option<String>>,
+    /// ilia fork: the environment the settings resolve against (set once
+    /// at startup; tests replace it).
+    env: std::sync::RwLock<EnvSnapshot>,
+    /// ilia fork: bumped when the runtime is replaced with new settings;
+    /// the watcher's supervisor restarts its loop on the new one.
+    generation: tokio::sync::watch::Sender<u64>,
     /// Payment page and status GETs per client address.
     pub(crate) page_limiter: RateLimiter,
     /// "I have paid" per invoice.
@@ -425,6 +587,8 @@ impl TonSlot {
         Self {
             runtime: std::sync::RwLock::new(runtime),
             disabled: std::sync::RwLock::new(reason),
+            env: std::sync::RwLock::new(EnvSnapshot::default()),
+            generation: tokio::sync::watch::channel(0).0,
             page_limiter: RateLimiter::new(120, 60),
             check_limiter: RateLimiter::new(1, 10),
             email_limiter: RateLimiter::new(5, 3600),
@@ -437,10 +601,45 @@ impl TonSlot {
         Self::with(None, reason)
     }
 
-    /// From the `CALRS_TON_*` environment. Unset: off. Invalid: off, with
-    /// the reason logged as an error.
-    pub(crate) fn from_env() -> Self {
-        match TonConfig::from_env() {
+    /// ilia fork: from the `CALRS_TON_*` environment and the settings
+    /// stored in `ton_settings` (env > DB > default,
+    /// `crate::ton::settings`). Network unset: off. Invalid, or the stored
+    /// settings unreadable: off, with the reason logged as an error.
+    pub(crate) async fn load(pool: &sqlx::SqlitePool) -> Self {
+        let env = EnvSnapshot::capture();
+        let db = match pool.acquire().await {
+            Ok(mut conn) => store::load_settings(&mut conn).await,
+            Err(e) => Err(e),
+        };
+        let slot = match db {
+            Ok(db) => Self::resolved(&env, &db),
+            Err(e) => {
+                tracing::error!(
+                    target: TARGET,
+                    error = %e,
+                    "ton payments disabled: the stored TON settings could not be read"
+                );
+                Self::off(Some("the stored TON settings could not be read".into()))
+            }
+        };
+        slot.set_env(env);
+        slot
+    }
+
+    /// The environment the settings resolve against.
+    pub(crate) fn env(&self) -> EnvSnapshot {
+        self.env.read().map(|e| e.clone()).unwrap_or_default()
+    }
+
+    /// Replace the environment (startup, and tests that stand for one).
+    pub(crate) fn set_env(&self, env: EnvSnapshot) {
+        if let Ok(mut e) = self.env.write() {
+            *e = env;
+        }
+    }
+
+    fn resolved(env: &EnvSnapshot, db: &crate::ton::settings::DbValues) -> Self {
+        match TonConfig::resolve(&|k| env.get(k), db) {
             Ok(Some(cfg)) => Self::with(Some(Arc::new(TonRuntime::http(cfg))), None),
             Ok(None) => Self::off(Some("CALRS_TON_NETWORK is not set".into())),
             Err(e) => {
@@ -452,6 +651,37 @@ impl TonSlot {
                 Self::off(Some(e.0))
             }
         }
+    }
+
+    /// ilia fork: put stored settings into effect without a restart (the
+    /// admin page, after its save committed). The running runtime is
+    /// replaced by one with the new settings ([`TonRuntime::retuned`]) and
+    /// the watcher restarts on it after its current step. Open invoices
+    /// keep the amounts and deadlines stored with them.
+    pub(crate) async fn apply_settings(&self, db: &crate::ton::settings::DbValues) -> Applied {
+        let env = self.env();
+        let cfg = match TonConfig::resolve(&|k| env.get(k), db) {
+            Ok(Some(cfg)) => cfg,
+            Ok(None) => return Applied::Off,
+            Err(e) => return Applied::Invalid(e.0),
+        };
+        let Some(current) = self.get() else {
+            return Applied::RestartNeeded;
+        };
+        let Some(next) = current.retuned(cfg) else {
+            return Applied::RestartNeeded;
+        };
+        if let Ok(mut r) = self.runtime.write() {
+            *r = Some(Arc::new(next));
+        }
+        self.generation.send_modify(|g| *g += 1);
+        tracing::info!(target: TARGET, "ton settings applied; the watcher restarts on them");
+        Applied::Live
+    }
+
+    /// Changes each time [`Self::apply_settings`] replaces the runtime.
+    pub(crate) fn generation(&self) -> tokio::sync::watch::Receiver<u64> {
+        self.generation.subscribe()
     }
 
     pub(crate) fn get(&self) -> Option<Arc<TonRuntime>> {

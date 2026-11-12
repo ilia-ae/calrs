@@ -14,6 +14,7 @@
 //! | `jitsi`                                | Jitsi (`admin_update_jitsi`)        |
 //! | `oidc`, `google_oauth2`, `captcha`, `meeting_webhook` | their cards, all fields empty |
 //! | `sms_allow_all_users`                  | SMS policy                          |
+//! | `ton` (ilia fork)                      | none: `apply/ton.rs` writes `ton_settings` as the TON page does |
 //!
 //! Two writes have no form apply can post:
 //! - `mfa_policy`: the web form asks for the admin's password and a TOTP
@@ -42,7 +43,10 @@ use std::collections::HashSet;
 
 /// Every check of the section, reading only (pipeline step 1). The document
 /// alone decides: each value must be in the form the handler stores as is.
-pub(super) async fn check(_ctx: &Ctx, site: &Site) -> Result<(), ApplyError> {
+pub(super) async fn check(ctx: &Ctx, site: &Site) -> Result<(), ApplyError> {
+    if let Some(ton) = &site.ton {
+        super::ton::check(ctx, ton).await?;
+    }
     match (site.theme, &site.custom) {
         (Some(Theme::Custom), None) => {
             return Err(ApplyError::invalid(
@@ -74,6 +78,9 @@ pub(super) async fn check(_ctx: &Ctx, site: &Site) -> Result<(), ApplyError> {
 /// Post the cards whose keys differ and record the changes (pipeline step
 /// 3). A card whose keys all match is not posted.
 pub(super) async fn apply(ctx: &mut Ctx, site: &Site) -> Result<(), ApplyError> {
+    if let Some(ton) = &site.ton {
+        super::ton::apply(ctx, ton).await?;
+    }
     let before = Stored::load(ctx).await?;
     let pairs = pairs(site, &before);
     let mut cards = HashSet::new();
@@ -232,6 +239,9 @@ pub(super) async fn apply(ctx: &mut Ctx, site: &Site) -> Result<(), ApplyError> 
 
 /// Read back and compare with the document (pipeline step 4).
 pub(super) async fn verify(ctx: &Ctx, site: &Site) -> Result<(), ApplyError> {
+    if let Some(ton) = &site.ton {
+        super::ton::verify(ctx, ton).await?;
+    }
     let stored = Stored::load(ctx).await?;
     match pairs(site, &stored).into_iter().find(Pair::differs) {
         Some(pair) => Err(ApplyError::stored_differs(
@@ -281,6 +291,7 @@ pub(super) async fn export(ctx: &Ctx) -> Result<Option<Site>, ApplyError> {
         captcha: off(s.captcha_is_off()),
         meeting_webhook: off(s.webhook_is_off()),
         sms_allow_all_users: Some(s.sms_allow_all_users),
+        ton: super::ton::export(ctx).await?,
     }))
 }
 
