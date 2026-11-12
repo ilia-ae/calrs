@@ -206,7 +206,7 @@ fn attr_escape(s: &str) -> String {
 }
 
 /// The menu entries for the page being rendered: `code`, `label` (the native
-/// name), `short` (what the closed menu shows), `href` and `current`, sorted
+/// name, which the closed menu shows), `short` (the code in capitals), `href` and `current`, sorted
 /// by name. Empty outside a GET public page. German is listed once: on an
 /// instance addressing visitors as "Sie" the cookie's `de` is read as
 /// `de-formal` (`crate::i18n::chosen_from_headers`), so the entry is current

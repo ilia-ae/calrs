@@ -393,7 +393,8 @@ async fn every_language_renders_the_switcher_with_its_entry_current() {
             "{code}: {menu}"
         );
         assert!(
-            menu.contains(&format!("<span>{}</span>", code.to_ascii_uppercase())),
+            // The closed menu names the current language, as BTCPay's footer does.
+            menu.contains(&format!("<span>{label}</span>")),
             "{code}: {menu}"
         );
         assert!(!menu.contains("Deutsch (Sie)"), "{code}");
