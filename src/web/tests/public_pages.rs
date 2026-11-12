@@ -391,7 +391,8 @@ async fn public_profile_returns_200() {
 #[tokio::test]
 async fn public_profile_trailing_slash_redirects_to_working_canonical_page() {
     let (app, _, _, _) = setup_test_app().await;
-    for query in ["", "?lang=fr&next=https%3A%2F%2Fexample.com%2F&tag=a&tag=b"] {
+    // ilia fork: not `lang`, which the language switcher answers first.
+    for query in ["", "?ref=fr&next=https%3A%2F%2Fexample.com%2F&tag=a&tag=b"] {
         let response = app
             .clone()
             .oneshot(get(&format!("/u/testuser/{query}")))

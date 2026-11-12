@@ -243,10 +243,9 @@ async fn current_state(state: &AppState, row: &PayRow, now: DateTime<Utc>) -> Pa
     state_of(row, seen, late, now)
 }
 
+/// The booking's language, unless the guest picked one with the switcher.
 fn page_lang(row: Option<&PayRow>, headers: &HeaderMap) -> &'static str {
-    row.and_then(|r| r.booking_lang.as_deref())
-        .and_then(crate::i18n::supported_code)
-        .unwrap_or_else(|| crate::i18n::detect_from_headers(headers))
+    crate::i18n::page_lang(row.and_then(|r| r.booking_lang.as_deref()), headers)
 }
 
 fn private(mut resp: Response) -> Response {

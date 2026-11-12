@@ -105,6 +105,7 @@ Every user-facing string goes through Fluent (`i18n/`).
 | `branding.rs` | Theme CSS, embed pages, static assets baked into the binary |
 | `format.rs` | Date and time labels for pages, emails and the dashboard |
 | `telegram.rs` | ilia fork: Profile & Settings → Telegram (host linking, guest field per event type), the booking form's Telegram helpers, dashboard labels |
+| `lang_switch.rs` | ilia fork: the language menu of public pages: `?lang=` sets the `calrs_lang` cookie and redirects to the same page, and the `lang_switcher()` template function (`templates/partials/lang_switcher.html`) |
 | `messages.rs` | ilia fork: host <-> guest messages, one thread per booking: `send_host_message` (the one path for the dashboard, the agent and Telegram replies, with the limits), guest texts, the thread page `/dashboard/bookings/{id}/messages`, see CLAUDE.md "Messages with guests" |
 | `week_start.rs` | Calendar display preference: event override → account owner's default → site default (Monday); named weekday keys, independent of availability's `0=Sunday` storage |
 | `tests/` | Web tests, one file per area (below) |
@@ -161,7 +162,10 @@ Call sites use `crate::email::name` whatever file `name` lives in.
   public pages follow the visitor's browser, `/u/` pages per the host's
   "public page language" setting (`user_page_lang` in
   `src/web/public_pages.rs`); guest emails use the language stored on the
-  booking. Guard tests: `src/i18n.rs` (key coverage, plurals, keys used from
+  booking. A language picked with the switcher (ilia fork, `calrs_lang`
+  cookie, `i18n::chosen_from_headers`, `src/web/lang_switch.rs`) comes
+  before all of those on public pages, and before the browser only on the
+  dashboard. Guard tests: `src/i18n.rs` (key coverage, plurals, keys used from
   Rust), `src/web/tests/guards.rs` (lang passed to host templates, no English
   on the booking error page, escaping).
 - **Email sending** (`src/web/notify.rs`, `src/email/`). Handlers never wait on

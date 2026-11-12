@@ -160,16 +160,54 @@ pub fn detect_from_accept_language(header: Option<&str>) -> &'static str {
 /// (`auth_config.german_formal`). Read only by `detect_from_headers`.
 pub const GERMAN_FORMAL_HEADER: &str = "x-calrs-german-formal";
 
-/// Convenience: pull `Accept-Language` from a `HeaderMap`. A browser asking
-/// for German gets the formal register when the instance chose it (see
-/// `GERMAN_FORMAL_HEADER`); a user's saved language is never rewritten.
-pub fn detect_from_headers(headers: &HeaderMap) -> &'static str {
-    let header = headers.get("accept-language").and_then(|v| v.to_str().ok());
-    let lang = detect_from_accept_language(header);
+/// Cookie holding the language a visitor picked with the switcher of the
+/// public pages (ilia fork, `web::lang_switch`).
+pub const LANG_COOKIE: &str = "calrs_lang";
+
+/// German in the register the instance chose for visitors (see
+/// `GERMAN_FORMAL_HEADER`); any other language as it is.
+fn visitor_register(lang: &'static str, headers: &HeaderMap) -> &'static str {
     if lang == "de" && headers.contains_key(GERMAN_FORMAL_HEADER) {
         return "de-formal";
     }
     lang
+}
+
+/// The language the visitor picked with the switcher: the first
+/// `calrs_lang` cookie, when it names a bundled locale (anything else is
+/// ignored). The switcher offers one German, so `de` follows the instance's
+/// register like a browser's German does.
+pub fn chosen_from_headers(headers: &HeaderMap) -> Option<&'static str> {
+    let prefix = format!("{LANG_COOKIE}=");
+    let value = headers
+        .get_all(axum::http::header::COOKIE)
+        .iter()
+        .filter_map(|v| v.to_str().ok())
+        .flat_map(|s| s.split(';'))
+        .find_map(|part| part.trim().strip_prefix(prefix.as_str()))?;
+    supported_code(value).map(|code| visitor_register(code, headers))
+}
+
+/// The visitor's language: the one picked with the switcher
+/// (`chosen_from_headers`), else `Accept-Language`. A browser asking for
+/// German gets the formal register when the instance chose it (see
+/// `GERMAN_FORMAL_HEADER`); a user's saved language is never rewritten.
+pub fn detect_from_headers(headers: &HeaderMap) -> &'static str {
+    if let Some(code) = chosen_from_headers(headers) {
+        return code;
+    }
+    let header = headers.get("accept-language").and_then(|v| v.to_str().ok());
+    visitor_register(detect_from_accept_language(header), headers)
+}
+
+/// Language of a page that has a language of its own (the one stored with
+/// a booking, a host's saved language): the visitor's pick with the switcher
+/// first, since they asked for it, then `stored` when calrs ships it, then
+/// the browser's.
+pub fn page_lang(stored: Option<&str>, headers: &HeaderMap) -> &'static str {
+    chosen_from_headers(headers)
+        .or_else(|| stored.and_then(supported_code))
+        .unwrap_or_else(|| detect_from_headers(headers))
 }
 
 /// Whether a given language code matches one of the bundled locales.
@@ -189,7 +227,9 @@ pub fn supported_code(code: &str) -> Option<&'static str> {
 }
 
 /// Resolve the language to use for rendering. The user's saved preference
-/// (when set and supported) wins over `Accept-Language`. Pass `None` for
+/// (when set and supported) wins over the switcher's pick and
+/// `Accept-Language`, so the dashboard follows the pick only while the user
+/// has no saved language. Pass `None` for
 /// `user_pref` to skip straight to header detection (e.g. for guests).
 pub fn resolve(user_pref: Option<&str>, headers: &HeaderMap) -> &'static str {
     if let Some(pref) = user_pref {

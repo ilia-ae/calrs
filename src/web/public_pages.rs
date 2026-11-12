@@ -845,7 +845,7 @@ pub(super) async fn user_profile(
                 ))
             }
         };
-    let lang = user_page_lang(host_language.as_deref(), &page_mode, visitor);
+    let lang = user_page_lang(host_language.as_deref(), &page_mode, &headers);
 
     let event_types: Vec<(String, String, Option<String>, i32, String)> = sqlx::query_as(
         "SELECT et.slug, et.title, et.description, et.duration_min, et.id
@@ -1315,23 +1315,25 @@ async fn show_dynamic_group_book_form(
 /// (selected by the queries they already run), so `bookings.language` (the
 /// page language, #209) always matches what the guest saw.
 ///
-/// 'visitor' (the default) gives `visitor`, the browser's language
+/// 'visitor' (the default) gives the visitor's language
 /// (`i18n::detect_from_headers`), the rule of every public guest page;
-/// 'host' gives the host's saved language (#76), or `visitor` when the host
-/// has none. A logged-in user's own preference never counts on these pages:
-/// staff booking for a client, or an admin impersonating someone, would
-/// otherwise stamp their language on a real guest's booking.
+/// 'host' gives the host's saved language (#76), or the visitor's when the
+/// host has none. A language the visitor picked with the switcher (ilia
+/// fork, `i18n::chosen_from_headers`) wins in both modes: they asked for it.
+/// A logged-in user's own preference never counts on these pages: staff
+/// booking for a client, or an admin impersonating someone, would otherwise
+/// stamp their language on a real guest's booking.
 pub(super) fn user_page_lang(
     host_language: Option<&str>,
     mode: &str,
-    visitor: &'static str,
+    headers: &HeaderMap,
 ) -> &'static str {
-    if normalize_public_page_language(mode) == Some("host") {
-        if let Some(code) = host_language.and_then(crate::i18n::supported_code) {
-            return code;
-        }
-    }
-    visitor
+    let host = if normalize_public_page_language(mode) == Some("host") {
+        host_language
+    } else {
+        None
+    };
+    crate::i18n::page_lang(host, headers)
 }
 
 /// [`user_page_lang`] from scratch, for the error pages the `/u/` booking
@@ -1354,7 +1356,7 @@ pub(super) async fn user_page_lang_lookup(
     .await
     .unwrap_or(None);
     match row {
-        Some((host_language, mode)) => user_page_lang(host_language.as_deref(), &mode, visitor),
+        Some((host_language, mode)) => user_page_lang(host_language.as_deref(), &mode, headers),
         None => visitor,
     }
 }
@@ -1385,7 +1387,7 @@ pub(super) async fn legacy_page_lang_lookup(
         Some((host_language, mode)) => user_page_lang(
             host_language.as_deref(),
             mode.as_deref().unwrap_or(""),
-            visitor,
+            headers,
         ),
         None => visitor,
     }
@@ -1437,7 +1439,7 @@ pub(super) async fn show_slots_for_user(
             }
         };
 
-    let lang = user_page_lang(host_language.as_deref(), &page_mode, visitor);
+    let lang = user_page_lang(host_language.as_deref(), &page_mode, &headers);
 
     let et: Option<(String, String, String, Option<String>, i32, i32, i32, i32, String, Option<String>, String, String)> = sqlx::query_as(
         "SELECT et.id, et.slug, et.title, et.description, et.duration_min, et.buffer_before, et.buffer_after, et.min_notice_min, et.location_type, et.location_value, et.visibility, et.default_calendar_view
@@ -1713,7 +1715,7 @@ pub(super) async fn show_book_form_for_user(
         }
     };
 
-    let lang = user_page_lang(host_language.as_deref(), &page_mode, visitor);
+    let lang = user_page_lang(host_language.as_deref(), &page_mode, &headers);
 
     // Validate invite token for private event types
     let invite_guest_name;
@@ -2113,7 +2115,7 @@ pub(super) async fn show_slots(
     let lang = user_page_lang(
         host_language.as_deref(),
         page_mode.as_deref().unwrap_or(""),
-        visitor,
+        &headers,
     );
 
     // Block private event types on legacy route (use /u/ or /team/ routes with invite token instead)
@@ -2335,7 +2337,7 @@ pub(super) async fn show_book_form(
     let lang = user_page_lang(
         host_language.as_deref(),
         page_mode.as_deref().unwrap_or(""),
-        visitor,
+        &headers,
     );
 
     // Block non-public event types on legacy route

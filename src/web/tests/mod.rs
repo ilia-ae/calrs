@@ -36,6 +36,7 @@ mod guards;
 mod hosts;
 mod ilia;
 mod invites;
+mod lang_switch;
 // ilia fork: host <-> guest messages.
 mod messages;
 mod organizer;

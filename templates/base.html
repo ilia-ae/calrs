@@ -493,7 +493,7 @@
        content. */
     body { padding: 1rem 0.75rem; background: transparent; display: block; min-height: 0; }
     .container { max-width: none; }
-    .logo, .made-by, .theme-pill, #theme-toggle { display: none !important; }
+    .logo, .made-by, .theme-pill, #theme-toggle, .lang-switch { display: none !important; }
     {% if embed_brand %}
     /* Apply the brand accent in both light and dark mode. The `html.dark`
        selector is needed to out-specify base.html's `html.dark` accent rule;
@@ -566,6 +566,8 @@
       html:not(.dark) .theme-pill-moon { opacity: 0.4; }
     </style>
     {% endblock %}
+    {#- ilia fork: the language menu beside the theme toggle; the dashboard leaves it out. #}
+    {% block lang_switcher %}{% include "partials/lang_switcher.html" %}{% endblock %}
   </div>
 <script>
 // CSRF protection: inject _csrf hidden field into all POST forms

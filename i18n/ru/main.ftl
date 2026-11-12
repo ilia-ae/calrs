@@ -211,6 +211,7 @@ base-loader-checking = Проверяем свободное время
 base-loader-please-wait = Подождите, загружаем актуальные данные календаря…
 base-stop-impersonating = Вернуться в свой аккаунт
 base-theme-toggle = Сменить тему
+base-language-choose = Выберите язык
 base-powered-by = Сделано на
 
 # Profile (templates/profile.html)

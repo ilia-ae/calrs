@@ -37,11 +37,8 @@ async fn host_token_page_lang(
     .fetch_optional(pool)
     .await
     .unwrap_or(None);
-    language
-        .flatten()
-        .as_deref()
-        .and_then(crate::i18n::supported_code)
-        .unwrap_or_else(|| crate::i18n::detect_from_headers(headers))
+    // ilia fork: a language picked with the switcher comes first.
+    crate::i18n::page_lang(language.flatten().as_deref(), headers)
 }
 
 /// Language of the claim pages: the saved language of the watcher the claim
@@ -51,6 +48,10 @@ async fn claim_page_lang(
     token: Option<&str>,
     headers: &HeaderMap,
 ) -> &'static str {
+    // ilia fork: a language picked with the switcher comes first.
+    if let Some(code) = crate::i18n::chosen_from_headers(headers) {
+        return code;
+    }
     if let Some(token) = token {
         let language: Option<Option<String>> = sqlx::query_scalar(
             "SELECT u.language FROM booking_claim_tokens bct JOIN users u ON u.id = bct.user_id
@@ -973,11 +974,11 @@ pub(super) async fn booking_ics(
 /// Language of a guest token page (cancel, reschedule, pick a new time): the
 /// language stored with the booking, so the page agrees with the emails the
 /// guest gets about it (#209); the visitor rule for bookings made before the
-/// column existed, or when the token matches no booking.
-fn token_page_lang(stored: Option<&str>, visitor: &'static str) -> &'static str {
-    stored
-        .and_then(crate::i18n::supported_code)
-        .unwrap_or(visitor)
+/// column existed, or when the token matches no booking. ilia fork: a
+/// language the guest picked with the switcher comes first, and the emails
+/// the page sends follow it.
+fn token_page_lang(stored: Option<&str>, headers: &HeaderMap) -> &'static str {
+    crate::i18n::page_lang(stored, headers)
 }
 
 pub(super) async fn guest_cancel_form(
@@ -985,7 +986,6 @@ pub(super) async fn guest_cancel_form(
     headers: HeaderMap,
     Path(token): Path<String>,
 ) -> impl IntoResponse {
-    let visitor = crate::i18n::detect_from_headers(&headers);
     let booking: Option<(String, String, String, String, String, String, Option<String>)> = sqlx::query_as(
         "SELECT b.guest_name, b.guest_email, CASE b.time_version WHEN 1 THEN b.start_at ELSE rtrim(b.start_at, 'Z') END AS start_at, CASE b.time_version WHEN 1 THEN b.end_at ELSE rtrim(b.end_at, 'Z') END AS end_at, et.title, u.name, b.language
              FROM bookings b
@@ -1011,8 +1011,10 @@ pub(super) async fn guest_cancel_form(
                         .await
                         .unwrap_or(None);
 
-                let lang =
-                    token_page_lang(status_row.as_ref().and_then(|(_, l)| l.as_deref()), visitor);
+                let lang = token_page_lang(
+                    status_row.as_ref().and_then(|(_, l)| l.as_deref()),
+                    &headers,
+                );
                 let (title_key, message_key) = match status_row {
                     Some((status, _)) if status == "cancelled" => {
                         ("bae-title-already-cancelled", "bae-body-already-cancelled")
@@ -1030,7 +1032,7 @@ pub(super) async fn guest_cancel_form(
             }
         };
 
-    let lang = token_page_lang(booking_language.as_deref(), visitor);
+    let lang = token_page_lang(booking_language.as_deref(), &headers);
 
     // Block the GET form before any state mutation if the booking falls
     // inside the host's configured cancel-notice window.
@@ -1170,10 +1172,7 @@ pub(super) async fn guest_cancel_booking(
     };
 
     // The page and the emails both use the language the guest booked in.
-    let lang = token_page_lang(
-        booking_language.as_deref(),
-        crate::i18n::detect_from_headers(&headers),
-    );
+    let lang = token_page_lang(booking_language.as_deref(), &headers);
 
     // Defensive notice-window check on POST too: the GET may have been
     // cached, or the cutoff may have rolled over between page load and
@@ -1435,7 +1434,7 @@ pub(super) async fn guest_reschedule_slots(
             }
         };
 
-    let lang = token_page_lang(booking_language.as_deref(), visitor);
+    let lang = token_page_lang(booking_language.as_deref(), &headers);
     // ilia fork: an unpaid priced booking cannot be moved (docs/ton.md).
     if let Some(refused) = ton_pay::guest_reschedule_refused(&state, &booking_id, lang).await {
         return refused;
@@ -1835,10 +1834,7 @@ pub(super) async fn guest_reschedule_booking(
 
     // Past the rate limit: the page and every email use the language stored
     // with the booking, as the slot picker did (#209).
-    let lang = token_page_lang(
-        stored_language.as_deref(),
-        crate::i18n::detect_from_headers(&headers),
-    );
+    let lang = token_page_lang(stored_language.as_deref(), &headers);
     // ilia fork: an unpaid priced booking cannot be moved (docs/ton.md).
     if let Some(refused) = ton_pay::guest_reschedule_refused(&state, &booking_id, lang).await {
         return refused;
@@ -2136,7 +2132,7 @@ pub(super) async fn guest_reschedule_booking(
                 reminder_sent_at = NULL, guest_timezone = ?, reschedule_by_host = 0,
                 assigned_resource_id = ?,
                 pending_expires_at = ?, pending_since = ?, pending_reminder_sent_at = NULL,
-                ics_sequence = ics_sequence + 1
+                ics_sequence = ics_sequence + 1, language = COALESCE(?, language)
          WHERE id = ?",
     )
     .bind(&new_start_at)
@@ -2149,6 +2145,9 @@ pub(super) async fn guest_reschedule_booking(
     .bind(&new_resource_assignment)
     .bind(&pending_expires_at)
     .bind(&pending_since)
+    // ilia fork: a language the guest picked with the switcher on this page
+    // becomes the booking's, so the reminders follow the emails sent now.
+    .bind(crate::i18n::chosen_from_headers(&headers))
     .bind(&booking_id)
     .execute(&state.pool)
     .await;

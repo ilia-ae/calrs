@@ -64,6 +64,7 @@ resched-confirm-subtitle = Sie sind dabei, Ihre Buchung auf einen neuen Termin z
 # Base layout chrome (templates/base.html)
 
 base-loader-please-wait = Bitte warten Sie, die neuesten Kalenderdaten werden geladen...
+base-language-choose = Wählen Sie Ihre Sprache
 
 # Profile (templates/profile.html)
 

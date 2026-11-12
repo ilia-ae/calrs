@@ -57,7 +57,7 @@ impl Footer {
 /// Template globals of the fork: `source_url`, `made_by_name` and
 /// `made_by_url` for the footer line of `base.html` ("Made by Ilia · based on
 /// calrs · Source code", in English whatever the page language), and
-/// `telegram_enabled()`. The source link is on every page, the embedded
+/// `telegram_enabled()` and `lang_switcher()`. The source link is on every page, the embedded
 /// booking widget and the dashboard included; the made-by part is the footer
 /// block, which embed mode hides and the dashboard leaves out.
 /// URLs are validated above (no quotes, angle brackets or whitespace), so they
@@ -76,6 +76,8 @@ pub(crate) fn register(env: &mut Environment<'static>, footer: &Footer) {
     // Whether Telegram is on (`CALRS_TELEGRAM_BOT_TOKEN`), read at render
     // time: Profile & Settings links the Telegram page only then.
     env.add_function("telegram_enabled", crate::telegram::enabled);
+    // `lang_switcher()`, the language menu of public pages.
+    super::lang_switch::register(env);
 }
 
 /// ilia fork (`crate::inbox`): what the "too late to cancel or reschedule"
