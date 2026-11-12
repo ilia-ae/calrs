@@ -15,6 +15,13 @@
 //! `CALRS_TON_ALLOW_LOCAL_ENDPOINTS` stay with the environment (and the
 //! systemd credentials): a database row for any other name is ignored.
 //!
+//! **One key that is not TON's:** [`DEBUG_BOOKING`] (`CALRS_DEBUG_BOOKING`,
+//! field `debug_booking`, a [`Kind::Bool`]), the switch of the admin's test
+//! booking page (`crate::web::debug_booking`). It is toggled at the top of
+//! the TON page and stored, owned and audited exactly like the TON keys
+//! (one mechanism), but no TON parser reads it ([`debug_booking`] does),
+//! and unlike them it is read on every request: a change is live at once.
+//!
 //! A row whose value is empty means "the default, owned": `config apply`
 //! writes one for a key it declares as `null`, so the page keeps it locked.
 //! Pure: no database, no web (the SQL is `crate::web::ton_pay::settings`).
@@ -110,6 +117,8 @@ pub enum Kind {
     Pct(PctSpec),
     Email,
     Ladder,
+    /// On or off, stored as `1` or `0` ([`parse_bool`]).
+    Bool,
 }
 
 /// A key the page and `config apply` may store.
@@ -130,10 +139,15 @@ impl Key {
             Kind::Nano(s) => ton_text(s.default as u128),
             Kind::Pct(s) => bp_text(s.default_bp),
             Kind::Ladder => super::ladder::DEFAULT.to_string(),
+            Kind::Bool => "off".to_string(),
             Kind::Usd | Kind::Email => String::new(),
         }
     }
 }
+
+/// The test booking page's switch (`crate::web::debug_booking`): off by
+/// default; the environment, if set, wins and locks the toggle.
+pub const DEBUG_BOOKING: &str = "CALRS_DEBUG_BOOKING";
 
 const fn key(var: &'static str, field: &'static str, kind: Kind) -> Key {
     Key { var, field, kind }
@@ -196,6 +210,7 @@ pub const SPECS: &[Key] = &[
         "free_per_guest_days",
         Kind::Int(cfg::FREE_PER_GUEST_DAYS),
     ),
+    key(DEBUG_BOOKING, "debug_booking", Kind::Bool),
 ];
 
 /// The variable names of [`SPECS`]: the only `ton_settings` keys read.
@@ -215,6 +230,7 @@ pub const KEYS: &[&str] = &[
     cfg::ALERT_EMAIL,
     cfg::LADDER,
     cfg::FREE_PER_GUEST_DAYS.var,
+    DEBUG_BOOKING,
 ];
 
 pub fn by_var(var: &str) -> Option<&'static Key> {
@@ -297,6 +313,30 @@ pub fn free_per_guest_days(
     })
 }
 
+/// An on/off value as the environment, the page and the database write it:
+/// `1`, `true`, `yes`, `on` or `0`, `false`, `no`, `off` (any case, trimmed).
+/// Anything else (blank included) is `None`.
+pub fn parse_bool(text: &str) -> Option<bool> {
+    match text.trim().to_ascii_lowercase().as_str() {
+        "1" | "true" | "yes" | "on" => Some(true),
+        "0" | "false" | "no" | "off" => Some(false),
+        _ => None,
+    }
+}
+
+/// The test booking switch in effect: the environment (set and not blank)
+/// wins, else the stored row, else off. A value that is not on/off is off
+/// (fail closed), still from where it was set, so an environment typo
+/// keeps the toggle locked rather than handing it to the page.
+pub fn debug_booking(env: &dyn Fn(&str) -> Option<String>, db: &DbValues) -> Resolved<bool> {
+    Resolved {
+        value: lookup(env, db, DEBUG_BOOKING)
+            .and_then(|v| parse_bool(&v))
+            .unwrap_or(false),
+        source: source(env, db, DEBUG_BOOKING),
+    }
+}
+
 /// The key a [`ConfigError`] is about (its message names the variable).
 pub fn key_of_error(e: &ConfigError) -> Option<&'static Key> {
     SPECS.iter().find(|k| e.0.starts_with(k.var))
@@ -330,6 +370,11 @@ pub fn to_env(key: &Key, human: &str) -> Result<Option<String>, ConfigError> {
             .email(key.var)?
             .unwrap_or_default(),
         Kind::Ladder => Vars(one(human.to_string())).ladder(key.var)?.text(),
+        Kind::Bool => match parse_bool(human) {
+            Some(true) => "1".to_string(),
+            Some(false) => "0".to_string(),
+            None => return Err(ConfigError(format!("{}: on or off (1 or 0)", key.var))),
+        },
     };
     Ok(Some(text))
 }
@@ -342,6 +387,11 @@ pub fn to_human(key: &Key, env_text: &str) -> String {
             .parse::<u128>()
             .map(ton_text)
             .unwrap_or_else(|_| text.to_string()),
+        Kind::Bool => match parse_bool(text) {
+            Some(true) => "on".to_string(),
+            Some(false) => "off".to_string(),
+            None => text.to_string(),
+        },
         _ => text.to_string(),
     }
 }
@@ -438,7 +488,8 @@ mod tests {
         assert_eq!(KEYS.len(), SPECS.len());
         for (k, spec) in KEYS.iter().zip(SPECS) {
             assert_eq!(*k, spec.var);
-            assert!(cfg::VARS.contains(k), "{k}");
+            // The test booking switch is the one key no TON parser reads.
+            assert!(cfg::VARS.contains(k) || *k == DEBUG_BOOKING, "{k}");
         }
     }
 
@@ -512,6 +563,52 @@ mod tests {
         assert!(validate(&no_env, &db).is_err());
         // The environment's own reading ignores it without a corridor.
         assert!(Tuning::parse(&Vars(|k: &str| lookup(&no_env, &db, k)), false).is_ok());
+    }
+
+    /// The test booking switch: env > DB > off, an unknown value off but
+    /// still locked where it was set, and the one spelling stored.
+    #[test]
+    fn the_debug_switch_resolves_like_the_others() {
+        let k = by_field("debug_booking").unwrap();
+        assert_eq!(k.var, DEBUG_BOOKING);
+        assert_eq!(k.default_text(), "off");
+        let off = debug_booking(&no_env, &DbValues::default());
+        assert_eq!((off.value, off.source), (false, Source::Default));
+        let mut db = DbValues::default();
+        db.set(DEBUG_BOOKING, "1".into(), Owner::Panel);
+        let r = debug_booking(&no_env, &db);
+        assert_eq!((r.value, r.source), (true, Source::Panel));
+        db.set(DEBUG_BOOKING, "".into(), Owner::Apply);
+        let r = debug_booking(&no_env, &db);
+        assert_eq!((r.value, r.source), (false, Source::Apply));
+        let env_off = |v: &str| (v == DEBUG_BOOKING).then(|| "0".to_string());
+        db.set(DEBUG_BOOKING, "1".into(), Owner::Panel);
+        let r = debug_booking(&env_off, &db);
+        assert_eq!((r.value, r.source), (false, Source::Env), "env wins");
+        let env_typo = |v: &str| (v == DEBUG_BOOKING).then(|| "enabled".to_string());
+        let r = debug_booking(&env_typo, &db);
+        assert_eq!((r.value, r.source), (false, Source::Env), "fails closed");
+        let env_blank = |v: &str| (v == DEBUG_BOOKING).then(|| " ".to_string());
+        assert_eq!(debug_booking(&env_blank, &db).source, Source::Panel);
+        for (human, stored) in [
+            ("on", "1"),
+            (" TRUE ", "1"),
+            ("1", "1"),
+            ("off", "0"),
+            ("No", "0"),
+        ] {
+            assert_eq!(
+                to_env(k, human).unwrap().as_deref(),
+                Some(stored),
+                "{human}"
+            );
+        }
+        assert_eq!(to_env(k, "").unwrap(), None);
+        assert!(to_env(k, "2").unwrap_err().0.starts_with(DEBUG_BOOKING));
+        assert_eq!(to_human(k, "1"), "on");
+        assert_eq!(canonical(k, "yes").unwrap().as_deref(), Some("on"));
+        // No TON parser reads it: the tuning is valid either way.
+        assert!(validate(&no_env, &db).is_ok());
     }
 
     #[test]

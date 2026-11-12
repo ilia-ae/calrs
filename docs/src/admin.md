@@ -76,3 +76,7 @@ Shows whether SMTP is configured and the current sender address. SMTP is configu
 ## TON payments (ilia fork)
 
 **Admin → TON payments** (`/dashboard/admin/ton`, admins only) shows the state of TON payments and edits their tuning: the demand ladder and the free-step limit, invoice timing and renewals, the exchange-rate corridor and rules, and the alert email. The network, the wallet address, the indexer and the API keys are never edited here: they stay in the server's environment and systemd credentials, and the page only shows them (the address in both forms, the keys as set or not set). A field set in the environment or by `config apply` is read-only, with the reason. See [TON payments](ton.md).
+
+## Debug booking (ilia fork)
+
+**Admin → Debug booking** (`/dashboard/admin/debug-booking`) exists only while its switch is on: the Debug block at the top of **Admin → TON payments** (on/off, live at once, audited), unless the server's environment sets `CALRS_DEBUG_BOOKING` (which then wins and locks the switch) or `config apply` owns `site.ton.debug_booking`. Off, the address answers 404 and nothing links to it. The page is marked as debug (a striped banner and a hazard frame), and its bookings carry a TEST badge in the bookings list and on their payment page. It books a test meeting through the public booking path with the admin's own details filled in, optionally routes the guest's Telegram messages to the admin's own linked chat, and cancels all of the admin's test bookings at once. See [TON payments](ton.md#debug-booking-ilia-fork).

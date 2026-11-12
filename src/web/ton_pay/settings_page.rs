@@ -21,6 +21,11 @@
 //! to its field. A valid save writes the rows and their audit trail in one
 //! transaction (`super::settings::write`), then puts the settings into
 //! effect without a restart (`TonSlot::apply_settings`).
+//!
+//! At the top, the Debug block: the test booking page's switch
+//! (`settings::DEBUG_BOOKING`, stored and audited with the keys above but
+//! never part of this form: its own POST is `debug_booking::toggle`) and,
+//! while on, the button to the page (`crate::web::debug_booking`).
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -97,6 +102,10 @@ pub(crate) fn merged(
     let mut next = before.clone();
     let mut errors = Errors::new();
     for key in settings::SPECS {
+        // The debug switch has its own form (`debug_booking::toggle`).
+        if key.var == settings::DEBUG_BOOKING {
+            continue;
+        }
         if matches!(
             settings::source(env, before, key.var),
             Source::Env | Source::Apply
@@ -127,7 +136,13 @@ pub(crate) async fn page(
         .get("saved")
         .map(String::as_str)
         .filter(|s| matches!(*s, "live" | "off" | "restart" | "invalid" | "none"));
-    render(&state, &admin, View::stored(notice)).await
+    let mut view = View::stored(notice);
+    view.debug_notice = query.get("debug").and_then(|d| {
+        ["on", "off", "locked"]
+            .into_iter()
+            .find(|k| *k == d.as_str())
+    });
+    render(&state, &admin, view).await
 }
 
 /// `POST /dashboard/admin/ton`: save (or, with `action=preview`, only
@@ -171,6 +186,7 @@ pub(crate) async fn save(
             posted: Some(posted),
             errors,
             notice: None,
+            debug_notice: None,
             preview: if preview { ladder } else { None },
         };
         let mut resp = render(&state, &admin, view).await;
@@ -223,6 +239,8 @@ struct View {
     posted: Option<Posted>,
     errors: Errors,
     notice: Option<&'static str>,
+    /// What the debug switch's POST did (`on`, `off`, `locked`).
+    debug_notice: Option<&'static str>,
     /// The ladder to preview instead of the one in effect.
     preview: Option<Ladder>,
 }
@@ -237,6 +255,7 @@ impl View {
                     .into_iter()
                     .find(|k| *k == n)
             }),
+            debug_notice: None,
             preview: None,
         }
     }
@@ -250,6 +269,7 @@ fn kind_name(kind: Kind) -> &'static str {
         Kind::Pct(_) => "pct",
         Kind::Email => "email",
         Kind::Ladder => "ladder",
+        Kind::Bool => "bool",
     }
 }
 
@@ -290,6 +310,7 @@ async fn render(state: &AppState, admin: &AdminUser, view: View) -> Response {
     };
 
     // The fields, by section.
+    let debug = crate::web::debug_booking::block(state).await;
     let groups: Vec<minijinja::Value> = GROUPS
         .iter()
         .map(|(group, fields)| {
@@ -438,6 +459,8 @@ async fn render(state: &AppState, admin: &AdminUser, view: View) -> Response {
             impersonating => false,
             impersonating_name => "",
             status => status,
+            debug => debug,
+            debug_notice => view.debug_notice,
             groups => groups,
             general_error => view.errors.get(""),
             has_errors => !view.errors.is_empty(),
@@ -480,7 +503,12 @@ mod tests {
     fn every_key_has_one_field_and_a_label() {
         let mut seen: Vec<&str> = GROUPS.iter().flat_map(|(_, f)| f.iter().copied()).collect();
         seen.sort_unstable();
-        let mut all: Vec<&str> = settings::SPECS.iter().map(|k| k.field).collect();
+        // The debug switch is the Debug block's, not a field of the form.
+        let mut all: Vec<&str> = settings::SPECS
+            .iter()
+            .filter(|k| k.var != settings::DEBUG_BOOKING)
+            .map(|k| k.field)
+            .collect();
         all.sort_unstable();
         assert_eq!(seen, all);
         for key in settings::SPECS {
@@ -521,6 +549,13 @@ mod tests {
         assert_eq!(next.value("CALRS_TON_FUSE_HOURS"), None, "blank: default");
         assert_eq!(next.value("CALRS_TON_MAX_RENEWALS"), Some("3"));
         assert_eq!(next.value("CALRS_TON_LADDER"), Some("free,10,20"));
+        // The debug switch is never this form's, even forced.
+        let (next, _) = merged(
+            &env,
+            &before,
+            &[("debug_booking".to_string(), "on".to_string())].into(),
+        );
+        assert_eq!(next.value(settings::DEBUG_BOOKING), None);
         let (_, errors) = merged(
             &env,
             &before,

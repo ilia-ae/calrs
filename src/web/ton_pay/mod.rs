@@ -481,9 +481,11 @@ impl TonRuntime {
 }
 
 /// ilia fork: the `CALRS_TON_*` environment `calrs serve` started with,
-/// read once: the only environment the settings resolve against (it does
-/// not change while the process runs), and which secrets were really set
-/// from systemd credentials (names only, never a value).
+/// and `CALRS_DEBUG_BOOKING` (`crate::ton::settings::DEBUG_BOOKING`, the
+/// test booking switch stored with them), read once: the only environment
+/// the settings resolve against (it does not change while the process
+/// runs), and which secrets were really set from systemd credentials
+/// (names only, never a value).
 #[derive(Clone, Debug, Default)]
 pub(crate) struct EnvSnapshot {
     vars: HashMap<String, String>,
@@ -494,6 +496,7 @@ impl EnvSnapshot {
     pub(crate) fn capture() -> Self {
         let vars = crate::ton::config::VARS
             .iter()
+            .chain(std::iter::once(&crate::ton::settings::DEBUG_BOOKING))
             .filter_map(|k| std::env::var(k).ok().map(|v| (k.to_string(), v)))
             .collect();
         Self {
@@ -524,6 +527,14 @@ impl EnvSnapshot {
                 .collect(),
             credentials: Default::default(),
         }
+    }
+
+    /// This environment with `var` set to `value` (tests that stand for
+    /// one more variable of `calrs serve`'s environment).
+    #[cfg(test)]
+    pub(crate) fn with(mut self, var: &str, value: &str) -> Self {
+        self.vars.insert(var.to_string(), value.to_string());
+        self
     }
 
     pub(crate) fn get(&self, var: &str) -> Option<String> {

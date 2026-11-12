@@ -434,6 +434,8 @@ pub(crate) async fn pay_page(
             renewals => row.renewals,
             renewals_max => row.renewals_max,
             expires_at => row.expires_at,
+            // A booking the admin's debug page made: TEST.
+            test_booking => crate::web::debug_booking::is_marked(&state.pool, &row.booking_id).await,
         })
         .unwrap_or_else(|e| internal_error_body("template render", &e));
     private(Html(rendered).into_response())

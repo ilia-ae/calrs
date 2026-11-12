@@ -30,6 +30,11 @@
 //!   not. Each change is audited (`ton_settings_audit`, source `apply`).
 //! - **Export** prints the keys `apply` owns, so applying an export is no
 //!   change; a section with none is left out.
+//! - **`debug_booking`** (`settings::DEBUG_BOOKING`, the admin's test
+//!   booking page) is a JSON boolean (`null`: off, still owned). `calrs
+//!   serve` reads it on every request, so its change sets no `restart`.
+//!   It came after the marker below, which is kept as it was: an older
+//!   calrs refuses the key as unknown (exit 2, nothing written).
 
 use chrono::Utc;
 use serde_json::Value;
@@ -64,6 +69,9 @@ fn to_doc(key: &Key, text: &str) -> Value {
             .parse::<i64>()
             .map(Value::from)
             .unwrap_or(Value::String(human)),
+        Kind::Bool => settings::parse_bool(&human)
+            .map(Value::Bool)
+            .unwrap_or(Value::String(human)),
         _ => Value::String(human),
     }
 }
@@ -73,6 +81,8 @@ fn from_doc(key: &Key, value: &Value) -> Result<String, ApplyError> {
     let path = path(key.field);
     let human = match (key.kind, value) {
         (_, Value::Null) => return Ok(String::new()),
+        (Kind::Bool, Value::Bool(b)) => return Ok(if *b { "1" } else { "0" }.to_string()),
+        (Kind::Bool, _) => return Err(ApplyError::invalid(path, "must be true, false or null")),
         (Kind::Int(_), Value::Number(n)) => match n.as_i64() {
             Some(n) => n.to_string(),
             None => return Err(ApplyError::invalid(path, "must be a whole number")),
@@ -172,7 +182,12 @@ pub(super) async fn apply(ctx: &mut Ctx, section: &TonSection) -> Result<(), App
             continue;
         };
         let value = |v: &Option<String>| to_doc(key, v.as_deref().unwrap_or(""));
-        ctx.record_restart(path(key.field), value(&c.before), value(&c.after));
+        if key.var == settings::DEBUG_BOOKING {
+            // Read per request by `calrs serve`: live, no restart.
+            ctx.record(path(key.field), value(&c.before), value(&c.after));
+        } else {
+            ctx.record_restart(path(key.field), value(&c.before), value(&c.after));
+        }
         ctx.record(
             format!("{}.owner", path(key.field)),
             before.owner(c.var).map(Owner::as_str),
@@ -260,6 +275,16 @@ mod tests {
         );
         assert!(from_doc(k("ladder"), &json!("")).is_err());
         assert!(from_doc(k("alert_email"), &json!(5)).is_err());
+        assert_eq!(from_doc(k("debug_booking"), &json!(true)).unwrap(), "1");
+        assert_eq!(from_doc(k("debug_booking"), &json!(false)).unwrap(), "0");
+        assert_eq!(from_doc(k("debug_booking"), &json!(null)).unwrap(), "");
+        for bad in [json!("on"), json!(1), json!("true")] {
+            let e = from_doc(k("debug_booking"), &bad).unwrap_err();
+            assert!(e.to_string().contains("true, false or null"), "{e}");
+        }
+        assert_eq!(to_doc(k("debug_booking"), "1"), json!(true));
+        assert_eq!(to_doc(k("debug_booking"), "0"), json!(false));
+        assert_eq!(to_doc(k("debug_booking"), ""), Value::Null);
         for f in [
             "window_min",
             "underpay_tolerance_ton",

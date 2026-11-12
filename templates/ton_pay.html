@@ -26,7 +26,7 @@
 <div class="logo"><img src="/logo" alt="" onerror="this.closest('.logo').style.display='none'"></div>
 
 <div class="card">
-  <h1>{{ event_title }}</h1>
+  <h1>{{ event_title }}{% if test_booking %}{% include "partials/ilia_test_badge.html" %}{% endif %}</h1>
   <p class="subtitle">{{ t("email-date-at-time", date=meeting_date, time=meeting_time) }}</p>
 
   <div class="ton-state" id="ton-state" data-state="{{ pay_state }}">

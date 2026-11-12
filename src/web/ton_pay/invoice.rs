@@ -292,14 +292,7 @@ pub(crate) async fn prepare(
             .await
             .map(|p| Prepared::Invoice(Box::new(p))),
         store::Terms::Ladder => {
-            let guest = store::FreeGuest {
-                email_norm: normalize_email(ask.guest_email),
-                telegram_norm: ask
-                    .telegram
-                    .map(normalize_telegram)
-                    .filter(|t| !t.is_empty()),
-                client_tag: client_tag(&state.secret_key, ask.client_ip),
-            };
+            let guest = free_guest(state, ask.guest_email, ask.telegram, ask.client_ip);
             let quote = ladder_quote(state, &rt, &row, ask.quoted, guest, now).await?;
             match quote.step {
                 Step::Free => Ok(Prepared::Free(Box::new(FreeStep {
@@ -355,6 +348,83 @@ fn normalize_telegram(raw: &str) -> String {
     raw.trim().trim_start_matches('@').to_lowercase()
 }
 
+/// The guest as the per-guest free-step limit knows them: email, typed
+/// Telegram username, client network.
+fn free_guest(
+    state: &AppState,
+    guest_email: &str,
+    telegram: Option<&str>,
+    client_ip: &str,
+) -> store::FreeGuest {
+    store::FreeGuest {
+        email_norm: normalize_email(guest_email),
+        telegram_norm: telegram.map(normalize_telegram).filter(|t| !t.is_empty()),
+        client_tag: client_tag(&state.secret_key, client_ip),
+    }
+}
+
+/// The owner's demand `n` now and the step `guest` books at with it
+/// ([`step_for_guest`]): the price [`prepare`] checks the quote against.
+async fn guest_step(
+    state: &AppState,
+    ladder: &Ladder,
+    free_days: i64,
+    owner_user_id: &str,
+    guest: &store::FreeGuest,
+    now: DateTime<Utc>,
+) -> Result<(i64, Step, bool), Refusal> {
+    let mut conn = state.pool.acquire().await.map_err(|e| {
+        tracing::error!(target: TARGET, error = %e, "cannot count the demand");
+        Refusal::Internal
+    })?;
+    let n = store::demand_n(&mut conn, owner_user_id, now, None)
+        .await
+        .map_err(|e| {
+            tracing::error!(target: TARGET, error = %e, "cannot count the demand");
+            Refusal::Internal
+        })?;
+    let (step, free_used) = step_for_guest(&mut conn, ladder, n, free_days, guest, now).await?;
+    Ok((n, step, free_used))
+}
+
+/// ilia fork (the debug booking page): the ladder step this guest books
+/// at now, priced exactly as [`prepare`] prices a booking (the owner's
+/// demand, then the per-guest free-step limit), and `true` when a free
+/// step this guest already used became the first price. The page quotes
+/// it, so its booking is not refused as a changed price. `None` for a type
+/// not priced by the ladder, a team type, while payments are off, or on an
+/// error (logged). Reads only.
+pub(crate) async fn guest_ladder_step(
+    state: &AppState,
+    event_type_id: &str,
+    guest_email: &str,
+    telegram: Option<&str>,
+    client_ip: &str,
+    now: DateTime<Utc>,
+) -> Option<(Step, bool)> {
+    let row = store::price_for(&state.pool, event_type_id).await.ok()??;
+    if row.is_team != 0 || !matches!(row.terms()?, store::Terms::Ladder) {
+        return None;
+    }
+    let rt = state.ton.get()?;
+    // As `price_badge`: a booking may follow, so an idle watcher steps now.
+    rt.wake_if_idle(Utc::now());
+    let owner_user_id = row.owner_user_id.as_deref()?;
+    let guest = free_guest(state, guest_email, telegram, client_ip);
+    let now = DateTime::from_timestamp(now.timestamp(), 0).unwrap_or(now);
+    guest_step(
+        state,
+        &rt.cfg.ladder,
+        rt.cfg.free_per_guest_days,
+        owner_user_id,
+        &guest,
+        now,
+    )
+    .await
+    .ok()
+    .map(|(_, step, free_used)| (step, free_used))
+}
+
 /// The ladder price of `row` now for this guest, against what the guest
 /// was shown. The ladder and the per-guest limit are the runtime's
 /// settings (`TonConfig::ladder`, env > stored > default), fixed for the
@@ -370,17 +440,8 @@ async fn ladder_quote(
     let owner_user_id = row.owner_user_id.clone().ok_or(Refusal::Internal)?;
     let ladder = rt.cfg.ladder.clone();
     let free_days = rt.cfg.free_per_guest_days;
-    let mut conn = state.pool.acquire().await.map_err(|e| {
-        tracing::error!(target: TARGET, error = %e, "cannot count the demand");
-        Refusal::Internal
-    })?;
-    let n = store::demand_n(&mut conn, &owner_user_id, now, None)
-        .await
-        .map_err(|e| {
-            tracing::error!(target: TARGET, error = %e, "cannot count the demand");
-            Refusal::Internal
-        })?;
-    let (step, free_used) = step_for_guest(&mut conn, &ladder, n, free_days, &guest, now).await?;
+    let (n, step, free_used) =
+        guest_step(state, &ladder, free_days, &owner_user_id, &guest, now).await?;
     match quoted {
         Some(q) if ladder::accepts(q, step) => Ok(LadderQuote {
             ladder,

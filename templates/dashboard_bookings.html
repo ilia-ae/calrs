@@ -13,7 +13,7 @@
   {% set pay = ton[b.id] if ton is defined else none %}
   <div class="booking-row" {% if not loop.last %}style="border-bottom: 1px solid var(--border);"{% endif %}>
     <div class="booking-info">
-      <div>{{ t("bookings-with", title='<strong>' ~ (b.event_title | escape) ~ '</strong>', guest=b.guest_name | escape) | safe }}{% if pay %}{% include "partials/ton_booking_badge.html" %}{% endif %}</div>
+      <div>{{ t("bookings-with", title='<strong>' ~ (b.event_title | escape) ~ '</strong>', guest=b.guest_name | escape) | safe }}{% if pay %}{% include "partials/ton_booking_badge.html" %}{% endif %}{% if test_bookings is defined and b.id in test_bookings %}{% include "partials/ilia_test_badge.html" %}{% endif %}</div>
       <div style="color: var(--text-muted); font-size: 0.85rem;">{{ b.start_at }} &middot; {{ b.guest_email }}{% if b.guest_phone %} &middot; {{ b.guest_phone }}{% endif %}{% if telegram_guests is defined and telegram_guests[b.id] %} &middot; {{ telegram_guests[b.id] }}{% endif %}</div>
       {% if b.start_at_guest %}<div style="color: var(--text-muted); font-size: 0.75rem;">{{ t("bookings-guest-booked") }} {{ b.start_at_guest }}</div>{% endif %}
       {% if b.resource_name %}<div style="color: var(--text-muted); font-size: 0.75rem;">{{ t("bookings-resource") }} {{ b.resource_name }}</div>{% endif %}
@@ -73,6 +73,7 @@
             <span class="badge badge-error" style="margin-left: 0.25rem;" title="{{ b.writeback_error }}">{{ t("bookings-badge-writeback-failed") }}</span>
           {% endif %}
           {% set pay = ton[b.id] if ton is defined else none %}{% if pay %}{% include "partials/ton_booking_badge.html" %}{% endif %}
+          {% if test_bookings is defined and b.id in test_bookings %}{% include "partials/ilia_test_badge.html" %}{% endif %}
         </div>
         <div style="color: var(--text-muted); font-size: 0.85rem;">
           {{ b.start_at }} &middot; {{ b.guest_email }}{% if b.guest_phone %} &middot; {{ b.guest_phone }}{% endif %}{% if telegram_guests is defined and telegram_guests[b.id] %} &middot; {{ telegram_guests[b.id] }}{% endif %}

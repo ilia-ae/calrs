@@ -1,0 +1,53 @@
+{#- ilia fork: the debug look (debug_booking.rs): yellow and black hazard
+    stripes in fixed colours, so it reads the same in the light and the dark
+    theme and never looks like a normal admin page. -#}
+<style>
+  .dbg-hazard {
+    border: 6px solid #facc15;
+    border-image: repeating-linear-gradient(-45deg, #facc15 0 12px, #111111 12px 24px) 6;
+    border-radius: 0;
+  }
+  .dbg-banner {
+    background: repeating-linear-gradient(-45deg, #facc15 0 14px, #111111 14px 28px);
+    padding: 0.5rem;
+    margin-bottom: 1rem;
+    text-align: center;
+  }
+  .dbg-label {
+    display: inline-block;
+    background: #facc15;
+    color: #111111;
+    border: 2px solid #111111;
+    padding: 0.2rem 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+  }
+  .dbg-switch {
+    display: inline-flex; align-items: center; gap: 0.6rem;
+    padding: 0.35rem 0.9rem 0.35rem 0.35rem;
+    border: 2px solid #111111; border-radius: 999px;
+    background: #e5e7eb; color: #111111;
+    font-weight: 700; font-size: 0.9rem; cursor: pointer;
+  }
+  .dbg-switch[aria-checked="true"] { background: #facc15; }
+  .dbg-switch .dbg-knob {
+    width: 2.4rem; height: 1.3rem; border-radius: 999px; background: #6b7280;
+    position: relative; flex: none;
+  }
+  .dbg-switch[aria-checked="true"] .dbg-knob { background: #111111; }
+  .dbg-switch .dbg-knob::after {
+    content: ""; position: absolute; top: 0.15rem; left: 0.15rem;
+    width: 1rem; height: 1rem; border-radius: 50%; background: #ffffff;
+    transition: left 0.15s ease;
+  }
+  .dbg-switch[aria-checked="true"] .dbg-knob::after { left: 1.25rem; background: #facc15; }
+  .dbg-switch:disabled { opacity: 0.55; cursor: not-allowed; }
+  .dbg-open {
+    display: inline-block; width: auto; text-decoration: none;
+    background: #111111; color: #facc15; border: 2px solid #facc15;
+    padding: 0.55rem 1.1rem; font-weight: 800; border-radius: var(--radius);
+  }
+  .dbg-open:hover { background: #facc15; color: #111111; border-color: #111111; }
+</style>

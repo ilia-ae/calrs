@@ -283,3 +283,88 @@ fn the_audit_event_is_logged_only_after_the_commit() {
     assert!(real.contains("ton setting changed"), "{real}");
     assert!(real.contains("CALRS_TON_WINDOW_MIN"), "{real}");
 }
+
+/// `site.ton.debug_booking`: a boolean, owned and audited like the TON
+/// keys, live (no restart), and round-tripped by the export.
+#[tokio::test]
+async fn the_debug_switch_is_a_live_boolean() {
+    use crate::ton::settings::{self, Source, DEBUG_BOOKING};
+    let env = ApplyEnv::new().await;
+    let doc = ton_doc(json!({"debug_booking": true}));
+    let report = env.apply(&doc, false).await.unwrap();
+    assert_eq!(
+        report.changed,
+        [
+            change("site.ton.debug_booking", Value::Null, json!(true)),
+            change("site.ton.debug_booking.owner", Value::Null, json!("apply")),
+        ]
+    );
+    assert!(!report.restart, "calrs serve reads it on every request");
+    let stored = rows(&env).await;
+    assert_eq!(stored.value(DEBUG_BOOKING), Some("1"));
+    assert_eq!(stored.owner(DEBUG_BOOKING), Some(Owner::Apply));
+    let none = |_: &str| None;
+    let r = settings::debug_booking(&none, &stored);
+    assert_eq!((r.value, r.source), (true, Source::Apply));
+    let audit: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM ton_settings_audit WHERE source = 'apply' AND key = 'CALRS_DEBUG_BOOKING'",
+    )
+    .fetch_one(&env.pool)
+    .await
+    .unwrap();
+    assert_eq!(audit, 1);
+
+    // The export prints it back as a boolean and applies as no change.
+    let exported = env.export().await.unwrap();
+    let ton = exported.site.as_ref().unwrap().ton.clone().unwrap();
+    assert_eq!(
+        serde_json::to_value(&ton).unwrap(),
+        json!({"debug_booking": true})
+    );
+    let again = env
+        .apply(&serde_json::to_string(&exported).unwrap(), false)
+        .await
+        .unwrap();
+    assert_eq!(again.changed, []);
+
+    // false and null: off, still owned (the page stays locked).
+    let report = env
+        .apply(&ton_doc(json!({"debug_booking": false})), false)
+        .await
+        .unwrap();
+    assert_eq!(
+        report.changed,
+        [change("site.ton.debug_booking", json!(true), json!(false))]
+    );
+    assert!(!report.restart);
+    env.apply(&ton_doc(json!({"debug_booking": null})), false)
+        .await
+        .unwrap();
+    let stored = rows(&env).await;
+    let r = settings::debug_booking(&none, &stored);
+    assert_eq!((r.value, r.source), (false, Source::Apply));
+    let exported = env.export().await.unwrap();
+    let ton = exported.site.unwrap().ton.unwrap();
+    assert_eq!(
+        serde_json::to_value(&ton).unwrap(),
+        json!({"debug_booking": null})
+    );
+
+    // Only a boolean or null; nothing is written otherwise.
+    let before = env.snapshot().await;
+    for bad in [json!("on"), json!(1), json!("true")] {
+        let e = env
+            .apply(&ton_doc(json!({ "debug_booking": bad })), false)
+            .await
+            .unwrap_err();
+        assert!(
+            e.to_string().contains("site.ton.debug_booking"),
+            "{bad}: {e}"
+        );
+    }
+    assert_eq!(env.snapshot().await, before);
+
+    // Left out of a present section: back to the page (a null row removed).
+    env.apply(&ton_doc(json!({})), false).await.unwrap();
+    assert_eq!(rows(&env).await.owner(DEBUG_BOOKING), None);
+}

@@ -7,6 +7,33 @@
   <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 0;">{{ t("ton-admin-intro") }}</p>
 </div>
 
+{#- ilia fork: the debug switch and the test booking page (debug_booking.rs). -#}
+{% include "ilia/debug_style.html" %}
+<div class="card dbg-hazard" id="debug-block" data-debug="{{ 'on' if debug.on else 'off' }}" data-source="{{ debug.source }}">
+  <div class="dbg-banner" style="margin: -0.25rem 0 0.75rem;"><span class="dbg-label">{{ t("ton-admin-debug-title") }}</span></div>
+  <p style="color: var(--text-secondary); font-size: 0.875rem; margin: 0 0 0.75rem;">{{ t("ton-admin-debug-intro") }}</p>
+  {% if debug_notice %}
+  <p id="debug-notice" data-notice="{{ debug_notice }}" style="font-size: 0.875rem; font-weight: 600; margin: 0 0 0.75rem;">
+    {% if debug_notice == "on" %}{{ t("ton-admin-debug-saved-on") }}{% elif debug_notice == "off" %}{{ t("ton-admin-debug-saved-off") }}{% else %}{{ t("ton-admin-debug-saved-locked") }}{% endif %}
+  </p>
+  {% endif %}
+  <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+    <form method="post" action="{{ debug.toggle_path }}" id="debug-toggle" style="margin: 0;">
+      <input type="hidden" name="on" value="{{ '0' if debug.on else '1' }}">
+      <button type="submit" class="dbg-switch" role="switch" aria-checked="{{ 'true' if debug.on else 'false' }}" title="{% if debug.on %}{{ t('ton-admin-debug-turn-off') }}{% else %}{{ t('ton-admin-debug-turn-on') }}{% endif %}"{% if debug.locked %} disabled{% endif %}>
+        <span class="dbg-knob" aria-hidden="true"></span>
+        <span>{% if debug.on %}{{ t("ton-admin-debug-state-on") }}{% else %}{{ t("ton-admin-debug-state-off") }}{% endif %}</span>
+      </button>
+    </form>
+    {% if debug.on %}<a href="{{ debug.path }}" class="dbg-open" id="debug-open">{{ t("ton-admin-debug-open") }}</a>{% endif %}
+  </div>
+  {% if debug.locked %}
+  <p id="debug-locked" style="font-size: 0.825rem; color: var(--warning-text, #b45309); margin: 0.75rem 0 0;">
+    {% if debug.source == "env" %}{{ t("ton-admin-debug-locked-env", var=debug.var, value=debug.env_value) }}{% else %}{{ t("ton-admin-debug-locked-apply") }}{% endif %}
+  </p>
+  {% endif %}
+</div>
+
 {% if notice %}
 <div class="card" id="ton-notice" data-notice="{{ notice }}" style="border-color: var(--accent);">
   <div style="font-size: 0.9rem;">

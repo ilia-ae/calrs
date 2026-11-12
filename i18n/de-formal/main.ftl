@@ -567,3 +567,16 @@ ton-admin-errors = Nichts gespeichert: Korrigieren Sie die unten markierten Feld
 ton-admin-locked-env = Um es hier zu ändern, entfernen Sie { $var } aus der Umgebung des Servers und starten Sie calrs neu.
 ton-admin-locked-apply = Ändern Sie es im Dokument von config apply oder lassen Sie es in dessen ton-Abschnitt weg, um es an diese Seite zu übergeben.
 ton-admin-my-demand = Ihre anstehenden Buchungen jetzt: { $n }. Ihr Staffelpreis jetzt: { $price }.
+
+# ilia fork: the debug booking page (src/web/debug_booking.rs)
+
+dbg-intro = Einen Testtermin so buchen, wie ein Gast es täte, ohne jedes Mal das Gastformular auszufüllen. Die Buchung läuft über denselben Weg wie die öffentliche Buchungsseite: die Prüfungen, der Preis und die TON-Rechnung, das Freihalten der Zeit und die E-Mails. Die Zahlung wird nie übersprungen und nie als erhalten markiert: Bezahlen Sie die Rechnung aus Ihrer Wallet oder stornieren Sie die Buchung.
+dbg-switch-note = Schalten Sie diese Seite nach dem Debuggen wieder aus, mit dem Schalter oben auf der Seite TON-Zahlungen:
+dbg-price-now-free = jetzt kostenlos (die Anfrage wird von Ihnen bestätigt)
+dbg-impersonating = Die Testbuchung ist nur ohne Identitätswechsel verfügbar. Beenden Sie zuerst den Identitätswechsel.
+ton-admin-debug-intro = Testbuchung: Ihre eigenen Termintypen so buchen, wie ein Gast es tut (der echte Preis, die Rechnung, die Zahlungsseite und Telegram), ohne das Gastformular auszufüllen. Nur für Admins. Solange sie aus ist, antwortet ihre Seite mit 404 und nichts verlinkt sie.
+ton-admin-debug-locked-env = Von der Umgebung des Servers festgelegt ({ $var }={ $value }). Um es hier zu schalten, entfernen Sie { $var } aus der Umgebung und starten Sie calrs neu.
+ton-admin-debug-locked-apply = Von config apply festgelegt (site.ton.debug_booking). Ändern Sie es im Dokument von config apply oder lassen Sie den Schlüssel weg, um es an diese Seite zu übergeben.
+dbg-err-type = Wählen Sie einen der eigenen Termintypen.
+dbg-err-slot = Wählen Sie eine Zeit aus der Liste.
+dbg-own-chat-failed = Die Testbuchung wurde angelegt, aber die Nachrichten an den Gast konnten nicht in Ihren Telegram-Chat geleitet werden: Der Chat wurde getrennt, der Bot gestoppt oder der Link ist inzwischen abgelaufen. Die Buchung besteht und hält die Zeit frei: Öffnen Sie ihre Zahlungsseite in der Liste unten oder stornieren Sie sie.

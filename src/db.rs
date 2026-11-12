@@ -385,6 +385,10 @@ pub async fn migrate(pool: &SqlitePool) -> Result<()> {
             "ilia_012_ton_settings_audit",
             include_str!("../migrations/ilia_012_ton_settings_audit.sql"),
         ),
+        (
+            "ilia_013_debug_bookings",
+            include_str!("../migrations/ilia_013_debug_bookings.sql"),
+        ),
     ];
 
     let mut applied_count = 0u32;
@@ -1046,8 +1050,9 @@ mod tests {
         // 79 upstream + ilia_001_ton_payments + ilia_002_telegram + ilia_003_busy_only
         // + ilia_004_ton_price_currency + ilia_005_ton_renewals + ilia_006_booking_messages
         // + ilia_007_optimize + ilia_008_busy_window + ilia_009_inbox
-        // + ilia_010_webauthn + ilia_011_ton_ladder + ilia_012_ton_settings_audit.
-        assert_eq!(count.0, 91, "All 91 migrations should be tracked");
+        // + ilia_010_webauthn + ilia_011_ton_ladder + ilia_012_ton_settings_audit
+        // + ilia_013_debug_bookings.
+        assert_eq!(count.0, 92, "All 92 migrations should be tracked");
     }
 
     /// #324: calendars that existed before 079, and calendars discovered
@@ -1270,7 +1275,7 @@ mod tests {
             .fetch_one(&pool)
             .await
             .unwrap();
-        assert_eq!(count.0, 91, "Still 91 migrations after second run");
+        assert_eq!(count.0, 92, "Still 92 migrations after second run");
     }
 
     #[tokio::test]

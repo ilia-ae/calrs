@@ -9,6 +9,8 @@ mod branding;
 mod calendar_push;
 pub mod captcha;
 mod dashboard;
+// ilia fork: the admin's debug booking page (switched on the TON page).
+pub(crate) mod debug_booking;
 mod directory;
 // ilia fork: real statuses and a styled page for bare errors.
 mod error_page;
@@ -186,6 +188,10 @@ pub struct AppState {
     /// ilia fork: the sites an embedded booking page (`?embed=1`) may be
     /// framed by, from `CALRS_EMBED_ORIGINS` (`embed_origins.rs`).
     pub(crate) embed_origins: embed_origins::EmbedOrigins,
+    /// ilia fork: the debug booking switch as last resolved, for the
+    /// sidebar link (`debug_booking.rs`; the switch itself is resolved per
+    /// request: env > `ton_settings` > off).
+    pub(crate) debug_booking: debug_booking::Shown,
 }
 
 // --- CSRF protection (double-submit cookie pattern) ---
@@ -757,6 +763,9 @@ pub(crate) async fn build_state(
     crate::i18n::register(&mut env);
     ilia::register(&mut env, &ilia::Footer::from_env());
     crate::brand::register(&mut env, crate::brand::configured());
+    // ilia fork: `debug_booking_on()`, the debug booking switch for the sidebar.
+    let debug_shown = debug_booking::Shown::default();
+    debug_shown.install(&mut env);
 
     // Populate the process-global runtime-settings cache (base URL, private-host
     // allowlist) so synchronous readers and email/link builders see DB values.
@@ -771,7 +780,7 @@ pub(crate) async fn build_state(
     // ilia fork: the TON settings resolve against the stored ones too.
     let ton = ton_pay::TonSlot::load(&pool).await;
 
-    Arc::new(AppState {
+    let state = AppState {
         pool,
         templates: env,
         // 10 login attempts per IP per 15 minutes
@@ -789,7 +798,11 @@ pub(crate) async fn build_state(
         ton,
         passkeys: crate::webauthn::Rp::from_env(),
         embed_origins: embed_origins::EmbedOrigins::from_env(),
-    })
+        debug_booking: debug_shown,
+    };
+    // ilia fork: the debug booking switch, resolved once for the link and the log.
+    debug_booking::startup(&state).await;
+    Arc::new(state)
 }
 
 /// Every route, over `state`.
@@ -803,6 +816,9 @@ pub(crate) fn router(state: Arc<AppState>) -> Router {
         .merge(ton_pay::router())
         .merge(telegram::router())
         .merge(messages::router())
+        // ilia fork: always registered; 404 while the switch is off
+        // (`debug_booking::middleware`, below).
+        .merge(debug_booking::router())
         .route("/", get(root_redirect))
         .route("/dashboard", get(dashboard))
         .route("/dashboard/event-types", get(dashboard_event_types))
@@ -1121,6 +1137,13 @@ pub(crate) fn router(state: Arc<AppState>) -> Router {
         // Legacy single-user routes (kept for backward compatibility)
         .route("/{slug}", get(show_slots))
         .route("/{slug}/book", get(show_book_form).post(handle_booking))
+        // ilia fork: the debug booking switch, per `/dashboard` request
+        // (404 for its page while off, the sidebar link). Below the error
+        // page layer, which styles that 404.
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            debug_booking::middleware,
+        ))
         // ilia fork: `?lang=` (cookie and redirect) and the switcher's page.
         .layer(axum::middleware::from_fn(lang_switch::middleware))
         // ilia fork: 404/410/403/400 and a styled page for upstream's bare

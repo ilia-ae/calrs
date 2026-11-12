@@ -627,6 +627,8 @@ pub(super) async fn dashboard_bookings(
             claimable_bookings => claimable_ctx,
             bookings => bookings_ctx,
             ton => ton_pay::dashboard_badges(&state.pool, &user.id, &user.timezone, auth_user.lang).await,
+            // ilia fork: the TEST badge of bookings the debug page made.
+            test_bookings => super::debug_booking::marked(&state.pool, &telegram_ids).await,
             impersonating => impersonating,
             impersonating_name => impersonating_name,
         })
