@@ -285,6 +285,8 @@ pub(super) struct EventTypeForm {
     pub(super) ton_price_currency: Option<String>,
     pub(super) ton_window_min: Option<String>,
     pub(super) ton_guest_telegram: Option<String>,
+    // ilia fork: `fixed` (absent: fixed) or `ladder` (the demand ladder).
+    pub(super) ton_price_mode: Option<String>,
 }
 
 /// Longest event type title accepted, the same limit as team names.
@@ -2214,7 +2216,7 @@ async fn render_event_type_form_error(
             form_pending => PendingSettings::from_form(form)
                 .unwrap_or(PendingSettings::DEFAULT)
                 .context(),
-            ton_price => ton_pay::price_form_from_post(state, &ton_price_form(form), !is_group),
+            ton_price => ton_pay::price_form_from_post(state, &ton_price_form(form), !is_group).await,
             form_reminder_minutes => parse_int_field(&form.reminder_minutes, 0),
             form_max_additional_guests => parse_int_field(&form.max_additional_guests, 0),
             form_scheduling_mode => scheduling_mode,
@@ -3857,5 +3859,6 @@ fn ton_price_form(form: &EventTypeForm) -> ton_pay::PriceForm<'_> {
         currency: form.ton_price_currency.as_deref(),
         window_min: form.ton_window_min.as_deref(),
         guest_telegram: form.ton_guest_telegram.as_deref(),
+        mode: form.ton_price_mode.as_deref(),
     }
 }

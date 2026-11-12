@@ -5,8 +5,9 @@
 //!
 //! Who reads what: payment and invoice alerts go to the owner of the event
 //! type (in their saved language and timezone); health alerts, and payments
-//! that match no booking, to `CALRS_TON_ALERT_EMAIL` or else every enabled
-//! admin. No email carries the sender's on-chain comment.
+//! that match no booking, to the alert email ([`alert_email`]: the
+//! environment's `CALRS_TON_ALERT_EMAIL`, else the stored one) or else
+//! every enabled admin. No email carries the sender's on-chain comment.
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -51,10 +52,7 @@ pub(crate) async fn operators(pool: &SqlitePool) -> Vec<Recipient> {
     .fetch_all(pool)
     .await
     .unwrap_or_default();
-    let configured = std::env::var("CALRS_TON_ALERT_EMAIL")
-        .ok()
-        .map(|v| v.trim().to_string())
-        .filter(|v| v.contains('@'));
+    let configured = alert_email(pool).await;
     match configured {
         Some(email) => {
             let lang = admins
@@ -68,6 +66,34 @@ pub(crate) async fn operators(pool: &SqlitePool) -> Vec<Recipient> {
             .map(|(name, email, l)| (name, email, lang_of(l)))
             .collect(),
     }
+}
+
+/// ilia fork: the alert email in effect, through the settings resolver:
+/// `CALRS_TON_ALERT_EMAIL` from the environment, else the stored one (the
+/// admin page, `config apply`), else none. Read at each alert, so a saved
+/// change applies to the next one, with payments on or off. An invalid
+/// value (only a hand edit can store one) counts as none: the admins get
+/// the alert instead.
+pub(crate) async fn alert_email(pool: &SqlitePool) -> Option<String> {
+    alert_email_with(pool, &crate::ton::settings::process_env).await
+}
+
+pub(crate) async fn alert_email_with(
+    pool: &SqlitePool,
+    env: &(dyn Fn(&str) -> Option<String> + Sync),
+) -> Option<String> {
+    use crate::ton::config::{Vars, ALERT_EMAIL};
+    let db = match pool.acquire().await {
+        Ok(mut conn) => super::store::load_settings(&mut conn).await,
+        Err(e) => Err(e),
+    }
+    .map_err(|e| tracing::error!(target: TARGET, error = %e, "cannot read the TON settings"))
+    .unwrap_or_default();
+    Vars(|k: &str| crate::ton::settings::lookup(env, &db, k))
+        .email(ALERT_EMAIL)
+        .map_err(|e| tracing::error!(target: TARGET, error = %e, "the TON alert email is invalid"))
+        .ok()
+        .flatten()
 }
 
 #[derive(sqlx::FromRow)]

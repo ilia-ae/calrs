@@ -15,6 +15,7 @@ use sqlx::{SqliteConnection, SqlitePool};
 use super::{stamp, store, watcher, TonRuntime, TARGET};
 use crate::ton::amount;
 use crate::ton::deadlines::{self, InvoiceTimes};
+use crate::ton::ladder::{self, Ladder, Step};
 use crate::ton::rate::{AcceptedRate, RateRefusal};
 use crate::ton::reference;
 use crate::ton::Network;
@@ -39,6 +40,20 @@ pub(crate) enum Refusal {
     Rate(RateRefusal),
     /// A database error: refuse rather than guess.
     Internal,
+    /// ilia fork (the ladder): the price is not the one the guest was
+    /// shown (`quoted`, `None` when the form carried none): it is `now`
+    /// instead. Asked again; nothing is created. `free_used`: the step is
+    /// free, but this guest already had a free step within the per-guest
+    /// limit, so `now` is the ladder's first price for them.
+    Requote {
+        quoted: Option<Step>,
+        now: Step,
+        free_used: bool,
+    },
+    /// ilia fork (the ladder): this guest already had a free step within
+    /// the per-guest limit, and the ladder has no price to book at instead
+    /// (every step is free).
+    FreeUsed,
 }
 
 impl std::fmt::Display for Refusal {
@@ -52,6 +67,22 @@ impl std::fmt::Display for Refusal {
             Self::ClientLimit => f.write_str("too many invoices from this network today"),
             Self::Rate(r) => write!(f, "no acceptable rate: {r}"),
             Self::Internal => f.write_str("database error"),
+            Self::Requote {
+                quoted,
+                now,
+                free_used,
+            } => write!(
+                f,
+                "the price changed: quoted {}, now {}{}",
+                quoted.map_or_else(|| "nothing".to_string(), |q| q.text()),
+                now.text(),
+                if *free_used {
+                    " (the guest's free step is used)"
+                } else {
+                    ""
+                }
+            ),
+            Self::FreeUsed => f.write_str("this guest already had a free booking recently"),
         }
     }
 }
@@ -108,6 +139,70 @@ pub(crate) struct PreparedInvoice {
     pub(crate) created_at: DateTime<Utc>,
     /// Renewals this invoice may have (`CALRS_TON_MAX_RENEWALS` now).
     pub(crate) renewals_max: i64,
+    /// ilia fork: priced by the ladder (its step at `n`, recounted inside
+    /// the booking transaction); `None` for a fixed price.
+    pub(crate) ladder: Option<LadderQuote>,
+}
+
+/// ilia fork: a booking request, as the booking handlers hand it in.
+#[derive(Clone, Debug)]
+pub(crate) struct BookingAsk<'a> {
+    pub(crate) event_type_id: &'a str,
+    /// The booking's stored UTC start.
+    pub(crate) start_utc: DateTime<Utc>,
+    pub(crate) min_notice_min: i64,
+    pub(crate) guest_email: &'a str,
+    pub(crate) client_ip: &'a str,
+    /// The Telegram username the form carried (the per-guest free limit).
+    pub(crate) telegram: Option<&'a str>,
+    /// The price the form showed (`quoted_nano`), when it carried one.
+    pub(crate) quoted: Option<Step>,
+}
+
+/// ilia fork: a ladder price as quoted before the booking transaction.
+#[derive(Clone, Debug)]
+pub(crate) struct LadderQuote {
+    pub(crate) ladder: Ladder,
+    /// Whose demand is counted: the owner of the type's account.
+    pub(crate) owner_user_id: String,
+    pub(crate) n: i64,
+    /// The step this guest books at: the ladder's step at `n`, or its first
+    /// price when that step is free and the guest's free step is used.
+    pub(crate) step: Step,
+    /// What the guest agreed to: never charged more than this.
+    pub(crate) quoted: Step,
+    /// One free step per guest per this many days (0: no limit).
+    pub(crate) free_days: i64,
+    /// Who the per-guest free limit counts: email, Telegram, network.
+    pub(crate) guest: store::FreeGuest,
+}
+
+/// ilia fork: a ladder booking at a free step: no invoice; it waits for
+/// the owner's approval, and the guest's free step is recorded.
+#[derive(Clone, Debug)]
+pub(crate) struct FreeStep {
+    pub(crate) quote: LadderQuote,
+    pub(crate) event_type_id: String,
+    pub(crate) created_at: DateTime<Utc>,
+}
+
+/// What a booking needs, decided before its transaction.
+#[derive(Clone, Debug)]
+pub(crate) enum Prepared {
+    /// No price: the upstream path, unchanged.
+    Unpriced,
+    /// A free ladder step: pending, the owner approves it.
+    Free(Box<FreeStep>),
+    /// An invoice to open in the transaction.
+    Invoice(Box<PreparedInvoice>),
+}
+
+impl Prepared {
+    /// The booking waits (pending): for its payment or, at a free ladder
+    /// step, for the owner's approval.
+    pub(crate) fn holds(&self) -> bool {
+        !matches!(self, Self::Unpriced)
+    }
 }
 
 /// What the booking handler needs once the invoice is open.
@@ -157,27 +252,24 @@ pub(crate) fn client_tag(secret_key: &[u8; 32], client_ip: &str) -> String {
     hex::encode(&mac.finalize().into_bytes()[..16])
 }
 
-/// Step 1 of a priced booking, before `BEGIN`: is this type priced, can it
-/// be paid for now, and for how much. `Ok(None)`: not priced, the booking
-/// goes the upstream way unchanged. The only network call (the rate) is
-/// here, never inside the SQL transaction.
-#[allow(clippy::too_many_arguments)]
-pub(crate) async fn prepare_invoice(
+/// Step 1 of a booking, before `BEGIN`: is this type priced, can it be
+/// paid for now, and for how much. `Prepared::Unpriced`: not priced, the
+/// booking goes the upstream way unchanged. The only network call (the
+/// rate) is here, never inside the SQL transaction. A ladder type is
+/// quoted from its demand now; the quote is checked again inside the
+/// transaction ([`open`]).
+pub(crate) async fn prepare(
     state: &AppState,
-    event_type_id: &str,
-    start_utc: DateTime<Utc>,
-    min_notice_min: i64,
-    guest_email: &str,
-    client_ip: &str,
+    ask: &BookingAsk<'_>,
     now: DateTime<Utc>,
-) -> Result<Option<PreparedInvoice>, Refusal> {
+) -> Result<Prepared, Refusal> {
     // Whole seconds, as stored: the deadlines handed back match the rows.
     let now = DateTime::from_timestamp(now.timestamp(), 0).unwrap_or(now);
-    let price = match store::price_for(&state.pool, event_type_id).await {
+    let row = match store::price_for(&state.pool, ask.event_type_id).await {
         Ok(Some(p)) => p,
-        Ok(None) => return Ok(None),
+        Ok(None) => return Ok(Prepared::Unpriced),
         Err(e) => {
-            tracing::error!(target: TARGET, error = %e, event_type_id, "cannot read the price");
+            tracing::error!(target: TARGET, error = %e, event_type_id = ask.event_type_id, "cannot read the price");
             return Err(Refusal::Internal);
         }
     };
@@ -188,13 +280,171 @@ pub(crate) async fn prepare_invoice(
             .unwrap_or_else(|| "not configured".into());
         return Err(Refusal::Unavailable(why));
     };
-    if price.is_team != 0 {
+    if row.is_team != 0 {
         return Err(Refusal::PersonalOnly);
     }
-    let Some(priced) = price.price() else {
-        tracing::error!(target: TARGET, event_type_id, "the price row cannot be read");
+    let Some(terms) = row.terms() else {
+        tracing::error!(target: TARGET, event_type_id = ask.event_type_id, "the price row cannot be read");
         return Err(Refusal::Internal);
     };
+    match terms {
+        store::Terms::Fixed(price) => prepare_priced(state, &rt, row, price, None, ask, now)
+            .await
+            .map(|p| Prepared::Invoice(Box::new(p))),
+        store::Terms::Ladder => {
+            let guest = store::FreeGuest {
+                email_norm: normalize_email(ask.guest_email),
+                telegram_norm: ask
+                    .telegram
+                    .map(normalize_telegram)
+                    .filter(|t| !t.is_empty()),
+                client_tag: client_tag(&state.secret_key, ask.client_ip),
+            };
+            let quote = ladder_quote(state, &rt, &row, ask.quoted, guest, now).await?;
+            match quote.step {
+                Step::Free => Ok(Prepared::Free(Box::new(FreeStep {
+                    quote,
+                    event_type_id: ask.event_type_id.to_string(),
+                    created_at: now,
+                }))),
+                Step::Ton(nano) => prepare_priced(
+                    state,
+                    &rt,
+                    row,
+                    store::Price::Ton(nano),
+                    Some(quote),
+                    ask,
+                    now,
+                )
+                .await
+                .map(|p| Prepared::Invoice(Box::new(p))),
+            }
+        }
+    }
+}
+
+/// [`prepare`] as the invoice tests use it: the invoice of a priced type,
+/// `None` otherwise.
+#[cfg(test)]
+pub(crate) async fn prepare_invoice(
+    state: &AppState,
+    event_type_id: &str,
+    start_utc: DateTime<Utc>,
+    min_notice_min: i64,
+    guest_email: &str,
+    client_ip: &str,
+    now: DateTime<Utc>,
+) -> Result<Option<PreparedInvoice>, Refusal> {
+    let ask = BookingAsk {
+        event_type_id,
+        start_utc,
+        min_notice_min,
+        guest_email,
+        client_ip,
+        telegram: None,
+        quoted: None,
+    };
+    match prepare(state, &ask, now).await? {
+        Prepared::Invoice(p) => Ok(Some(*p)),
+        Prepared::Unpriced | Prepared::Free(_) => Ok(None),
+    }
+}
+
+/// A typed Telegram username as the free-step limit compares it.
+fn normalize_telegram(raw: &str) -> String {
+    raw.trim().trim_start_matches('@').to_lowercase()
+}
+
+/// The ladder price of `row` now for this guest, against what the guest
+/// was shown. The ladder and the per-guest limit are the runtime's
+/// settings (`TonConfig::ladder`, env > stored > default), fixed for the
+/// request.
+async fn ladder_quote(
+    state: &AppState,
+    rt: &TonRuntime,
+    row: &store::PriceRow,
+    quoted: Option<Step>,
+    guest: store::FreeGuest,
+    now: DateTime<Utc>,
+) -> Result<LadderQuote, Refusal> {
+    let owner_user_id = row.owner_user_id.clone().ok_or(Refusal::Internal)?;
+    let ladder = rt.cfg.ladder.clone();
+    let free_days = rt.cfg.free_per_guest_days;
+    let mut conn = state.pool.acquire().await.map_err(|e| {
+        tracing::error!(target: TARGET, error = %e, "cannot count the demand");
+        Refusal::Internal
+    })?;
+    let n = store::demand_n(&mut conn, &owner_user_id, now, None)
+        .await
+        .map_err(|e| {
+            tracing::error!(target: TARGET, error = %e, "cannot count the demand");
+            Refusal::Internal
+        })?;
+    let (step, free_used) = step_for_guest(&mut conn, &ladder, n, free_days, &guest, now).await?;
+    match quoted {
+        Some(q) if ladder::accepts(q, step) => Ok(LadderQuote {
+            ladder,
+            owner_user_id,
+            n,
+            step,
+            quoted: q,
+            free_days,
+            guest,
+        }),
+        _ => Err(Refusal::Requote {
+            quoted,
+            now: step,
+            free_used,
+        }),
+    }
+}
+
+/// The step this guest books at with demand `n`: the ladder's step, except
+/// that a free step already used by this guest within the per-guest limit
+/// becomes the ladder's first price (`true`: so replaced). Never a lockout:
+/// a guest past the free limit can always pay. Only a ladder without any
+/// price refuses ([`Refusal::FreeUsed`]).
+async fn step_for_guest(
+    conn: &mut SqliteConnection,
+    ladder: &Ladder,
+    n: i64,
+    free_days: i64,
+    guest: &store::FreeGuest,
+    at: DateTime<Utc>,
+) -> Result<(Step, bool), Refusal> {
+    let step = ladder.price(n);
+    if !step.is_free() || free_days <= 0 {
+        return Ok((step, false));
+    }
+    let taken = store::free_step_taken(conn, guest, at - chrono::Duration::days(free_days))
+        .await
+        .map_err(|e| {
+            tracing::error!(target: TARGET, error = %e, "cannot read the free steps");
+            Refusal::Internal
+        })?;
+    if !taken {
+        return Ok((step, false));
+    }
+    match ladder.lowest_price() {
+        Some(nano) => Ok((Step::Ton(nano), true)),
+        None => Err(Refusal::FreeUsed),
+    }
+}
+
+/// The priced part of [`prepare`]: payments ready, time to pay, the
+/// limits, the amount.
+async fn prepare_priced(
+    state: &AppState,
+    rt: &std::sync::Arc<TonRuntime>,
+    row: store::PriceRow,
+    priced: store::Price,
+    ladder: Option<LadderQuote>,
+    ask: &BookingAsk<'_>,
+    now: DateTime<Utc>,
+) -> Result<PreparedInvoice, Refusal> {
+    let (event_type_id, start_utc, min_notice_min) =
+        (ask.event_type_id, ask.start_utc, ask.min_notice_min);
+    let price = row;
     if matches!(priced, store::Price::Usd(_)) && rt.cfg.rate_policy.is_none() {
         return Err(Refusal::Unavailable(RateRefusal::NoCorridor.to_string()));
     }
@@ -231,8 +481,8 @@ pub(crate) async fn prepare_invoice(
         per_day: rt.cfg.max_per_day,
         per_ip_day: rt.cfg.max_per_ip_day,
     };
-    let guest_email_norm = normalize_email(guest_email);
-    let tag = client_tag(&state.secret_key, client_ip);
+    let guest_email_norm = normalize_email(ask.guest_email);
+    let tag = client_tag(&state.secret_key, ask.client_ip);
     let counts = match state.pool.acquire().await {
         Ok(mut conn) => store::open_counts(&mut conn, &guest_email_norm, &tag, now).await,
         Err(e) => Err(e),
@@ -245,7 +495,7 @@ pub(crate) async fn prepare_invoice(
         if refusal == Refusal::Capacity {
             rt.note_capacity_refusal(now);
             watcher::raise(
-                &rt,
+                rt,
                 &state.pool,
                 "capacity",
                 &format!("open={} last_24h={}", counts.total, counts.last_day),
@@ -257,7 +507,7 @@ pub(crate) async fn prepare_invoice(
     }
     if limits.nearly_full(counts) {
         watcher::raise(
-            &rt,
+            rt,
             &state.pool,
             "capacity_near",
             &format!(
@@ -280,7 +530,7 @@ pub(crate) async fn prepare_invoice(
                 Ok(r) => r,
                 Err(refusal) => {
                     watcher::raise(
-                        &rt,
+                        rt,
                         &state.pool,
                         "rate_unavailable",
                         &refusal.to_string(),
@@ -297,7 +547,7 @@ pub(crate) async fn prepare_invoice(
         }
     };
     let tolerance_nano = amount::to_i64(rt.cfg.underpay_tolerance_nano).unwrap_or(0);
-    Ok(Some(PreparedInvoice {
+    Ok(PreparedInvoice {
         event_type_id: event_type_id.to_string(),
         event_title: price.title,
         start_utc,
@@ -313,13 +563,96 @@ pub(crate) async fn prepare_invoice(
         limits,
         created_at: now,
         renewals_max: rt.cfg.max_renewals,
-    }))
+        ladder,
+    })
 }
 
 fn random_token() -> String {
     let mut bytes = [0u8; 16];
     rand::rngs::OsRng.fill_bytes(&mut bytes);
     hex::encode(bytes)
+}
+
+/// Step 2 of a booking, inside its transaction, right after the booking
+/// row (its INSERT took the write lock, so no other booking commits until
+/// this one ends). A ladder type is recounted here, on the transaction's
+/// own connection: a free step is taken only while the price is still
+/// free, and a priced one is charged the price now when it is at most the
+/// one quoted (a lower price without asking). A free step this guest
+/// already used within the per-guest limit is the ladder's first price
+/// for them ([`step_for_guest`]). Any other change, free to priced or
+/// back, or a higher price, is [`Refusal::Requote`]: the caller rolls
+/// back and asks the guest again.
+pub(crate) async fn open(
+    conn: &mut SqliteConnection,
+    booking_id: &str,
+    prepared: &Prepared,
+) -> Result<Option<OpenedInvoice>, Refusal> {
+    match prepared {
+        Prepared::Unpriced => Ok(None),
+        Prepared::Free(f) => {
+            let q = &f.quote;
+            let n = recount(conn, booking_id, q, f.created_at).await?;
+            let (step, free_used) =
+                step_for_guest(conn, &q.ladder, n, q.free_days, &q.guest, f.created_at).await?;
+            if !ladder::accepts(Step::Free, step) {
+                return Err(Refusal::Requote {
+                    quoted: Some(q.quoted),
+                    now: step,
+                    free_used,
+                });
+            }
+            store::record_free_step(conn, booking_id, &f.event_type_id, &q.guest, n, f.created_at)
+                .await
+                .map_err(|e| {
+                    tracing::error!(target: TARGET, error = %e, booking_id, "cannot record the free step");
+                    Refusal::Internal
+                })?;
+            tracing::info!(target: TARGET, booking_id, demand_n = n, "free ladder step taken, awaiting approval");
+            Ok(None)
+        }
+        Prepared::Invoice(p) => {
+            let Some(q) = &p.ladder else {
+                return open_invoice(conn, booking_id, p).await.map(Some);
+            };
+            let n = recount(conn, booking_id, q, p.created_at).await?;
+            let (step, free_used) =
+                step_for_guest(conn, &q.ladder, n, q.free_days, &q.guest, p.created_at).await?;
+            match step {
+                Step::Ton(nano) if ladder::accepts(q.quoted, step) => {
+                    let mut now_priced = p.clone();
+                    now_priced.price = store::Price::Ton(nano);
+                    now_priced.amount_nano = amount::to_i64(nano).ok_or(Refusal::Internal)?;
+                    if let Some(l) = now_priced.ladder.as_mut() {
+                        l.n = n;
+                        l.step = step;
+                    }
+                    open_invoice(conn, booking_id, &now_priced).await.map(Some)
+                }
+                _ => Err(Refusal::Requote {
+                    quoted: Some(q.quoted),
+                    now: step,
+                    free_used,
+                }),
+            }
+        }
+    }
+}
+
+/// The demand again, on the booking transaction's connection, without the
+/// booking being made.
+async fn recount(
+    conn: &mut SqliteConnection,
+    booking_id: &str,
+    q: &LadderQuote,
+    at: DateTime<Utc>,
+) -> Result<i64, Refusal> {
+    store::demand_n(conn, &q.owner_user_id, at, Some(booking_id))
+        .await
+        .map_err(|e| {
+            tracing::error!(target: TARGET, error = %e, booking_id, "cannot recount the demand");
+            Refusal::Internal
+        })
 }
 
 /// Step 2, inside the booking's transaction, right after the pending
@@ -361,8 +694,8 @@ pub(crate) async fn open_invoice(
                  address_raw, event_title, start_at_utc, guest_email_norm, client_tag,
                  currency, price_usd_cents, rate_usd_micro, rate_sources, rate_at, amount_nano,
                  tolerance_nano, status, created_at, expires_at, settle_by, hard_deadline,
-                 renewals_max)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?)",
+                 renewals_max, pricing_mode, demand_n, quoted_nano)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(&id)
         .bind(booking_id)
@@ -387,6 +720,14 @@ pub(crate) async fn open_invoice(
         .bind(stamp(p.times.settle_by))
         .bind(stamp(p.times.hard_deadline))
         .bind(p.renewals_max)
+        .bind(if p.ladder.is_some() { "ladder" } else { "fixed" })
+        .bind(p.ladder.as_ref().map(|l| l.n))
+        .bind(
+            p.ladder
+                .as_ref()
+                .and_then(|l| l.quoted.nano())
+                .and_then(amount::to_i64),
+        )
         .execute(&mut *conn)
         .await;
         match inserted {

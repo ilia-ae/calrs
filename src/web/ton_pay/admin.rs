@@ -44,6 +44,18 @@ pub(crate) struct PriceForm<'a> {
     /// The guest Telegram mode chosen in the section (only shown while
     /// Telegram is on).
     pub(crate) guest_telegram: Option<&'a str>,
+    /// ilia fork: `fixed` (the default when absent: the amount and
+    /// currency above) or `ladder` (the site's demand ladder, TON).
+    pub(crate) mode: Option<&'a str>,
+}
+
+/// `fixed` unless the form says `ladder`; `None` for anything else.
+fn mode_of(v: Option<&str>) -> Option<&'static str> {
+    match v.map(str::trim) {
+        None | Some("") | Some("fixed") => Some("fixed"),
+        Some("ladder") => Some("ladder"),
+        _ => None,
+    }
 }
 
 /// `TON` unless the form says `USD`; `None` for anything else.
@@ -79,8 +91,15 @@ pub(crate) fn validate_price_form(
     if on && !blank(team_id) {
         return Err("ton-form-error-team");
     }
+    let mode = mode_of(form.mode).ok_or("ton-form-error-mode")?;
     let currency = currency_of(form.currency).ok_or("ton-form-error-currency")?;
-    if (on || !blank(form.amount)) && parse_price(currency, form.amount.unwrap_or("")).is_none() {
+    if mode == "ladder" && !blank(team_id) {
+        return Err("ton-form-error-team");
+    }
+    if mode == "fixed"
+        && (on || !blank(form.amount))
+        && parse_price(currency, form.amount.unwrap_or("")).is_none()
+    {
         return Err(if currency == "TON" {
             "ton-form-error-price-ton"
         } else {
@@ -104,10 +123,11 @@ pub(crate) fn validate_price_form(
 /// What a price section asks to store.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum PriceWrite {
-    /// The price, its payment window (`None`: the server's default) and
-    /// whether it is switched on. Unchecked with a price keeps it, off.
+    /// The terms (a fixed price or the ladder), the payment window
+    /// (`None`: the server's default) and whether they are switched on.
+    /// Unchecked with a price keeps it, off.
     Save {
-        price: store::Price,
+        terms: store::Terms,
         window_min: Option<i64>,
         enabled: bool,
     },
@@ -116,9 +136,9 @@ pub(crate) enum PriceWrite {
 }
 
 impl PriceWrite {
-    fn price(&self) -> Option<store::Price> {
+    fn terms(&self) -> Option<store::Terms> {
         match self {
-            Self::Save { price, .. } => Some(*price),
+            Self::Save { terms, .. } => Some(*terms),
             Self::Remove => None,
         }
     }
@@ -130,17 +150,25 @@ impl PriceWrite {
 pub(crate) fn price_write(form: &PriceForm<'_>) -> Option<PriceWrite> {
     let raw = form.amount?;
     let on = checked(form.enabled);
-    // Unchecked and blank means no price, whatever the default.
-    let price = currency_of(form.currency)
-        .filter(|_| on || !raw.trim().is_empty())
-        .and_then(|c| parse_price(c, raw));
     let window_min = form
         .window_min
         .and_then(|w| w.trim().parse::<i64>().ok())
         .filter(|w| (10..=240).contains(w));
+    // ilia fork: the ladder needs no amount; unchecked it is kept, off.
+    if mode_of(form.mode) == Some("ladder") {
+        return Some(PriceWrite::Save {
+            terms: store::Terms::Ladder,
+            window_min,
+            enabled: on,
+        });
+    }
+    // Unchecked and blank means no price, whatever the default.
+    let price = currency_of(form.currency)
+        .filter(|_| on || !raw.trim().is_empty())
+        .and_then(|c| parse_price(c, raw));
     match price {
         Some(price) => Some(PriceWrite::Save {
-            price,
+            terms: store::Terms::Fixed(price),
             window_min,
             enabled: on,
         }),
@@ -161,10 +189,10 @@ pub(crate) async fn write_price(
 ) -> Result<bool, sqlx::Error> {
     match write {
         PriceWrite::Save {
-            price,
+            terms,
             window_min,
             enabled,
-        } => store::save_price(conn, event_type_id, price, window_min, enabled, now).await,
+        } => store::save_price(conn, event_type_id, terms, window_min, enabled, now).await,
         PriceWrite::Remove => sqlx::query("DELETE FROM ton_prices WHERE event_type_id = ?")
             .bind(event_type_id)
             .execute(&mut *conn)
@@ -196,7 +224,7 @@ pub(crate) async fn save_price_form(state: &AppState, event_type_id: &str, form:
             .flatten()
             .is_some_and(|v| v != 0);
     let on = checked(form.enabled);
-    let price = write.price();
+    let price = write.terms();
     if price.is_some() && !personal {
         tracing::warn!(target: TARGET, event_type_id, "a team event type cannot be priced");
         return;
@@ -213,6 +241,7 @@ pub(crate) async fn save_price_form(state: &AppState, event_type_id: &str, form:
             tracing::info!(
                 target: TARGET,
                 event_type_id,
+                mode = price.map(|p| p.mode()).unwrap_or(""),
                 currency = price.map(|p| p.currency()).unwrap_or(""),
                 created,
                 enabled = on && price.is_some(),
@@ -262,9 +291,9 @@ pub(crate) async fn copy_price(
     to: &str,
 ) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "INSERT INTO ton_prices (event_type_id, currency, price_nano, price_usd_cents, window_min,
-             enabled, updated_at)
-         SELECT ?, p.currency, p.price_nano, p.price_usd_cents, p.window_min, p.enabled, ?
+        "INSERT INTO ton_prices (event_type_id, mode, currency, price_nano, price_usd_cents,
+             window_min, enabled, updated_at)
+         SELECT ?, p.mode, p.currency, p.price_nano, p.price_usd_cents, p.window_min, p.enabled, ?
          FROM ton_prices p JOIN event_types et ON et.id = ?
          WHERE p.event_type_id = ? AND et.team_id IS NULL",
     )
@@ -284,14 +313,18 @@ struct PriceSection {
     currency: &'static str,
     window: String,
     guest_telegram: &'static str,
+    /// `fixed` or `ladder`.
+    mode: &'static str,
 }
 
-fn price_ctx(state: &AppState, section: PriceSection) -> minijinja::Value {
+async fn price_ctx(state: &AppState, section: PriceSection) -> minijinja::Value {
     let (payments_on, default_window, rates_on) = match state.ton.get() {
         Some(rt) => (true, rt.cfg.window_min, rt.cfg.rate_policy.is_some()),
         None => (false, 30, false),
     };
     context! {
+        mode => section.mode,
+        ladder => super::pricing::form_ctx(state).await,
         enabled => section.enabled,
         amount => section.amount,
         currency => section.currency,
@@ -318,12 +351,14 @@ pub(crate) async fn price_form_ctx(
         currency: "TON",
         window: String::new(),
         guest_telegram: crate::telegram::username::mode::REQUIRED,
+        mode: "fixed",
     };
     let Some(et_id) = event_type_id else {
-        return Some(price_ctx(state, fresh));
+        return Some(price_ctx(state, fresh).await);
     };
     #[allow(clippy::type_complexity)]
     let row: Option<(
+        Option<String>,
         Option<String>,
         Option<i64>,
         Option<i64>,
@@ -331,7 +366,7 @@ pub(crate) async fn price_form_ctx(
         Option<i64>,
         i64,
     )> = sqlx::query_as(
-        "SELECT p.currency, p.price_nano, p.price_usd_cents, p.window_min, p.enabled,
+        "SELECT p.mode, p.currency, p.price_nano, p.price_usd_cents, p.window_min, p.enabled,
                 et.team_id IS NULL
          FROM event_types et LEFT JOIN ton_prices p ON p.event_type_id = et.id
          WHERE et.id = ?",
@@ -341,14 +376,15 @@ pub(crate) async fn price_form_ctx(
     .await
     .ok()
     .flatten();
-    let (currency, nano, cents, window, enabled, personal) = row?;
+    let (mode, currency, nano, cents, window, enabled, personal) = row?;
     if personal == 0 {
         return None;
     }
-    let price = currency
+    let terms = mode
         .as_deref()
-        .and_then(|c| store::Price::from_columns(c, nano, cents));
-    let Some(price) = price else {
+        .zip(currency.as_deref())
+        .and_then(|(m, c)| store::Terms::from_columns(m, c, nano, cents));
+    let Some(terms) = terms else {
         // No price yet: the defaults, with the type's own Telegram mode
         // if one was chosen.
         let stored = crate::telegram::store::event_type_mode(&state.pool, et_id).await;
@@ -359,37 +395,47 @@ pub(crate) async fn price_form_ctx(
                 .await
                 .ok()
                 .flatten();
-        return Some(price_ctx(
+        return Some(
+            price_ctx(
+                state,
+                PriceSection {
+                    guest_telegram: if chosen.is_some() {
+                        stored
+                    } else {
+                        fresh.guest_telegram
+                    },
+                    ..fresh
+                },
+            )
+            .await,
+        );
+    };
+    Some(
+        price_ctx(
             state,
             PriceSection {
-                guest_telegram: if chosen.is_some() {
-                    stored
-                } else {
-                    fresh.guest_telegram
-                },
-                ..fresh
+                enabled: enabled == Some(1),
+                amount: terms.fixed().map(|p| p.amount()).unwrap_or_default(),
+                currency: terms.currency(),
+                window: window.map(|w| w.to_string()).unwrap_or_default(),
+                guest_telegram: crate::telegram::store::event_type_mode(&state.pool, et_id).await,
+                mode: terms.mode(),
             },
-        ));
-    };
-    Some(price_ctx(
-        state,
-        PriceSection {
-            enabled: enabled == Some(1),
-            amount: price.amount(),
-            currency: price.currency(),
-            window: window.map(|w| w.to_string()).unwrap_or_default(),
-            guest_telegram: crate::telegram::store::event_type_mode(&state.pool, et_id).await,
-        },
-    ))
+        )
+        .await,
+    )
 }
 
 /// The section echoed back after a validation error, as posted.
-pub(crate) fn price_form_from_post(
+pub(crate) async fn price_form_from_post(
     state: &AppState,
     form: &PriceForm<'_>,
     personal: bool,
 ) -> Option<minijinja::Value> {
-    personal.then(|| {
+    if !personal {
+        return None;
+    }
+    Some(
         price_ctx(
             state,
             PriceSection {
@@ -401,9 +447,11 @@ pub(crate) fn price_form_from_post(
                     form.guest_telegram
                         .unwrap_or(crate::telegram::username::mode::REQUIRED),
                 ),
+                mode: mode_of(form.mode).unwrap_or("fixed"),
             },
         )
-    })
+        .await,
+    )
 }
 
 /// The price line of a public slot or form page. A TON price is shown as
@@ -420,11 +468,13 @@ pub(crate) async fn price_badge(state: &AppState, event_type_id: &str) -> Option
     if let Some(rt) = state.ton.get() {
         rt.wake_if_idle(Utc::now());
     }
-    match row.price()? {
-        store::Price::Ton(nano) => Some(context! {
+    match row.terms()? {
+        // ilia fork: the price now, on the ladder, and the ladder in short.
+        store::Terms::Ladder => super::pricing::badge(state, row.owner_user_id.as_deref()?).await,
+        store::Terms::Fixed(store::Price::Ton(nano)) => Some(context! {
             ton_exact => format_ton(nano),
         }),
-        store::Price::Usd(cents) => {
+        store::Terms::Fixed(store::Price::Usd(cents)) => {
             let ton = state
                 .ton
                 .get()
@@ -692,6 +742,7 @@ mod tests {
             currency,
             window_min,
             guest_telegram: None,
+            mode: None,
         }
     }
 
@@ -763,5 +814,50 @@ mod tests {
             validate_price_form(&f, None),
             Err("ton-form-error-telegram")
         );
+    }
+
+    /// ilia fork: the ladder mode needs no amount, is kept switched off,
+    /// and is for personal types only.
+    #[test]
+    fn the_ladder_mode() {
+        let mut f = form(Some("on"), Some(""), None, None);
+        f.mode = Some("ladder");
+        assert_eq!(validate_price_form(&f, None), Ok(()));
+        assert_eq!(
+            price_write(&f),
+            Some(PriceWrite::Save {
+                terms: store::Terms::Ladder,
+                window_min: None,
+                enabled: true
+            })
+        );
+        // A junk amount left in the hidden fixed fields does not matter.
+        f.amount = Some("x");
+        assert_eq!(validate_price_form(&f, None), Ok(()));
+        f.enabled = None;
+        assert_eq!(
+            price_write(&f),
+            Some(PriceWrite::Save {
+                terms: store::Terms::Ladder,
+                window_min: None,
+                enabled: false
+            })
+        );
+        assert_eq!(
+            validate_price_form(&f, Some("team-1")),
+            Err("ton-form-error-team")
+        );
+        f.mode = Some("auction");
+        assert_eq!(validate_price_form(&f, None), Err("ton-form-error-mode"));
+        f.mode = Some("fixed");
+        f.amount = Some("100");
+        f.enabled = Some("on");
+        assert!(matches!(
+            price_write(&f),
+            Some(PriceWrite::Save {
+                terms: store::Terms::Fixed(store::Price::Ton(_)),
+                ..
+            })
+        ));
     }
 }

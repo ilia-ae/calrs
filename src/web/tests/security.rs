@@ -618,7 +618,7 @@ fn oidc_error_response_returns_500_without_detail() {
 /// dropped buffer), and we don't need the formatting machinery here:
 /// recording field names + their `Debug` strings is enough to assert that
 /// the event carried the expected markers.
-fn capture_tracing<F: FnOnce()>(f: F) -> String {
+pub(super) fn capture_tracing<F: FnOnce()>(f: F) -> String {
     use std::sync::{Arc, Mutex};
     use tracing::field::{Field, Visit};
     use tracing::{Event, Metadata, Subscriber};
@@ -686,7 +686,7 @@ fn capture_tracing<F: FnOnce()>(f: F) -> String {
 /// Detection uses `cfg!(tarpaulin)` since cargo-tarpaulin compiles with
 /// `--cfg=tarpaulin`. An earlier attempt keyed off `CARGO_TARPAULIN_VERSION`
 /// but tarpaulin never sets that env var, so the guard never fired.
-fn under_tarpaulin() -> bool {
+pub(super) fn under_tarpaulin() -> bool {
     cfg!(tarpaulin)
 }
 

@@ -27,6 +27,12 @@ mod perf;
 // The Optimize stage: the watcher's on-demand heartbeat.
 #[path = "ton_optimize.rs"]
 mod optimize;
+// The price by demand (the ladder).
+#[path = "ton_ladder.rs"]
+mod ladder;
+// The TON settings page, its hot apply and the alert email.
+#[path = "ton_settings.rs"]
+mod settings_page;
 
 const OUR: &str = "0:83DFD552E63729B472FCBCC8C45EBCC6691702558B68EC7527E1BA403A0F31A8";
 const OTHER: &str = "0:077F69B02858C4A6BC33E5F052E64E5BAD13AB95DB61442CFE0958B97959BDE4";

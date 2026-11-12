@@ -16,6 +16,21 @@
         <div style="color: var(--text-muted); font-size: 0.825rem;">{{ t("ton-etf-enabled-help") }}</div>
       </div>
     </label>
+    <div class="form-group" style="margin-top: 0.75rem; margin-bottom: 0;">
+      <label for="ton_price_mode">{{ t("ton-etf-mode") }}</label>
+      <select id="ton_price_mode" name="ton_price_mode" style="padding: 0.625rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.925rem; font-family: inherit; background: var(--surface); color: var(--text); width: 100%;">
+        <option value="fixed"{% if ton_price.mode != "ladder" %} selected{% endif %}>{{ t("ton-etf-mode-fixed") }}</option>
+        <option value="ladder"{% if ton_price.mode == "ladder" %} selected{% endif %}>{{ t("ton-etf-mode-ladder") }}</option>
+      </select>
+    </div>
+    <div id="ton-price-ladder"{% if ton_price.mode != "ladder" %} hidden{% endif %} style="margin-top: 0.75rem; font-size: 0.85rem; color: var(--text-secondary);">
+      {% if ton_price.ladder %}
+      <div><strong>{{ t("ton-etf-ladder-now") }}</strong> {% for step in ton_price.ladder.steps %}{% if step == "free" %}{{ t("ton-admin-free") }}{% else %}{{ step }}{% endif %}{% if not loop.last %} → {% endif %}{% endfor %} TON</div>
+      {% endif %}
+      <span class="hint" style="font-size: 0.825rem; color: var(--text-muted); display: block; margin-top: 0.375rem;">{{ t("ton-etf-ladder-help") }}</span>
+      {% if sidebar and sidebar.user_role == "admin" %}<a href="/dashboard/admin/ton#pricing" style="font-size: 0.825rem;">{{ t("ton-etf-ladder-edit") }}</a>{% endif %}
+    </div>
+    <div id="ton-price-fixed"{% if ton_price.mode == "ladder" %} hidden{% endif %}>
     <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.75rem;">
       <div class="form-group" style="flex: 2 1 10rem; margin-bottom: 0;">
         <label for="ton_price_amount">{{ t("ton-etf-price") }}</label>
@@ -33,6 +48,19 @@
     {% if ton_price.usd_unbookable %}
     <p style="color: var(--error-text); font-size: 0.85rem; margin: 0.5rem 0 0;">{{ t("ton-etf-usd-no-rates") }}</p>
     {% endif %}
+    </div>
+    <script>
+    (function() {
+      var mode = document.getElementById('ton_price_mode');
+      if (!mode) return;
+      var fixed = document.getElementById('ton-price-fixed');
+      var ladder = document.getElementById('ton-price-ladder');
+      mode.addEventListener('change', function() {
+        fixed.hidden = mode.value === 'ladder';
+        ladder.hidden = mode.value !== 'ladder';
+      });
+    })();
+    </script>
     {% if ton_price.telegram_on %}
     <div class="form-group" style="margin-top: 0.75rem;">
       <label for="ton_guest_telegram">{{ t("ton-etf-telegram") }}</label>

@@ -23,9 +23,11 @@ impl AgentServer {
                        books. The booking holds the time while the guest pays and is \
                        confirmed by itself once the payment is final; an unpaid window of a \
                        far meeting is renewed, else the time is released. Neither price \
-                       removes it (the type books free again). A new price makes the booking \
-                       form ask for the guest's Telegram. Pass the version from \
-                       get_event_type. Bookings already made keep their terms. Asks the owner \
+                       removes it (the type books free again). Or mode \"ladder\" (no amount): \
+                       the price follows the site's demand ladder, the step for the owner's \
+                       confirmed bookings in the coming days, shown to the guest before \
+                       booking. A new price makes the booking form ask for the guest's \
+                       Telegram. Pass the version from get_event_type. Bookings already made keep their terms. Asks the owner \
                        to confirm: say the price first. Returns the price, the new version and \
                        warnings (payments off in this server, notice too short to pay).",
         annotations(

@@ -546,3 +546,19 @@ ilia-mfa-action-totp-add = Sie richten eine Authenticator-App ein.
 ilia-mfa-action-totp-remove = Sie entfernen die Authenticator-App.
 ilia-mfa-action-regenerate = Sie ersetzen alle Wiederherstellungscodes.
 ilia-mfa-action-policy = Sie setzen die Zwei-Faktor-Richtlinie für lokale Konten auf:
+
+# ilia fork: TON price by demand (the ladder)
+ton-slots-ladder-fee = Die Netzwerkgebühr zahlt Ihre Wallet.
+ton-quote-was = Ihnen wurden { $ton } TON angezeigt.
+ton-quote-was-free = Ihnen wurde eine kostenlose Buchung angezeigt.
+ton-quote-confirm-help = Bitte bestätigen Sie den Preis. Es wurde noch nichts gebucht.
+ton-quote-why-free-used = Sie hatten vor Kurzem schon eine kostenlose Buchung, daher ist diese Buchung kostenpflichtig. Es wurde noch nichts gebucht.
+ton-bae-body-free-used = Sie hatten vor Kurzem schon eine kostenlose Buchung, daher kann diese nicht kostenlos sein. Versuchen Sie es bitte später noch einmal.
+ton-form-error-mode = Wählen Sie einen festen Preis oder den Preis nach Nachfrage.
+ton-etf-ladder-help = Der Preis ist die Stufe für die Zahl Ihrer anstehenden Buchungen in den nächsten Tagen (bestätigte oder bezahlte, kostenlose Anfragen, die auf Ihre Bestätigung warten, und Team-Buchungen, die Sie leiten; unbezahlte zählen nicht): zuerst kostenlos (jede kostenlose Buchung bestätigen Sie), dann höher, je voller Ihr Kalender wird. Gäste sehen den aktuellen Preis und zahlen den angezeigten. Die Staffel legt der Administrator fest.
+
+# ilia fork: the TON settings page (/dashboard/admin/ton)
+ton-admin-errors = Nichts gespeichert: Korrigieren Sie die unten markierten Felder.
+ton-admin-locked-env = Um es hier zu ändern, entfernen Sie { $var } aus der Umgebung des Servers und starten Sie calrs neu.
+ton-admin-locked-apply = Ändern Sie es im Dokument von config apply oder lassen Sie es in dessen ton-Abschnitt weg, um es an diese Seite zu übergeben.
+ton-admin-my-demand = Ihre anstehenden Buchungen jetzt: { $n }. Ihr Staffelpreis jetzt: { $price }.

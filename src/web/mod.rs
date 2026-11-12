@@ -743,6 +743,8 @@ pub(crate) async fn build_state(
     let initial_meeting = meeting::load_config(&pool, &secret_key).await;
     let initial_csp = build_csp(&initial_captcha);
     let initial_german_formal = load_german_formal(&pool).await;
+    // ilia fork: the TON settings resolve against the stored ones too.
+    let ton = ton_pay::TonSlot::load(&pool).await;
 
     Arc::new(AppState {
         pool,
@@ -759,7 +761,7 @@ pub(crate) async fn build_state(
         csp: tokio::sync::RwLock::new(initial_csp),
         csp_baseline: build_csp(&None),
         german_formal: std::sync::atomic::AtomicBool::new(initial_german_formal),
-        ton: ton_pay::TonSlot::from_env(),
+        ton,
         passkeys: crate::webauthn::Rp::from_env(),
     })
 }

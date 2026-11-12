@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{#- ilia fork: a demand-ladder price is not the one the guest was shown
+    (ilia-booking docs/ton.md, "Price by demand"). Nothing was booked; the
+    button posts the same form again with the new price as its quote. The
+    server recomputes the price inside the booking transaction and never
+    charges more than the quote. -#}
+
+{% block title %}{{ t("ton-quote-title") }}{% endblock %}
+
+{% block content %}
+<div class="card" style="text-align: center;">
+  <div class="check" style="background: #d97706;">!</div>
+  <h1>{{ t("ton-quote-title") }}</h1>
+  <p class="subtitle">
+    {% if was_shown %}{% if was_ton %}{{ t("ton-quote-was", ton=was_ton) }}{% else %}{{ t("ton-quote-was-free") }}{% endif %}<br>{% endif %}
+    <strong>{% if now_ton %}{{ t("ton-quote-now", ton=now_ton) }}{% else %}{{ t("ton-quote-now-free") }}{% endif %}</strong>
+  </p>
+  <p style="color: var(--text-muted); font-size: 0.9rem;">{{ t(why_key) }} {{ t("ton-slots-ladder-locked") }}</p>
+  <form method="POST" action="{{ action }}" style="margin-top: 1.25rem; text-align: left;">
+    {% for f in fields %}<input type="hidden" name="{{ f.name }}" value="{{ f.value }}">
+    {% endfor %}<input type="hidden" name="quoted_nano" value="{{ quoted_nano }}">
+    {% if captcha_enabled %}
+    <div class="form-group">
+      <label>{{ t("captcha-label") }}</label>
+      {% if captcha_wasm_url %}<script>window.CAP_CUSTOM_WASM_URL = {{ captcha_wasm_url | tojson }};</script>{% endif %}
+      <script src="{{ captcha_widget_url }}"></script>
+      <cap-widget
+        data-cap-api-endpoint="{{ captcha_api_endpoint }}"
+        data-cap-i18n-initial-state="{{ t('captcha-initial-state') }}"
+        data-cap-i18n-verifying-label="{{ t('captcha-verifying') }}"
+        data-cap-i18n-solved-label="{{ t('captcha-solved') }}"
+        data-cap-i18n-error-label="{{ t('captcha-error') }}"
+        data-cap-i18n-troubleshooting-label="{{ t('captcha-troubleshooting') }}"
+        data-cap-i18n-wasm-disabled="{{ t('captcha-wasm-disabled') }}"
+        data-cap-i18n-verify-aria-label="{{ t('captcha-verify-aria') }}"
+        data-cap-i18n-verifying-aria-label="{{ t('captcha-verifying-aria') }}"
+        data-cap-i18n-verified-aria-label="{{ t('captcha-verified-aria') }}"
+        data-cap-i18n-required-label="{{ t('captcha-required') }}"
+        data-cap-i18n-error-aria-label="{{ t('captcha-error-aria') }}"
+      ></cap-widget>
+    </div>
+    {% endif %}
+    <button type="submit" class="btn" style="width: 100%;">{% if now_ton %}{{ t("ton-quote-confirm", ton=now_ton) }}{% else %}{{ t("ton-quote-confirm-free") }}{% endif %}</button>
+  </form>
+</div>
+{% endblock %}

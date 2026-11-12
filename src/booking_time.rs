@@ -15,7 +15,8 @@ use sqlx::SqlitePool;
 /// round-robin team the owner stays free when another member took the
 /// booking (#146). Pending requests count when their own event type holds
 /// the slot (`pending_blocks_slot`, #234), and (ilia fork) always while they
-/// wait for a TON payment, whatever that flag says.
+/// wait for a TON payment, or for the owner's approval of a free step of
+/// the demand ladder (`ton_free_bookings`), whatever that flag says.
 ///
 /// Shared by the web slot engine, the troubleshoot view and the CLI so the
 /// three can never disagree about who is busy. `include_pending_holds` is
@@ -23,7 +24,7 @@ use sqlx::SqlitePool;
 /// not block the one being approved.
 pub fn user_busy_bookings(include_pending_holds: bool) -> String {
     let status = if include_pending_holds {
-        "(b.status = 'confirmed' OR (b.status = 'pending' AND (et.pending_blocks_slot = 1 OR EXISTS (SELECT 1 FROM ton_invoices ti WHERE ti.booking_id = b.id AND ti.status IN ('open', 'paid', 'waived')))))"
+        "(b.status = 'confirmed' OR (b.status = 'pending' AND (et.pending_blocks_slot = 1 OR EXISTS (SELECT 1 FROM ton_invoices ti WHERE ti.booking_id = b.id AND ti.status IN ('open', 'paid', 'waived')) OR EXISTS (SELECT 1 FROM ton_free_bookings fb WHERE fb.booking_id = b.id))))"
     } else {
         "b.status = 'confirmed'"
     };

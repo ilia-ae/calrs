@@ -55,7 +55,27 @@ pub(crate) struct Report {
     pub(crate) names: Vec<(&'static str, Outcome)>,
 }
 
+/// ilia fork: the names [`load_into_env`] actually set from a credential
+/// (`Outcome::Loaded`), for the TON settings page's "where the key comes
+/// from". A variable already set (`AlreadySet`) is not here: its value is
+/// the environment's, whatever credential file exists.
+static LOADED: std::sync::OnceLock<Vec<&'static str>> = std::sync::OnceLock::new();
+
+/// The names the process's [`load_into_env`] loaded from credentials.
+pub(crate) fn loaded_names() -> &'static [&'static str] {
+    LOADED.get().map_or(&[], Vec::as_slice)
+}
+
 impl Report {
+    /// The names whose value came from a credential.
+    pub(crate) fn loaded(&self) -> Vec<&'static str> {
+        self.names
+            .iter()
+            .filter(|(_, o)| *o == Outcome::Loaded)
+            .map(|(n, _)| *n)
+            .collect()
+    }
+
     /// Logs what was loaded (names only). Silent outside systemd.
     pub(crate) fn log(&self) {
         if self.missing_dir {
@@ -63,12 +83,7 @@ impl Report {
                 "CREDENTIALS_DIRECTORY is set but not readable: no systemd credentials loaded"
             );
         }
-        let loaded: Vec<&str> = self
-            .names
-            .iter()
-            .filter(|(_, o)| *o == Outcome::Loaded)
-            .map(|(n, _)| *n)
-            .collect();
+        let loaded = self.loaded();
         if !loaded.is_empty() {
             tracing::info!(names = %loaded.join(","), "secrets loaded from systemd credentials");
         }
@@ -167,6 +182,7 @@ pub(crate) fn load_into_env(names: &[&'static str]) -> Report {
             Err(outcome) => report.names.push((name, outcome)),
         }
     }
+    let _ = LOADED.set(report.loaded());
     report
 }
 

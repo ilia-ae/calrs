@@ -78,7 +78,15 @@ calrs --data-dir D config apply --export [--user E]    # stored state, same sche
     "google_oauth2": "off",
     "captcha": "off",
     "meeting_webhook": "off",
-    "sms_allow_all_users": false
+    "sms_allow_all_users": false,
+    "ton": {                              // ilia fork; left out = no change (see "TON settings" below)
+      "window_min": 30, "grace_min": 15,  // whole numbers, or null (the default, still owned)
+      "underpay_tolerance_ton": "0",      // canonical strings: TON, USD, %, the ladder, the email
+      "rate_min_usd": "0.3", "rate_max_usd": "5",
+      "alert_email": "mail@ilia.ae",
+      "ladder": "free,20,40,60,80,100,200,300,400,500",
+      "free_per_guest_days": 30
+    }
   },
 
   "sources": [                            // A4; each must already exist, matched on url + username
@@ -133,12 +141,21 @@ calrs --data-dir D config apply --export [--user E]    # stored state, same sche
   - These are not in v1 and are left as they are: busy calendars, resources, watchers, team fields and date overrides.
 - **TON price (`ton_price`, added after v1 froze; same format string):** the price section of the event type form (`ton_prices`).
   - `null` is free: no price, a stored one is removed (the section unchecked and blank).
-  - Otherwise an object, always the whole price: exactly one of `ton` (the invoice amount itself, no exchange rate) and `usd` (converted at the rate of the moment the guest books, inside the server's corridor `CALRS_TON_RATE_MIN_USD`..`MAX_USD`); `window_min`, the minutes the guest has to pay (10..240, `null` = the server's `CALRS_TON_WINDOW_MIN`), left out = `null`; `enabled`, left out = `true`, `false` keeps the price switched off (the type books free, the section's unchecked box with an amount).
+  - Otherwise an object, always the whole price: exactly one of `ton` (the invoice amount itself, no exchange rate), `usd` (converted at the rate of the moment the guest books, inside the server's corridor `CALRS_TON_RATE_MIN_USD`..`MAX_USD`) and `"ladder": true` (ilia fork: the site's demand ladder, `CALRS_TON_LADDER`, in TON; only `true` is accepted, `null` and `false` are refused); `window_min`, the minutes the guest has to pay (10..240, `null` = the server's `CALRS_TON_WINDOW_MIN`), left out = `null`; `enabled`, left out = `true`, `false` keeps the price switched off (the type books free, the section's unchecked box with an amount).
   - The amount is a string spelled as the form shows a stored price: `"500.00"`, `"100.00"`, `"12.35"`. `"500"` is refused with `spell it "500.00"`, so a document and an export compare as text.
   - Checks: the form's own (`ton_pay::validate_price_form`, its English message): USD 1..10000 with at most two decimals, TON 1..100000 in steps of 0.01, the window 10..240. What is stored is what the form stores for the same fields (`ton_pay::price_write`, `ton_pay::write_price`, `store::save_price`), written after the form, as `timezone` is: the form's own save opens a transaction, which SQLite refuses inside the run's.
   - Like the form, a price switched on makes a type with no Telegram mode chosen ask for the guest's Telegram (`required`). A `telegram_guest_mode` in the item is written after the price and wins. Without one, the mode the price set is reported as `event_types[<slug>].telegram_guest_mode`.
   - Nothing is refused because payments are off on the server: the form does not refuse either (it notes that a paid type cannot be booked until they are), and `config apply` does not run with `calrs serve`'s environment. Open invoices keep their terms; the new price applies to bookings made from then on.
   - An older calrs refuses the key (`deny_unknown_fields`, exit 2, nothing written). The marker of a calrs that knows it is the literal `TON_PRICE_SHAPE` in `src/web/apply/event_types.rs`: `ton_price: null or {ton|usd, window_min, enabled}`, in the source and in the binary.
+  - `"ladder": true` came later still: an older calrs refuses it as an unknown key (exit 2, nothing written). Its marker is the literal `TON_PRICE_LADDER_SHAPE` in the same file, `ton_price: null or {ton|usd, window_min, enabled} or {ladder: true, window_min, enabled}`; `TON_PRICE_SHAPE` is kept as it was. An export prints a ladder price as `{"ladder": true, "window_min": …, "enabled": …}`, which applies back with no change.
+- **TON settings (`site.ton`, ilia fork, added after v1 froze; same format string):** the tuning keys of the admin's TON page (`/dashboard/admin/ton`), stored in `ton_settings` (`src/web/apply/ton.rs`; the keys are `crate::ton::settings::SPECS`).
+  - Keys: `window_min`, `grace_min`, `fuse_hours`, `renew_min_lead_hours`, `renew_window_min`, `max_renewals`, `rate_max_age_min`, `free_per_guest_days` (JSON integers); `underpay_tolerance_ton` (TON), `rate_min_usd`, `rate_max_usd` (USD per TON), `rate_max_spread_pct`, `rate_max_jump_pct` (%), `alert_email`, `ladder` (`"free,20,40"`) (strings). Any key may be `null`: the default, still owned by apply. Any other key (`network`, `address`, the indexer, the API keys, the limits) is refused as unknown: they belong to the server's environment.
+  - Values go through the parser the environment and the page use (`settings::to_env`), with the environment's ranges and messages, and must be canonical: `"0.01"`, not `"0.010"`; `"0.3"`, not `"0.30"`; `"free,20"`, not `"free, 20"`. Then the whole stored result is checked (`settings::validate`, strict): half a corridor is refused under `site.ton.rate_min_usd`.
+  - **A missing `ton` changes nothing.** Given, each of its keys is written with the owner `apply` (read-only on the page). The one exception to "a key left out means leave as is": a key apply owned before and the present section leaves out goes back to the page, keeping its value (a `null` row is removed), reported as `site.ton.<key>.owner` (`"apply"` to `"panel"` or `null`).
+  - **`config apply` cannot see `calrs serve`'s environment** (it is its own process). It validates as if no `CALRS_TON_*` were set, and at run time a variable set in the server's environment still wins over what apply stored (env > DB > default). Keep a key either in the environment or in the document, not both.
+  - Report: `site.ton.<key>` (before and after in the document's shape; `null` for the default or no row) and `site.ton.<key>.owner` (`"apply"`, `"panel"` or `null`). A value change sets `restart` (`calrs serve` resolves the settings at startup); an owner change alone does not. Each change gets a row in `ton_settings_audit` (source `apply`, the admin of `user`): the durable trail. A `calrs::audit` log event follows each change only once the run has committed (never on `--dry-run` or a rollback); the ilia-booking role runs `config apply` with `RUST_LOG=off`, so its runs log none.
+  - An older calrs refuses `ton` as an unknown key of `site` (exit 2, nothing written). The marker of a calrs that knows it is the literal `TON_SETTINGS_SHAPE` in `src/web/apply/ton.rs`, `site.ton: {window_min .. free_per_guest_days}, each a value or null (apply-owned)`, in the source and in the binary.
+  - Export: the keys apply owns, `null` for a default it owns; no `ton` key when it owns none, so applying an export is no change. A stored value the document cannot state (a hand edit) is left out.
 - **Not in the document:** `base_url` and `allow_private_hosts` belong to the environment, so they are unknown keys. There are no secrets in v1.
 
 ### Canonical values
@@ -179,7 +196,7 @@ The checks reuse the existing validators: `check_text`/`check_opt_text`/`check_t
 - A cleared secret column shows `"(secret set)"` changing to `null` (`SECRET_SET`).
 - `profile.avatar` shows `"sha256:<hex>"`, or `null`.
 
-**`restart`** is true when a value `calrs serve` caches at startup changed: the theme and `custom.*`, `company_link`, `german_formal`, `captcha`, `jitsi` and `meeting_webhook`. Record these with `Ctx::record_restart`.
+**`restart`** is true when a value `calrs serve` caches at startup changed: the theme and `custom.*`, `company_link`, `german_formal`, `captcha`, `jitsi`, `meeting_webhook` and (ilia fork) a `site.ton` value. Record these with `Ctx::record_restart`.
 
 **`unmanaged.event_types`** lists the slugs of the admin's personal event types that the document leaves out, as they were before pruning, sorted by slug.
 

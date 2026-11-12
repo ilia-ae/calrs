@@ -1201,9 +1201,13 @@ pub(crate) struct SourceSynced {
 #[serde(deny_unknown_fields)]
 #[schemars(crate = "rmcp::schemars")]
 pub(crate) struct PriceOut {
-    /// TON (the default) or USD.
+    /// fixed (the amount below) or ladder (the price follows the site's
+    /// demand ladder: the step for the owner's confirmed bookings in the
+    /// coming days; ton and usd are null).
+    pub(crate) mode: String,
+    /// TON (the default) or USD. Always TON for the ladder.
     pub(crate) currency: String,
-    /// The price in TON, e.g. "100.00"; null for a USD price.
+    /// The price in TON, e.g. "100.00"; null for a USD or ladder price.
     pub(crate) ton: Option<String>,
     /// The price in US dollars, e.g. "40.00"; null for a TON price.
     pub(crate) usd: Option<String>,
@@ -1290,6 +1294,13 @@ pub(crate) struct SetPriceArgs {
     #[serde(default)]
     #[schemars(range(min = 10, max = 240))]
     pub(crate) window_min: Option<i64>,
+    /// "fixed" (the default: price_ton or price_usd) or "ladder": the price
+    /// follows the site's demand ladder (TON; free at the first step, where
+    /// the owner approves each booking, then higher as the calendar fills).
+    /// With "ladder" leave price_ton and price_usd out.
+    #[serde(default)]
+    #[schemars(length(min = 1, max = 10))]
+    pub(crate) mode: Option<String>,
 }
 
 /// An event type's price after set_event_type_price.

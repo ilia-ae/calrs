@@ -321,6 +321,7 @@ pub(crate) async fn list_event_types(
         String,
         i64,
         Option<String>,
+        Option<String>,
         Option<i64>,
         Option<i64>,
         Option<i64>,
@@ -359,6 +360,7 @@ pub(crate) async fn list_event_types(
                     visibility,
                     timezone,
                     active,
+                    mode,
                     currency,
                     nano,
                     cents,
@@ -376,7 +378,7 @@ pub(crate) async fn list_event_types(
                         timezone,
                         active_bookings: active,
                         price: super::ops_ton::price_out((
-                            currency, nano, cents, window, priced, guest_mode,
+                            mode, currency, nano, cents, window, priced, guest_mode,
                         )),
                     }
                 },

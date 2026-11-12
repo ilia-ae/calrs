@@ -1744,22 +1744,27 @@ pub(super) async fn handle_booking_for_user(
     let reschedule_token = uuid::Uuid::new_v4().to_string();
     let (start_at, end_at) = (encoded_start, encoded_end);
 
-    // ilia fork: a priced type waits for its TON payment (docs/ton.md).
-    let priced = match ton_pay::prepare_for_booking(
-        &state,
-        &et_id,
-        &start_at,
-        min_notice,
-        &form.email,
-        &client_ip,
-        lang,
-    )
-    .await
-    {
+    // ilia fork: a priced type waits for its TON payment, a free ladder
+    // step for the owner's approval (docs/ton.md).
+    let repost = ton_pay::Repost {
+        action: format!("/u/{username}/{slug}/book{}", embed.query_suffix(false)),
+        fields: form.repost_fields(),
+        embed: &embed,
+    };
+    let ask = ton_pay::BookingAsk {
+        event_type_id: &et_id,
+        start_utc: ton_pay::start_of(&start_at),
+        min_notice_min: i64::from(min_notice),
+        guest_email: &form.email,
+        client_ip: &client_ip,
+        telegram: telegram_username.as_deref(),
+        quoted: form.quoted(),
+    };
+    let priced = match ton_pay::prepare_for_booking(&state, &ask, lang, &repost).await {
         Ok(p) => p,
         Err(refusal) => return refusal,
     };
-    let needs_approval = needs_approval || priced.is_some();
+    let needs_approval = needs_approval || priced.holds();
 
     let initial_status = if needs_approval {
         "pending"
@@ -1938,7 +1943,7 @@ pub(super) async fn handle_booking_for_user(
             return internal_error_response("database query", &e);
         }
     }
-    let opened = match ton_pay::open_for_booking(&mut tx, &id, priced.as_ref(), &state, lang).await
+    let opened = match ton_pay::open_for_booking(&mut tx, &id, &priced, &state, lang, &repost).await
     {
         Ok(o) => o,
         Err(refusal) => {
@@ -2286,6 +2291,43 @@ pub(super) struct BookForm {
     /// type's Telegram mode is not `off` (`web::telegram`).
     #[serde(default)]
     telegram: Option<String>,
+    /// ilia fork (the demand ladder): the price the form showed, `0` for
+    /// free, else nanotons. Only compared against, never charged.
+    #[serde(default)]
+    quoted_nano: Option<String>,
+}
+
+impl BookForm {
+    /// ilia fork: the form's values, for the "the price changed" page to
+    /// post again (`ton_pay::Repost`).
+    fn repost_fields(&self) -> Vec<(&'static str, String)> {
+        let mut out = vec![
+            ("date", self.date.clone()),
+            ("time", self.time.clone()),
+            ("name", self.name.clone()),
+            ("email", self.email.clone()),
+        ];
+        for (name, value) in [
+            ("notes", &self.notes),
+            ("tz", &self.tz),
+            ("invite_token", &self.invite_token),
+            ("additional_guests", &self.additional_guests),
+            ("phone", &self.phone),
+            ("telegram", &self.telegram),
+        ] {
+            if let Some(v) = value {
+                out.push((name, v.clone()));
+            }
+        }
+        out
+    }
+
+    /// ilia fork: the quote the form carried.
+    fn quoted(&self) -> Option<crate::ton::ladder::Step> {
+        self.quoted_nano
+            .as_deref()
+            .and_then(crate::ton::ladder::Step::from_quote)
+    }
 }
 
 /// Whether `user` may put an event type into an SMS-sending mode.
@@ -2597,22 +2639,27 @@ pub(super) async fn handle_booking(
     let reschedule_token = uuid::Uuid::new_v4().to_string();
     let (start_at, end_at) = (encoded_start, encoded_end);
 
-    // ilia fork: a priced type waits for its TON payment (docs/ton.md).
-    let priced = match ton_pay::prepare_for_booking(
-        &state,
-        &et_id,
-        &start_at,
-        min_notice,
-        &form.email,
-        &client_ip,
-        lang,
-    )
-    .await
-    {
+    // ilia fork: a priced type waits for its TON payment, a free ladder
+    // step for the owner's approval (docs/ton.md).
+    let repost = ton_pay::Repost {
+        action: format!("/{slug}/book{}", embed.query_suffix(false)),
+        fields: form.repost_fields(),
+        embed: &embed,
+    };
+    let ask = ton_pay::BookingAsk {
+        event_type_id: &et_id,
+        start_utc: ton_pay::start_of(&start_at),
+        min_notice_min: i64::from(min_notice),
+        guest_email: &form.email,
+        client_ip: &client_ip,
+        telegram: telegram_username.as_deref(),
+        quoted: form.quoted(),
+    };
+    let priced = match ton_pay::prepare_for_booking(&state, &ask, lang, &repost).await {
         Ok(p) => p,
         Err(refusal) => return refusal,
     };
-    let needs_approval = needs_approval || priced.is_some();
+    let needs_approval = needs_approval || priced.holds();
 
     let initial_status = if needs_approval {
         "pending"
@@ -2792,7 +2839,7 @@ pub(super) async fn handle_booking(
             return internal_error_response("database query", &e);
         }
     }
-    let opened = match ton_pay::open_for_booking(&mut tx, &id, priced.as_ref(), &state, lang).await
+    let opened = match ton_pay::open_for_booking(&mut tx, &id, &priced, &state, lang, &repost).await
     {
         Ok(o) => o,
         Err(refusal) => {

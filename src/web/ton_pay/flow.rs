@@ -13,22 +13,36 @@ use chrono::{DateTime, Utc};
 use minijinja::context;
 use sqlx::{SqliteConnection, SqlitePool};
 
-use super::invoice::{self, OpenedInvoice, PreparedInvoice, Refusal};
+use super::invoice::{self, BookingAsk, OpenedInvoice, Prepared, Refusal};
 use super::{parse_stamp, stamp, TARGET};
+use crate::ton::ladder::{self, Step};
 use crate::web::{
     html_response, internal_error_body, internal_error_response,
     render_booking_action_error_keys_in, AppState, EmbedParams,
 };
 
+/// ilia fork (the ladder): what a booking POST carried, to post it again
+/// from the "the price changed" page. `fields` are the form's own values
+/// (never `_csrf`, which the page adds, nor the captcha token, which is
+/// single-use); `quoted_nano` is replaced by the new price.
+pub(in crate::web) struct Repost<'a> {
+    /// The form's action, with the embed query.
+    pub(in crate::web) action: String,
+    pub(in crate::web) fields: Vec<(&'static str, String)>,
+    pub(in crate::web) embed: &'a EmbedParams,
+}
+
 /// The error page a refused priced booking shows, in the page language.
 /// Nothing was created. `guest_email` is what the form carried: the "you
 /// already have an unpaid booking" page offers to email that address the
-/// links of its open booking (pay, or cancel to free the time).
-pub(crate) fn refusal_page(
+/// links of its open booking (pay, or cancel to free the time). A changed
+/// ladder price ([`Refusal::Requote`]) is the quote page instead.
+pub(in crate::web) async fn refusal_page(
     state: &AppState,
     lang: &str,
     refusal: &Refusal,
     guest_email: Option<&str>,
+    repost: &Repost<'_>,
 ) -> Response {
     match refusal {
         Refusal::TooLate => render_booking_action_error_keys_in(
@@ -44,6 +58,17 @@ pub(crate) fn refusal_page(
             "ton-bae-title-unavailable",
             "ton-bae-body-personal-only",
         ),
+        Refusal::FreeUsed => render_booking_action_error_keys_in(
+            state,
+            lang,
+            "ton-bae-title-unavailable",
+            "ton-bae-body-free-used",
+        ),
+        Refusal::Requote {
+            quoted,
+            now,
+            free_used,
+        } => quote_page(state, lang, *quoted, *now, *free_used, repost).await,
         Refusal::Unavailable(_)
         | Refusal::Capacity
         | Refusal::ClientLimit
@@ -54,6 +79,66 @@ pub(crate) fn refusal_page(
             "ton-bae-title-unavailable",
             "ton-bae-body-unavailable",
         ),
+    }
+}
+
+/// "The price changed": the old and the new price and one button that
+/// books at the new one (the same form, posted again with the new quote).
+/// Nothing was booked; the guest is never charged more than they saw. The
+/// reason given is neutral (the price may have gone up or down, from a
+/// booking, a cancellation or a ladder change), or, with `free_used`, that
+/// this guest's free step is used, so they book at the first price.
+async fn quote_page(
+    state: &AppState,
+    lang: &str,
+    quoted: Option<Step>,
+    now: Step,
+    free_used: bool,
+    repost: &Repost<'_>,
+) -> Response {
+    let tmpl = match state.templates.get_template("ton_quote.html") {
+        Ok(t) => t,
+        Err(e) => return internal_error_response("internal", &e),
+    };
+    let fields: Vec<minijinja::Value> = repost
+        .fields
+        .iter()
+        .filter(|(name, _)| *name != "quoted_nano")
+        .map(|(name, value)| context! { name => *name, value => value })
+        .collect();
+    let captcha =
+        crate::web::captcha::CaptchaVars::from_config(&*state.captcha_config.read().await);
+    let embed = repost.embed;
+    let rendered = tmpl
+        .render(context! {
+            lang => lang,
+            action => &repost.action,
+            fields => fields,
+            quoted_nano => now.quote_value(),
+            was_shown => quoted.is_some(),
+            why_key => quote_why_key(quoted, free_used),
+            was_ton => quoted.and_then(Step::nano).map(ladder::ton_text),
+            now_ton => now.nano().map(ladder::ton_text),
+            captcha_enabled => captcha.enabled,
+            captcha_api_endpoint => captcha.api_endpoint,
+            captcha_widget_url => captcha.widget_url,
+            captcha_wasm_url => captcha.wasm_url,
+            embed => embed.is_embedded(),
+            embed_brand => embed.brand_css().unwrap_or_default(),
+            embed_theme => embed.theme.as_deref().unwrap_or(""),
+        })
+        .unwrap_or_else(|e| internal_error_body("template render", &e));
+    html_response(rendered, embed)
+}
+
+/// The quote page's explanation: the guest's free step is used, the price
+/// changed since it was shown (in either direction, for any reason), or
+/// the form carried no price to compare.
+pub(in crate::web) fn quote_why_key(quoted: Option<Step>, free_used: bool) -> &'static str {
+    match (free_used, quoted.is_some()) {
+        (true, _) => "ton-quote-why-free-used",
+        (false, true) => "ton-quote-why",
+        (false, false) => "ton-quote-confirm-help",
     }
 }
 
@@ -71,70 +156,65 @@ fn already_open_page(state: &AppState, lang: &str, guest_email: Option<&str>) ->
     axum::response::Html(rendered).into_response()
 }
 
-/// Before the booking transaction: `Ok(None)` for a type without a price
-/// (the upstream path, unchanged); the prepared invoice for a priced one;
-/// the refusal page when it cannot be paid for now. `start_at` is the
-/// booking's stored UTC start.
+/// Before the booking transaction: `Prepared::Unpriced` for a type without
+/// a price (the upstream path, unchanged); the prepared invoice for a
+/// priced one; a free ladder step (pending, the owner approves it); the
+/// refusal page when it cannot be booked now, or the quote page when a
+/// ladder price is not the one the guest was shown.
 #[allow(clippy::result_large_err)] // one per request, returned at once
-pub(crate) async fn prepare_for_booking(
+pub(in crate::web) async fn prepare_for_booking(
     state: &AppState,
-    event_type_id: &str,
-    start_at: &str,
-    min_notice_min: i32,
-    guest_email: &str,
-    client_ip: &str,
+    ask: &BookingAsk<'_>,
     lang: &str,
-) -> Result<Option<PreparedInvoice>, Response> {
-    // An unreadable start leaves no time to pay: refused when priced.
-    let start = parse_stamp(start_at).unwrap_or(DateTime::UNIX_EPOCH);
-    match invoice::prepare_invoice(
-        state,
-        event_type_id,
-        start,
-        i64::from(min_notice_min),
-        guest_email,
-        client_ip,
-        Utc::now(),
-    )
-    .await
-    {
+    repost: &Repost<'_>,
+) -> Result<Prepared, Response> {
+    match invoice::prepare(state, ask, Utc::now()).await {
         Ok(prepared) => Ok(prepared),
         Err(refusal) => {
-            tracing::warn!(target: TARGET, event_type_id, reason = %refusal, "priced booking refused");
-            Err(refusal_page(state, lang, &refusal, Some(guest_email)))
+            tracing::warn!(target: TARGET, event_type_id = ask.event_type_id, reason = %refusal, "priced booking refused");
+            Err(refusal_page(state, lang, &refusal, Some(ask.guest_email), repost).await)
         }
     }
 }
 
-/// Inside the booking transaction, right after the pending row and its
-/// deadline: open the invoice (it re-checks the limits under the write
-/// lock). On a refusal the caller rolls back and returns the page.
+/// The booking's stored start for [`BookingAsk`]: an unreadable start
+/// leaves no time to pay (refused when priced).
+pub(crate) fn start_of(start_at: &str) -> DateTime<Utc> {
+    parse_stamp(start_at).unwrap_or(DateTime::UNIX_EPOCH)
+}
+
+/// Inside the booking transaction, right after the booking row and its
+/// deadline: recount a ladder price and open the invoice (it re-checks
+/// the limits under the write lock), or record a free step. On a refusal
+/// the caller rolls back and returns the page.
 #[allow(clippy::result_large_err)] // one per request, returned at once
-pub(crate) async fn open_for_booking(
+pub(in crate::web) async fn open_for_booking(
     conn: &mut SqliteConnection,
     booking_id: &str,
-    prepared: Option<&PreparedInvoice>,
+    prepared: &Prepared,
     state: &AppState,
     lang: &str,
+    repost: &Repost<'_>,
 ) -> Result<Option<OpenedInvoice>, Response> {
-    let Some(p) = prepared else {
-        return Ok(None);
-    };
-    match invoice::open_invoice(conn, booking_id, p).await {
-        Ok(opened) => Ok(Some(opened)),
+    match invoice::open(conn, booking_id, prepared).await {
+        Ok(opened) => Ok(opened),
         Err(refusal) => {
+            let invoice = match prepared {
+                Prepared::Invoice(p) => Some(&**p),
+                _ => None,
+            };
             if refusal == Refusal::Capacity {
-                if let Some(rt) = state.ton.get() {
+                if let (Some(rt), Some(p)) = (state.ton.get(), invoice) {
                     rt.note_capacity_refusal(p.created_at);
                 }
             }
-            tracing::warn!(target: TARGET, booking_id, reason = %refusal, "invoice refused in the booking transaction");
-            Err(refusal_page(
-                state,
-                lang,
-                &refusal,
-                Some(p.guest_email_norm.as_str()),
-            ))
+            tracing::warn!(target: TARGET, booking_id, reason = %refusal, "booking refused in the booking transaction");
+            let email = match prepared {
+                Prepared::Invoice(p) => Some(p.guest_email_norm.as_str()),
+                Prepared::Free(f) => Some(f.quote.guest.email_norm.as_str()),
+                Prepared::Unpriced => None,
+            };
+            Err(refusal_page(state, lang, &refusal, email, repost).await)
         }
     }
 }

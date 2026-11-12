@@ -1,8 +1,13 @@
-//! TON payment settings, from the environment of `calrs serve` only: the
-//! address and network can never be changed from the database, the web, MCP
-//! or the CLI. `CALRS_TON_NETWORK` unset means payments are off. Any invalid
-//! value is an error, which also leaves payments off (fail closed): priced
-//! event types are then not bookable, never free.
+//! TON payment settings. The address, the network, the indexer and the rate
+//! sources come from the environment of `calrs serve` only: they can never
+//! be changed from the database, the web, MCP or the CLI. The tuning keys
+//! ([`super::settings::SPECS`]: windows, grace, fuse, renewals, tolerance,
+//! the rate corridor and rules, the alert email, the ladder) may also be
+//! stored in `ton_settings` by the admin page or `config apply`; the
+//! environment still wins ([`TonConfig::resolve`]). `CALRS_TON_NETWORK`
+//! unset means payments are off. Any invalid value is an error, which also
+//! leaves payments off (fail closed): priced event types are then not
+//! bookable, never free.
 //!
 //! `CALRS_TON_API_URL` may embed a provider key in its path (Chainstack), so
 //! neither it nor the API keys ever appear in an error, the log or `Debug`.
@@ -10,6 +15,7 @@
 use chrono::Duration;
 
 use super::address::TonAddress;
+use super::ladder::Ladder;
 use super::rate::{parse_decimal_micro, RatePolicy, SourceKind};
 use super::Network;
 
@@ -56,7 +62,84 @@ pub struct TonConfig {
     pub renew_window_min: i64,
     /// Renewals per invoice; 0 releases at the first deadline.
     pub max_renewals: i64,
+    /// ilia fork: the demand ladder of `ladder` event types.
+    pub ladder: Ladder,
+    /// Days within which a guest gets at most one booking at a free step
+    /// (0: no such limit).
+    pub free_per_guest_days: i64,
 }
+
+/// The tuning part of the settings: every key the admin page and `config
+/// apply` may store ([`super::settings::KEYS`]), parsed by the one parser
+/// the environment goes through too.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Tuning {
+    pub window_min: i64,
+    pub grace_min: i64,
+    pub fuse_hours: i64,
+    pub underpay_tolerance_nano: u128,
+    pub rate_policy: Option<RatePolicy>,
+    pub alert_email: Option<String>,
+    pub renew_min_lead_hours: i64,
+    pub renew_window_min: i64,
+    pub max_renewals: i64,
+    pub ladder: Ladder,
+    pub free_per_guest_days: i64,
+}
+
+/// A whole-number setting: its variable, default and range.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct IntSpec {
+    pub var: &'static str,
+    pub default: i64,
+    pub min: i64,
+    pub max: i64,
+}
+
+/// A percentage setting, in basis points.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PctSpec {
+    pub var: &'static str,
+    pub default_bp: u64,
+    pub min_bp: u64,
+    pub max_bp: u64,
+}
+
+const fn int(var: &'static str, default: i64, min: i64, max: i64) -> IntSpec {
+    IntSpec {
+        var,
+        default,
+        min,
+        max,
+    }
+}
+
+pub const WINDOW_MIN: IntSpec = int("CALRS_TON_WINDOW_MIN", 30, 10, 240);
+pub const GRACE_MIN: IntSpec = int("CALRS_TON_GRACE_MIN", 15, 5, 60);
+pub const FUSE_HOURS: IntSpec = int("CALRS_TON_FUSE_HOURS", 6, 1, 48);
+pub const UNDERPAY_TOLERANCE_NANO: IntSpec =
+    int("CALRS_TON_UNDERPAY_TOLERANCE_NANO", 0, 0, 100_000_000);
+pub const RATE_MAX_AGE_MIN: IntSpec = int("CALRS_TON_RATE_MAX_AGE_MIN", 10, 1, 60);
+pub const RENEW_MIN_LEAD_HOURS: IntSpec = int("CALRS_TON_RENEW_MIN_LEAD_HOURS", 24, 1, 720);
+pub const RENEW_WINDOW_MIN: IntSpec = int("CALRS_TON_RENEW_WINDOW_MIN", 360, 10, 1440);
+pub const MAX_RENEWALS: IntSpec = int("CALRS_TON_MAX_RENEWALS", 2, 0, 5);
+pub const FREE_PER_GUEST_DAYS: IntSpec = int("CALRS_TON_FREE_PER_GUEST_DAYS", 30, 0, 90);
+pub const RATE_MAX_SPREAD_PCT: PctSpec = PctSpec {
+    var: "CALRS_TON_RATE_MAX_SPREAD_PCT",
+    default_bp: 300,
+    min_bp: 10,
+    max_bp: 2000,
+};
+pub const RATE_MAX_JUMP_PCT: PctSpec = PctSpec {
+    var: "CALRS_TON_RATE_MAX_JUMP_PCT",
+    default_bp: 1000,
+    min_bp: 100,
+    max_bp: 5000,
+};
+pub const RATE_MIN_USD: &str = "CALRS_TON_RATE_MIN_USD";
+pub const RATE_MAX_USD: &str = "CALRS_TON_RATE_MAX_USD";
+pub const ALERT_EMAIL: &str = "CALRS_TON_ALERT_EMAIL";
+pub const LADDER: &str = "CALRS_TON_LADDER";
 
 impl std::fmt::Debug for TonConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -121,9 +204,11 @@ pub const VARS: &[&str] = &[
     "CALRS_TON_RENEW_MIN_LEAD_HOURS",
     "CALRS_TON_RENEW_WINDOW_MIN",
     "CALRS_TON_MAX_RENEWALS",
+    "CALRS_TON_LADDER",
+    "CALRS_TON_FREE_PER_GUEST_DAYS",
 ];
 
-struct Vars<F: Fn(&str) -> Option<String>>(F);
+pub(crate) struct Vars<F: Fn(&str) -> Option<String>>(pub(crate) F);
 
 impl<F: Fn(&str) -> Option<String>> Vars<F> {
     /// A set, non-blank value, trimmed.
@@ -144,6 +229,42 @@ impl<F: Fn(&str) -> Option<String>> Vars<F> {
             return Err(err(format!("{name} must be between {min} and {max}")));
         }
         Ok(v)
+    }
+
+    pub(crate) fn int_spec(&self, spec: IntSpec) -> Result<i64, ConfigError> {
+        self.int(spec.var, spec.default, spec.min, spec.max)
+    }
+
+    pub(crate) fn pct_spec(&self, spec: PctSpec) -> Result<u64, ConfigError> {
+        self.pct_bp(spec.var, spec.default_bp, spec.min_bp, spec.max_bp)
+    }
+
+    /// A positive USD decimal (a corridor bound), in micro-USD.
+    pub(crate) fn usd(&self, name: &str) -> Result<Option<u64>, ConfigError> {
+        self.get(name)
+            .map(|raw| {
+                parse_decimal_micro(&raw)
+                    .ok_or_else(|| err(format!("{name} must be a positive decimal")))
+            })
+            .transpose()
+    }
+
+    pub(crate) fn email(&self, name: &str) -> Result<Option<String>, ConfigError> {
+        let email = self.get(name);
+        if email
+            .as_deref()
+            .is_some_and(|e| !e.contains('@') || e.contains(char::is_whitespace) || e.len() > 254)
+        {
+            return Err(err(format!("{name} is not an email address")));
+        }
+        Ok(email)
+    }
+
+    pub(crate) fn ladder(&self, name: &str) -> Result<Ladder, ConfigError> {
+        match self.get(name) {
+            None => Ok(Ladder::default()),
+            Some(raw) => Ladder::parse(&raw).map_err(|e| err(format!("{name}: {e}"))),
+        }
     }
 
     fn flag(&self, name: &str) -> Result<bool, ConfigError> {
@@ -215,9 +336,84 @@ pub fn host_of(url: &str) -> String {
         .unwrap_or_else(|| "?".into())
 }
 
+impl Tuning {
+    /// The tuning keys from `v`. `strict` (the admin page and `config
+    /// apply`) also checks the rate rules while no corridor is set, so a
+    /// value stored now cannot fail later when the corridor is set;
+    /// otherwise they are read only with a corridor, as always.
+    pub(crate) fn parse<F: Fn(&str) -> Option<String>>(
+        v: &Vars<F>,
+        strict: bool,
+    ) -> Result<Tuning, ConfigError> {
+        let window_min = v.int_spec(WINDOW_MIN)?;
+        let grace_min = v.int_spec(GRACE_MIN)?;
+        let fuse_hours = v.int_spec(FUSE_HOURS)?;
+        let underpay_tolerance_nano = v.int_spec(UNDERPAY_TOLERANCE_NANO)? as u128;
+        // The corridor: both or neither. Only USD prices need it.
+        let rules = |v: &Vars<F>| -> Result<(u64, Duration, u64), ConfigError> {
+            Ok((
+                v.pct_spec(RATE_MAX_SPREAD_PCT)?,
+                Duration::minutes(v.int_spec(RATE_MAX_AGE_MIN)?),
+                v.pct_spec(RATE_MAX_JUMP_PCT)?,
+            ))
+        };
+        let rate_policy = match (v.usd(RATE_MIN_USD)?, v.usd(RATE_MAX_USD)?) {
+            (None, None) => {
+                if strict {
+                    rules(v)?;
+                }
+                None
+            }
+            (Some(min_usd_micro), Some(max_usd_micro)) => {
+                if min_usd_micro >= max_usd_micro {
+                    return Err(err(
+                        "CALRS_TON_RATE_MIN_USD must be below CALRS_TON_RATE_MAX_USD",
+                    ));
+                }
+                let (max_spread_bp, max_age, max_jump_bp) = rules(v)?;
+                Some(RatePolicy {
+                    min_usd_micro,
+                    max_usd_micro,
+                    max_spread_bp,
+                    max_age,
+                    max_jump_bp,
+                })
+            }
+            _ => {
+                return Err(err(
+                    "CALRS_TON_RATE_MIN_USD and CALRS_TON_RATE_MAX_USD go together: set both (USD prices) or neither",
+                ))
+            }
+        };
+        Ok(Tuning {
+            window_min,
+            grace_min,
+            fuse_hours,
+            underpay_tolerance_nano,
+            rate_policy,
+            alert_email: v.email(ALERT_EMAIL)?,
+            renew_min_lead_hours: v.int_spec(RENEW_MIN_LEAD_HOURS)?,
+            renew_window_min: v.int_spec(RENEW_WINDOW_MIN)?,
+            max_renewals: v.int_spec(MAX_RENEWALS)?,
+            ladder: v.ladder(LADDER)?,
+            free_per_guest_days: v.int_spec(FREE_PER_GUEST_DAYS)?,
+        })
+    }
+}
+
 impl TonConfig {
     pub fn from_env() -> Result<Option<TonConfig>, ConfigError> {
         Self::from_vars(|k| std::env::var(k).ok())
+    }
+
+    /// The settings `calrs serve` runs with: for each key the environment
+    /// (`env`), else the stored value (`db`, tuning keys only), else the
+    /// default ([`super::settings::lookup`]).
+    pub fn resolve(
+        env: &dyn Fn(&str) -> Option<String>,
+        db: &super::settings::DbValues,
+    ) -> Result<Option<TonConfig>, ConfigError> {
+        Self::from_vars(|k| super::settings::lookup(env, db, k))
     }
 
     pub fn from_vars(
@@ -295,49 +491,7 @@ impl TonConfig {
             allow_local,
         )?;
 
-        // The corridor: both or neither. Only USD prices need it.
-        let corridor = |name: &str| -> Result<Option<u64>, ConfigError> {
-            v.get(name)
-                .map(|raw| {
-                    parse_decimal_micro(&raw)
-                        .ok_or_else(|| err(format!("{name} must be a positive decimal")))
-                })
-                .transpose()
-        };
-        let rate_policy = match (
-            corridor("CALRS_TON_RATE_MIN_USD")?,
-            corridor("CALRS_TON_RATE_MAX_USD")?,
-        ) {
-            (None, None) => None,
-            (Some(min_usd_micro), Some(max_usd_micro)) => {
-                if min_usd_micro >= max_usd_micro {
-                    return Err(err(
-                        "CALRS_TON_RATE_MIN_USD must be below CALRS_TON_RATE_MAX_USD",
-                    ));
-                }
-                Some(RatePolicy {
-                    min_usd_micro,
-                    max_usd_micro,
-                    max_spread_bp: v.pct_bp("CALRS_TON_RATE_MAX_SPREAD_PCT", 300, 10, 2000)?,
-                    max_age: Duration::minutes(v.int("CALRS_TON_RATE_MAX_AGE_MIN", 10, 1, 60)?),
-                    max_jump_bp: v.pct_bp("CALRS_TON_RATE_MAX_JUMP_PCT", 1000, 100, 5000)?,
-                })
-            }
-            _ => {
-                return Err(err(
-                    "CALRS_TON_RATE_MIN_USD and CALRS_TON_RATE_MAX_USD go together: set both (USD prices) or neither",
-                ))
-            }
-        };
-
-        let alert_email = v.get("CALRS_TON_ALERT_EMAIL");
-        if alert_email
-            .as_deref()
-            .is_some_and(|e| !e.contains('@') || e.contains(char::is_whitespace) || e.len() > 254)
-        {
-            return Err(err("CALRS_TON_ALERT_EMAIL is not an email address"));
-        }
-
+        let t = Tuning::parse(&v, false)?;
         Ok(Some(TonConfig {
             network,
             address,
@@ -346,16 +500,11 @@ impl TonConfig {
             api_url,
             api_key,
             poll_secs: v.int("CALRS_TON_POLL_SECS", 10, 5, 60)? as u64,
-            window_min: v.int("CALRS_TON_WINDOW_MIN", 30, 10, 240)?,
-            grace_min: v.int("CALRS_TON_GRACE_MIN", 15, 5, 60)?,
+            window_min: t.window_min,
+            grace_min: t.grace_min,
             expiry_margin_min: v.int("CALRS_TON_EXPIRY_MARGIN_MIN", 3, 1, 30)?,
-            fuse_hours: v.int("CALRS_TON_FUSE_HOURS", 6, 1, 48)?,
-            underpay_tolerance_nano: v.int(
-                "CALRS_TON_UNDERPAY_TOLERANCE_NANO",
-                0,
-                0,
-                100_000_000,
-            )? as u128,
+            fuse_hours: t.fuse_hours,
+            underpay_tolerance_nano: t.underpay_tolerance_nano,
             record_min_nano: v.int(
                 "CALRS_TON_RECORD_MIN_NANO",
                 100_000_000,
@@ -373,12 +522,31 @@ impl TonConfig {
             coingecko_key: v.get("CALRS_TON_COINGECKO_KEY"),
             binance_url,
             binance_symbol,
-            rate_policy,
-            alert_email,
-            renew_min_lead_hours: v.int("CALRS_TON_RENEW_MIN_LEAD_HOURS", 24, 1, 720)?,
-            renew_window_min: v.int("CALRS_TON_RENEW_WINDOW_MIN", 360, 10, 1440)?,
-            max_renewals: v.int("CALRS_TON_MAX_RENEWALS", 2, 0, 5)?,
+            rate_policy: t.rate_policy,
+            alert_email: t.alert_email,
+            renew_min_lead_hours: t.renew_min_lead_hours,
+            renew_window_min: t.renew_window_min,
+            max_renewals: t.max_renewals,
+            ladder: t.ladder,
+            free_per_guest_days: t.free_per_guest_days,
         }))
+    }
+
+    /// The tuning part (what the stored settings may change).
+    pub fn tuning(&self) -> Tuning {
+        Tuning {
+            window_min: self.window_min,
+            grace_min: self.grace_min,
+            fuse_hours: self.fuse_hours,
+            underpay_tolerance_nano: self.underpay_tolerance_nano,
+            rate_policy: self.rate_policy.clone(),
+            alert_email: self.alert_email.clone(),
+            renew_min_lead_hours: self.renew_min_lead_hours,
+            renew_window_min: self.renew_window_min,
+            max_renewals: self.max_renewals,
+            ladder: self.ladder.clone(),
+            free_per_guest_days: self.free_per_guest_days,
+        }
     }
 
     /// The indexer's host, for the log.

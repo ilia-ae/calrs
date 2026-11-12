@@ -45,7 +45,11 @@
     "google_oauth2": "off",
     "captcha": "off",
     "meeting_webhook": "off",
-    "sms_allow_all_users": false
+    "sms_allow_all_users": false,
+    "ton": {
+      "ladder": "free,20,40,60,80,100,200,300,400,500",
+      "free_per_guest_days": 30
+    }
   },
   "sources": [
     {
@@ -104,6 +108,20 @@
         ],
         "ton_price": {"ton": "25.00", "window_min": 20, "enabled": true},
         "telegram_guest_mode": "off",
+        "enabled": false
+      },
+      {
+        "slug": "by-demand",
+        "title": "Consultation, priced by demand",
+        "duration_min": 15,
+        "location_type": "custom",
+        "location_value": "The meeting link comes by email",
+        "visibility": "private",
+        "weekly_hours": [
+          {"day": "wed", "windows": [{"start": "10:00", "end": "12:00"}]}
+        ],
+        "ton_price": {"ladder": true, "window_min": null, "enabled": true},
+        "telegram_guest_mode": "required",
         "enabled": false
       }
     ]

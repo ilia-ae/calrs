@@ -33,6 +33,7 @@ mod files;
 mod profile;
 mod site;
 mod sources;
+mod ton;
 
 use crate::auth::{AdminUser, AuthUser};
 use crate::models::User;
@@ -479,7 +480,21 @@ pub(crate) struct Site {
         skip_serializing_if = "Option::is_none"
     )]
     pub(crate) sms_allow_all_users: Option<bool>,
+    /// ilia fork: the TON settings the admin page also edits
+    /// (`site.ton`, `apply/ton.rs`): left out, nothing changes; given, its
+    /// keys are owned by `config apply` and the ones it owned and leaves
+    /// out go back to the page.
+    #[serde(
+        default,
+        deserialize_with = "present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub(crate) ton: Option<TonSection>,
 }
+
+/// `site.ton`: the `crate::ton::settings::SPECS` fields, each a value or
+/// null (the default, still owned).
+pub(crate) type TonSection = std::collections::BTreeMap<String, Value>;
 
 /// The five colours of the custom theme, each `#rrggbb`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -764,9 +779,10 @@ pub(crate) struct FrequencyLimit {
 }
 
 /// The TON price of an event type (`ton_prices`), the event type form's
-/// price section: exactly one of `ton` (the invoice amount itself) and
-/// `usd` (converted at the rate of the moment the guest books), spelled as
-/// the form shows a stored price ("100.00", "500.00"). Always the whole
+/// price section: exactly one of `ton` (the invoice amount itself), `usd`
+/// (converted at the rate of the moment the guest books), spelled as the
+/// form shows a stored price ("100.00", "500.00"), and `ladder: true` (ilia
+/// fork: the site's demand ladder, in TON). Always the whole
 /// price: `window_min` and `enabled` left out take their defaults.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -783,6 +799,15 @@ pub(crate) struct TonPrice {
         skip_serializing_if = "Option::is_none"
     )]
     pub(crate) usd: Option<String>,
+    /// ilia fork: `true` instead of `ton`/`usd`: the price follows the
+    /// site's demand ladder (TON). Only `true` is accepted; leave it out
+    /// for a fixed price.
+    #[serde(
+        default,
+        deserialize_with = "present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub(crate) ladder: Option<bool>,
     /// Minutes the guest has to pay; null: the server's default
     /// (`CALRS_TON_WINDOW_MIN`).
     #[serde(default)]
@@ -1076,6 +1101,9 @@ pub(crate) struct Ctx {
     pub(crate) unmanaged_event_types: Vec<String>,
     /// Files to move into place once the transaction commits.
     pub(crate) staged: Vec<files::Staged>,
+    /// ilia fork: `site.ton` changes, logged (`calrs::audit`) once the
+    /// transaction commits; their durable trail is `ton_settings_audit`.
+    pub(crate) ton_audit: Vec<crate::web::ton_pay::settings::Change>,
 }
 
 impl Ctx {
@@ -1088,6 +1116,7 @@ impl Ctx {
             restart: false,
             unmanaged_event_types: Vec::new(),
             staged: Vec::new(),
+            ton_audit: Vec::new(),
         }
     }
 
@@ -1324,6 +1353,13 @@ pub(crate) async fn run(
     };
     let staged = std::mem::take(&mut ctx.staged);
     let committed = outcome.is_ok() && !dry_run;
+    if committed {
+        crate::web::ton_pay::settings::log_changes(
+            &ctx.ton_audit,
+            Some(&ctx.me.id),
+            crate::ton::settings::Owner::Apply,
+        );
+    }
     let finished = files::finish(staged, committed);
     outcome?;
     let report = ctx.report();

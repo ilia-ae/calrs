@@ -1,7 +1,19 @@
-{#- ilia fork: the price of a paid event type (docs/ton.md). -#}
+{#- ilia fork: the price of a paid event type (docs/ton.md). A ladder type
+    (priced by demand) shows the price now, that it is fixed when the guest
+    books, the ladder in short and who pays the network fee. -#}
 {% if ton_price is defined and ton_price %}
 <div class="ton-price" style="margin: 0.375rem 0 0.5rem; font-size: 0.9rem; color: var(--text-secondary);">
-  {% if ton_price.ton_exact %}<strong>{{ t("ton-slots-price-ton", ton=ton_price.ton_exact) }}</strong>{% else %}<strong>{{ t("ton-slots-price", usd=ton_price.usd) }}</strong>{% if ton_price.ton %} {{ t("ton-slots-price-approx", ton=ton_price.ton) }}{% endif %}{% endif %}
+  {% if ton_price.ladder %}
+  <strong>{% if ton_price.now_free %}{{ t("ton-slots-ladder-now-free") }}{% else %}{{ t("ton-slots-ladder-now", ton=ton_price.now_ton) }}{% endif %}</strong>
+  <span style="color: var(--text-muted);">· {{ t("ton-slots-ladder-locked") }}</span>
+  <div style="color: var(--text-muted); font-size: 0.825rem; margin-top: 0.125rem;">
+    {% if not ton_price.from_ton %}{{ t("ton-slots-ladder-all-free") }}{% elif ton_price.starts_free %}{{ t("ton-slots-ladder-summary-free", from=ton_price.from_ton, to=ton_price.to_ton) }}{% else %}{{ t("ton-slots-ladder-summary", from=ton_price.from_ton, to=ton_price.to_ton) }}{% endif %}
+    {% if ton_price.from_ton %}{{ t("ton-slots-ladder-fee") }}{% endif %}
+  </div>
+  {% elif ton_price.ton_exact %}<strong>{{ t("ton-slots-price-ton", ton=ton_price.ton_exact) }}</strong>
   <span style="color: var(--text-muted);">· {{ t("ton-slots-price-note") }}</span>
+  {% else %}<strong>{{ t("ton-slots-price", usd=ton_price.usd) }}</strong>{% if ton_price.ton %} {{ t("ton-slots-price-approx", ton=ton_price.ton) }}{% endif %}
+  <span style="color: var(--text-muted);">· {{ t("ton-slots-price-note") }}</span>
+  {% endif %}
 </div>
 {% endif %}
