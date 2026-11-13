@@ -30,6 +30,12 @@
 //! key stops every call for an hour ([`auth_blocked`]); the admin page's test
 //! button tries again at once. The key never reaches a log line, an error
 //! message or the page (`ThreeCxConfig` prints `<redacted>`).
+//!
+//! The key may come from the deployment instead of the page: `CALRS_THREECX_API_KEY`
+//! (a systemd credential, `crate::credentials`; owner's decision 2026-11-13:
+//! "all secrets in the vault"). When it is set it is the key, the stored one
+//! is never used, and the card and `config apply` refuse a key of their own
+//! ([`env_key`]).
 
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use serde_json::{json, Value};
@@ -137,10 +143,107 @@ pub fn check_display_name(raw: &str) -> Result<Option<String>, &'static str> {
     Ok(Some(name.to_string()))
 }
 
+// --- The key from the deployment ---
+
+/// The environment variable that carries the key (also a name in
+/// `crate::credentials::NAMES`).
+pub const ENV_KEY: &str = "CALRS_THREECX_API_KEY";
+
+/// What `CALRS_THREECX_API_KEY` says.
+#[derive(Clone, PartialEq, Eq)]
+pub enum EnvKey {
+    /// Not set (or empty): the key is the stored one.
+    Unset,
+    /// The key.
+    Set(String),
+    /// Set but not a key: 3CX stays off rather than using another key.
+    Malformed,
+}
+
+impl std::fmt::Debug for EnvKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            EnvKey::Unset => "Unset",
+            EnvKey::Set(_) => "Set(<redacted>)",
+            EnvKey::Malformed => "Malformed",
+        })
+    }
+}
+
+impl EnvKey {
+    /// The variable is set, valid or not: the key is the deployment's.
+    pub fn is_set(&self) -> bool {
+        !matches!(self, EnvKey::Unset)
+    }
+}
+
+/// Pure: the variable's value read as a key. Empty is unset, so the role can
+/// always define the credential.
+pub fn parse_env_key(value: Option<&str>) -> EnvKey {
+    match value.map(str::trim) {
+        None | Some("") => EnvKey::Unset,
+        Some(raw) => match check_api_key(raw) {
+            Ok(key) => EnvKey::Set(key),
+            Err(_) => EnvKey::Malformed,
+        },
+    }
+}
+
+#[cfg(not(test))]
+static ENV: std::sync::OnceLock<EnvKey> = std::sync::OnceLock::new();
+
+/// `CALRS_THREECX_API_KEY`, read once. A malformed value logs its name, never
+/// the value. Tests read [`test_env_key`]'s value instead, never the process
+/// environment.
+pub fn env_key() -> EnvKey {
+    #[cfg(not(test))]
+    {
+        ENV.get_or_init(|| {
+            let parsed = parse_env_key(std::env::var(ENV_KEY).ok().as_deref());
+            if parsed == EnvKey::Malformed {
+                tracing::warn!("{ENV_KEY} is malformed (16 to 256 printable characters); 3CX off");
+            }
+            parsed
+        })
+        .clone()
+    }
+    #[cfg(test)]
+    {
+        ENV_OVERRIDE.with(|c| c.borrow().clone())
+    }
+}
+
+#[cfg(test)]
+thread_local! {
+    /// Tests only: the variable for this thread (`#[tokio::test]` is one
+    /// thread, the app under `oneshot` included).
+    static ENV_OVERRIDE: std::cell::RefCell<EnvKey> = const { std::cell::RefCell::new(EnvKey::Unset) };
+}
+
+/// Tests only: act as if `CALRS_THREECX_API_KEY` were `value` until the guard
+/// is dropped.
+#[cfg(test)]
+pub fn test_env_key(value: Option<&str>) -> EnvKeyGuard {
+    EnvKeyGuard(ENV_OVERRIDE.with(|c| c.replace(parse_env_key(value))))
+}
+
+#[cfg(test)]
+pub struct EnvKeyGuard(EnvKey);
+
+#[cfg(test)]
+impl Drop for EnvKeyGuard {
+    fn drop(&mut self) {
+        let old = std::mem::replace(&mut self.0, EnvKey::Unset);
+        ENV_OVERRIDE.with(|c| *c.borrow_mut() = old);
+    }
+}
+
 // --- Stored settings ---
 
-/// The stored settings, `None` unless base URL, extension and key are all
-/// there and valid (a key that does not decrypt counts as missing).
+/// The settings, `None` unless base URL, extension and key are all there and
+/// valid. The key is `CALRS_THREECX_API_KEY` when that is set (none when it is
+/// malformed), else the stored one (a key that does not decrypt counts as
+/// missing).
 pub async fn load(pool: &SqlitePool, key: &[u8; 32]) -> Option<ThreeCxConfig> {
     let row: Option<(
         Option<String>,
@@ -158,8 +261,14 @@ pub async fn load(pool: &SqlitePool, key: &[u8; 32]) -> Option<ThreeCxConfig> {
     let (base_url, key_enc, extension, display_name) = row?;
     let base_url = check_base_url(base_url.as_deref()?).ok()?;
     let extension = check_extension(extension.as_deref()?).ok()?;
-    let api_key = crate::crypto::decrypt_value(key, key_enc.as_deref()?).ok()?;
-    let api_key = check_api_key(&api_key).ok()?;
+    let api_key = match env_key() {
+        EnvKey::Set(env) => env,
+        EnvKey::Malformed => return None,
+        EnvKey::Unset => {
+            let stored = crate::crypto::decrypt_value(key, key_enc.as_deref()?).ok()?;
+            check_api_key(&stored).ok()?
+        }
+    };
     Some(ThreeCxConfig {
         base_url,
         api_key,
@@ -169,13 +278,18 @@ pub async fn load(pool: &SqlitePool, key: &[u8; 32]) -> Option<ThreeCxConfig> {
 }
 
 /// What the admin page shows: the stored values except the key, and whether
-/// one is stored.
+/// there is one (the deployment's, or a stored one when the deployment sets
+/// none).
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Shown {
     pub base_url: String,
     pub extension: String,
     pub display_name: String,
     pub key_set: bool,
+    /// `CALRS_THREECX_API_KEY` is set: the key is the deployment's.
+    pub key_from_env: bool,
+    /// It is set but not a key.
+    pub key_env_bad: bool,
 }
 
 pub async fn shown(pool: &SqlitePool) -> Shown {
@@ -192,20 +306,26 @@ pub async fn shown(pool: &SqlitePool) -> Shown {
     .await
     .ok()
     .flatten();
-    let Some((base_url, key_enc, extension, display_name)) = row else {
-        return Shown::default();
-    };
+    let env = env_key();
+    let (base_url, key_enc, extension, display_name) = row.unwrap_or_default();
     Shown {
         base_url: base_url.unwrap_or_default(),
         extension: extension.unwrap_or_default(),
         display_name: display_name.unwrap_or_default(),
-        key_set: key_enc.is_some_and(|k| !k.is_empty()),
+        key_set: match &env {
+            EnvKey::Set(_) => true,
+            EnvKey::Malformed => false,
+            EnvKey::Unset => key_enc.is_some_and(|k| !k.is_empty()),
+        },
+        key_from_env: env.is_set(),
+        key_env_bad: env == EnvKey::Malformed,
     }
 }
 
 /// A change to the stored settings. `api_key: None` keeps the stored key
 /// (the form's empty password field); `clear` removes everything, the key
-/// with it.
+/// with it. While `CALRS_THREECX_API_KEY` is set a key is refused, and every
+/// save removes a stored key, which is never used then.
 pub struct Update {
     pub base_url: Option<String>,
     pub extension: Option<String>,
@@ -213,6 +333,9 @@ pub struct Update {
     pub api_key: Option<String>,
     pub clear: bool,
 }
+
+/// The refusal of a key while the deployment sets it.
+pub const KEY_FROM_ENV: &str = "is set by the deployment (CALRS_THREECX_API_KEY); change it there";
 
 /// Why a change was refused, with the field it concerns.
 #[derive(Debug, PartialEq, Eq)]
@@ -257,8 +380,10 @@ pub async fn store(pool: &SqlitePool, key: &[u8; 32], update: Update) -> Result<
     }
     let display_name = check_display_name(update.display_name.as_deref().unwrap_or(""))
         .map_err(|r| refused("display_name", r))?;
+    let from_env = env_key().is_set();
     let new_key = match update.api_key.as_deref().map(str::trim) {
         None | Some("") => None,
+        Some(_) if from_env => return Err(refused("api_key", KEY_FROM_ENV)),
         Some(raw) => Some(check_api_key(raw).map_err(|r| refused("api_key", r))?),
     };
     if new_key.is_some() && base_url.is_none() {
@@ -286,16 +411,18 @@ pub async fn store(pool: &SqlitePool, key: &[u8; 32], update: Update) -> Result<
         None => {
             // Without an address there is nothing to call: the stored key
             // goes with it, so a later address is never used with an old key.
+            // With the deployment's key a stored one is never used: it goes.
+            let keep_key = base_url.is_some() && !from_env;
             sqlx::query(
                 "UPDATE auth_config SET threecx_base_url = ?, threecx_extension = ?, \
                  threecx_display_name = ?, \
-                 threecx_api_key_enc = CASE WHEN ? IS NULL THEN NULL ELSE threecx_api_key_enc END, \
+                 threecx_api_key_enc = CASE WHEN ? THEN threecx_api_key_enc ELSE NULL END, \
                  updated_at = datetime('now') WHERE id = 'singleton'",
             )
             .bind(&base_url)
             .bind(&extension)
             .bind(&display_name)
-            .bind(&base_url)
+            .bind(keep_key)
             .execute(pool)
             .await?;
         }
@@ -921,6 +1048,7 @@ pub(super) const NOTICES: &[&str] = &[
     "bad-api-key",
     "bad-display-name",
     "bad-pair",
+    "key-env",
 ];
 
 fn notice_for(error: &ApiError) -> &'static str {
@@ -936,6 +1064,7 @@ fn refused_notice(refused: &Refused) -> &'static str {
     match refused.field {
         "base_url" if refused.reason.contains("together") => "bad-pair",
         "extension" if refused.reason.contains("together") => "bad-pair",
+        "api_key" if refused.reason == KEY_FROM_ENV => "key-env",
         "api_key" if refused.reason.contains("too") => "bad-pair",
         "base_url" => "bad-base-url",
         "extension" => "bad-extension",
@@ -975,11 +1104,16 @@ pub(super) async fn admin_save(
             .threecx_extension
             .as_deref()
             .and_then(|e| check_extension(e).ok());
-        let typed_key = form
-            .threecx_api_key
-            .as_deref()
-            .filter(|k| !k.trim().is_empty())
-            .and_then(|k| check_api_key(k).ok());
+        // The deployment's key is the key: a typed one is not tried.
+        let typed_key = match env_key() {
+            EnvKey::Set(env) => Some(env),
+            EnvKey::Malformed => None,
+            EnvKey::Unset => form
+                .threecx_api_key
+                .as_deref()
+                .filter(|k| !k.trim().is_empty())
+                .and_then(|k| check_api_key(k).ok()),
+        };
         let cfg = match (typed_url, typed_ext, typed_key, stored) {
             (Some(base_url), Some(extension), Some(api_key), _) => Some(ThreeCxConfig {
                 base_url,
