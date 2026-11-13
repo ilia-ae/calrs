@@ -1,0 +1,3747 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  
+  
+  <meta name="color-scheme" content="light dark">
+  
+  <title>Test Meeting — Test User</title>
+  <link rel="icon" href="/favicon">
+  <script>
+  // Apply theme ASAP to avoid flash. In embed mode the parent controls theme
+  // via ?theme= so we skip localStorage and respect the URL param only.
+  (function(){
+    var embed = false;
+    var embedTheme = "";
+    var t = embed ? embedTheme : (localStorage.getItem('calrs_theme') || '');
+    var prefersDark = matchMedia('(prefers-color-scheme:dark)').matches;
+    var dark = t === 'dark' || ((t === '' || t === 'auto' || t === 'system') && prefersDark);
+    if (dark) document.documentElement.classList.add('dark');
+  })();
+  </script>
+  <style>
+    @font-face {
+      font-family: 'Inter';
+      font-style: normal;
+      font-weight: 400 700;
+      font-display: swap;
+      src: url(/fonts/inter-latin-ext.woff2) format('woff2');
+      unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+    }
+    @font-face {
+      font-family: 'Inter';
+      font-style: normal;
+      font-weight: 400 700;
+      font-display: swap;
+      src: url(/fonts/inter-latin.woff2) format('woff2');
+      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+    }
+    :root {
+      --bg: #f4f4f5;
+      --surface: #fff;
+      --surface-hover: #fafafa;
+      --text: #18181b;
+      --text-secondary: #52525b;
+      --text-muted: #6b7280;
+      --border: #e4e4e7;
+      --border-hover: #a1a1aa;
+      /* ilia fork: the outline of a text field; dark mode takes a stronger one. */
+      --field-border: var(--border);
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --accent-subtle: #eff6ff;
+      --accent-border: #bfdbfe;
+      --accent-muted: #93c5fd;
+      --success: #16a34a;
+      --error-bg: #fef2f2;
+      --error-text: #dc2626;
+      --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+      --shadow-lg: 0 4px 6px rgba(0,0,0,0.05), 0 2px 4px rgba(0,0,0,0.03);
+      --radius: 10px;
+      --radius-lg: 14px;
+      --on-accent: #fff;
+      --warn: #b45309;
+      --warn-bg: rgba(245,158,11,0.08);
+      --warn-border: rgba(217,119,6,0.45);
+      /* ilia fork: the status tokens templates use, in both themes. The
+         var() aliases are computed on <html>, so html.dark's --warn wins
+         there. The .success notice's green is fixed (presets set only
+         --success, which badges and the ok disc keep using). */
+      --success-bg: rgba(34,197,94,0.1);
+      --success-border: rgba(22,163,74,0.4);
+      --success-text: #15803d;
+      --warning: var(--warn);
+      --warning-bg: var(--warn-bg);
+      --warning-text: var(--warn);
+      --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+      /* ilia fork: native controls (checkboxes, radios, selects, date pickers,
+         scrollbars) follow the page theme, not the OS one. The property wins
+         over the color-scheme meta tag, which still sets the first paint. */
+      color-scheme: light;
+    }
+
+    html.dark {
+      --bg: #09090b;
+      --surface: #18181b;
+      --surface-hover: #27272a;
+      --text: #fafafa;
+      --text-secondary: #a1a1aa;
+      --text-muted: #9ca3af;
+      --border: #27272a;
+      --border-hover: #52525b;
+      --field-border: var(--border-hover);
+      --accent: #3b82f6;
+      --accent-hover: #60a5fa;
+      --accent-subtle: rgba(59,130,246,0.1);
+      --accent-border: rgba(59,130,246,0.25);
+      --accent-muted: #1e40af;
+      --success: #22c55e;
+      --error-bg: rgba(220,38,38,0.1);
+      --error-text: #f87171;
+      --warn: #fbbf24;
+      --warn-bg: rgba(245,158,11,0.07);
+      --warn-border: rgba(251,191,36,0.35);
+      --success-bg: rgba(34,197,94,0.12);
+      --success-border: rgba(34,197,94,0.35);
+      --success-text: #4ade80;
+      --shadow: 0 1px 3px rgba(0,0,0,0.3);
+      --shadow-lg: 0 4px 6px rgba(0,0,0,0.25);
+      color-scheme: dark;
+    }
+    html.dark .badge-warning, html.dark .badge-pending, html.dark .badge-requires { background: rgba(234,179,8,0.15); color: #fbbf24; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    [hidden] { display: none !important; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.6;
+      color: var(--text);
+      background: var(--bg);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 2.5rem 1rem;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Links (ilia fork): a link with no class of its own is in the accent and
+       underlined, so it reads as a link in running text (translated strings
+       with a link, empty states, settings). :where() keeps the specificity
+       at zero, so every class or descendant rule (.powered a, .lang-switch a,
+       .week-nav a, the sidebar) and every inline style still wins, and a
+       link inside a .btn is left to the button. */
+    :where(a:not([class]):not(.btn *)) {
+      color: var(--accent);
+      text-decoration: underline;
+      text-decoration-thickness: 1px;
+      text-underline-offset: 2px;
+    }
+    :where(a:not([class]):not(.btn *):hover) {
+      color: var(--accent-hover);
+      text-decoration-thickness: 2px;
+    }
+
+    /* Inline icon (ilia fork): a 1em svg icon sitting on the text line, in place
+       of an emoji. Markup: <svg class="icon" viewBox="0 0 24 24" fill="none"
+       stroke="currentColor" ... aria-hidden="true">. */
+    svg.icon {
+      display: inline-block;
+      width: 1em;
+      height: 1em;
+      flex: none;
+      vertical-align: -0.125em;
+    }
+
+    .container {
+      max-width: 800px;
+      width: 100%;
+      margin-top: auto;
+      margin-bottom: auto;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 2rem;
+      margin-bottom: 1.25rem;
+      box-shadow: var(--shadow);
+    }
+
+    /* One narrow centred column (ilia fork) for single-column pages (sign
+       in, guest results), the width of the payment page's .ton-wrap. Only
+       the side margins are set, so a margin-top on the same element stays. */
+    .page-narrow, .card-narrow {
+      max-width: 30rem;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    h1 {
+      font-size: 1.375rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.25rem;
+    }
+    h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      color: var(--text-secondary);
+    }
+    /* ilia fork: sub-headings inside a card, under the card's h2. */
+    h3 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      line-height: 1.4;
+      margin-bottom: 0.5rem;
+    }
+
+    .subtitle {
+      color: var(--text-secondary);
+      font-size: 0.925rem;
+      margin-bottom: 1.5rem;
+      line-height: 1.5;
+    }
+
+    .meta {
+      display: flex;
+      gap: 1.25rem;
+      margin-bottom: 1.5rem;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+    .meta span {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    /* Week navigation */
+    .week-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.25rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .week-nav .range {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .week-nav .nav-links {
+      display: flex;
+      gap: 0.5rem;
+    }
+    .week-nav a, .week-nav span.disabled {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 2rem;
+      height: 2rem;
+      border-radius: var(--radius);
+      font-size: 0.85rem;
+      text-decoration: none;
+      transition: all 0.15s ease;
+    }
+    .week-nav a {
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .week-nav a:hover {
+      border-color: var(--border-hover);
+      background: var(--surface-hover);
+    }
+    .week-nav span.disabled {
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      opacity: 0.4;
+      cursor: default;
+    }
+
+    /* Day groups */
+    .day { margin-bottom: 1.5rem; }
+    .day:last-child { margin-bottom: 0; }
+    .day-label {
+      font-weight: 600;
+      font-size: 0.875rem;
+      margin-bottom: 0.5rem;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .slots { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .slot-btn {
+      display: inline-block;
+      padding: 0.5rem 1rem;
+      border: 1px solid var(--field-border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.15s ease;
+    }
+    .slot-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: var(--accent-subtle);
+      box-shadow: var(--shadow);
+      transform: scale(1.03);
+    }
+    .slot-btn:active {
+      transform: scale(0.97);
+      box-shadow: none;
+    }
+    .slot-btn:focus-visible, .slot-pill:focus-visible, .btn:focus-visible, .ton-copy:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    /* Form */
+    .form-group { margin-bottom: 1.25rem; }
+    .form-group label {
+      display: block;
+      font-weight: 500;
+      margin-bottom: 0.375rem;
+      font-size: 0.875rem;
+      color: var(--text);
+    }
+    .form-group .hint {
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+    /* ilia fork: a hint on its own line under a field (not inside the
+       label) is the small muted line under it. Inline styles still win. */
+    .form-group > .hint {
+      display: block;
+      font-size: 0.8rem;
+      margin-top: 0.25rem;
+    }
+    .form-group input, .form-group textarea, .form-group > select {
+      width: 100%;
+      padding: 0.625rem 0.875rem;
+      border: 1px solid var(--field-border);
+      border-radius: var(--radius);
+      font-size: 0.925rem;
+      font-family: inherit;
+      background: var(--surface);
+      color: var(--text);
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .form-group input:focus, .form-group textarea:focus, .form-group > select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-border);
+    }
+    /* ilia fork: a select is the height of a text field (Safari draws its own
+       menu height otherwise); the child combinator leaves the selects inside
+       a flex row of a .form-group (a number and its unit) as they are. */
+    .form-group > select { min-height: 2.5rem; line-height: 1.25; }
+    /* ilia fork: a text field directly in a .form-group gets the select's floor, so a field
+       and a select side by side end on the same line. */
+    .form-group > input:not([type=checkbox]):not([type=radio]) { min-height: 2.5rem; }
+    /* ilia fork: checkboxes and radios keep their own size. The text-field
+       rule above (width 100%, padding, border) stretched them across the
+       row and squeezed their label into a narrow column. This comes after
+       the :focus rule, so they do not get the text field's focus ring;
+       that rule's outline: none would leave them with no ring at all, so
+       the :focus-visible rule after this one gives the outline back.
+       Inline sizes still win. */
+    input[type=checkbox], input[type=radio] { accent-color: var(--accent); }
+    .form-group input[type=checkbox], .form-group input[type=radio] {
+      width: auto;
+      padding: 0;
+      border: 0;
+      box-shadow: none;
+      flex: none;
+    }
+    .form-group input[type=checkbox]:focus-visible, .form-group input[type=radio]:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .form-group input::placeholder, .form-group textarea::placeholder {
+      color: var(--text-muted);
+    }
+    textarea { resize: vertical; min-height: 80px; }
+    cap-widget {
+      --cap-background: var(--surface);
+      --cap-border-color: var(--border);
+      --cap-color: var(--text);
+      --cap-checkbox-background: var(--surface-hover);
+      --cap-spinner-color: var(--text);
+      --cap-spinner-background-color: var(--border);
+      --cap-widget-width: 480px;
+    }
+
+    /* intl-tel-input (guest phone field). Same approach as cap-widget above:
+       map the widget's own custom properties onto the theme variables, so it
+       follows dark mode and every custom preset without extra CSS. Its
+       defaults are hard-coded greys and a white dropdown, which would sit
+       badly on a dark surface. */
+    .iti {
+      --iti-border-color: var(--field-border);
+      --iti-dropdown-bg: var(--surface);
+      --iti-hover-color: var(--surface-hover);
+      --iti-dialcode-color: var(--text-muted);
+      --iti-arrow-color: var(--text-muted);
+      width: 100%;
+    }
+    .iti__search-input {
+      background: var(--surface);
+      color: var(--text);
+      border-bottom: 1px solid var(--border);
+    }
+    .iti__country.iti__highlight {
+      background-color: var(--surface-hover);
+    }
+
+    /* Buttons (ilia fork): one shape for every action. .btn is the primary
+       fill, full width by default as upstream's form submits are;
+       .btn-secondary is outlined, .btn-ghost is text only; .btn-auto sizes to
+       the label, .btn-sm is the compact one (copy), .btn-row lays them out.
+       Hover rules are gated with :where(:not(:disabled)...), which adds no
+       specificity: a disabled button keeps its own variant's fill, faded
+       (the rule after .btn-row), and reacts to neither hover nor press. */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      min-height: 2.75rem;
+      padding: 0.625rem 1.25rem;
+      background: var(--accent);
+      color: var(--on-accent);
+      border: 1px solid transparent;
+      border-radius: var(--radius);
+      font: inherit;
+      font-size: 0.95rem;
+      font-weight: 600;
+      line-height: 1.25;
+      text-align: center;
+      text-decoration: none;
+      cursor: pointer;
+      width: 100%;
+      transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+      letter-spacing: -0.01em;
+    }
+    .btn:hover:where(:not(:disabled):not([aria-disabled="true"])) { background: var(--accent-hover); color: var(--on-accent); box-shadow: var(--shadow-lg); }
+    .btn:active { transform: scale(0.98); box-shadow: none; }
+    .btn svg { width: 1.125em; height: 1.125em; flex: none; }
+    .btn-secondary { background: var(--surface); color: var(--text); border-color: var(--field-border); font-weight: 500; }
+    .btn-secondary:hover:where(:not(:disabled):not([aria-disabled="true"])) { background: var(--surface-hover); color: var(--text); border-color: var(--border-hover); box-shadow: none; }
+    .btn-ghost { background: transparent; color: var(--text-secondary); font-weight: 500; }
+    .btn-ghost:hover:where(:not(:disabled):not([aria-disabled="true"])) { background: var(--surface-hover); color: var(--text); box-shadow: none; }
+    .btn-danger { background: #dc2626; color: #fff; }
+    .btn-danger:hover:where(:not(:disabled):not([aria-disabled="true"])) { background: #b91c1c; color: #fff; }
+    /* Telegram's own blue on the shared shape (Telegram settings, the
+       booking's Telegram card). */
+    .btn-telegram { background: #229ED9; color: #fff; }
+    .btn-telegram:hover:where(:not(:disabled):not([aria-disabled="true"])) { background: #1b8bc2; color: #fff; }
+    .btn-auto { width: auto; }
+    .btn-sm { min-height: 2rem; padding: 0.3125rem 0.75rem; font-size: 0.8125rem; font-weight: 500; border-radius: 8px; }
+    .btn-lg { min-height: 3.25rem; font-size: 1rem; }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
+    .btn-row > form { margin: 0; display: contents; }
+    .btn:disabled, .btn[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+    .btn:disabled:active, .btn[aria-disabled="true"]:active { transform: none; }
+
+    /* File picker (ilia fork): the browser's own file control speaks the
+       browser's language, not the page's, so a label button opens the
+       visually hidden input and the chosen name shows beside it:
+       <label class="btn btn-secondary btn-sm btn-auto file-pick">LABEL<input
+       type="file" ... class="file-pick-input"></label><span
+       class="file-pick-name" data-file-name>NO FILE</span>. The script that
+       fills in the name is in dashboard_base.html. */
+    .file-pick { position: relative; }
+    .file-pick-input { position: absolute; left: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
+    .file-pick:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .file-pick-name { font-size: 0.8125rem; color: var(--text-muted); min-width: 0; overflow-wrap: anywhere; }
+    @media (prefers-reduced-motion: reduce) { .btn, .slot-btn { transition: none; } .btn:active, .slot-btn:hover, .slot-btn:active { transform: none; } }
+
+    /* Confirmation */
+    .check {
+      width: 3rem;
+      height: 3rem;
+      border-radius: 50%;
+      background: var(--success);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      margin: 0 auto 1rem;
+    }
+
+    .detail { margin-bottom: 0.625rem; color: var(--text-secondary); font-size: 0.925rem; overflow-wrap: anywhere; }
+    .detail strong { color: var(--text); }
+
+    .empty {
+      color: var(--text-muted);
+      text-align: center;
+      padding: 2rem 1rem;
+    }
+    .empty-icon {
+      font-size: 2.5rem;
+      margin-bottom: 0.75rem;
+      opacity: 0.5;
+    }
+    /* ilia fork: an empty state draws a stroke icon, not an emoji:
+       <div class="empty-icon"><svg class="icon" viewBox="0 0 24 24" ...></div>. */
+    .empty-icon svg { width: 2.5rem; height: 2.5rem; }
+    .empty-text {
+      font-size: 0.925rem;
+      max-width: 320px;
+      margin: 0 auto;
+      line-height: 1.5;
+    }
+    /* ilia fork: the link of an empty state ("Add a source") stands out from
+       the muted sentence by weight too, not by shade alone. */
+    .empty a:not([class]) { font-weight: 500; }
+
+    .logo { text-align: center; margin-bottom: 1.5rem; }
+    .logo img { max-height: 80px; max-width: 280px; object-fit: contain; }
+
+    .powered {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      margin-top: 1.5rem;
+    }
+    .powered a { color: var(--text-muted); text-decoration: none; }
+    .powered a:hover { color: var(--text-secondary); }
+    /* ilia fork: the dashboard has no made-by part, and without a source URL nothing is left. */
+    .powered:empty { display: none; }
+
+    .error {
+      color: var(--error-text);
+      background: var(--error-bg);
+      padding: 1rem;
+      border-radius: var(--radius);
+      margin-bottom: 1.25rem;
+      font-size: 0.9rem;
+    }
+    /* ilia fork: the green notice beside .error ("saved", "sent"):
+       <div class="success" role="status">text</div>. */
+    .success {
+      color: var(--success-text);
+      background: var(--success-bg);
+      border: 1px solid var(--success-border);
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius);
+      margin: 1rem 0 1.25rem;
+      font-size: 0.9rem;
+    }
+
+    /* Selected slot summary */
+    .selected-summary {
+      background: var(--accent-subtle);
+      border: 1px solid var(--accent-border);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      margin-bottom: 1.5rem;
+      font-size: 0.925rem;
+      font-weight: 500;
+    }
+
+    /* Back link */
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 500;
+      margin-bottom: 1rem;
+      transition: color 0.15s ease;
+    }
+    .back-link:hover { color: var(--text); }
+
+    .meta { flex-wrap: wrap; }
+    .week-nav .range { min-width: 0; }
+
+    @media (max-width: 480px) {
+      body { padding: 1.5rem 0.75rem; }
+      .card { padding: 1.25rem; }
+      .week-nav { flex-wrap: wrap; gap: 0.5rem; }
+      .week-nav .range { font-size: 0.8rem; }
+    }
+
+    /* Interactive card hover lift */
+    a.card, .card.card-link {
+      transition: border-color 0.15s ease, box-shadow 0.2s ease, transform 0.2s ease;
+    }
+    a.card:hover, .card.card-link:hover {
+      border-color: var(--accent-border);
+      box-shadow: var(--shadow-lg);
+      transform: translateY(-2px);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      a.card, .card.card-link { transition: border-color 0.15s ease, box-shadow 0.2s ease; }
+      a.card:hover, .card.card-link:hover { transform: none; }
+    }
+
+    /* Clickable card that may contain its own links (e.g. a markdown
+       description). A link cannot be nested in another link, so the card is a
+       <div> and the title link stretches over it with ::after. Inner links
+       are lifted above that overlay so they keep their own target. */
+    .card.card-link { position: relative; }
+    .card-link-title { color: inherit; text-decoration: none; }
+    .card-link-title::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: var(--radius-lg);
+    }
+    .card-link-title:focus-visible { outline: none; }
+    .card-link-title:focus-visible::after {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .card.card-link a:not(.card-link-title) { position: relative; z-index: 1; }
+
+    /* Status badges */
+    .badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-weight: 500;
+      padding: 0.15rem 0.5rem;
+      border-radius: 999px;
+      vertical-align: middle;
+    }
+    .badge-success {
+      background: var(--success-bg, rgba(34,197,94,0.1));
+      color: var(--success, #16a34a);
+    }
+    .badge-warning {
+      background: rgba(234,179,8,0.1);
+      color: #a16207;
+    }
+    .badge-info {
+      background: var(--accent-subtle, rgba(99,102,241,0.1));
+      color: var(--accent);
+    }
+    .badge-muted {
+      background: var(--surface-hover);
+      color: var(--text-muted);
+    }
+    .badge-error {
+      background: rgba(239,68,68,0.1);
+      color: var(--error-text, #dc2626);
+    }
+    /* Legacy aliases */
+    .badge-disabled { background: var(--error-bg); color: var(--error-text); }
+    .badge-pending { background: rgba(234,179,8,0.1); color: #a16207; }
+    .badge-confirmed { background: var(--success-bg, rgba(34,197,94,0.1)); color: var(--success); }
+    .badge-requires { background: rgba(234,179,8,0.1); color: #a16207; }
+
+    /* Result icon (ilia fork): the 3rem disc of every result page (the payment
+       page, the guest action pages, the 404). One inline <svg> inside (24x24
+       viewBox, stroke currentColor); the modifier sets the colour:
+       <span class="result-icon ok" aria-hidden="true"><svg ...></svg></span> */
+    .result-icon {
+      display: grid;
+      place-items: center;
+      flex: none;
+      width: 3rem;
+      height: 3rem;
+      border-radius: 50%;
+      margin: 0 auto 1rem;
+      background: #6b7280;
+      color: #fff;
+      box-shadow: 0 0 0 6px rgba(107,114,128,0.15);
+    }
+    .result-icon svg { width: 1.5rem; height: 1.5rem; }
+    .result-icon.ok { background: var(--success); box-shadow: 0 0 0 6px rgba(34,197,94,0.2); }
+    .result-icon.wait { background: #d97706; box-shadow: 0 0 0 6px rgba(245,158,11,0.2); }
+    .result-icon.info { background: #3b82f6; box-shadow: 0 0 0 6px rgba(59,130,246,0.2); }
+    .result-icon.bad { background: var(--error-text); box-shadow: 0 0 0 6px rgba(239,68,68,0.15); }
+    /* Muted: the secondary text colour with the card's colour for the glyph,
+       over 7:1 in both themes (the muted grey with white was 2.6:1 in dark). */
+    .result-icon.muted { background: var(--text-secondary); color: var(--surface); box-shadow: 0 0 0 6px rgba(107,114,128,0.15); }
+    /* Dark mode lightens --success and --error-text for text; a white glyph
+       on those is under 3:1, so the discs keep the light theme's fills. */
+    html.dark .result-icon.ok { background: #16a34a; }
+    html.dark .result-icon.bad { background: #dc2626; }
+    @media (prefers-reduced-motion: no-preference) {
+      .result-icon { animation: checkPop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+    }
+
+    /* Checkmark animation */
+    @keyframes checkPop {
+      0% { transform: scale(0); opacity: 0; }
+      60% { transform: scale(1.15); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    @media (prefers-reduced-motion: no-preference) {
+      .check { animation: checkPop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+    }
+  </style>
+  <style>:root{--bg:#f6f6f6;--surface:#ffffff;--text:#313131;--accent:#313131;--accent-hover:#111111;--on-accent:#ffffff;--accent-subtle:rgba(49,49,49,0.08);--accent-border:rgba(49,49,49,0.25);--accent-muted:rgba(49,49,49,0.5)}html.dark{--bg:#0a0a0a;--surface:#181818;--surface-hover:#262626;--text:#f7f7f7;--text-secondary:#a5a5a5;--text-muted:#a0a0a0;--border:#262626;--border-hover:#535353;--accent:#ededed;--accent-hover:#d1d1d1;--on-accent:#0a0a0a;--accent-subtle:rgba(237,237,237,0.12);--accent-border:rgba(237,237,237,0.3);--accent-muted:rgba(237,237,237,0.5)}</style>
+  
+  
+</head>
+<body>
+  <!-- Global sync loader overlay -->
+  <div id="calrs-sync-loader" style="display:none; position:fixed; inset:0; z-index:10000; background:var(--bg); align-items:center; justify-content:center; flex-direction:column; gap:1.25rem;">
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: calrs-spin 1s linear infinite;"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+    <div style="font-size:1.125rem; font-weight:600; color:var(--text); text-align:center;">Проверяем свободное время</div>
+    <div style="font-size:0.875rem; color:var(--text-muted); text-align:center;">Подождите, загружаем актуальные данные календаря…</div>
+  </div>
+  <style>
+    @keyframes calrs-spin { to { transform: rotate(360deg); } }
+  </style>
+  <script>
+  var calrsLoader = {
+    show: function() {
+      var el = document.getElementById('calrs-sync-loader');
+      if (el) el.style.display = 'flex';
+    },
+    hide: function() {
+      var el = document.getElementById('calrs-sync-loader');
+      if (el) el.style.display = 'none';
+    }
+  };
+  </script>
+  
+  <div class="container">
+    
+
+
+  
+
+
+<div class="logo"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='40'%3E%3Crect width='120' height='40' rx='8' fill='%23888'/%3E%3Ccircle cx='20' cy='20' r='9' fill='%23fff'/%3E%3C/svg%3E" alt="" onerror="this.closest('.logo').style.display='none'"></div>
+
+<style>
+  /* Override container width for the wider layout */
+  .container { max-width: 960px; }
+  .slots-outer {
+    display: flex;
+    gap: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg, 12px);
+    background: var(--card-bg, var(--surface));
+    overflow: hidden;
+  }
+  /* Left: meeting info sidebar */
+  .slots-info {
+    flex: 0 0 260px;
+    padding: 1.75rem 1.5rem;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .slots-info-host {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+  }
+  .slots-info-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--on-accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.8rem;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+  .slots-info-name {
+    font-weight: 600;
+    font-size: 0.9rem;
+  }
+  .slots-info-title-text {
+    font-size: 0.775rem;
+    color: var(--text-muted);
+  }
+  .slots-info h1 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 0.25rem 0 0;
+    line-height: 1.3;
+  }
+  .slots-info .subtitle {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin: 0;
+    line-height: 1.4;
+  }
+  .slots-info-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+  }
+  .slots-info-meta-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  /* ilia fork: stroke SVG icons (currentColor) instead of colour emoji */
+  .slots-info-meta-icon {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1rem;
+    color: var(--text-muted);
+  }
+  .slots-info-meta-icon svg {
+    width: 14px;
+    height: 14px;
+  }
+
+
+  /* Right: calendar + slots */
+  .slots-main {
+    flex: 1;
+    min-width: 0;
+    padding: 1.75rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .slots-info-settings {
+    margin-top: auto;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .slots-info-setting {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+  .slots-info-setting-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+  }
+  .slots-info-setting select {
+    padding: 0.4rem 0.5rem;
+    /* ilia fork: the field outline token of base.html (--border-hover in dark mode). */
+    border: 1px solid var(--field-border, var(--border));
+    border-radius: var(--radius);
+    font-size: 0.825rem;
+    font-family: inherit;
+    background: var(--surface);
+    color: var(--text);
+    width: 100%;
+  }
+  .time-format-toggle {
+    display: inline-flex;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    align-self: flex-start;
+  }
+  .time-format-toggle button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 30px;
+    padding: 0 0.625rem;
+    border: none;
+    border-left: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-muted);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.775rem;
+    font-weight: 500;
+    transition: all 0.15s ease;
+  }
+  .time-format-toggle button:first-child {
+    border-left: none;
+  }
+  .time-format-toggle button:hover {
+    background: var(--surface-hover);
+    color: var(--text);
+  }
+  .time-format-toggle button.active {
+    background: var(--accent);
+    color: var(--on-accent);
+  }
+
+  .slots-layout {
+    display: flex;
+    gap: 1.5rem;
+  }
+  .cal-panel {
+    flex: 1;
+    min-width: 0;
+  }
+  .cal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+  }
+  .cal-header-title {
+    font-size: 1rem;
+    font-weight: 700;
+    /* Title-case the standalone month/week label. Lets locales like French
+       store grammatically-correct lowercase ("avril") while still rendering
+       a typographic header ("Avril 2026"). Mid-sentence date labels are
+       unaffected, they live in different elements. */
+    text-transform: capitalize;
+  }
+  .cal-header-title span {
+    font-weight: 400;
+    color: var(--text-muted);
+  }
+  .cal-nav {
+    display: flex;
+    gap: 0.25rem;
+  }
+  .cal-nav a, .cal-nav span.disabled {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    text-decoration: none;
+    font-size: 0.8rem;
+    transition: all 0.15s ease;
+  }
+  .cal-nav a:hover {
+    border-color: var(--border-hover);
+    background: var(--surface-hover);
+  }
+  .cal-nav span.disabled {
+    opacity: 0.3;
+    cursor: default;
+  }
+  .cal-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 0;
+    margin-bottom: 0.25rem;
+  }
+  .cal-weekday {
+    text-align: center;
+    font-size: 0.675rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    padding: 0.3rem 0;
+  }
+  /* Default: show full names, hide short names. Kept before the
+     max-width: 400px block, which shows the short ones on phones. */
+  .cal-weekday .cal-weekday-short { display: none; }
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+  }
+  .cal-cell {
+    aspect-ratio: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: default;
+    position: relative;
+    transition: all 0.15s ease;
+    color: var(--text-muted);
+  }
+  .cal-cell.has-slots {
+    color: var(--text);
+    background: var(--surface-hover);
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .cal-cell.has-slots:hover {
+    background: var(--accent-subtle);
+  }
+  .cal-cell.selected {
+    background: var(--accent) !important;
+    color: var(--on-accent) !important;
+  }
+  .cal-cell.today:not(.selected) {
+    box-shadow: inset 0 0 0 2px var(--accent);
+  }
+  .cal-cell.past {
+    opacity: 0.3;
+  }
+  .cal-cell.other-month {
+    opacity: 0.25;
+    font-size: 0.775rem;
+    cursor: pointer;
+  }
+  .cal-cell.other-month:hover {
+    opacity: 0.45;
+    background: var(--surface-hover);
+  }
+  /* Available day dot removed — the bold text + background is enough */
+
+  /* Slot panel */
+  .slot-panel {
+    flex: 0 0 240px;
+    min-width: 0;
+  }
+  .slot-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+  }
+  .slot-panel-title {
+    font-size: 1rem;
+    font-weight: 700;
+  }
+  .slot-panel-title span {
+    font-weight: 400;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+  }
+  .slot-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    max-height: 420px;
+    overflow-y: auto;
+  }
+  .slot-pill {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.45rem 0.875rem;
+    border: 1px solid var(--field-border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 0.9rem;
+    font-weight: 500;
+    text-decoration: none;
+    transition: all 0.15s ease;
+    cursor: pointer;
+  }
+  .slot-pill:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-subtle);
+    box-shadow: var(--shadow);
+  }
+  .slot-pill:active {
+    transform: scale(0.97);
+  }
+  /* Slot pill dot removed — pills are visually distinct enough */
+  /* Shown when the day's UTC offset differs from the one in the picker */
+  .slot-offset-note {
+    margin-bottom: 0.6rem;
+    padding: 0.45rem 0.6rem;
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius);
+    background: var(--accent-subtle);
+    color: var(--text);
+    font-size: 0.78rem;
+    line-height: 1.35;
+  }
+  .slot-offset-note[hidden] {
+    display: none;
+  }
+  .slot-empty {
+    text-align: center;
+    padding: 1.5rem 1rem;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+  .slot-empty-icon {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 0.5rem;
+    color: var(--text-muted);
+  }
+  .slot-empty-icon svg {
+    width: 28px;
+    height: 28px;
+  }
+
+  @media (max-width: 900px) {
+    .slots-outer {
+      flex-direction: column;
+    }
+    .slots-info {
+      flex: none;
+      border-right: none;
+      border-bottom: 1px solid var(--border);
+      padding: 1.25rem;
+    }
+    .slots-info-settings {
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .slots-info-setting {
+      flex: 1;
+      min-width: 140px;
+    }
+  }
+  /* Reschedule banner — sits above the slots card */
+  .reschedule-banner {
+    background: var(--warn-bg);
+    border: 1px solid var(--border);
+    border-bottom: 1px solid var(--warn-border);
+    border-radius: var(--radius-lg, 12px) var(--radius-lg, 12px) 0 0;
+    padding: 0.75rem 1.5rem;
+    font-size: 0.875rem;
+    color: var(--warn);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .reschedule-banner + .slots-outer {
+    border-top: none;
+    border-radius: 0 0 var(--radius-lg, 12px) var(--radius-lg, 12px);
+  }
+  .reschedule-banner > svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+  }
+
+  @media (max-width: 640px) {
+    .slots-layout {
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+    .slot-panel {
+      flex: none;
+      width: 100%;
+    }
+    .slot-list {
+      max-height: none;
+    }
+    .slots-info {
+      flex: none;
+    }
+  }
+
+  @media (max-width: 400px) {
+    .slots-main {
+      padding: 1rem 0.75rem;
+    }
+    .slots-info {
+      padding: 1rem 0.75rem;
+    }
+    .slots-info h1 {
+      font-size: 1.1rem;
+    }
+    .cal-cell {
+      font-size: 0.75rem;
+      border-radius: 6px;
+    }
+    .cal-weekday {
+      font-size: 0.6rem;
+      padding: 0.2rem 0;
+    }
+    /* Show single-letter abbreviations */
+    .cal-weekday .cal-weekday-full { display: none; }
+    .cal-weekday .cal-weekday-short { display: inline; }
+    .cal-header-title {
+      font-size: 0.85rem;
+    }
+    .cal-nav a, .cal-nav span.disabled {
+      width: 26px;
+      height: 26px;
+      font-size: 0.7rem;
+    }
+    .slot-pill {
+      padding: 0.4rem 0.625rem;
+      font-size: 0.8rem;
+    }
+    .slot-panel-title {
+      font-size: 0.85rem;
+    }
+    .slots-layout {
+      gap: 0.75rem;
+    }
+  }
+
+  /* View toggle */
+  .view-toggle {
+    display: inline-flex;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .view-toggle button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 30px;
+    padding: 0;
+    border: none;
+    border-left: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .view-toggle button:first-child {
+    border-left: none;
+  }
+  .view-toggle button:hover {
+    background: var(--surface-hover);
+    color: var(--text);
+  }
+  .view-toggle button.active {
+    background: var(--accent);
+    color: var(--on-accent);
+  }
+  .view-toggle button svg {
+    width: 14px;
+    height: 14px;
+    fill: currentColor;
+  }
+
+  /* Week view */
+  .week-view {
+    display: none;
+    flex: 1;
+    min-width: 0;
+  }
+  .week-view.active {
+    display: block;
+  }
+  .week-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+  }
+  .week-day-col {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .week-day-header {
+    text-align: center;
+    padding: 0.4rem 0;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+  }
+  .week-day-header .week-day-num {
+    display: block;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: 0;
+    text-transform: none;
+    margin-top: 0.15rem;
+  }
+  .week-day-header.today .week-day-num {
+    color: var(--accent);
+    font-weight: 800;
+    position: relative;
+  }
+  .week-day-header.today .week-day-num::after {
+    content: '';
+    display: block;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--accent);
+    margin: 2px auto 0;
+  }
+  .week-day-header.no-slots {
+    opacity: 0.4;
+  }
+  .week-slot-pill {
+    display: block;
+    padding: 0.35rem 0.25rem;
+    border: 1px solid var(--field-border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-align: center;
+    text-decoration: none;
+    transition: all 0.15s ease;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .week-slot-pill:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-subtle);
+  }
+  .week-more {
+    text-align: center;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    padding: 0.2rem 0;
+    cursor: pointer;
+  }
+  .week-more:hover {
+    color: var(--accent);
+  }
+
+  /* Column view */
+  .column-view {
+    display: none;
+    flex: 1;
+    min-width: 0;
+  }
+  .column-view.active {
+    display: block;
+  }
+  .column-days {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    max-height: 480px;
+    overflow-y: auto;
+  }
+  .column-day {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .column-day:last-child {
+    border-bottom: none;
+  }
+  .column-day-label {
+    flex: 0 0 60px;
+    text-align: right;
+    padding-top: 0.15rem;
+  }
+  .column-day-weekday {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+  }
+  .column-day-date {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.2;
+  }
+  .column-day.today .column-day-date {
+    color: var(--accent);
+  }
+  .column-day-slots {
+    flex: 1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    min-width: 0;
+  }
+  .column-slot-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.35rem 0.75rem;
+    border: 1px solid var(--field-border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 0.8rem;
+    font-weight: 500;
+    text-decoration: none;
+    transition: all 0.15s ease;
+    cursor: pointer;
+  }
+  .column-slot-pill:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-subtle);
+  }
+
+  /* Hide slot panel in week/column mode */
+  .slots-layout.view-week .slot-panel,
+  .slots-layout.view-column .slot-panel {
+    display: none;
+  }
+  .slots-layout.view-week .cal-panel,
+  .slots-layout.view-column .cal-panel {
+    display: none;
+  }
+
+  @media (max-width: 640px) {
+    .week-grid {
+      grid-template-columns: repeat(7, 1fr);
+      gap: 2px;
+    }
+    .week-slot-pill {
+      font-size: 0.65rem;
+      padding: 0.25rem 0.15rem;
+    }
+    .week-day-header {
+      font-size: 0.6rem;
+    }
+    .week-day-header .week-day-num {
+      font-size: 0.9rem;
+    }
+    .column-day-label {
+      flex: 0 0 45px;
+    }
+    .column-slot-pill {
+      font-size: 0.7rem;
+      padding: 0.3rem 0.5rem;
+    }
+  }
+</style>
+
+
+<div class="reschedule-banner">
+  <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 21v-5h5"/><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/></svg>
+  <span>Перенос: <strong>Test Meeting</strong> (сейчас: понедельник, 14 декабря 2026 в 14:00)</span>
+</div>
+
+
+<div class="slots-outer" style="position: relative;">
+  <!-- Left: meeting info -->
+  <div class="slots-info">
+    
+    <div class="slots-info-host">
+      <div class="slots-info-avatar">
+        
+          TU
+        
+      </div>
+      <div>
+        <div class="slots-info-name">Test User</div>
+        
+      </div>
+    </div>
+    
+    <h1>Test Meeting</h1>
+    
+    
+    <div class="slots-info-meta">
+      <div class="slots-info-meta-item">
+        <span class="slots-info-meta-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></span>
+        <span>30 мин</span>
+      </div>
+      
+      
+      
+    </div>
+
+    
+    <div class="slots-info-settings">
+      <div class="slots-info-setting">
+        <label for="tz-select" class="slots-info-setting-label">Ваш часовой пояс</label>
+        <select id="tz-select">
+          
+            <optgroup label="Популярные часовые пояса">
+            
+              <option value="Pacific&#x2f;Midway">Мидуэй (UTC-11)</option>
+            
+              <option value="Pacific&#x2f;Honolulu">Гавайи (UTC-10)</option>
+            
+              <option value="America&#x2f;Anchorage">Аляска (UTC-9)</option>
+            
+              <option value="America&#x2f;Los_Angeles">Лос-Анджелес (UTC-8)</option>
+            
+              <option value="America&#x2f;Denver">Денвер (UTC-7)</option>
+            
+              <option value="America&#x2f;Chicago">Чикаго (UTC-6)</option>
+            
+              <option value="America&#x2f;New_York">Нью-Йорк (UTC-5)</option>
+            
+              <option value="America&#x2f;Sao_Paulo">Сан-Паулу (UTC-3)</option>
+            
+              <option value="Atlantic&#x2f;Cape_Verde">Кабо-Верде (UTC-1)</option>
+            
+              <option value="UTC" selected>UTC</option>
+            
+              <option value="Europe&#x2f;London">Лондон (UTC+0)</option>
+            
+              <option value="Europe&#x2f;Paris">Париж, Брюссель (UTC+1)</option>
+            
+              <option value="Europe&#x2f;Helsinki">Хельсинки, Киев (UTC+2)</option>
+            
+              <option value="Europe&#x2f;Moscow">Москва (UTC+3)</option>
+            
+              <option value="Asia&#x2f;Dubai">Дубай (UTC+4)</option>
+            
+              <option value="Asia&#x2f;Kolkata">Индия (UTC+5:30)</option>
+            
+              <option value="Asia&#x2f;Bangkok">Бангкок (UTC+7)</option>
+            
+              <option value="Asia&#x2f;Shanghai">Шанхай (UTC+8)</option>
+            
+              <option value="Asia&#x2f;Tokyo">Токио (UTC+9)</option>
+            
+              <option value="Australia&#x2f;Sydney">Сидней (UTC+11)</option>
+            
+              <option value="Pacific&#x2f;Auckland">Окленд (UTC+13)</option>
+            
+            </optgroup>
+          
+            <optgroup label="Африка">
+            
+              <option value="Africa&#x2f;Abidjan">Abidjan (UTC+0)</option>
+            
+              <option value="Africa&#x2f;Accra">Accra (UTC+0)</option>
+            
+              <option value="Africa&#x2f;Addis_Ababa">Addis Ababa (UTC+3)</option>
+            
+              <option value="Africa&#x2f;Algiers">Algiers (UTC+1)</option>
+            
+              <option value="Africa&#x2f;Asmara">Asmara (UTC+3)</option>
+            
+              <option value="Africa&#x2f;Bamako">Bamako (UTC+0)</option>
+            
+              <option value="Africa&#x2f;Bangui">Bangui (UTC+1)</option>
+            
+              <option value="Africa&#x2f;Banjul">Banjul (UTC+0)</option>
+            
+              <option value="Africa&#x2f;Bissau">Bissau (UTC+0)</option>
+            
+              <option value="Africa&#x2f;Blantyre">Blantyre (UTC+2)</option>
+            
+              <option value="Africa&#x2f;Brazzaville">Brazzaville (UTC+1)</option>
+            
+              <option value="Africa&#x2f;Bujumbura">Bujumbura (UTC+2)</option>
+            
+              <option value="Africa&#x2f;Cairo">Cairo (UTC+2)</option>
+            
+              <option value="Africa&#x2f;Casablanca">Casablanca (UTC+1)</option>
+            
+              <option value="Africa&#x2f;Ceuta">Ceuta (UTC+1)</option>
+            
+              <option value="Africa&#x2f;Conakry">Conakry (UTC+0)</option>
+            
+              <option value="Africa&#x2f;Dakar">Dakar (UTC+0)</option>
+            
+              <option value="Africa&#x2f;Dar_es_Salaam">Dar es Salaam (UTC+3)</option>
+            
+              <option value="Africa&#x2f;Djibouti">Djibouti (UTC+3)</option>
+            
+              <option value="Africa&#x2f;Douala">Douala (UTC+1)</option>
+            
+              <option value="Africa&#x2f;El_Aaiun">El Aaiun (UTC+1)</option>
+            
+              <option value="Africa&#x2f;Freetown">Freetown (UTC+0)</option>
+            
+              <option value="Africa&#x2f;Gaborone">Gaborone (UTC+2)</option>
+            
+              <option value="Africa&#x2f;Harare">Harare (UTC+2)</option>
+            
+              <option value="Africa&#x2f;Johannesburg">Johannesburg (UTC+2)</option>
+            
+              <option value="Africa&#x2f;Juba">Juba (UTC+2)</option>
+            
+              <option value="Africa&#x2f;Kampala">Kampala (UTC+3)</option>
+            
+              <option value="Africa&#x2f;Khartoum">Khartoum (UTC+2)</option>
+            
+              <option value="Africa&#x2f;Kigali">Kigali (UTC+2)</option>
+            
+              <option value="Africa&#x2f;Kinshasa">Kinshasa (UTC+1)</option>
+            
+              <option value="Africa&#x2f;Lagos">Lagos (UTC+1)</option>
+            
+              <option value="Africa&#x2f;Libreville">Libreville (UTC+1)</option>
+            
+              <option value="Africa&#x2f;Lome">Lome (UTC+0)</option>
+            
+              <option value="Africa&#x2f;Luanda">Luanda (UTC+1)</option>
+            
+              <option value="Africa&#x2f;Lubumbashi">Lubumbashi (UTC+2)</option>
+            
+              <option value="Africa&#x2f;Lusaka">Lusaka (UTC+2)</option>
+            
+              <option value="Africa&#x2f;Malabo">Malabo (UTC+1)</option>
+            
+              <option value="Africa&#x2f;Maputo">Maputo (UTC+2)</option>
+            
+              <option value="Africa&#x2f;Maseru">Maseru (UTC+2)</option>
+            
+              <option value="Africa&#x2f;Mbabane">Mbabane (UTC+2)</option>
+            
+              <option value="Africa&#x2f;Mogadishu">Mogadishu (UTC+3)</option>
+            
+              <option value="Africa&#x2f;Monrovia">Monrovia (UTC+0)</option>
+            
+              <option value="Africa&#x2f;Nairobi">Nairobi (UTC+3)</option>
+            
+              <option value="Africa&#x2f;Ndjamena">Ndjamena (UTC+1)</option>
+            
+              <option value="Africa&#x2f;Niamey">Niamey (UTC+1)</option>
+            
+              <option value="Africa&#x2f;Nouakchott">Nouakchott (UTC+0)</option>
+            
+              <option value="Africa&#x2f;Ouagadougou">Ouagadougou (UTC+0)</option>
+            
+              <option value="Africa&#x2f;Porto-Novo">Porto-Novo (UTC+1)</option>
+            
+              <option value="Africa&#x2f;Sao_Tome">Sao Tome (UTC+0)</option>
+            
+              <option value="Africa&#x2f;Timbuktu">Timbuktu (UTC+0)</option>
+            
+              <option value="Africa&#x2f;Tripoli">Tripoli (UTC+2)</option>
+            
+              <option value="Africa&#x2f;Tunis">Tunis (UTC+1)</option>
+            
+              <option value="Africa&#x2f;Windhoek">Windhoek (UTC+2)</option>
+            
+            </optgroup>
+          
+            <optgroup label="Америка">
+            
+              <option value="America&#x2f;Adak">Adak (UTC-10)</option>
+            
+              <option value="America&#x2f;Anguilla">Anguilla (UTC-4)</option>
+            
+              <option value="America&#x2f;Antigua">Antigua (UTC-4)</option>
+            
+              <option value="America&#x2f;Araguaina">Araguaina (UTC-3)</option>
+            
+              <option value="America&#x2f;Aruba">Aruba (UTC-4)</option>
+            
+              <option value="America&#x2f;Asuncion">Asuncion (UTC-3)</option>
+            
+              <option value="America&#x2f;Atikokan">Atikokan (UTC-5)</option>
+            
+              <option value="America&#x2f;Atka">Atka (UTC-10)</option>
+            
+              <option value="America&#x2f;Bahia">Bahia (UTC-3)</option>
+            
+              <option value="America&#x2f;Bahia_Banderas">Bahia Banderas (UTC-6)</option>
+            
+              <option value="America&#x2f;Barbados">Barbados (UTC-4)</option>
+            
+              <option value="America&#x2f;Belem">Belem (UTC-3)</option>
+            
+              <option value="America&#x2f;Belize">Belize (UTC-6)</option>
+            
+              <option value="America&#x2f;North_Dakota&#x2f;Beulah">Beulah, North Dakota (UTC-6)</option>
+            
+              <option value="America&#x2f;Blanc-Sablon">Blanc-Sablon (UTC-4)</option>
+            
+              <option value="America&#x2f;Boa_Vista">Boa Vista (UTC-4)</option>
+            
+              <option value="America&#x2f;Bogota">Bogota (UTC-5)</option>
+            
+              <option value="America&#x2f;Boise">Boise (UTC-7)</option>
+            
+              <option value="America&#x2f;Argentina&#x2f;Buenos_Aires">Buenos Aires, Argentina (UTC-3)</option>
+            
+              <option value="America&#x2f;Cambridge_Bay">Cambridge Bay (UTC-7)</option>
+            
+              <option value="America&#x2f;Campo_Grande">Campo Grande (UTC-4)</option>
+            
+              <option value="America&#x2f;Cancun">Cancun (UTC-5)</option>
+            
+              <option value="America&#x2f;Caracas">Caracas (UTC-4)</option>
+            
+              <option value="America&#x2f;Argentina&#x2f;Catamarca">Catamarca, Argentina (UTC-3)</option>
+            
+              <option value="America&#x2f;Cayenne">Cayenne (UTC-3)</option>
+            
+              <option value="America&#x2f;Cayman">Cayman (UTC-5)</option>
+            
+              <option value="America&#x2f;North_Dakota&#x2f;Center">Center, North Dakota (UTC-6)</option>
+            
+              <option value="America&#x2f;Chihuahua">Chihuahua (UTC-6)</option>
+            
+              <option value="America&#x2f;Ciudad_Juarez">Ciudad Juarez (UTC-7)</option>
+            
+              <option value="America&#x2f;Argentina&#x2f;ComodRivadavia">Comodoro Rivadavia, Argentina (UTC-3)</option>
+            
+              <option value="America&#x2f;Coral_Harbour">Coral Harbour (UTC-5)</option>
+            
+              <option value="America&#x2f;Argentina&#x2f;Cordoba">Cordoba, Argentina (UTC-3)</option>
+            
+              <option value="America&#x2f;Costa_Rica">Costa Rica (UTC-6)</option>
+            
+              <option value="America&#x2f;Coyhaique">Coyhaique (UTC-3)</option>
+            
+              <option value="America&#x2f;Creston">Creston (UTC-7)</option>
+            
+              <option value="America&#x2f;Cuiaba">Cuiaba (UTC-4)</option>
+            
+              <option value="America&#x2f;Curacao">Curacao (UTC-4)</option>
+            
+              <option value="America&#x2f;Danmarkshavn">Danmarkshavn (UTC+0)</option>
+            
+              <option value="America&#x2f;Dawson">Dawson (UTC-7)</option>
+            
+              <option value="America&#x2f;Dawson_Creek">Dawson Creek (UTC-7)</option>
+            
+              <option value="America&#x2f;Detroit">Detroit (UTC-5)</option>
+            
+              <option value="America&#x2f;Dominica">Dominica (UTC-4)</option>
+            
+              <option value="America&#x2f;Edmonton">Edmonton (UTC-7)</option>
+            
+              <option value="America&#x2f;Eirunepe">Eirunepe (UTC-5)</option>
+            
+              <option value="America&#x2f;El_Salvador">El Salvador (UTC-6)</option>
+            
+              <option value="America&#x2f;Ensenada">Ensenada (UTC-8)</option>
+            
+              <option value="America&#x2f;Fort_Nelson">Fort Nelson (UTC-7)</option>
+            
+              <option value="America&#x2f;Fort_Wayne">Fort Wayne (UTC-5)</option>
+            
+              <option value="America&#x2f;Fortaleza">Fortaleza (UTC-3)</option>
+            
+              <option value="America&#x2f;Glace_Bay">Glace Bay (UTC-4)</option>
+            
+              <option value="America&#x2f;Goose_Bay">Goose Bay (UTC-4)</option>
+            
+              <option value="America&#x2f;Grand_Turk">Grand Turk (UTC-5)</option>
+            
+              <option value="America&#x2f;Grenada">Grenada (UTC-4)</option>
+            
+              <option value="America&#x2f;Guadeloupe">Guadeloupe (UTC-4)</option>
+            
+              <option value="America&#x2f;Guatemala">Guatemala (UTC-6)</option>
+            
+              <option value="America&#x2f;Guayaquil">Guayaquil (UTC-5)</option>
+            
+              <option value="America&#x2f;Guyana">Guyana (UTC-4)</option>
+            
+              <option value="America&#x2f;Halifax">Halifax (UTC-4)</option>
+            
+              <option value="America&#x2f;Havana">Havana (UTC-5)</option>
+            
+              <option value="America&#x2f;Hermosillo">Hermosillo (UTC-7)</option>
+            
+              <option value="America&#x2f;Indiana&#x2f;Indianapolis">Indianapolis, Indiana (UTC-5)</option>
+            
+              <option value="America&#x2f;Inuvik">Inuvik (UTC-7)</option>
+            
+              <option value="America&#x2f;Iqaluit">Iqaluit (UTC-5)</option>
+            
+              <option value="America&#x2f;Jamaica">Jamaica (UTC-5)</option>
+            
+              <option value="America&#x2f;Argentina&#x2f;Jujuy">Jujuy, Argentina (UTC-3)</option>
+            
+              <option value="America&#x2f;Juneau">Juneau (UTC-9)</option>
+            
+              <option value="America&#x2f;Indiana&#x2f;Knox">Knox, Indiana (UTC-6)</option>
+            
+              <option value="America&#x2f;Kralendijk">Kralendijk (UTC-4)</option>
+            
+              <option value="America&#x2f;La_Paz">La Paz (UTC-4)</option>
+            
+              <option value="America&#x2f;Argentina&#x2f;La_Rioja">La Rioja, Argentina (UTC-3)</option>
+            
+              <option value="America&#x2f;Lima">Lima (UTC-5)</option>
+            
+              <option value="America&#x2f;Kentucky&#x2f;Louisville">Louisville, Kentucky (UTC-5)</option>
+            
+              <option value="America&#x2f;Lower_Princes">Lower Princes (UTC-4)</option>
+            
+              <option value="America&#x2f;Maceio">Maceio (UTC-3)</option>
+            
+              <option value="America&#x2f;Managua">Managua (UTC-6)</option>
+            
+              <option value="America&#x2f;Manaus">Manaus (UTC-4)</option>
+            
+              <option value="America&#x2f;Indiana&#x2f;Marengo">Marengo, Indiana (UTC-5)</option>
+            
+              <option value="America&#x2f;Marigot">Marigot (UTC-4)</option>
+            
+              <option value="America&#x2f;Martinique">Martinique (UTC-4)</option>
+            
+              <option value="America&#x2f;Matamoros">Matamoros (UTC-6)</option>
+            
+              <option value="America&#x2f;Mazatlan">Mazatlan (UTC-7)</option>
+            
+              <option value="America&#x2f;Argentina&#x2f;Mendoza">Mendoza, Argentina (UTC-3)</option>
+            
+              <option value="America&#x2f;Menominee">Menominee (UTC-6)</option>
+            
+              <option value="America&#x2f;Merida">Merida (UTC-6)</option>
+            
+              <option value="America&#x2f;Metlakatla">Metlakatla (UTC-9)</option>
+            
+              <option value="America&#x2f;Mexico_City">Mexico City (UTC-6)</option>
+            
+              <option value="America&#x2f;Miquelon">Miquelon (UTC-3)</option>
+            
+              <option value="America&#x2f;Moncton">Moncton (UTC-4)</option>
+            
+              <option value="America&#x2f;Monterrey">Monterrey (UTC-6)</option>
+            
+              <option value="America&#x2f;Montevideo">Montevideo (UTC-3)</option>
+            
+              <option value="America&#x2f;Kentucky&#x2f;Monticello">Monticello, Kentucky (UTC-5)</option>
+            
+              <option value="America&#x2f;Montreal">Montreal (UTC-5)</option>
+            
+              <option value="America&#x2f;Montserrat">Montserrat (UTC-4)</option>
+            
+              <option value="America&#x2f;Nassau">Nassau (UTC-5)</option>
+            
+              <option value="America&#x2f;North_Dakota&#x2f;New_Salem">New Salem, North Dakota (UTC-6)</option>
+            
+              <option value="America&#x2f;Nipigon">Nipigon (UTC-5)</option>
+            
+              <option value="America&#x2f;Nome">Nome (UTC-9)</option>
+            
+              <option value="America&#x2f;Noronha">Noronha (UTC-2)</option>
+            
+              <option value="America&#x2f;Nuuk">Nuuk (UTC-2)</option>
+            
+              <option value="America&#x2f;Ojinaga">Ojinaga (UTC-6)</option>
+            
+              <option value="America&#x2f;Panama">Panama (UTC-5)</option>
+            
+              <option value="America&#x2f;Pangnirtung">Pangnirtung (UTC-5)</option>
+            
+              <option value="America&#x2f;Paramaribo">Paramaribo (UTC-3)</option>
+            
+              <option value="America&#x2f;Indiana&#x2f;Petersburg">Petersburg, Indiana (UTC-5)</option>
+            
+              <option value="America&#x2f;Phoenix">Phoenix (UTC-7)</option>
+            
+              <option value="America&#x2f;Port_of_Spain">Port of Spain (UTC-4)</option>
+            
+              <option value="America&#x2f;Port-au-Prince">Port-au-Prince (UTC-5)</option>
+            
+              <option value="America&#x2f;Porto_Velho">Porto Velho (UTC-4)</option>
+            
+              <option value="America&#x2f;Puerto_Rico">Puerto Rico (UTC-4)</option>
+            
+              <option value="America&#x2f;Punta_Arenas">Punta Arenas (UTC-3)</option>
+            
+              <option value="America&#x2f;Rainy_River">Rainy River (UTC-6)</option>
+            
+              <option value="America&#x2f;Rankin_Inlet">Rankin Inlet (UTC-6)</option>
+            
+              <option value="America&#x2f;Recife">Recife (UTC-3)</option>
+            
+              <option value="America&#x2f;Regina">Regina (UTC-6)</option>
+            
+              <option value="America&#x2f;Resolute">Resolute (UTC-6)</option>
+            
+              <option value="America&#x2f;Rio_Branco">Rio Branco (UTC-5)</option>
+            
+              <option value="America&#x2f;Argentina&#x2f;Rio_Gallegos">Rio Gallegos, Argentina (UTC-3)</option>
+            
+              <option value="America&#x2f;Rosario">Rosario (UTC-3)</option>
+            
+              <option value="America&#x2f;Argentina&#x2f;Salta">Salta, Argentina (UTC-3)</option>
+            
+              <option value="America&#x2f;Argentina&#x2f;San_Juan">San Juan, Argentina (UTC-3)</option>
+            
+              <option value="America&#x2f;Argentina&#x2f;San_Luis">San Luis, Argentina (UTC-3)</option>
+            
+              <option value="America&#x2f;Santa_Isabel">Santa Isabel (UTC-8)</option>
+            
+              <option value="America&#x2f;Santarem">Santarem (UTC-3)</option>
+            
+              <option value="America&#x2f;Santiago">Santiago (UTC-3)</option>
+            
+              <option value="America&#x2f;Santo_Domingo">Santo Domingo (UTC-4)</option>
+            
+              <option value="America&#x2f;Scoresbysund">Scoresbysund (UTC-2)</option>
+            
+              <option value="America&#x2f;Shiprock">Shiprock (UTC-7)</option>
+            
+              <option value="America&#x2f;Sitka">Sitka (UTC-9)</option>
+            
+              <option value="America&#x2f;St_Barthelemy">St Barthelemy (UTC-4)</option>
+            
+              <option value="America&#x2f;St_Johns">St Johns (UTC-3:30)</option>
+            
+              <option value="America&#x2f;St_Kitts">St Kitts (UTC-4)</option>
+            
+              <option value="America&#x2f;St_Lucia">St Lucia (UTC-4)</option>
+            
+              <option value="America&#x2f;St_Thomas">St Thomas (UTC-4)</option>
+            
+              <option value="America&#x2f;St_Vincent">St Vincent (UTC-4)</option>
+            
+              <option value="America&#x2f;Swift_Current">Swift Current (UTC-6)</option>
+            
+              <option value="America&#x2f;Tegucigalpa">Tegucigalpa (UTC-6)</option>
+            
+              <option value="America&#x2f;Indiana&#x2f;Tell_City">Tell City, Indiana (UTC-6)</option>
+            
+              <option value="America&#x2f;Thule">Thule (UTC-4)</option>
+            
+              <option value="America&#x2f;Thunder_Bay">Thunder Bay (UTC-5)</option>
+            
+              <option value="America&#x2f;Tijuana">Tijuana (UTC-8)</option>
+            
+              <option value="America&#x2f;Toronto">Toronto (UTC-5)</option>
+            
+              <option value="America&#x2f;Tortola">Tortola (UTC-4)</option>
+            
+              <option value="America&#x2f;Argentina&#x2f;Tucuman">Tucuman, Argentina (UTC-3)</option>
+            
+              <option value="America&#x2f;Argentina&#x2f;Ushuaia">Ushuaia, Argentina (UTC-3)</option>
+            
+              <option value="America&#x2f;Vancouver">Vancouver (UTC-7)</option>
+            
+              <option value="America&#x2f;Indiana&#x2f;Vevay">Vevay, Indiana (UTC-5)</option>
+            
+              <option value="America&#x2f;Indiana&#x2f;Vincennes">Vincennes, Indiana (UTC-5)</option>
+            
+              <option value="America&#x2f;Whitehorse">Whitehorse (UTC-7)</option>
+            
+              <option value="America&#x2f;Indiana&#x2f;Winamac">Winamac, Indiana (UTC-5)</option>
+            
+              <option value="America&#x2f;Winnipeg">Winnipeg (UTC-6)</option>
+            
+              <option value="America&#x2f;Yakutat">Yakutat (UTC-9)</option>
+            
+              <option value="America&#x2f;Yellowknife">Yellowknife (UTC-7)</option>
+            
+            </optgroup>
+          
+            <optgroup label="Антарктида">
+            
+              <option value="Antarctica&#x2f;Casey">Casey (UTC+8)</option>
+            
+              <option value="Antarctica&#x2f;Davis">Davis (UTC+7)</option>
+            
+              <option value="Antarctica&#x2f;DumontDUrville">Dumont d&#x27;Urville (UTC+10)</option>
+            
+              <option value="Antarctica&#x2f;Macquarie">Macquarie (UTC+11)</option>
+            
+              <option value="Antarctica&#x2f;Mawson">Mawson (UTC+5)</option>
+            
+              <option value="Antarctica&#x2f;McMurdo">McMurdo (UTC+13)</option>
+            
+              <option value="Antarctica&#x2f;Palmer">Palmer (UTC-3)</option>
+            
+              <option value="Antarctica&#x2f;Rothera">Rothera (UTC-3)</option>
+            
+              <option value="Antarctica&#x2f;South_Pole">South Pole (UTC+13)</option>
+            
+              <option value="Antarctica&#x2f;Syowa">Syowa (UTC+3)</option>
+            
+              <option value="Antarctica&#x2f;Troll">Troll (UTC+0)</option>
+            
+              <option value="Antarctica&#x2f;Vostok">Vostok (UTC+5)</option>
+            
+            </optgroup>
+          
+            <optgroup label="Арктика">
+            
+              <option value="Arctic&#x2f;Longyearbyen">Longyearbyen (UTC+1)</option>
+            
+            </optgroup>
+          
+            <optgroup label="Азия">
+            
+              <option value="Asia&#x2f;Aden">Aden (UTC+3)</option>
+            
+              <option value="Asia&#x2f;Almaty">Almaty (UTC+5)</option>
+            
+              <option value="Asia&#x2f;Amman">Amman (UTC+3)</option>
+            
+              <option value="Asia&#x2f;Anadyr">Anadyr (UTC+12)</option>
+            
+              <option value="Asia&#x2f;Aqtau">Aqtau (UTC+5)</option>
+            
+              <option value="Asia&#x2f;Aqtobe">Aqtobe (UTC+5)</option>
+            
+              <option value="Asia&#x2f;Ashgabat">Ashgabat (UTC+5)</option>
+            
+              <option value="Asia&#x2f;Atyrau">Atyrau (UTC+5)</option>
+            
+              <option value="Asia&#x2f;Baghdad">Baghdad (UTC+3)</option>
+            
+              <option value="Asia&#x2f;Bahrain">Bahrain (UTC+3)</option>
+            
+              <option value="Asia&#x2f;Baku">Baku (UTC+4)</option>
+            
+              <option value="Asia&#x2f;Barnaul">Barnaul (UTC+7)</option>
+            
+              <option value="Asia&#x2f;Beirut">Beirut (UTC+2)</option>
+            
+              <option value="Asia&#x2f;Bishkek">Bishkek (UTC+6)</option>
+            
+              <option value="Asia&#x2f;Brunei">Brunei (UTC+8)</option>
+            
+              <option value="Asia&#x2f;Chita">Chita (UTC+9)</option>
+            
+              <option value="Asia&#x2f;Choibalsan">Choibalsan (UTC+8)</option>
+            
+              <option value="Asia&#x2f;Chongqing">Chongqing (UTC+8)</option>
+            
+              <option value="Asia&#x2f;Colombo">Colombo (UTC+5:30)</option>
+            
+              <option value="Asia&#x2f;Damascus">Damascus (UTC+3)</option>
+            
+              <option value="Asia&#x2f;Dhaka">Dhaka (UTC+6)</option>
+            
+              <option value="Asia&#x2f;Dili">Dili (UTC+9)</option>
+            
+              <option value="Asia&#x2f;Dushanbe">Dushanbe (UTC+5)</option>
+            
+              <option value="Asia&#x2f;Famagusta">Famagusta (UTC+2)</option>
+            
+              <option value="Asia&#x2f;Gaza">Gaza (UTC+2)</option>
+            
+              <option value="Asia&#x2f;Harbin">Harbin (UTC+8)</option>
+            
+              <option value="Asia&#x2f;Hebron">Hebron (UTC+2)</option>
+            
+              <option value="Asia&#x2f;Ho_Chi_Minh">Ho Chi Minh (UTC+7)</option>
+            
+              <option value="Asia&#x2f;Hong_Kong">Hong Kong (UTC+8)</option>
+            
+              <option value="Asia&#x2f;Hovd">Hovd (UTC+7)</option>
+            
+              <option value="Asia&#x2f;Irkutsk">Irkutsk (UTC+8)</option>
+            
+              <option value="Asia&#x2f;Jakarta">Jakarta (UTC+7)</option>
+            
+              <option value="Asia&#x2f;Jayapura">Jayapura (UTC+9)</option>
+            
+              <option value="Asia&#x2f;Jerusalem">Jerusalem (UTC+2)</option>
+            
+              <option value="Asia&#x2f;Kabul">Kabul (UTC+4:30)</option>
+            
+              <option value="Asia&#x2f;Kamchatka">Kamchatka (UTC+12)</option>
+            
+              <option value="Asia&#x2f;Karachi">Karachi (UTC+5)</option>
+            
+              <option value="Asia&#x2f;Kashgar">Kashgar (UTC+6)</option>
+            
+              <option value="Asia&#x2f;Kathmandu">Kathmandu (UTC+5:45)</option>
+            
+              <option value="Asia&#x2f;Khandyga">Khandyga (UTC+9)</option>
+            
+              <option value="Asia&#x2f;Krasnoyarsk">Krasnoyarsk (UTC+7)</option>
+            
+              <option value="Asia&#x2f;Kuala_Lumpur">Kuala Lumpur (UTC+8)</option>
+            
+              <option value="Asia&#x2f;Kuching">Kuching (UTC+8)</option>
+            
+              <option value="Asia&#x2f;Kuwait">Kuwait (UTC+3)</option>
+            
+              <option value="Asia&#x2f;Macau">Macau (UTC+8)</option>
+            
+              <option value="Asia&#x2f;Magadan">Magadan (UTC+11)</option>
+            
+              <option value="Asia&#x2f;Makassar">Makassar (UTC+8)</option>
+            
+              <option value="Asia&#x2f;Manila">Manila (UTC+8)</option>
+            
+              <option value="Asia&#x2f;Muscat">Muscat (UTC+4)</option>
+            
+              <option value="Asia&#x2f;Nicosia">Nicosia (UTC+2)</option>
+            
+              <option value="Asia&#x2f;Novokuznetsk">Novokuznetsk (UTC+7)</option>
+            
+              <option value="Asia&#x2f;Novosibirsk">Novosibirsk (UTC+7)</option>
+            
+              <option value="Asia&#x2f;Omsk">Omsk (UTC+6)</option>
+            
+              <option value="Asia&#x2f;Oral">Oral (UTC+5)</option>
+            
+              <option value="Asia&#x2f;Phnom_Penh">Phnom Penh (UTC+7)</option>
+            
+              <option value="Asia&#x2f;Pontianak">Pontianak (UTC+7)</option>
+            
+              <option value="Asia&#x2f;Pyongyang">Pyongyang (UTC+9)</option>
+            
+              <option value="Asia&#x2f;Qatar">Qatar (UTC+3)</option>
+            
+              <option value="Asia&#x2f;Qostanay">Qostanay (UTC+5)</option>
+            
+              <option value="Asia&#x2f;Qyzylorda">Qyzylorda (UTC+5)</option>
+            
+              <option value="Asia&#x2f;Riyadh">Riyadh (UTC+3)</option>
+            
+              <option value="Asia&#x2f;Sakhalin">Sakhalin (UTC+11)</option>
+            
+              <option value="Asia&#x2f;Samarkand">Samarkand (UTC+5)</option>
+            
+              <option value="Asia&#x2f;Seoul">Seoul (UTC+9)</option>
+            
+              <option value="Asia&#x2f;Singapore">Singapore (UTC+8)</option>
+            
+              <option value="Asia&#x2f;Srednekolymsk">Srednekolymsk (UTC+11)</option>
+            
+              <option value="Asia&#x2f;Taipei">Taipei (UTC+8)</option>
+            
+              <option value="Asia&#x2f;Tashkent">Tashkent (UTC+5)</option>
+            
+              <option value="Asia&#x2f;Tbilisi">Tbilisi (UTC+4)</option>
+            
+              <option value="Asia&#x2f;Tehran">Tehran (UTC+3:30)</option>
+            
+              <option value="Asia&#x2f;Tel_Aviv">Tel Aviv (UTC+2)</option>
+            
+              <option value="Asia&#x2f;Thimphu">Thimphu (UTC+6)</option>
+            
+              <option value="Asia&#x2f;Tomsk">Tomsk (UTC+7)</option>
+            
+              <option value="Asia&#x2f;Ulaanbaatar">Ulaanbaatar (UTC+8)</option>
+            
+              <option value="Asia&#x2f;Urumqi">Urumqi (UTC+6)</option>
+            
+              <option value="Asia&#x2f;Ust-Nera">Ust-Nera (UTC+10)</option>
+            
+              <option value="Asia&#x2f;Vientiane">Vientiane (UTC+7)</option>
+            
+              <option value="Asia&#x2f;Vladivostok">Vladivostok (UTC+10)</option>
+            
+              <option value="Asia&#x2f;Yakutsk">Yakutsk (UTC+9)</option>
+            
+              <option value="Asia&#x2f;Yangon">Yangon (UTC+6:30)</option>
+            
+              <option value="Asia&#x2f;Yekaterinburg">Yekaterinburg (UTC+5)</option>
+            
+              <option value="Asia&#x2f;Yerevan">Yerevan (UTC+4)</option>
+            
+            </optgroup>
+          
+            <optgroup label="Атлантический океан">
+            
+              <option value="Atlantic&#x2f;Azores">Azores (UTC-1)</option>
+            
+              <option value="Atlantic&#x2f;Bermuda">Bermuda (UTC-4)</option>
+            
+              <option value="Atlantic&#x2f;Canary">Canary (UTC+0)</option>
+            
+              <option value="Atlantic&#x2f;Faroe">Faroe (UTC+0)</option>
+            
+              <option value="Atlantic&#x2f;Jan_Mayen">Jan Mayen (UTC+1)</option>
+            
+              <option value="Atlantic&#x2f;Madeira">Madeira (UTC+0)</option>
+            
+              <option value="Atlantic&#x2f;Reykjavik">Reykjavik (UTC+0)</option>
+            
+              <option value="Atlantic&#x2f;South_Georgia">South Georgia (UTC-2)</option>
+            
+              <option value="Atlantic&#x2f;St_Helena">St Helena (UTC+0)</option>
+            
+              <option value="Atlantic&#x2f;Stanley">Stanley (UTC-3)</option>
+            
+            </optgroup>
+          
+            <optgroup label="Австралия">
+            
+              <option value="Australia&#x2f;Adelaide">Adelaide (UTC+10:30)</option>
+            
+              <option value="Australia&#x2f;Brisbane">Brisbane (UTC+10)</option>
+            
+              <option value="Australia&#x2f;Broken_Hill">Broken Hill (UTC+10:30)</option>
+            
+              <option value="Australia&#x2f;Canberra">Canberra (UTC+11)</option>
+            
+              <option value="Australia&#x2f;Currie">Currie (UTC+11)</option>
+            
+              <option value="Australia&#x2f;Darwin">Darwin (UTC+9:30)</option>
+            
+              <option value="Australia&#x2f;Eucla">Eucla (UTC+8:45)</option>
+            
+              <option value="Australia&#x2f;Hobart">Hobart (UTC+11)</option>
+            
+              <option value="Australia&#x2f;Lindeman">Lindeman (UTC+10)</option>
+            
+              <option value="Australia&#x2f;Lord_Howe">Lord Howe (UTC+11)</option>
+            
+              <option value="Australia&#x2f;Melbourne">Melbourne (UTC+11)</option>
+            
+              <option value="Australia&#x2f;Perth">Perth (UTC+8)</option>
+            
+            </optgroup>
+          
+            <optgroup label="Европа">
+            
+              <option value="Europe&#x2f;Amsterdam">Amsterdam (UTC+1)</option>
+            
+              <option value="Europe&#x2f;Andorra">Andorra (UTC+1)</option>
+            
+              <option value="Europe&#x2f;Astrakhan">Astrakhan (UTC+4)</option>
+            
+              <option value="Europe&#x2f;Athens">Athens (UTC+2)</option>
+            
+              <option value="Europe&#x2f;Belfast">Belfast (UTC+0)</option>
+            
+              <option value="Europe&#x2f;Belgrade">Belgrade (UTC+1)</option>
+            
+              <option value="Europe&#x2f;Berlin">Berlin (UTC+1)</option>
+            
+              <option value="Europe&#x2f;Bratislava">Bratislava (UTC+1)</option>
+            
+              <option value="Europe&#x2f;Brussels">Brussels (UTC+1)</option>
+            
+              <option value="Europe&#x2f;Bucharest">Bucharest (UTC+2)</option>
+            
+              <option value="Europe&#x2f;Budapest">Budapest (UTC+1)</option>
+            
+              <option value="Europe&#x2f;Busingen">Busingen (UTC+1)</option>
+            
+              <option value="Europe&#x2f;Chisinau">Chisinau (UTC+2)</option>
+            
+              <option value="Europe&#x2f;Copenhagen">Copenhagen (UTC+1)</option>
+            
+              <option value="Europe&#x2f;Dublin">Dublin (UTC+0)</option>
+            
+              <option value="Europe&#x2f;Gibraltar">Gibraltar (UTC+1)</option>
+            
+              <option value="Europe&#x2f;Guernsey">Guernsey (UTC+0)</option>
+            
+              <option value="Europe&#x2f;Isle_of_Man">Isle of Man (UTC+0)</option>
+            
+              <option value="Europe&#x2f;Istanbul">Istanbul (UTC+3)</option>
+            
+              <option value="Europe&#x2f;Jersey">Jersey (UTC+0)</option>
+            
+              <option value="Europe&#x2f;Kaliningrad">Kaliningrad (UTC+2)</option>
+            
+              <option value="Europe&#x2f;Kirov">Kirov (UTC+3)</option>
+            
+              <option value="Europe&#x2f;Kyiv">Kyiv (UTC+2)</option>
+            
+              <option value="Europe&#x2f;Lisbon">Lisbon (UTC+0)</option>
+            
+              <option value="Europe&#x2f;Ljubljana">Ljubljana (UTC+1)</option>
+            
+              <option value="Europe&#x2f;Luxembourg">Luxembourg (UTC+1)</option>
+            
+              <option value="Europe&#x2f;Madrid">Madrid (UTC+1)</option>
+            
+              <option value="Europe&#x2f;Malta">Malta (UTC+1)</option>
+            
+              <option value="Europe&#x2f;Mariehamn">Mariehamn (UTC+2)</option>
+            
+              <option value="Europe&#x2f;Minsk">Minsk (UTC+3)</option>
+            
+              <option value="Europe&#x2f;Monaco">Monaco (UTC+1)</option>
+            
+              <option value="Europe&#x2f;Oslo">Oslo (UTC+1)</option>
+            
+              <option value="Europe&#x2f;Podgorica">Podgorica (UTC+1)</option>
+            
+              <option value="Europe&#x2f;Prague">Prague (UTC+1)</option>
+            
+              <option value="Europe&#x2f;Riga">Riga (UTC+2)</option>
+            
+              <option value="Europe&#x2f;Rome">Rome (UTC+1)</option>
+            
+              <option value="Europe&#x2f;Samara">Samara (UTC+4)</option>
+            
+              <option value="Europe&#x2f;San_Marino">San Marino (UTC+1)</option>
+            
+              <option value="Europe&#x2f;Sarajevo">Sarajevo (UTC+1)</option>
+            
+              <option value="Europe&#x2f;Saratov">Saratov (UTC+4)</option>
+            
+              <option value="Europe&#x2f;Simferopol">Simferopol (UTC+3)</option>
+            
+              <option value="Europe&#x2f;Skopje">Skopje (UTC+1)</option>
+            
+              <option value="Europe&#x2f;Sofia">Sofia (UTC+2)</option>
+            
+              <option value="Europe&#x2f;Stockholm">Stockholm (UTC+1)</option>
+            
+              <option value="Europe&#x2f;Tallinn">Tallinn (UTC+2)</option>
+            
+              <option value="Europe&#x2f;Tirane">Tirane (UTC+1)</option>
+            
+              <option value="Europe&#x2f;Tiraspol">Tiraspol (UTC+2)</option>
+            
+              <option value="Europe&#x2f;Ulyanovsk">Ulyanovsk (UTC+4)</option>
+            
+              <option value="Europe&#x2f;Uzhgorod">Uzhgorod (UTC+2)</option>
+            
+              <option value="Europe&#x2f;Vaduz">Vaduz (UTC+1)</option>
+            
+              <option value="Europe&#x2f;Vatican">Vatican (UTC+1)</option>
+            
+              <option value="Europe&#x2f;Vienna">Vienna (UTC+1)</option>
+            
+              <option value="Europe&#x2f;Vilnius">Vilnius (UTC+2)</option>
+            
+              <option value="Europe&#x2f;Volgograd">Volgograd (UTC+3)</option>
+            
+              <option value="Europe&#x2f;Warsaw">Warsaw (UTC+1)</option>
+            
+              <option value="Europe&#x2f;Zagreb">Zagreb (UTC+1)</option>
+            
+              <option value="Europe&#x2f;Zaporozhye">Zaporozhye (UTC+2)</option>
+            
+              <option value="Europe&#x2f;Zurich">Zurich (UTC+1)</option>
+            
+            </optgroup>
+          
+            <optgroup label="Индийский океан">
+            
+              <option value="Indian&#x2f;Antananarivo">Antananarivo (UTC+3)</option>
+            
+              <option value="Indian&#x2f;Chagos">Chagos (UTC+6)</option>
+            
+              <option value="Indian&#x2f;Christmas">Christmas (UTC+7)</option>
+            
+              <option value="Indian&#x2f;Cocos">Cocos (UTC+6:30)</option>
+            
+              <option value="Indian&#x2f;Comoro">Comoro (UTC+3)</option>
+            
+              <option value="Indian&#x2f;Kerguelen">Kerguelen (UTC+5)</option>
+            
+              <option value="Indian&#x2f;Mahe">Mahe (UTC+4)</option>
+            
+              <option value="Indian&#x2f;Maldives">Maldives (UTC+5)</option>
+            
+              <option value="Indian&#x2f;Mauritius">Mauritius (UTC+4)</option>
+            
+              <option value="Indian&#x2f;Mayotte">Mayotte (UTC+3)</option>
+            
+              <option value="Indian&#x2f;Reunion">Reunion (UTC+4)</option>
+            
+            </optgroup>
+          
+            <optgroup label="Тихий океан">
+            
+              <option value="Pacific&#x2f;Apia">Apia (UTC+13)</option>
+            
+              <option value="Pacific&#x2f;Bougainville">Bougainville (UTC+11)</option>
+            
+              <option value="Pacific&#x2f;Chatham">Chatham (UTC+13:45)</option>
+            
+              <option value="Pacific&#x2f;Chuuk">Chuuk (UTC+10)</option>
+            
+              <option value="Pacific&#x2f;Easter">Easter (UTC-5)</option>
+            
+              <option value="Pacific&#x2f;Efate">Efate (UTC+11)</option>
+            
+              <option value="Pacific&#x2f;Enderbury">Enderbury (UTC+13)</option>
+            
+              <option value="Pacific&#x2f;Fakaofo">Fakaofo (UTC+13)</option>
+            
+              <option value="Pacific&#x2f;Fiji">Fiji (UTC+12)</option>
+            
+              <option value="Pacific&#x2f;Funafuti">Funafuti (UTC+12)</option>
+            
+              <option value="Pacific&#x2f;Galapagos">Galapagos (UTC-6)</option>
+            
+              <option value="Pacific&#x2f;Gambier">Gambier (UTC-9)</option>
+            
+              <option value="Pacific&#x2f;Guadalcanal">Guadalcanal (UTC+11)</option>
+            
+              <option value="Pacific&#x2f;Guam">Guam (UTC+10)</option>
+            
+              <option value="Pacific&#x2f;Johnston">Johnston (UTC-10)</option>
+            
+              <option value="Pacific&#x2f;Kanton">Kanton (UTC+13)</option>
+            
+              <option value="Pacific&#x2f;Kiritimati">Kiritimati (UTC+14)</option>
+            
+              <option value="Pacific&#x2f;Kosrae">Kosrae (UTC+11)</option>
+            
+              <option value="Pacific&#x2f;Kwajalein">Kwajalein (UTC+12)</option>
+            
+              <option value="Pacific&#x2f;Majuro">Majuro (UTC+12)</option>
+            
+              <option value="Pacific&#x2f;Marquesas">Marquesas (UTC-9:30)</option>
+            
+              <option value="Pacific&#x2f;Nauru">Nauru (UTC+12)</option>
+            
+              <option value="Pacific&#x2f;Niue">Niue (UTC-11)</option>
+            
+              <option value="Pacific&#x2f;Norfolk">Norfolk (UTC+12)</option>
+            
+              <option value="Pacific&#x2f;Noumea">Noumea (UTC+11)</option>
+            
+              <option value="Pacific&#x2f;Pago_Pago">Pago Pago (UTC-11)</option>
+            
+              <option value="Pacific&#x2f;Palau">Palau (UTC+9)</option>
+            
+              <option value="Pacific&#x2f;Pitcairn">Pitcairn (UTC-8)</option>
+            
+              <option value="Pacific&#x2f;Pohnpei">Pohnpei (UTC+11)</option>
+            
+              <option value="Pacific&#x2f;Port_Moresby">Port Moresby (UTC+10)</option>
+            
+              <option value="Pacific&#x2f;Rarotonga">Rarotonga (UTC-10)</option>
+            
+              <option value="Pacific&#x2f;Saipan">Saipan (UTC+10)</option>
+            
+              <option value="Pacific&#x2f;Tahiti">Tahiti (UTC-10)</option>
+            
+              <option value="Pacific&#x2f;Tarawa">Tarawa (UTC+12)</option>
+            
+              <option value="Pacific&#x2f;Tongatapu">Tongatapu (UTC+13)</option>
+            
+              <option value="Pacific&#x2f;Wake">Wake (UTC+12)</option>
+            
+              <option value="Pacific&#x2f;Wallis">Wallis (UTC+12)</option>
+            
+              <option value="Pacific&#x2f;Yap">Yap (UTC+10)</option>
+            
+            </optgroup>
+          
+        </select>
+      </div>
+      <div class="slots-info-setting">
+        <span class="slots-info-setting-label" id="tf-label">Формат времени</span>
+        <div id="time-format-toggle" class="time-format-toggle" role="group" aria-labelledby="tf-label">
+          <button type="button" data-format="24" aria-pressed="false">24 ч</button>
+          <button type="button" data-format="12" aria-pressed="false">12 ч</button>
+        </div>
+      </div>
+    </div>
+    
+  </div>
+
+  
+  <!-- Calendar data (extractable by AJAX) -->
+  <script type="application/json" id="calendar-data">
+  {
+    "slotData": {
+      "2026-11-13": [{"start":"09:00","guestDate":"2026-11-13","hostDate":"2026-11-13","hostTime":"09:00"},{"start":"09:30","guestDate":"2026-11-13","hostDate":"2026-11-13","hostTime":"09:30"},{"start":"10:00","guestDate":"2026-11-13","hostDate":"2026-11-13","hostTime":"10:00"},{"start":"10:30","guestDate":"2026-11-13","hostDate":"2026-11-13","hostTime":"10:30"},{"start":"11:00","guestDate":"2026-11-13","hostDate":"2026-11-13","hostTime":"11:00"},{"start":"11:30","guestDate":"2026-11-13","hostDate":"2026-11-13","hostTime":"11:30"},{"start":"12:00","guestDate":"2026-11-13","hostDate":"2026-11-13","hostTime":"12:00"},{"start":"12:30","guestDate":"2026-11-13","hostDate":"2026-11-13","hostTime":"12:30"},{"start":"13:00","guestDate":"2026-11-13","hostDate":"2026-11-13","hostTime":"13:00"},{"start":"13:30","guestDate":"2026-11-13","hostDate":"2026-11-13","hostTime":"13:30"},{"start":"14:00","guestDate":"2026-11-13","hostDate":"2026-11-13","hostTime":"14:00"},{"start":"14:30","guestDate":"2026-11-13","hostDate":"2026-11-13","hostTime":"14:30"},{"start":"15:00","guestDate":"2026-11-13","hostDate":"2026-11-13","hostTime":"15:00"},{"start":"15:30","guestDate":"2026-11-13","hostDate":"2026-11-13","hostTime":"15:30"},{"start":"16:00","guestDate":"2026-11-13","hostDate":"2026-11-13","hostTime":"16:00"},{"start":"16:30","guestDate":"2026-11-13","hostDate":"2026-11-13","hostTime":"16:30"}],"2026-11-16": [{"start":"09:00","guestDate":"2026-11-16","hostDate":"2026-11-16","hostTime":"09:00"},{"start":"09:30","guestDate":"2026-11-16","hostDate":"2026-11-16","hostTime":"09:30"},{"start":"10:00","guestDate":"2026-11-16","hostDate":"2026-11-16","hostTime":"10:00"},{"start":"10:30","guestDate":"2026-11-16","hostDate":"2026-11-16","hostTime":"10:30"},{"start":"11:00","guestDate":"2026-11-16","hostDate":"2026-11-16","hostTime":"11:00"},{"start":"11:30","guestDate":"2026-11-16","hostDate":"2026-11-16","hostTime":"11:30"},{"start":"12:00","guestDate":"2026-11-16","hostDate":"2026-11-16","hostTime":"12:00"},{"start":"12:30","guestDate":"2026-11-16","hostDate":"2026-11-16","hostTime":"12:30"},{"start":"13:00","guestDate":"2026-11-16","hostDate":"2026-11-16","hostTime":"13:00"},{"start":"13:30","guestDate":"2026-11-16","hostDate":"2026-11-16","hostTime":"13:30"},{"start":"14:00","guestDate":"2026-11-16","hostDate":"2026-11-16","hostTime":"14:00"},{"start":"14:30","guestDate":"2026-11-16","hostDate":"2026-11-16","hostTime":"14:30"},{"start":"15:00","guestDate":"2026-11-16","hostDate":"2026-11-16","hostTime":"15:00"},{"start":"15:30","guestDate":"2026-11-16","hostDate":"2026-11-16","hostTime":"15:30"},{"start":"16:00","guestDate":"2026-11-16","hostDate":"2026-11-16","hostTime":"16:00"},{"start":"16:30","guestDate":"2026-11-16","hostDate":"2026-11-16","hostTime":"16:30"}],"2026-11-17": [{"start":"09:00","guestDate":"2026-11-17","hostDate":"2026-11-17","hostTime":"09:00"},{"start":"09:30","guestDate":"2026-11-17","hostDate":"2026-11-17","hostTime":"09:30"},{"start":"10:00","guestDate":"2026-11-17","hostDate":"2026-11-17","hostTime":"10:00"},{"start":"10:30","guestDate":"2026-11-17","hostDate":"2026-11-17","hostTime":"10:30"},{"start":"11:00","guestDate":"2026-11-17","hostDate":"2026-11-17","hostTime":"11:00"},{"start":"11:30","guestDate":"2026-11-17","hostDate":"2026-11-17","hostTime":"11:30"},{"start":"12:00","guestDate":"2026-11-17","hostDate":"2026-11-17","hostTime":"12:00"},{"start":"12:30","guestDate":"2026-11-17","hostDate":"2026-11-17","hostTime":"12:30"},{"start":"13:00","guestDate":"2026-11-17","hostDate":"2026-11-17","hostTime":"13:00"},{"start":"13:30","guestDate":"2026-11-17","hostDate":"2026-11-17","hostTime":"13:30"},{"start":"14:00","guestDate":"2026-11-17","hostDate":"2026-11-17","hostTime":"14:00"},{"start":"14:30","guestDate":"2026-11-17","hostDate":"2026-11-17","hostTime":"14:30"},{"start":"15:00","guestDate":"2026-11-17","hostDate":"2026-11-17","hostTime":"15:00"},{"start":"15:30","guestDate":"2026-11-17","hostDate":"2026-11-17","hostTime":"15:30"},{"start":"16:00","guestDate":"2026-11-17","hostDate":"2026-11-17","hostTime":"16:00"},{"start":"16:30","guestDate":"2026-11-17","hostDate":"2026-11-17","hostTime":"16:30"}],"2026-11-18": [{"start":"09:00","guestDate":"2026-11-18","hostDate":"2026-11-18","hostTime":"09:00"},{"start":"09:30","guestDate":"2026-11-18","hostDate":"2026-11-18","hostTime":"09:30"},{"start":"10:00","guestDate":"2026-11-18","hostDate":"2026-11-18","hostTime":"10:00"},{"start":"10:30","guestDate":"2026-11-18","hostDate":"2026-11-18","hostTime":"10:30"},{"start":"11:00","guestDate":"2026-11-18","hostDate":"2026-11-18","hostTime":"11:00"},{"start":"11:30","guestDate":"2026-11-18","hostDate":"2026-11-18","hostTime":"11:30"},{"start":"12:00","guestDate":"2026-11-18","hostDate":"2026-11-18","hostTime":"12:00"},{"start":"12:30","guestDate":"2026-11-18","hostDate":"2026-11-18","hostTime":"12:30"},{"start":"13:00","guestDate":"2026-11-18","hostDate":"2026-11-18","hostTime":"13:00"},{"start":"13:30","guestDate":"2026-11-18","hostDate":"2026-11-18","hostTime":"13:30"},{"start":"14:00","guestDate":"2026-11-18","hostDate":"2026-11-18","hostTime":"14:00"},{"start":"14:30","guestDate":"2026-11-18","hostDate":"2026-11-18","hostTime":"14:30"},{"start":"15:00","guestDate":"2026-11-18","hostDate":"2026-11-18","hostTime":"15:00"},{"start":"15:30","guestDate":"2026-11-18","hostDate":"2026-11-18","hostTime":"15:30"},{"start":"16:00","guestDate":"2026-11-18","hostDate":"2026-11-18","hostTime":"16:00"},{"start":"16:30","guestDate":"2026-11-18","hostDate":"2026-11-18","hostTime":"16:30"}],"2026-11-19": [{"start":"09:00","guestDate":"2026-11-19","hostDate":"2026-11-19","hostTime":"09:00"},{"start":"09:30","guestDate":"2026-11-19","hostDate":"2026-11-19","hostTime":"09:30"},{"start":"10:00","guestDate":"2026-11-19","hostDate":"2026-11-19","hostTime":"10:00"},{"start":"10:30","guestDate":"2026-11-19","hostDate":"2026-11-19","hostTime":"10:30"},{"start":"11:00","guestDate":"2026-11-19","hostDate":"2026-11-19","hostTime":"11:00"},{"start":"11:30","guestDate":"2026-11-19","hostDate":"2026-11-19","hostTime":"11:30"},{"start":"12:00","guestDate":"2026-11-19","hostDate":"2026-11-19","hostTime":"12:00"},{"start":"12:30","guestDate":"2026-11-19","hostDate":"2026-11-19","hostTime":"12:30"},{"start":"13:00","guestDate":"2026-11-19","hostDate":"2026-11-19","hostTime":"13:00"},{"start":"13:30","guestDate":"2026-11-19","hostDate":"2026-11-19","hostTime":"13:30"},{"start":"14:00","guestDate":"2026-11-19","hostDate":"2026-11-19","hostTime":"14:00"},{"start":"14:30","guestDate":"2026-11-19","hostDate":"2026-11-19","hostTime":"14:30"},{"start":"15:00","guestDate":"2026-11-19","hostDate":"2026-11-19","hostTime":"15:00"},{"start":"15:30","guestDate":"2026-11-19","hostDate":"2026-11-19","hostTime":"15:30"},{"start":"16:00","guestDate":"2026-11-19","hostDate":"2026-11-19","hostTime":"16:00"},{"start":"16:30","guestDate":"2026-11-19","hostDate":"2026-11-19","hostTime":"16:30"}],"2026-11-20": [{"start":"09:00","guestDate":"2026-11-20","hostDate":"2026-11-20","hostTime":"09:00"},{"start":"09:30","guestDate":"2026-11-20","hostDate":"2026-11-20","hostTime":"09:30"},{"start":"10:00","guestDate":"2026-11-20","hostDate":"2026-11-20","hostTime":"10:00"},{"start":"10:30","guestDate":"2026-11-20","hostDate":"2026-11-20","hostTime":"10:30"},{"start":"11:00","guestDate":"2026-11-20","hostDate":"2026-11-20","hostTime":"11:00"},{"start":"11:30","guestDate":"2026-11-20","hostDate":"2026-11-20","hostTime":"11:30"},{"start":"12:00","guestDate":"2026-11-20","hostDate":"2026-11-20","hostTime":"12:00"},{"start":"12:30","guestDate":"2026-11-20","hostDate":"2026-11-20","hostTime":"12:30"},{"start":"13:00","guestDate":"2026-11-20","hostDate":"2026-11-20","hostTime":"13:00"},{"start":"13:30","guestDate":"2026-11-20","hostDate":"2026-11-20","hostTime":"13:30"},{"start":"14:00","guestDate":"2026-11-20","hostDate":"2026-11-20","hostTime":"14:00"},{"start":"14:30","guestDate":"2026-11-20","hostDate":"2026-11-20","hostTime":"14:30"},{"start":"15:00","guestDate":"2026-11-20","hostDate":"2026-11-20","hostTime":"15:00"},{"start":"15:30","guestDate":"2026-11-20","hostDate":"2026-11-20","hostTime":"15:30"},{"start":"16:00","guestDate":"2026-11-20","hostDate":"2026-11-20","hostTime":"16:00"},{"start":"16:30","guestDate":"2026-11-20","hostDate":"2026-11-20","hostTime":"16:30"}],"2026-11-23": [{"start":"09:00","guestDate":"2026-11-23","hostDate":"2026-11-23","hostTime":"09:00"},{"start":"09:30","guestDate":"2026-11-23","hostDate":"2026-11-23","hostTime":"09:30"},{"start":"10:00","guestDate":"2026-11-23","hostDate":"2026-11-23","hostTime":"10:00"},{"start":"10:30","guestDate":"2026-11-23","hostDate":"2026-11-23","hostTime":"10:30"},{"start":"11:00","guestDate":"2026-11-23","hostDate":"2026-11-23","hostTime":"11:00"},{"start":"11:30","guestDate":"2026-11-23","hostDate":"2026-11-23","hostTime":"11:30"},{"start":"12:00","guestDate":"2026-11-23","hostDate":"2026-11-23","hostTime":"12:00"},{"start":"12:30","guestDate":"2026-11-23","hostDate":"2026-11-23","hostTime":"12:30"},{"start":"13:00","guestDate":"2026-11-23","hostDate":"2026-11-23","hostTime":"13:00"},{"start":"13:30","guestDate":"2026-11-23","hostDate":"2026-11-23","hostTime":"13:30"},{"start":"14:00","guestDate":"2026-11-23","hostDate":"2026-11-23","hostTime":"14:00"},{"start":"14:30","guestDate":"2026-11-23","hostDate":"2026-11-23","hostTime":"14:30"},{"start":"15:00","guestDate":"2026-11-23","hostDate":"2026-11-23","hostTime":"15:00"},{"start":"15:30","guestDate":"2026-11-23","hostDate":"2026-11-23","hostTime":"15:30"},{"start":"16:00","guestDate":"2026-11-23","hostDate":"2026-11-23","hostTime":"16:00"},{"start":"16:30","guestDate":"2026-11-23","hostDate":"2026-11-23","hostTime":"16:30"}],"2026-11-24": [{"start":"09:00","guestDate":"2026-11-24","hostDate":"2026-11-24","hostTime":"09:00"},{"start":"09:30","guestDate":"2026-11-24","hostDate":"2026-11-24","hostTime":"09:30"},{"start":"10:00","guestDate":"2026-11-24","hostDate":"2026-11-24","hostTime":"10:00"},{"start":"10:30","guestDate":"2026-11-24","hostDate":"2026-11-24","hostTime":"10:30"},{"start":"11:00","guestDate":"2026-11-24","hostDate":"2026-11-24","hostTime":"11:00"},{"start":"11:30","guestDate":"2026-11-24","hostDate":"2026-11-24","hostTime":"11:30"},{"start":"12:00","guestDate":"2026-11-24","hostDate":"2026-11-24","hostTime":"12:00"},{"start":"12:30","guestDate":"2026-11-24","hostDate":"2026-11-24","hostTime":"12:30"},{"start":"13:00","guestDate":"2026-11-24","hostDate":"2026-11-24","hostTime":"13:00"},{"start":"13:30","guestDate":"2026-11-24","hostDate":"2026-11-24","hostTime":"13:30"},{"start":"14:00","guestDate":"2026-11-24","hostDate":"2026-11-24","hostTime":"14:00"},{"start":"14:30","guestDate":"2026-11-24","hostDate":"2026-11-24","hostTime":"14:30"},{"start":"15:00","guestDate":"2026-11-24","hostDate":"2026-11-24","hostTime":"15:00"},{"start":"15:30","guestDate":"2026-11-24","hostDate":"2026-11-24","hostTime":"15:30"},{"start":"16:00","guestDate":"2026-11-24","hostDate":"2026-11-24","hostTime":"16:00"},{"start":"16:30","guestDate":"2026-11-24","hostDate":"2026-11-24","hostTime":"16:30"}],"2026-11-25": [{"start":"09:00","guestDate":"2026-11-25","hostDate":"2026-11-25","hostTime":"09:00"},{"start":"09:30","guestDate":"2026-11-25","hostDate":"2026-11-25","hostTime":"09:30"},{"start":"10:00","guestDate":"2026-11-25","hostDate":"2026-11-25","hostTime":"10:00"},{"start":"10:30","guestDate":"2026-11-25","hostDate":"2026-11-25","hostTime":"10:30"},{"start":"11:00","guestDate":"2026-11-25","hostDate":"2026-11-25","hostTime":"11:00"},{"start":"11:30","guestDate":"2026-11-25","hostDate":"2026-11-25","hostTime":"11:30"},{"start":"12:00","guestDate":"2026-11-25","hostDate":"2026-11-25","hostTime":"12:00"},{"start":"12:30","guestDate":"2026-11-25","hostDate":"2026-11-25","hostTime":"12:30"},{"start":"13:00","guestDate":"2026-11-25","hostDate":"2026-11-25","hostTime":"13:00"},{"start":"13:30","guestDate":"2026-11-25","hostDate":"2026-11-25","hostTime":"13:30"},{"start":"14:00","guestDate":"2026-11-25","hostDate":"2026-11-25","hostTime":"14:00"},{"start":"14:30","guestDate":"2026-11-25","hostDate":"2026-11-25","hostTime":"14:30"},{"start":"15:00","guestDate":"2026-11-25","hostDate":"2026-11-25","hostTime":"15:00"},{"start":"15:30","guestDate":"2026-11-25","hostDate":"2026-11-25","hostTime":"15:30"},{"start":"16:00","guestDate":"2026-11-25","hostDate":"2026-11-25","hostTime":"16:00"},{"start":"16:30","guestDate":"2026-11-25","hostDate":"2026-11-25","hostTime":"16:30"}],"2026-11-26": [{"start":"09:00","guestDate":"2026-11-26","hostDate":"2026-11-26","hostTime":"09:00"},{"start":"09:30","guestDate":"2026-11-26","hostDate":"2026-11-26","hostTime":"09:30"},{"start":"10:00","guestDate":"2026-11-26","hostDate":"2026-11-26","hostTime":"10:00"},{"start":"10:30","guestDate":"2026-11-26","hostDate":"2026-11-26","hostTime":"10:30"},{"start":"11:00","guestDate":"2026-11-26","hostDate":"2026-11-26","hostTime":"11:00"},{"start":"11:30","guestDate":"2026-11-26","hostDate":"2026-11-26","hostTime":"11:30"},{"start":"12:00","guestDate":"2026-11-26","hostDate":"2026-11-26","hostTime":"12:00"},{"start":"12:30","guestDate":"2026-11-26","hostDate":"2026-11-26","hostTime":"12:30"},{"start":"13:00","guestDate":"2026-11-26","hostDate":"2026-11-26","hostTime":"13:00"},{"start":"13:30","guestDate":"2026-11-26","hostDate":"2026-11-26","hostTime":"13:30"},{"start":"14:00","guestDate":"2026-11-26","hostDate":"2026-11-26","hostTime":"14:00"},{"start":"14:30","guestDate":"2026-11-26","hostDate":"2026-11-26","hostTime":"14:30"},{"start":"15:00","guestDate":"2026-11-26","hostDate":"2026-11-26","hostTime":"15:00"},{"start":"15:30","guestDate":"2026-11-26","hostDate":"2026-11-26","hostTime":"15:30"},{"start":"16:00","guestDate":"2026-11-26","hostDate":"2026-11-26","hostTime":"16:00"},{"start":"16:30","guestDate":"2026-11-26","hostDate":"2026-11-26","hostTime":"16:30"}],"2026-11-27": [{"start":"09:00","guestDate":"2026-11-27","hostDate":"2026-11-27","hostTime":"09:00"},{"start":"09:30","guestDate":"2026-11-27","hostDate":"2026-11-27","hostTime":"09:30"},{"start":"10:00","guestDate":"2026-11-27","hostDate":"2026-11-27","hostTime":"10:00"},{"start":"10:30","guestDate":"2026-11-27","hostDate":"2026-11-27","hostTime":"10:30"},{"start":"11:00","guestDate":"2026-11-27","hostDate":"2026-11-27","hostTime":"11:00"},{"start":"11:30","guestDate":"2026-11-27","hostDate":"2026-11-27","hostTime":"11:30"},{"start":"12:00","guestDate":"2026-11-27","hostDate":"2026-11-27","hostTime":"12:00"},{"start":"12:30","guestDate":"2026-11-27","hostDate":"2026-11-27","hostTime":"12:30"},{"start":"13:00","guestDate":"2026-11-27","hostDate":"2026-11-27","hostTime":"13:00"},{"start":"13:30","guestDate":"2026-11-27","hostDate":"2026-11-27","hostTime":"13:30"},{"start":"14:00","guestDate":"2026-11-27","hostDate":"2026-11-27","hostTime":"14:00"},{"start":"14:30","guestDate":"2026-11-27","hostDate":"2026-11-27","hostTime":"14:30"},{"start":"15:00","guestDate":"2026-11-27","hostDate":"2026-11-27","hostTime":"15:00"},{"start":"15:30","guestDate":"2026-11-27","hostDate":"2026-11-27","hostTime":"15:30"},{"start":"16:00","guestDate":"2026-11-27","hostDate":"2026-11-27","hostTime":"16:00"},{"start":"16:30","guestDate":"2026-11-27","hostDate":"2026-11-27","hostTime":"16:30"}],"2026-11-30": [{"start":"09:00","guestDate":"2026-11-30","hostDate":"2026-11-30","hostTime":"09:00"},{"start":"09:30","guestDate":"2026-11-30","hostDate":"2026-11-30","hostTime":"09:30"},{"start":"10:00","guestDate":"2026-11-30","hostDate":"2026-11-30","hostTime":"10:00"},{"start":"10:30","guestDate":"2026-11-30","hostDate":"2026-11-30","hostTime":"10:30"},{"start":"11:00","guestDate":"2026-11-30","hostDate":"2026-11-30","hostTime":"11:00"},{"start":"11:30","guestDate":"2026-11-30","hostDate":"2026-11-30","hostTime":"11:30"},{"start":"12:00","guestDate":"2026-11-30","hostDate":"2026-11-30","hostTime":"12:00"},{"start":"12:30","guestDate":"2026-11-30","hostDate":"2026-11-30","hostTime":"12:30"},{"start":"13:00","guestDate":"2026-11-30","hostDate":"2026-11-30","hostTime":"13:00"},{"start":"13:30","guestDate":"2026-11-30","hostDate":"2026-11-30","hostTime":"13:30"},{"start":"14:00","guestDate":"2026-11-30","hostDate":"2026-11-30","hostTime":"14:00"},{"start":"14:30","guestDate":"2026-11-30","hostDate":"2026-11-30","hostTime":"14:30"},{"start":"15:00","guestDate":"2026-11-30","hostDate":"2026-11-30","hostTime":"15:00"},{"start":"15:30","guestDate":"2026-11-30","hostDate":"2026-11-30","hostTime":"15:30"},{"start":"16:00","guestDate":"2026-11-30","hostDate":"2026-11-30","hostTime":"16:00"},{"start":"16:30","guestDate":"2026-11-30","hostDate":"2026-11-30","hostTime":"16:30"}],"2026-12-01": [{"start":"09:00","guestDate":"2026-12-01","hostDate":"2026-12-01","hostTime":"09:00"},{"start":"09:30","guestDate":"2026-12-01","hostDate":"2026-12-01","hostTime":"09:30"},{"start":"10:00","guestDate":"2026-12-01","hostDate":"2026-12-01","hostTime":"10:00"},{"start":"10:30","guestDate":"2026-12-01","hostDate":"2026-12-01","hostTime":"10:30"},{"start":"11:00","guestDate":"2026-12-01","hostDate":"2026-12-01","hostTime":"11:00"},{"start":"11:30","guestDate":"2026-12-01","hostDate":"2026-12-01","hostTime":"11:30"},{"start":"12:00","guestDate":"2026-12-01","hostDate":"2026-12-01","hostTime":"12:00"},{"start":"12:30","guestDate":"2026-12-01","hostDate":"2026-12-01","hostTime":"12:30"},{"start":"13:00","guestDate":"2026-12-01","hostDate":"2026-12-01","hostTime":"13:00"},{"start":"13:30","guestDate":"2026-12-01","hostDate":"2026-12-01","hostTime":"13:30"},{"start":"14:00","guestDate":"2026-12-01","hostDate":"2026-12-01","hostTime":"14:00"},{"start":"14:30","guestDate":"2026-12-01","hostDate":"2026-12-01","hostTime":"14:30"},{"start":"15:00","guestDate":"2026-12-01","hostDate":"2026-12-01","hostTime":"15:00"},{"start":"15:30","guestDate":"2026-12-01","hostDate":"2026-12-01","hostTime":"15:30"},{"start":"16:00","guestDate":"2026-12-01","hostDate":"2026-12-01","hostTime":"16:00"},{"start":"16:30","guestDate":"2026-12-01","hostDate":"2026-12-01","hostTime":"16:30"}],"2026-12-02": [{"start":"09:00","guestDate":"2026-12-02","hostDate":"2026-12-02","hostTime":"09:00"},{"start":"09:30","guestDate":"2026-12-02","hostDate":"2026-12-02","hostTime":"09:30"},{"start":"10:00","guestDate":"2026-12-02","hostDate":"2026-12-02","hostTime":"10:00"},{"start":"10:30","guestDate":"2026-12-02","hostDate":"2026-12-02","hostTime":"10:30"},{"start":"11:00","guestDate":"2026-12-02","hostDate":"2026-12-02","hostTime":"11:00"},{"start":"11:30","guestDate":"2026-12-02","hostDate":"2026-12-02","hostTime":"11:30"},{"start":"12:00","guestDate":"2026-12-02","hostDate":"2026-12-02","hostTime":"12:00"},{"start":"12:30","guestDate":"2026-12-02","hostDate":"2026-12-02","hostTime":"12:30"},{"start":"13:00","guestDate":"2026-12-02","hostDate":"2026-12-02","hostTime":"13:00"},{"start":"13:30","guestDate":"2026-12-02","hostDate":"2026-12-02","hostTime":"13:30"},{"start":"14:00","guestDate":"2026-12-02","hostDate":"2026-12-02","hostTime":"14:00"},{"start":"14:30","guestDate":"2026-12-02","hostDate":"2026-12-02","hostTime":"14:30"},{"start":"15:00","guestDate":"2026-12-02","hostDate":"2026-12-02","hostTime":"15:00"},{"start":"15:30","guestDate":"2026-12-02","hostDate":"2026-12-02","hostTime":"15:30"},{"start":"16:00","guestDate":"2026-12-02","hostDate":"2026-12-02","hostTime":"16:00"},{"start":"16:30","guestDate":"2026-12-02","hostDate":"2026-12-02","hostTime":"16:30"}],"2026-12-03": [{"start":"09:00","guestDate":"2026-12-03","hostDate":"2026-12-03","hostTime":"09:00"},{"start":"09:30","guestDate":"2026-12-03","hostDate":"2026-12-03","hostTime":"09:30"},{"start":"10:00","guestDate":"2026-12-03","hostDate":"2026-12-03","hostTime":"10:00"},{"start":"10:30","guestDate":"2026-12-03","hostDate":"2026-12-03","hostTime":"10:30"},{"start":"11:00","guestDate":"2026-12-03","hostDate":"2026-12-03","hostTime":"11:00"},{"start":"11:30","guestDate":"2026-12-03","hostDate":"2026-12-03","hostTime":"11:30"},{"start":"12:00","guestDate":"2026-12-03","hostDate":"2026-12-03","hostTime":"12:00"},{"start":"12:30","guestDate":"2026-12-03","hostDate":"2026-12-03","hostTime":"12:30"},{"start":"13:00","guestDate":"2026-12-03","hostDate":"2026-12-03","hostTime":"13:00"},{"start":"13:30","guestDate":"2026-12-03","hostDate":"2026-12-03","hostTime":"13:30"},{"start":"14:00","guestDate":"2026-12-03","hostDate":"2026-12-03","hostTime":"14:00"},{"start":"14:30","guestDate":"2026-12-03","hostDate":"2026-12-03","hostTime":"14:30"},{"start":"15:00","guestDate":"2026-12-03","hostDate":"2026-12-03","hostTime":"15:00"},{"start":"15:30","guestDate":"2026-12-03","hostDate":"2026-12-03","hostTime":"15:30"},{"start":"16:00","guestDate":"2026-12-03","hostDate":"2026-12-03","hostTime":"16:00"},{"start":"16:30","guestDate":"2026-12-03","hostDate":"2026-12-03","hostTime":"16:30"}],"2026-12-04": [{"start":"09:00","guestDate":"2026-12-04","hostDate":"2026-12-04","hostTime":"09:00"},{"start":"09:30","guestDate":"2026-12-04","hostDate":"2026-12-04","hostTime":"09:30"},{"start":"10:00","guestDate":"2026-12-04","hostDate":"2026-12-04","hostTime":"10:00"},{"start":"10:30","guestDate":"2026-12-04","hostDate":"2026-12-04","hostTime":"10:30"},{"start":"11:00","guestDate":"2026-12-04","hostDate":"2026-12-04","hostTime":"11:00"},{"start":"11:30","guestDate":"2026-12-04","hostDate":"2026-12-04","hostTime":"11:30"},{"start":"12:00","guestDate":"2026-12-04","hostDate":"2026-12-04","hostTime":"12:00"},{"start":"12:30","guestDate":"2026-12-04","hostDate":"2026-12-04","hostTime":"12:30"},{"start":"13:00","guestDate":"2026-12-04","hostDate":"2026-12-04","hostTime":"13:00"},{"start":"13:30","guestDate":"2026-12-04","hostDate":"2026-12-04","hostTime":"13:30"},{"start":"14:00","guestDate":"2026-12-04","hostDate":"2026-12-04","hostTime":"14:00"},{"start":"14:30","guestDate":"2026-12-04","hostDate":"2026-12-04","hostTime":"14:30"},{"start":"15:00","guestDate":"2026-12-04","hostDate":"2026-12-04","hostTime":"15:00"},{"start":"15:30","guestDate":"2026-12-04","hostDate":"2026-12-04","hostTime":"15:30"},{"start":"16:00","guestDate":"2026-12-04","hostDate":"2026-12-04","hostTime":"16:00"},{"start":"16:30","guestDate":"2026-12-04","hostDate":"2026-12-04","hostTime":"16:30"}],"2026-12-07": [{"start":"09:00","guestDate":"2026-12-07","hostDate":"2026-12-07","hostTime":"09:00"},{"start":"09:30","guestDate":"2026-12-07","hostDate":"2026-12-07","hostTime":"09:30"},{"start":"10:00","guestDate":"2026-12-07","hostDate":"2026-12-07","hostTime":"10:00"},{"start":"10:30","guestDate":"2026-12-07","hostDate":"2026-12-07","hostTime":"10:30"},{"start":"11:00","guestDate":"2026-12-07","hostDate":"2026-12-07","hostTime":"11:00"},{"start":"11:30","guestDate":"2026-12-07","hostDate":"2026-12-07","hostTime":"11:30"},{"start":"12:00","guestDate":"2026-12-07","hostDate":"2026-12-07","hostTime":"12:00"},{"start":"12:30","guestDate":"2026-12-07","hostDate":"2026-12-07","hostTime":"12:30"},{"start":"13:00","guestDate":"2026-12-07","hostDate":"2026-12-07","hostTime":"13:00"},{"start":"13:30","guestDate":"2026-12-07","hostDate":"2026-12-07","hostTime":"13:30"},{"start":"14:00","guestDate":"2026-12-07","hostDate":"2026-12-07","hostTime":"14:00"},{"start":"14:30","guestDate":"2026-12-07","hostDate":"2026-12-07","hostTime":"14:30"},{"start":"15:00","guestDate":"2026-12-07","hostDate":"2026-12-07","hostTime":"15:00"},{"start":"15:30","guestDate":"2026-12-07","hostDate":"2026-12-07","hostTime":"15:30"},{"start":"16:00","guestDate":"2026-12-07","hostDate":"2026-12-07","hostTime":"16:00"},{"start":"16:30","guestDate":"2026-12-07","hostDate":"2026-12-07","hostTime":"16:30"}]
+    },
+    "availableDates": { "2026-11-13":true,"2026-11-16":true,"2026-11-17":true,"2026-11-18":true,"2026-11-19":true,"2026-11-20":true,"2026-11-23":true,"2026-11-24":true,"2026-11-25":true,"2026-11-26":true,"2026-11-27":true,"2026-11-30":true,"2026-12-01":true,"2026-12-02":true,"2026-12-03":true,"2026-12-04":true,"2026-12-07":true },
+    "firstWeekday": 6,
+    "weekStartDay": 1,
+    "daysInMonth": 30,
+    "todayDate": "2026-11-13",
+    "monthYear": "2026-11",
+    "monthLabel": "ноябрь 2026",
+    "hasPrevMonth": false,
+    "prevMonth": "",
+    "hasNextMonth": true,
+    "nextMonth": "2026-12",
+    "firstBookableDate": "2026-11-13",
+    "lastBookableDate": "2027-11-14",
+    "defaultCalendarView": "month",
+    "deferredLoad": false,
+    "lang": "ru",
+    "i18n": {
+      "selectDate": "Выберите дату",
+      "inviteRequired": "Для записи нужна ссылка-приглашение",
+      "noTimesMonth": "В этом месяце нет свободного времени",
+      "noTimesDay": "В этот день нет свободного времени",
+      "clickHighlighted": "Выберите отмеченную дату, чтобы увидеть свободное время",
+      "noAvailabilityParticipants": "В этом месяце нет времени, когда свободны все участники",
+      "loadFailed": "Не удалось загрузить свободное время. Обновите страницу.",
+      "weekMore": "ещё",
+      "prevMonth": "Предыдущий месяц",
+      "nextMonth": "Следующий месяц",
+      "prevWeek": "Предыдущая неделя",
+      "nextWeek": "Следующая неделя",
+      "offsetNoteDay": "%1: время указано по %2 (перевод часов — %3).",
+      "offsetNoteRange": "Перевод часов — %1: с этого дня время указано по %2.",
+      "weekdays": [
+        "Вс",
+        "Пн",
+        "Вт",
+        "Ср",
+        "Чт",
+        "Пт",
+        "Сб"
+      ],
+      "monthNames": [
+        "январь",
+        "февраль",
+        "март",
+        "апрель",
+        "май",
+        "июнь",
+        "июль",
+        "август",
+        "сентябрь",
+        "октябрь",
+        "ноябрь",
+        "декабрь"
+      ]
+    }
+  }
+  </script>
+
+  <!-- Right: calendar + slots -->
+  <div class="slots-main">
+    <!-- Shared header: title + view toggle (left) / nav arrows (right) -->
+    <div class="cal-header">
+      <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <div class="cal-header-title" id="cal-header-title">ноябрь 2026</div>
+        <div class="view-toggle" id="view-toggle">
+          <button type="button" data-view="month" class="active" aria-pressed="true" title="Месяц">
+            <svg viewBox="0 0 16 16"><rect x="1" y="1" width="4" height="4" rx="0.5"/><rect x="6" y="1" width="4" height="4" rx="0.5"/><rect x="11" y="1" width="4" height="4" rx="0.5"/><rect x="1" y="6" width="4" height="4" rx="0.5"/><rect x="6" y="6" width="4" height="4" rx="0.5"/><rect x="11" y="6" width="4" height="4" rx="0.5"/><rect x="1" y="11" width="4" height="4" rx="0.5"/><rect x="6" y="11" width="4" height="4" rx="0.5"/><rect x="11" y="11" width="4" height="4" rx="0.5"/></svg>
+          </button>
+          <button type="button" data-view="week" aria-pressed="false" title="Неделя">
+            <svg viewBox="0 0 16 16"><rect x="1" y="0" width="2" height="16" rx="0.5"/><rect x="4.5" y="0" width="2" height="16" rx="0.5"/><rect x="8" y="0" width="2" height="16" rx="0.5"/><rect x="11.5" y="0" width="2" height="16" rx="0.5"/></svg>
+          </button>
+          <button type="button" data-view="column" aria-pressed="false" title="Список">
+            <svg viewBox="0 0 16 16"><rect x="0" y="1" width="16" height="2" rx="0.5"/><rect x="0" y="5" width="16" height="2" rx="0.5"/><rect x="0" y="9" width="16" height="2" rx="0.5"/><rect x="0" y="13" width="16" height="2" rx="0.5"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="cal-nav" id="main-cal-nav">
+        
+          <span class="disabled" aria-hidden="true">&larr;</span>
+        
+        
+          <a href="&#x2f;booking&#x2f;reschedule&#x2f;55cda108-5071-4c37-ac7c-fb699422c24d?month=2026-12&tz=UTC" class="cal-nav-link" aria-label="Следующий месяц"><span aria-hidden="true">&rarr;</span></a>
+        
+      </div>
+    </div>
+
+    <div class="slots-layout" id="slots-layout">
+      <!-- Month calendar panel -->
+      <div class="cal-panel">
+        <div class="cal-weekdays">
+          
+          
+          
+          
+          
+          <div class="cal-weekday" data-weekday="1"><span class="cal-weekday-full">Пн</span><span class="cal-weekday-short">Пн</span></div>
+          
+          
+          
+          
+          <div class="cal-weekday" data-weekday="2"><span class="cal-weekday-full">Вт</span><span class="cal-weekday-short">Вт</span></div>
+          
+          
+          
+          
+          <div class="cal-weekday" data-weekday="3"><span class="cal-weekday-full">Ср</span><span class="cal-weekday-short">Ср</span></div>
+          
+          
+          
+          
+          <div class="cal-weekday" data-weekday="4"><span class="cal-weekday-full">Чт</span><span class="cal-weekday-short">Чт</span></div>
+          
+          
+          
+          
+          <div class="cal-weekday" data-weekday="5"><span class="cal-weekday-full">Пт</span><span class="cal-weekday-short">Пт</span></div>
+          
+          
+          
+          
+          <div class="cal-weekday" data-weekday="6"><span class="cal-weekday-full">Сб</span><span class="cal-weekday-short">Сб</span></div>
+          
+          
+          
+          
+          <div class="cal-weekday" data-weekday="0"><span class="cal-weekday-full">Вс</span><span class="cal-weekday-short">Вс</span></div>
+          
+        </div>
+
+        <div class="cal-grid" id="cal-grid"></div>
+      </div>
+
+      <!-- Slot list panel -->
+      <div class="slot-panel">
+        <div class="slot-panel-header">
+          <div class="slot-panel-title" id="slot-panel-title">Выберите дату</div>
+        </div>
+        <div class="slot-offset-note" id="slot-offset-note" hidden></div>
+        <div class="slot-list" id="slot-list">
+          
+          <div class="slot-empty">
+            <div class="slot-empty-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></div>
+            <div>Выберите отмеченную дату, чтобы увидеть свободное время</div>
+          </div>
+          
+        </div>
+      </div>
+
+      <!-- Week view -->
+      <div class="week-view" id="week-view"></div>
+
+      <!-- Column view -->
+      <div class="column-view" id="column-view"></div>
+    </div>
+  </div>
+  
+</div>
+
+<script>
+(function() {
+  // Load calendar data from JSON block
+  var calDataEl = document.getElementById('calendar-data');
+  if (!calDataEl) return;
+  var calData;
+  try { calData = JSON.parse(calDataEl.textContent); } catch(e) { console.error('calrs: failed to parse calendar data', e); return; }
+  var slotData = calData.slotData;
+  var availableDates = calData.availableDates;
+  var firstWeekday = calData.firstWeekday;
+  var weekStartDay = calData.weekStartDay;
+  // A preference can change while this page is open. AJAX responses must
+  // update the headings and week anchor together with the month grid offset.
+  function updateCalendarLayout(newData) {
+    firstWeekday = newData.firstWeekday;
+    if (newData.weekStartDay === weekStartDay) return;
+    weekStartDay = newData.weekStartDay;
+    weekStart = null;
+    var headers = document.querySelector('.cal-weekdays');
+    Array.from(headers.children).sort(function(a, b) {
+      return (Number(a.dataset.weekday) + 7 - weekStartDay) % 7 -
+        (Number(b.dataset.weekday) + 7 - weekStartDay) % 7;
+    }).forEach(function(day) { headers.appendChild(day); });
+  }
+
+  var daysInMonth = calData.daysInMonth;
+  var todayDate = calData.todayDate;
+  var monthYear = calData.monthYear;
+  var hasPrevMonth = calData.hasPrevMonth;
+
+  function decHtml(s) { var d = document.createElement('textarea'); d.innerHTML = s; return d.value; }
+  var basePath = decHtml("&#x2f;booking&#x2f;reschedule&#x2f;55cda108-5071-4c37-ac7c-fb699422c24d");
+  var guestTz = decHtml("UTC");
+  var inviteToken = decHtml("{&quot;value&quot;: &quot;&quot;}");
+  var rescheduleBase = decHtml("&#x2f;booking&#x2f;reschedule&#x2f;55cda108-5071-4c37-ac7c-fb699422c24d");
+  // can_book is true when the viewer can actually book (public event, valid
+  // booking invite, or rescheduling). When false, slot pills render as
+  // non-clickable spans — used for logged-in team members viewing private/
+  // internal team event types in availability-only mode.
+  var canBook = true || !!rescheduleBase;
+  // Embed mode threads ?embed=1&layout=...&theme=...&brand=... through every
+  // navigation so slot clicks, month nav, and the book form stay in the
+  // chrome-stripped embed flow.
+  var embedSuffix = decHtml("");
+
+  var format = localStorage.getItem('calrs_time_format') || '24';
+  var i18n = calData.i18n || {};
+  var dayLabels = i18n.weekdays || ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  // ilia fork: the empty-state icons, stroke SVGs instead of colour emoji.
+  var ICON_CALENDAR = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>';
+  var ICON_CLOCK = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>';
+  var ICON_BAN = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M4.9 4.9l14.2 14.2"/></svg>';
+  function emptyIcon(svg) { return '<div class="slot-empty-icon">' + svg + '</div>'; }
+  // Names the JS-built prev/next arrows; a disabled arrow is hidden from
+  // screen readers, as the server-rendered ones are.
+  function arrowLabel(el, label) { if (label) el.setAttribute('aria-label', label); }
+  var inviteTitle = String(i18n.inviteRequired || 'Booking requires an invite link').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+
+  function formatTime(t) {
+    return format === '12' ? calrsFormat12h(t) : t;
+  }
+
+  // UTC offset note (#265). The picker labels each zone with today's
+  // offset, so on a day past a clock change the label is an hour off. These
+  // helpers find that case and say so above the times. Offsets are read in
+  // en-US, whose shortOffset reads "GMT+2" (plain "GMT" at zero), and shown
+  // as "UTC+2", "UTC+0" like the picker labels. A browser without
+  // shortOffset support shows no note. English dates use en-GB, so the
+  // change day reads "25 October".
+  var pageLang = calData.lang || 'en';
+  if (pageLang === 'en') pageLang = 'en-GB';
+  var offsetFmt = null;
+  try {
+    offsetFmt = new Intl.DateTimeFormat('en-US', { timeZone: guestTz || 'UTC', timeZoneName: 'shortOffset' });
+  } catch (e) { offsetFmt = null; }
+
+  function offsetAt(ms) {
+    var parts = offsetFmt.formatToParts(new Date(ms));
+    for (var i = 0; i < parts.length; i++) {
+      if (parts[i].type === 'timeZoneName') return normalizeOffset(parts[i].value);
+    }
+    return '';
+  }
+
+  // "GMT+2" -> "UTC+2"; "GMT", "GMT+0", "UTC" -> "UTC+0", as the server
+  // labels a zone at zero offset.
+  function normalizeOffset(label) {
+    var s = label.replace(/^(GMT|UTC)/, 'UTC');
+    return /^UTC([+-]0(:00)?)?$/.test(s) ? 'UTC+0' : s;
+  }
+
+  function offsetMinutes(label) {
+    var m = /([+-])(\d+)(?::(\d+))?/.exec(label);
+    if (!m) return 0;
+    var v = parseInt(m[2], 10) * 60 + (m[3] ? parseInt(m[3], 10) : 0);
+    return m[1] === '-' ? -v : v;
+  }
+
+  function utcNoon(ds) {
+    var p = ds.split('-');
+    return Date.UTC(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10), 12);
+  }
+
+  // Offset in force at local noon on a YYYY-MM-DD day of the guest's zone.
+  function dayOffset(ds) {
+    var noon = utcNoon(ds);
+    return offsetAt(noon - offsetMinutes(offsetAt(noon)) * 60000);
+  }
+
+  function shiftDay(ds, n) {
+    return new Date(utcNoon(ds) + n * 86400000).toISOString().slice(0, 10);
+  }
+
+  // A clock-change day in the page language ("25 October", "25 octobre").
+  function changeLabel(c) {
+    var opts = { day: 'numeric', month: 'long', timeZone: 'UTC' };
+    if (c.change.slice(0, 4) !== todayDate.slice(0, 4)) opts.year = 'numeric';
+    try { return new Intl.DateTimeFormat(pageLang, opts).format(new Date(utcNoon(c.change))); }
+    catch (e) { return c.change; }
+  }
+
+  // For the first of `dates` whose offset differs from the one in force
+  // now, returns that day, its offset and the day the clocks changed (the
+  // first day of the run of days with that offset). Null when none differs.
+  function offsetChange(dates) {
+    if (!offsetFmt) return null;
+    var now = offsetAt(Date.now());
+    for (var i = 0; i < dates.length; i++) {
+      var ds = dates[i];
+      if (ds < todayDate) continue;
+      var off = dayOffset(ds);
+      if (off === now) continue;
+      var change = ds;
+      for (var n = 0; n < 400 && change > todayDate; n++) {
+        var prev = shiftDay(change, -1);
+        if (dayOffset(prev) !== off) break;
+        change = prev;
+      }
+      return { date: ds, offset: off, change: change };
+    }
+    return null;
+  }
+
+  // Note for one selected day (month view). The day reads like the panel
+  // title just above it ("Mon 26"). On the change day itself the times
+  // before the change keep the old offset, so that day gets the range
+  // wording ("Clocks change on 25 October: from then on...").
+  function dayOffsetNote(ds) {
+    var c = offsetChange([ds]);
+    if (c && c.change === ds) return rangeNoteText(c);
+    if (!c || !i18n.offsetNoteDay) return '';
+    var weekday = dayLabels[new Date(utcNoon(ds)).getUTCDay()];
+    return i18n.offsetNoteDay
+      .replace('%1', weekday + ' ' + parseInt(ds.slice(8), 10))
+      .replace('%2', c.offset)
+      .replace('%3', changeLabel(c));
+  }
+
+  function rangeNoteText(c) {
+    if (!i18n.offsetNoteRange) return '';
+    return i18n.offsetNoteRange.replace('%1', changeLabel(c)).replace('%2', c.offset);
+  }
+
+  // Note for a range of days (week and column views). Both pass only their
+  // days with times, so the note follows the first bookable day past a
+  // change, as the month view does for the selected day.
+  function rangeOffsetNote(dates) {
+    var c = offsetChange(dates);
+    return c ? rangeNoteText(c) : '';
+  }
+
+  function prependOffsetNote(container, text) {
+    if (!text) return;
+    var note = document.createElement('div');
+    note.className = 'slot-offset-note';
+    note.textContent = text;
+    container.insertBefore(note, container.firstChild);
+  }
+
+  function showDayOffsetNote(text) {
+    var el = document.getElementById('slot-offset-note');
+    if (!el) return;
+    el.textContent = text;
+    el.hidden = !text;
+  }
+
+  // Time format toggle
+  var toggle = document.getElementById('time-format-toggle');
+  if (toggle) {
+    var btns = toggle.querySelectorAll('button');
+    function applyToggleStyle() {
+      btns.forEach(function(b) {
+        var on = b.dataset.format === format;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+    }
+    btns.forEach(function(b) {
+      b.addEventListener('click', function() {
+        format = b.dataset.format;
+        localStorage.setItem('calrs_time_format', format);
+        applyToggleStyle();
+        if (selectedDate) selectDay(selectedDate);
+      });
+    });
+    applyToggleStyle();
+  }
+
+  // Timezone auto-detect + change
+  var select = document.getElementById('tz-select');
+  if (select) {
+    var params = new URLSearchParams(window.location.search);
+    if (!params.has('tz')) {
+      var detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (detected && detected !== guestTz) {
+        params.set('tz', detected);
+        calrsLoader.show();
+        window.location.search = params.toString();
+        return;
+      }
+    }
+    select.addEventListener('change', function() {
+      params.set('tz', select.value);
+      calrsLoader.show();
+      window.location.search = params.toString();
+    });
+  }
+
+  // Build calendar grid
+  var grid = document.getElementById('cal-grid');
+  var selectedDate = null;
+
+  function buildCalendar() {
+    grid.innerHTML = '';
+    selectedDate = null;
+
+    var myParts = monthYear.split('-');
+    var myYear = parseInt(myParts[0], 10);
+    var myMonth = parseInt(myParts[1], 10);
+
+    // Previous month trailing days
+    var prevMonthLastDay = new Date(myYear, myMonth - 1, 0).getDate();
+    for (var i = 0; i < firstWeekday; i++) {
+      var pd = prevMonthLastDay - firstWeekday + 1 + i;
+      var cell = document.createElement('div');
+      cell.className = 'cal-cell other-month';
+      cell.textContent = pd;
+      grid.appendChild(cell);
+    }
+
+    // Current month days
+    for (var d = 1; d <= daysInMonth; d++) {
+      var dateStr = monthYear + '-' + (d < 10 ? '0' : '') + d;
+      var cell = document.createElement('div');
+      cell.className = 'cal-cell';
+      cell.textContent = d;
+      cell.dataset.date = dateStr;
+
+      if (dateStr < todayDate) {
+        cell.classList.add('past');
+      } else if (availableDates[dateStr]) {
+        cell.classList.add('has-slots');
+      }
+
+      if (dateStr === todayDate) {
+        cell.classList.add('today');
+      }
+
+      if (cell.classList.contains('has-slots')) {
+        cell.addEventListener('click', (function(ds) {
+          return function() { selectDay(ds); };
+        })(dateStr));
+      }
+
+      grid.appendChild(cell);
+    }
+
+    // Next month leading days to fill the grid
+    var totalCells = firstWeekday + daysInMonth;
+    var remaining = (7 - (totalCells % 7)) % 7;
+    for (var i = 1; i <= remaining; i++) {
+      var cell = document.createElement('div');
+      cell.className = 'cal-cell other-month';
+      cell.textContent = i;
+      grid.appendChild(cell);
+    }
+
+    // Other-month day click handlers
+    grid.querySelectorAll('.cal-cell.other-month').forEach(function(cell) {
+      cell.style.cursor = 'pointer';
+      var dayNum = parseInt(cell.textContent, 10);
+      var isPrev = dayNum > 15;
+      if ((isPrev && !hasPrevMonth) || (!isPrev && !calData.hasNextMonth)) {
+        cell.style.cursor = 'default';
+        return;
+      }
+      cell.addEventListener('click', function() {
+        if (isPrev) {
+          var pm = myMonth - 1, py = myYear;
+          if (pm < 1) { pm = 12; py--; }
+          navigateMonth(py, pm);
+        } else {
+          var nm = myMonth + 1, ny = myYear;
+          if (nm > 12) { nm = 1; ny++; }
+          navigateMonth(ny, nm);
+        }
+      });
+    });
+
+    // Auto-select first available date
+    var firstAvail = null;
+    // availableDates can hold days outside this month (the week grid's
+    // spill-over, or months merged by the week view): only pick one shown here.
+    for (var key in availableDates) {
+      if (key.indexOf(monthYear + '-') !== 0) continue;
+      if (!firstAvail || key < firstAvail) firstAvail = key;
+    }
+    if (firstAvail) selectDay(firstAvail);
+    else clearSlotPanel();
+  }
+
+  function clearSlotPanel() {
+    var titleEl = document.getElementById('slot-panel-title');
+    if (titleEl) titleEl.textContent = i18n.selectDate || 'Select a date';
+    showDayOffsetNote('');
+    var listEl = document.getElementById('slot-list');
+    if (listEl) listEl.innerHTML = '<div class="slot-empty">' + emptyIcon(ICON_CALENDAR) + '<div>' + (i18n.noTimesMonth || 'No available times this month') + '</div></div>';
+  }
+
+  // Select day and show slots
+  function selectDay(dateStr) {
+    selectedDate = dateStr;
+
+    var cells = grid.querySelectorAll('.cal-cell');
+    cells.forEach(function(c) { c.classList.remove('selected'); });
+    var target = grid.querySelector('[data-date="' + dateStr + '"]');
+    if (target) target.classList.add('selected');
+
+    var parts = dateStr.split('-');
+    var dt = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    var dayName = dayLabels[dt.getDay()];
+    var titleEl = document.getElementById('slot-panel-title');
+    if (titleEl) titleEl.innerHTML = dayName + ' <span>' + parts[2] + '</span>';
+
+    var listEl = document.getElementById('slot-list');
+    var slots = slotData[dateStr];
+
+    if (!slots || slots.length === 0) {
+      showDayOffsetNote('');
+      listEl.innerHTML = '<div class="slot-empty">' + emptyIcon(ICON_CLOCK) + '<div>' + (i18n.noTimesDay || 'No available times this day') + '</div></div>';
+      return;
+    }
+    showDayOffsetNote(dayOffsetNote(dateStr));
+
+    var html = '';
+    for (var i = 0; i < slots.length; i++) {
+      var s = slots[i];
+      var date = s.guestDate || s.hostDate;
+      var time = s.start || s.hostTime;
+      var href;
+      if (rescheduleBase) {
+        href = rescheduleBase + '?date=' + encodeURIComponent(date) + '&time=' + encodeURIComponent(time);
+      } else {
+        href = basePath + '/book?date=' + encodeURIComponent(date) + '&time=' + encodeURIComponent(time);
+      }
+      if (guestTz) href += '&tz=' + encodeURIComponent(guestTz);
+      if (inviteToken) href += '&invite=' + encodeURIComponent(inviteToken);
+      href += embedSuffix;
+      if (canBook) {
+        html += '<a href="' + href + '" class="slot-pill">' + formatTime(s.start) + '</a>';
+      } else {
+        html += '<span class="slot-pill" title="' + inviteTitle + '" style="cursor: default; opacity: 0.85;">' + formatTime(s.start) + '</span>';
+      }
+    }
+    listEl.innerHTML = html;
+  }
+
+  // AJAX month navigation — only rebuilds calendar + slots, not the full page
+  var isDynamicGroup = !!calData.deferredLoad || basePath.indexOf('+') !== -1;
+  function navigateMonth(targetYear, targetMonth) {
+    var monthStr = targetYear + '-' + (targetMonth < 10 ? '0' : '') + targetMonth;
+    var url = basePath + '?month=' + monthStr;
+    if (isDynamicGroup) url += '&deferred=1';
+    if (guestTz) url += '&tz=' + encodeURIComponent(guestTz);
+    if (inviteToken) url += '&invite=' + encodeURIComponent(inviteToken);
+    url += embedSuffix;
+
+    var layout = document.querySelector('.slots-layout');
+    if (layout) {
+      layout.style.transition = 'opacity 0.15s ease';
+      layout.style.opacity = '0.4';
+    }
+
+    fetch(url).then(function(r) { return r.text(); }).then(function(html) {
+      var parser = new DOMParser();
+      var doc = parser.parseFromString(html, 'text/html');
+      var newDataEl = doc.getElementById('calendar-data');
+      if (!newDataEl) { window.location.href = url; return; }
+
+      var newData = JSON.parse(newDataEl.textContent);
+      updateCalendarLayout(newData);
+      slotData = newData.slotData;
+      availableDates = newData.availableDates;
+      daysInMonth = newData.daysInMonth;
+      monthYear = newData.monthYear;
+      hasPrevMonth = newData.hasPrevMonth;
+      // A month change from the month or column view re-anchors the week view.
+      weekStart = null;
+
+      // Keep calData in sync so all views see fresh state
+      calData.monthLabel = newData.monthLabel;
+      calData.prevMonth = newData.prevMonth;
+      calData.nextMonth = newData.nextMonth;
+      calData.hasPrevMonth = newData.hasPrevMonth;
+      calData.hasNextMonth = newData.hasNextMonth;
+
+      // Update month title
+      var titleEl = document.querySelector('.cal-header-title');
+      if (titleEl) titleEl.textContent = newData.monthLabel;
+
+      // Update prev/next nav arrows
+      updateNavArrows(newData);
+
+      // Rebuild calendar grid
+      buildCalendar();
+
+      // Rebuild active alternate view
+      if (currentView === 'week') buildWeekView();
+      else if (currentView === 'column') buildColumnView();
+
+      if (layout) {
+        layout.style.opacity = '1';
+      }
+      if (typeof calrsLoader !== 'undefined') calrsLoader.hide();
+      history.pushState(null, '', url);
+    }).catch(function() {
+      window.location.href = url;
+    });
+  }
+
+  function updateNavArrows(data) {
+    var nav = document.getElementById('main-cal-nav');
+    if (!nav) return;
+    nav.innerHTML = '';
+    if (data.hasPrevMonth && data.prevMonth) {
+      var prevUrl = basePath + '?month=' + data.prevMonth;
+      if (guestTz) prevUrl += '&tz=' + encodeURIComponent(guestTz);
+      if (inviteToken) prevUrl += '&invite=' + encodeURIComponent(inviteToken);
+      prevUrl += embedSuffix;
+      var prev = document.createElement('a');
+      prev.href = prevUrl;
+      prev.innerHTML = '<span aria-hidden="true">&larr;</span>';
+      arrowLabel(prev, i18n.prevMonth);
+      prev.addEventListener('click', function(e) {
+        e.preventDefault();
+        var parts = data.prevMonth.split('-');
+        navigateMonth(parseInt(parts[0]), parseInt(parts[1]));
+      });
+      nav.appendChild(prev);
+    } else {
+      var span = document.createElement('span');
+      span.className = 'disabled';
+      span.setAttribute('aria-hidden', 'true');
+      span.innerHTML = '&larr;';
+      nav.appendChild(span);
+    }
+    if (data.hasNextMonth && data.nextMonth) {
+      var nextUrl = basePath + '?month=' + data.nextMonth;
+      if (guestTz) nextUrl += '&tz=' + encodeURIComponent(guestTz);
+      if (inviteToken) nextUrl += '&invite=' + encodeURIComponent(inviteToken);
+      nextUrl += embedSuffix;
+      var next = document.createElement('a');
+      next.href = nextUrl;
+      next.innerHTML = '<span aria-hidden="true">&rarr;</span>';
+      arrowLabel(next, i18n.nextMonth);
+      next.addEventListener('click', function(e) {
+        e.preventDefault();
+        var parts = data.nextMonth.split('-');
+        navigateMonth(parseInt(parts[0]), parseInt(parts[1]));
+      });
+      nav.appendChild(next);
+    } else {
+      var nspan = document.createElement('span');
+      nspan.className = 'disabled';
+      nspan.setAttribute('aria-hidden', 'true');
+      nspan.innerHTML = '&rarr;';
+      nav.appendChild(nspan);
+    }
+  }
+
+  // Handle browser back/forward
+  window.addEventListener('popstate', function() {
+    window.location.reload();
+  });
+
+  // Initial build
+  buildCalendar();
+
+  // Intercept initial server-rendered prev/next arrow links
+  document.querySelectorAll('.cal-nav a.cal-nav-link').forEach(function(link) {
+    link.addEventListener('click', function(e) {
+      e.preventDefault();
+      var params = new URLSearchParams(new URL(link.href).search);
+      var m = params.get('month');
+      if (m) {
+        var parts = m.split('-');
+        navigateMonth(parseInt(parts[0]), parseInt(parts[1]));
+      }
+    });
+  });
+
+  // --- View toggle ---
+  var serverDefaultView = calData.defaultCalendarView || 'month';
+  var currentView = localStorage.getItem('calrs_calendar_view') || serverDefaultView;
+  var viewToggle = document.getElementById('view-toggle');
+  var slotsLayout = document.getElementById('slots-layout');
+  var weekViewEl = document.getElementById('week-view');
+  var columnViewEl = document.getElementById('column-view');
+  var shortDays = i18n.weekdays || ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  function buildSlotHref(s) {
+    var date = s.guestDate || s.hostDate;
+    var time = s.start || s.hostTime;
+    var href;
+    if (rescheduleBase) {
+      href = rescheduleBase + '?date=' + encodeURIComponent(date) + '&time=' + encodeURIComponent(time);
+    } else {
+      href = basePath + '/book?date=' + encodeURIComponent(date) + '&time=' + encodeURIComponent(time);
+    }
+    if (guestTz) href += '&tz=' + encodeURIComponent(guestTz);
+    if (inviteToken) href += '&invite=' + encodeURIComponent(inviteToken);
+    href += embedSuffix;
+    return href;
+  }
+
+  // First day of the week shown in the week view. It is anchored once (on the
+  // week containing today, or the 1st of a future month) and then moved by
+  // whole weeks. Deriving it from monthYear plus an offset broke as soon as
+  // a week navigation loaded another month, since monthYear moved the base.
+  var weekStart = null;
+
+  function getWeekDates() {
+    if (!weekStart) {
+      var parts = monthYear.split('-');
+      var year = parseInt(parts[0], 10);
+      var month = parseInt(parts[1], 10);
+
+      // Find a good starting date: today if in this month, else first of month
+      var todayParts = todayDate.split('-');
+      var anchor;
+      if (parseInt(todayParts[0]) === year && parseInt(todayParts[1]) === month) {
+        anchor = new Date(year, month - 1, parseInt(todayParts[2]));
+      } else {
+        anchor = new Date(year, month - 1, 1);
+      }
+      // A bookable date range starting later this month: open on its week.
+      if (calData.firstBookableDate) {
+        var fb = new Date(calData.firstBookableDate + 'T00:00:00');
+        if (fb.getFullYear() === year && fb.getMonth() === month - 1 && fb > anchor) anchor = fb;
+      }
+
+      // Go back to the configured first day, keeping local date arithmetic.
+      var offset = (anchor.getDay() + 7 - weekStartDay) % 7;
+      anchor.setDate(anchor.getDate() - offset);
+      weekStart = anchor;
+    }
+
+    var dates = [];
+    for (var i = 0; i < 7; i++) {
+      var d = new Date(weekStart);
+      d.setDate(weekStart.getDate() + i);
+      var ds = d.getFullYear() + '-' + (d.getMonth() < 9 ? '0' : '') + (d.getMonth() + 1) + '-' + (d.getDate() < 10 ? '0' : '') + d.getDate();
+      dates.push({ date: d, dateStr: ds, day: d.getDate(), weekday: shortDays[d.getDay()] });
+    }
+    return dates;
+  }
+
+  function buildWeekView() {
+    var dates = getWeekDates();
+
+    // Update shared header title and nav for week view
+    var titleEl = document.getElementById('cal-header-title');
+    if (titleEl) {
+      var monthNames = i18n.monthNames || ['January','February','March','April','May','June','July','August','September','October','November','December'];
+      var startMonth = monthNames[dates[0].date.getMonth()];
+      var endMonth = monthNames[dates[6].date.getMonth()];
+      var startYear = dates[0].date.getFullYear();
+      var endYear = dates[6].date.getFullYear();
+      var label;
+      if (startMonth === endMonth) {
+        label = startMonth + ' ' + dates[0].day + ' &ndash; ' + dates[6].day + ' <span>' + startYear + '</span>';
+      } else {
+        label = startMonth + ' ' + dates[0].day + ' &ndash; ' + endMonth + ' ' + dates[6].day + ' <span>' + endYear + '</span>';
+      }
+      titleEl.innerHTML = label;
+    }
+    updateSharedNavForWeek(dates);
+
+    var html = '<div class="week-grid">';
+
+    var maxVisible = 8;
+    for (var i = 0; i < dates.length; i++) {
+      var d = dates[i];
+      var slots = slotData[d.dateStr] || [];
+      var isToday = d.dateStr === todayDate;
+      var headerClass = 'week-day-header' + (isToday ? ' today' : '') + (slots.length === 0 ? ' no-slots' : '');
+
+      html += '<div class="week-day-col">';
+      html += '<div class="' + headerClass + '">' + d.weekday +
+        '<span class="week-day-num">' + d.day + '</span></div>';
+
+      for (var j = 0; j < slots.length; j++) {
+        var hidden = j >= maxVisible ? ' style="display:none" data-week-overflow="' + i + '"' : '';
+        if (canBook) {
+          html += '<a href="' + buildSlotHref(slots[j]) + '" class="week-slot-pill"' + hidden + '>' + formatTime(slots[j].start) + '</a>';
+        } else {
+          html += '<span class="week-slot-pill"' + hidden + ' title="' + inviteTitle + '" style="cursor: default; opacity: 0.85;">' + formatTime(slots[j].start) + '</span>';
+        }
+      }
+      if (slots.length > maxVisible) {
+        html += '<div class="week-more" data-week-expand="' + i + '">+' + (slots.length - maxVisible) + ' ' + (i18n.weekMore || 'more') + '</div>';
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+    weekViewEl.innerHTML = html;
+    prependOffsetNote(weekViewEl, rangeOffsetNote(dates.filter(function(d) {
+      return (slotData[d.dateStr] || []).length > 0;
+    }).map(function(d) { return d.dateStr; })));
+
+    // Wire "+N more" expand buttons
+    weekViewEl.querySelectorAll('[data-week-expand]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var idx = btn.getAttribute('data-week-expand');
+        weekViewEl.querySelectorAll('[data-week-overflow="' + idx + '"]').forEach(function(el) {
+          el.style.display = '';
+        });
+        btn.remove();
+      });
+    });
+  }
+
+  function updateSharedNavForWeek(dates) {
+    var nav = document.getElementById('main-cal-nav');
+    if (!nav) return;
+    nav.innerHTML = '';
+
+    // Prev week
+    var prevWeekStart = new Date(dates[0].date);
+    prevWeekStart.setDate(prevWeekStart.getDate() - 7);
+    var prevWeekEnd = new Date(prevWeekStart);
+    prevWeekEnd.setDate(prevWeekEnd.getDate() + 6);
+    // Earliest bookable day: today, or the start of the bookable date range.
+    var earliest = todayDate;
+    if (calData.firstBookableDate && calData.firstBookableDate > earliest) earliest = calData.firstBookableDate;
+    var checkDate = new Date(earliest + 'T00:00:00');
+
+    if (prevWeekEnd >= checkDate) {
+      var prevBtn = document.createElement('a');
+      prevBtn.href = '#';
+      prevBtn.innerHTML = '<span aria-hidden="true">&larr;</span>';
+      arrowLabel(prevBtn, i18n.prevWeek);
+      prevBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        var targetDate = new Date(dates[0].date);
+        targetDate.setDate(targetDate.getDate() - 7);
+        weekStart = targetDate;
+        ensureMonthLoaded(targetDate, function() { buildWeekView(); });
+      });
+      nav.appendChild(prevBtn);
+    } else {
+      var s = document.createElement('span');
+      s.className = 'disabled';
+      s.setAttribute('aria-hidden', 'true');
+      s.innerHTML = '&larr;';
+      nav.appendChild(s);
+    }
+
+    // Next week: gated like the month view's arrow, so a booking horizon
+    // stops week paging too. Allowed while the next week starts in the
+    // loaded month, or in the next month when the server says it exists,
+    // and never past the last bookable day (end of the bookable date range).
+    var nextWeekStart = new Date(dates[6].date);
+    nextWeekStart.setDate(nextWeekStart.getDate() + 1);
+    var nextWeekMonth = nextWeekStart.getFullYear() + '-' + (nextWeekStart.getMonth() < 9 ? '0' : '') + (nextWeekStart.getMonth() + 1);
+    var canGoNext = nextWeekMonth === monthYear ||
+      (calData.hasNextMonth && calData.nextMonth === nextWeekMonth);
+    var lastDate = calData.lastBookableDate ? new Date(calData.lastBookableDate + 'T00:00:00') : null;
+    if (canGoNext && (!lastDate || nextWeekStart <= lastDate)) {
+      var nextBtn = document.createElement('a');
+      nextBtn.href = '#';
+      nextBtn.innerHTML = '<span aria-hidden="true">&rarr;</span>';
+      arrowLabel(nextBtn, i18n.nextWeek);
+      nextBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        weekStart = nextWeekStart;
+        ensureMonthLoaded(nextWeekStart, function() { buildWeekView(); });
+      });
+      nav.appendChild(nextBtn);
+    } else {
+      var n = document.createElement('span');
+      n.className = 'disabled';
+      n.setAttribute('aria-hidden', 'true');
+      n.innerHTML = '&rarr;';
+      nav.appendChild(n);
+    }
+  }
+
+  // Ensure data is loaded for the month containing targetDate
+  function ensureMonthLoaded(targetDate, cb) {
+    var targetMonth = targetDate.getFullYear() + '-' + (targetDate.getMonth() < 9 ? '0' : '') + (targetDate.getMonth() + 1);
+    if (targetMonth === monthYear) {
+      cb();
+      return;
+    }
+    // Fetch the new month data
+    var url = basePath + '?month=' + targetMonth;
+    if (guestTz) url += '&tz=' + encodeURIComponent(guestTz);
+    if (inviteToken) url += '&invite=' + encodeURIComponent(inviteToken);
+    url += embedSuffix;
+
+    fetch(url).then(function(r) { return r.text(); }).then(function(html) {
+      var parser = new DOMParser();
+      var doc = parser.parseFromString(html, 'text/html');
+      var newDataEl = doc.getElementById('calendar-data');
+      if (!newDataEl) { cb(); return; }
+
+      var newData = JSON.parse(newDataEl.textContent);
+      updateCalendarLayout(newData);
+      // Merge slot data (keep existing months, add new)
+      for (var key in newData.slotData) {
+        slotData[key] = newData.slotData[key];
+      }
+      for (var key in newData.availableDates) {
+        availableDates[key] = newData.availableDates[key];
+      }
+      // Update month-specific state
+      monthYear = newData.monthYear;
+      daysInMonth = newData.daysInMonth;
+      hasPrevMonth = newData.hasPrevMonth;
+      calData.monthLabel = newData.monthLabel;
+      calData.prevMonth = newData.prevMonth;
+      calData.nextMonth = newData.nextMonth;
+      calData.hasPrevMonth = newData.hasPrevMonth;
+      calData.hasNextMonth = newData.hasNextMonth;
+
+      // Update month title
+      var titleEl = document.querySelector('.cal-header-title');
+      if (titleEl) titleEl.textContent = newData.monthLabel;
+      updateNavArrows(newData);
+      buildCalendar();
+
+      cb();
+    }).catch(function() { cb(); });
+  }
+
+  function buildColumnView() {
+    // Update shared header title
+    var titleEl = document.getElementById('cal-header-title');
+    if (titleEl) titleEl.textContent = calData.monthLabel;
+    updateSharedNavForMonth();
+
+    // Show all available dates in the current month as rows
+    var dates = [];
+    var parts = monthYear.split('-');
+    var year = parseInt(parts[0], 10);
+    var month = parseInt(parts[1], 10);
+
+    for (var d = 1; d <= daysInMonth; d++) {
+      var ds = monthYear + '-' + (d < 10 ? '0' : '') + d;
+      if (ds < todayDate) continue;
+      var slots = slotData[ds];
+      if (!slots || slots.length === 0) continue;
+      var dt = new Date(year, month - 1, d);
+      dates.push({ dateStr: ds, day: d, weekday: shortDays[dt.getDay()], slots: slots, isToday: ds === todayDate });
+    }
+
+    var html = '';
+    if (dates.length === 0) {
+      html += '<div class="slot-empty">' + emptyIcon(ICON_CALENDAR) + '<div>' + (i18n.noTimesMonth || 'No available times this month') + '</div></div>';
+    } else {
+      html += '<div class="column-days">';
+      for (var i = 0; i < dates.length; i++) {
+        var d = dates[i];
+        html += '<div class="column-day' + (d.isToday ? ' today' : '') + '">';
+        html += '<div class="column-day-label"><div class="column-day-weekday">' + d.weekday + '</div><div class="column-day-date">' + d.day + '</div></div>';
+        html += '<div class="column-day-slots">';
+        for (var j = 0; j < d.slots.length; j++) {
+          if (canBook) {
+            html += '<a href="' + buildSlotHref(d.slots[j]) + '" class="column-slot-pill">' + formatTime(d.slots[j].start) + '</a>';
+          } else {
+            html += '<span class="column-slot-pill" title="' + inviteTitle + '" style="cursor: default; opacity: 0.85;">' + formatTime(d.slots[j].start) + '</span>';
+          }
+        }
+        html += '</div></div>';
+      }
+      html += '</div>';
+    }
+    columnViewEl.innerHTML = html;
+    // `dates` holds only the days with times, the same rule as the week view.
+    prependOffsetNote(columnViewEl, rangeOffsetNote(dates.map(function(d) { return d.dateStr; })));
+  }
+
+  // Update shared nav for month/column views (month-level prev/next)
+  function updateSharedNavForMonth() {
+    var nav = document.getElementById('main-cal-nav');
+    if (!nav) return;
+    nav.innerHTML = '';
+
+    if (calData.hasPrevMonth && calData.prevMonth) {
+      var prev = document.createElement('a');
+      prev.href = '#';
+      prev.innerHTML = '<span aria-hidden="true">&larr;</span>';
+      arrowLabel(prev, i18n.prevMonth);
+      prev.addEventListener('click', function(e) {
+        e.preventDefault();
+        var p = calData.prevMonth.split('-');
+        navigateMonth(parseInt(p[0]), parseInt(p[1]));
+      });
+      nav.appendChild(prev);
+    } else {
+      var s = document.createElement('span');
+      s.className = 'disabled';
+      s.setAttribute('aria-hidden', 'true');
+      s.innerHTML = '&larr;';
+      nav.appendChild(s);
+    }
+
+    if (calData.hasNextMonth && calData.nextMonth) {
+      var next = document.createElement('a');
+      next.href = '#';
+      next.innerHTML = '<span aria-hidden="true">&rarr;</span>';
+      arrowLabel(next, i18n.nextMonth);
+      next.addEventListener('click', function(e) {
+        e.preventDefault();
+        var n = calData.nextMonth.split('-');
+        navigateMonth(parseInt(n[0]), parseInt(n[1]));
+      });
+      nav.appendChild(next);
+    } else {
+      var ns = document.createElement('span');
+      ns.className = 'disabled';
+      ns.setAttribute('aria-hidden', 'true');
+      ns.innerHTML = '&rarr;';
+      nav.appendChild(ns);
+    }
+  }
+
+  function switchView(view) {
+    currentView = view;
+    localStorage.setItem('calrs_calendar_view', view);
+
+    // Update toggle buttons
+    viewToggle.querySelectorAll('button').forEach(function(b) {
+      b.classList.toggle('active', b.dataset.view === view);
+      b.setAttribute('aria-pressed', b.dataset.view === view ? 'true' : 'false');
+    });
+
+    // Update layout classes
+    slotsLayout.className = 'slots-layout';
+    if (view !== 'month') {
+      slotsLayout.classList.add('view-' + view);
+    }
+
+    // Build the active view
+    if (view === 'week') {
+      weekViewEl.classList.add('active');
+      columnViewEl.classList.remove('active');
+      buildWeekView();
+    } else if (view === 'column') {
+      columnViewEl.classList.add('active');
+      weekViewEl.classList.remove('active');
+      buildColumnView();
+    } else {
+      weekViewEl.classList.remove('active');
+      columnViewEl.classList.remove('active');
+      // Restore month header title and nav
+      var titleEl = document.getElementById('cal-header-title');
+      if (titleEl) titleEl.textContent = calData.monthLabel;
+      updateSharedNavForMonth();
+    }
+  }
+
+  // Wire up view toggle buttons
+  if (viewToggle) {
+    viewToggle.querySelectorAll('button').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        switchView(btn.dataset.view);
+      });
+    });
+  }
+
+  // Apply saved view preference
+  if (currentView !== 'month') {
+    switchView(currentView);
+  }
+
+  // --- Deferred slot loading for dynamic group links ---
+  if (calData.deferredLoad) {
+    var deferUrl = basePath + '?deferred=1';
+    if (calData.monthYear) deferUrl += '&month=' + calData.monthYear;
+    if (guestTz) deferUrl += '&tz=' + encodeURIComponent(guestTz);
+    if (inviteToken) deferUrl += '&invite=' + encodeURIComponent(inviteToken);
+    deferUrl += embedSuffix;
+
+    fetch(deferUrl).then(function(r) { return r.text(); }).then(function(html) {
+      var parser = new DOMParser();
+      var doc = parser.parseFromString(html, 'text/html');
+      var newDataEl = doc.getElementById('calendar-data');
+      if (!newDataEl) throw new Error('calendar-data block not found in response');
+
+      var newData = JSON.parse(newDataEl.textContent);
+      updateCalendarLayout(newData);
+      slotData = newData.slotData;
+      availableDates = newData.availableDates;
+
+      calData.slotData = slotData;
+      calData.availableDates = availableDates;
+
+      // Update loading spinner with appropriate message
+      var loader = document.getElementById('deferred-loader');
+      if (loader) {
+        // The payload also covers the edge weeks of neighbouring months
+        // (#228); only dates in the displayed month are highlighted.
+        var hasSlots = Object.keys(availableDates).some(function(k) {
+          return k.indexOf(monthYear + '-') === 0;
+        });
+        if (hasSlots) {
+          loader.innerHTML = emptyIcon(ICON_CALENDAR) + '<div>' + (i18n.clickHighlighted || 'Click a highlighted date to see available times') + '</div>';
+        } else {
+          loader.innerHTML = emptyIcon(ICON_BAN) + '<div>' + (i18n.noAvailabilityParticipants || 'No availability found for all participants this month') + '</div>';
+        }
+        loader.id = '';
+      }
+
+      // Rebuild all views with real data
+      buildCalendar();
+      if (currentView === 'week') buildWeekView();
+      else if (currentView === 'column') buildColumnView();
+    }).catch(function(e) {
+      console.error('calrs: deferred slot load failed', e);
+      var loader = document.getElementById('deferred-loader');
+      if (loader) {
+        // ilia fork: the page's language and the empty-state look of the other loader states.
+        loader.innerHTML = emptyIcon(ICON_BAN) + '<div>' + (i18n.loadFailed || 'Failed to load availability. Please refresh the page.') + '</div>';
+      }
+    });
+  }
+
+})();
+</script>
+
+    <div class="powered"><span class="made-by">based on <a href="https://cal.rs" target="_blank" rel="noopener noreferrer">calrs</a></span></div>
+    
+    <button id="theme-toggle" type="button" title="Сменить тему" aria-label="Сменить тему" class="theme-pill">
+      <span class="theme-pill-track">
+        <svg class="theme-pill-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        <svg class="theme-pill-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <span class="theme-pill-knob"></span>
+      </span>
+    </button>
+    <style>
+      .theme-pill { position: fixed; top: 0.75rem; right: 0.75rem; background: none; border: none; cursor: pointer; padding: 0; z-index: 10; }
+      .theme-pill-track { display: flex; align-items: center; justify-content: space-between; width: 52px; height: 28px; background: var(--border); border-radius: 999px; padding: 0 5px; position: relative; transition: background 0.3s ease; }
+      .theme-pill:hover .theme-pill-track { background: var(--text-muted); }
+      .theme-pill-sun, .theme-pill-moon { width: 14px; height: 14px; flex-shrink: 0; transition: opacity 0.3s ease; }
+      .theme-pill-sun { color: #f59e0b; }
+      .theme-pill-moon { color: var(--text-muted); }
+      .theme-pill-knob { position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; background: var(--surface, #fff); border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.2); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+      html.dark .theme-pill-knob { transform: translateX(24px); }
+      html.dark .theme-pill-track { background: var(--border-hover); }
+      html.dark .theme-pill:hover .theme-pill-track { background: var(--text-muted); }
+      html.dark .theme-pill-sun { opacity: 0.4; }
+      html:not(.dark) .theme-pill-moon { opacity: 0.4; }
+      @media (prefers-reduced-motion: reduce) { .theme-pill-knob, .theme-pill-track { transition: none; } }
+    </style>
+    
+    
+<details class="lang-switch">
+  <summary title="Выберите язык" aria-label="Выберите язык">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+    <span>Русский</span>
+    <svg class="lang-switch-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+  </summary>
+  <ul>
+    <li><a href="/booking/reschedule/55cda108-5071-4c37-ac7c-fb699422c24d?lang=de" data-lang="de" hreflang="de" lang="de">Deutsch</a></li>
+    <li><a href="/booking/reschedule/55cda108-5071-4c37-ac7c-fb699422c24d?lang=et" data-lang="et" hreflang="et" lang="et">Eesti</a></li>
+    <li><a href="/booking/reschedule/55cda108-5071-4c37-ac7c-fb699422c24d?lang=en" data-lang="en" hreflang="en" lang="en">English</a></li>
+    <li><a href="/booking/reschedule/55cda108-5071-4c37-ac7c-fb699422c24d?lang=es" data-lang="es" hreflang="es" lang="es">Español</a></li>
+    <li><a href="/booking/reschedule/55cda108-5071-4c37-ac7c-fb699422c24d?lang=fr" data-lang="fr" hreflang="fr" lang="fr">Français</a></li>
+    <li><a href="/booking/reschedule/55cda108-5071-4c37-ac7c-fb699422c24d?lang=it" data-lang="it" hreflang="it" lang="it">Italiano</a></li>
+    <li><a href="/booking/reschedule/55cda108-5071-4c37-ac7c-fb699422c24d?lang=nl" data-lang="nl" hreflang="nl" lang="nl">Nederlands</a></li>
+    <li><a href="/booking/reschedule/55cda108-5071-4c37-ac7c-fb699422c24d?lang=pl" data-lang="pl" hreflang="pl" lang="pl">Polski</a></li>
+    <li><a href="/booking/reschedule/55cda108-5071-4c37-ac7c-fb699422c24d?lang=pt" data-lang="pt" hreflang="pt-BR" lang="pt-BR">Português (Brasil)</a></li>
+    <li><a href="/booking/reschedule/55cda108-5071-4c37-ac7c-fb699422c24d?lang=ru" data-lang="ru" hreflang="ru" lang="ru" aria-current="true">Русский</a></li>
+  </ul>
+</details>
+<style>
+  .lang-switch { position: relative; width: fit-content; margin: 0.75rem auto 0; font-size: 0.8125rem; }
+  .lang-switch summary { list-style: none; display: flex; align-items: center; gap: 0.375rem; padding: 0.25rem 0.5rem; border-radius: 8px; color: var(--text-muted); cursor: pointer; user-select: none; transition: color 0.15s ease, background-color 0.15s ease; }
+  .lang-switch summary::-webkit-details-marker { display: none; }
+  .lang-switch summary:hover { color: var(--text); background: var(--surface-hover); }
+  .lang-switch summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .lang-switch summary svg { width: 14px; height: 14px; flex-shrink: 0; }
+  .lang-switch .lang-switch-caret { width: 12px; height: 12px; transition: transform 0.15s ease; }
+  .lang-switch[open] .lang-switch-caret { transform: rotate(180deg); }
+  .lang-switch ul { list-style: none; position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(100% + 0.375rem); z-index: 10; min-width: 11rem; max-height: min(22rem, 70vh); overflow-y: auto; margin: 0; padding: 0.3rem 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-lg); }
+  .lang-switch a { display: block; padding: 0.4rem 0.9rem; color: var(--text); text-decoration: none; font-size: 0.875rem; white-space: nowrap; }
+  .lang-switch a:hover, .lang-switch a:focus-visible { background: var(--surface-hover); outline: none; }
+  .lang-switch a[aria-current] { font-weight: 600; }
+  .lang-switch a[aria-current]::after { content: "\2713"; float: right; margin-left: 1rem; color: var(--text-muted); }
+  @media (prefers-reduced-motion: reduce) { .lang-switch summary, .lang-switch .lang-switch-caret { transition: none; } }
+</style>
+<script>
+(function () {
+  var menu = document.querySelector('details.lang-switch');
+  if (!menu) return;
+  // Link to the URL shown now: the slots page moves between months with
+  // history.pushState. Leading slashes collapse to one, so a path like
+  // `//other.host/x` never becomes a link to another host.
+  function pointLinks() {
+    var path = '/' + location.pathname.replace(/^[\/\\]+/, '');
+    menu.querySelectorAll('a[data-lang]').forEach(function (a) {
+      var query = new URLSearchParams(location.search);
+      query.set('lang', a.getAttribute('data-lang'));
+      a.setAttribute('href', path + '?' + query.toString());
+    });
+  }
+  menu.addEventListener('toggle', function () { if (menu.open) pointLinks(); });
+  // Close on a click or tap elsewhere, on Escape, and when focus leaves it.
+  document.addEventListener('pointerdown', function (e) {
+    if (menu.open && !menu.contains(e.target)) menu.open = false;
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && menu.open) {
+      menu.open = false;
+      menu.querySelector('summary').focus();
+    }
+  });
+  menu.addEventListener('focusout', function (e) {
+    if (menu.open && e.relatedTarget && !menu.contains(e.relatedTarget)) menu.open = false;
+  });
+})();
+</script>
+
+  </div>
+<script>
+// CSRF protection: inject _csrf hidden field into all POST forms
+(function() {
+  function getCsrfToken() {
+    var match = document.cookie.match(/(?:^|;\s*)__Host-calrs_csrf=([^;]+)/);
+    return match ? match[1] : '';
+  }
+  function injectCsrf() {
+    var token = getCsrfToken();
+    if (!token) return;
+    var forms = document.querySelectorAll('form[method="post"], form[method="POST"]');
+    for (var i = 0; i < forms.length; i++) {
+      var form = forms[i];
+      if (form.querySelector('input[name="_csrf"]')) continue;
+      // For multipart forms, add token to action URL as query param instead
+      if (form.enctype === 'multipart/form-data') {
+        var action = form.getAttribute('action') || '';
+        var sep = action.indexOf('?') >= 0 ? '&' : '?';
+        form.setAttribute('action', action + sep + '_csrf=' + encodeURIComponent(token));
+        continue;
+      }
+      var input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = '_csrf';
+      input.value = token;
+      form.appendChild(input);
+    }
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', injectCsrf);
+  } else {
+    injectCsrf();
+  }
+})();
+</script>
+<script>
+// Theme toggle (light / dark / system)
+(function() {
+  var btn = document.getElementById('theme-toggle');
+  // In embed mode the parent controls the theme via ?theme=, so we must read
+  // that instead of localStorage — otherwise this script would clobber the
+  // dark/light class the early head script already set from the URL param.
+  var embed = false;
+  var embedTheme = "";
+  function getTheme() {
+    if (embed) return embedTheme || 'system';
+    return localStorage.getItem('calrs_theme') || 'system';
+  }
+  function followsSystem(t) { return t === 'system' || t === 'auto' || t === ''; }
+  function isDark() {
+    var t = getTheme();
+    return t === 'dark' || (followsSystem(t) && matchMedia('(prefers-color-scheme:dark)').matches);
+  }
+  function apply() {
+    if (isDark()) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }
+  // The toggle button is hidden in embed mode; only wire it when present and
+  // when the visitor (not the parent) owns the theme.
+  if (btn && !embed) {
+    btn.addEventListener('click', function() {
+      var next = isDark() ? 'light' : 'dark';
+      localStorage.setItem('calrs_theme', next);
+      apply();
+    });
+  }
+  apply();
+  matchMedia('(prefers-color-scheme:dark)').addEventListener('change', function() {
+    if (followsSystem(getTheme())) apply();
+  });
+})();
+</script>
+<script>
+// Show sync loader on links/forms with data-calrs-sync attribute
+(function() {
+  document.addEventListener('click', function(e) {
+    var link = e.target.closest('a[data-calrs-sync]');
+    if (link && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+      calrsLoader.show();
+    }
+  });
+  document.addEventListener('submit', function(e) {
+    var form = e.target.closest('form[data-calrs-sync]');
+    if (form) calrsLoader.show();
+  });
+  document.addEventListener('change', function(e) {
+    var el = e.target.closest('[data-calrs-sync-onchange]');
+    if (el) calrsLoader.show();
+  });
+})();
+</script>
+<script>
+window.calrsFormat12h = function(time24) {
+  var parts = time24.split(':');
+  var h = parseInt(parts[0], 10);
+  var m = parts[1];
+  var suffix = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return h + ':' + m + ' ' + suffix;
+};
+</script>
+
+</body>
+</html>

@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  
+  
+  <meta name="color-scheme" content="light dark">
+  
+  <title>Не найдено — calrs</title>
+  <link rel="icon" href="/favicon">
+  <script>
+  // Apply theme ASAP to avoid flash. In embed mode the parent controls theme
+  // via ?theme= so we skip localStorage and respect the URL param only.
+  (function(){
+    var embed = false;
+    var embedTheme = "";
+    var t = embed ? embedTheme : (localStorage.getItem('calrs_theme') || '');
+    var prefersDark = matchMedia('(prefers-color-scheme:dark)').matches;
+    var dark = t === 'dark' || ((t === '' || t === 'auto' || t === 'system') && prefersDark);
+    if (dark) document.documentElement.classList.add('dark');
+  })();
+  </script>
+  <style>
+    @font-face {
+      font-family: 'Inter';
+      font-style: normal;
+      font-weight: 400 700;
+      font-display: swap;
+      src: url(/fonts/inter-latin-ext.woff2) format('woff2');
+      unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+    }
+    @font-face {
+      font-family: 'Inter';
+      font-style: normal;
+      font-weight: 400 700;
+      font-display: swap;
+      src: url(/fonts/inter-latin.woff2) format('woff2');
+      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+    }
+    :root {
+      --bg: #f4f4f5;
+      --surface: #fff;
+      --surface-hover: #fafafa;
+      --text: #18181b;
+      --text-secondary: #52525b;
+      --text-muted: #6b7280;
+      --border: #e4e4e7;
+      --border-hover: #a1a1aa;
+      /* ilia fork: the outline of a text field; dark mode takes a stronger one. */
+      --field-border: var(--border);
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --accent-subtle: #eff6ff;
+      --accent-border: #bfdbfe;
+      --accent-muted: #93c5fd;
+      --success: #16a34a;
+      --error-bg: #fef2f2;
+      --error-text: #dc2626;
+      --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+      --shadow-lg: 0 4px 6px rgba(0,0,0,0.05), 0 2px 4px rgba(0,0,0,0.03);
+      --radius: 10px;
+      --radius-lg: 14px;
+      --on-accent: #fff;
+      --warn: #b45309;
+      --warn-bg: rgba(245,158,11,0.08);
+      --warn-border: rgba(217,119,6,0.45);
+      /* ilia fork: the status tokens templates use, in both themes. The
+         var() aliases are computed on <html>, so html.dark's --warn wins
+         there. The .success notice's green is fixed (presets set only
+         --success, which badges and the ok disc keep using). */
+      --success-bg: rgba(34,197,94,0.1);
+      --success-border: rgba(22,163,74,0.4);
+      --success-text: #15803d;
+      --warning: var(--warn);
+      --warning-bg: var(--warn-bg);
+      --warning-text: var(--warn);
+      --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+      /* ilia fork: native controls (checkboxes, radios, selects, date pickers,
+         scrollbars) follow the page theme, not the OS one. The property wins
+         over the color-scheme meta tag, which still sets the first paint. */
+      color-scheme: light;
+    }
+
+    html.dark {
+      --bg: #09090b;
+      --surface: #18181b;
+      --surface-hover: #27272a;
+      --text: #fafafa;
+      --text-secondary: #a1a1aa;
+      --text-muted: #9ca3af;
+      --border: #27272a;
+      --border-hover: #52525b;
+      --field-border: var(--border-hover);
+      --accent: #3b82f6;
+      --accent-hover: #60a5fa;
+      --accent-subtle: rgba(59,130,246,0.1);
+      --accent-border: rgba(59,130,246,0.25);
+      --accent-muted: #1e40af;
+      --success: #22c55e;
+      --error-bg: rgba(220,38,38,0.1);
+      --error-text: #f87171;
+      --warn: #fbbf24;
+      --warn-bg: rgba(245,158,11,0.07);
+      --warn-border: rgba(251,191,36,0.35);
+      --success-bg: rgba(34,197,94,0.12);
+      --success-border: rgba(34,197,94,0.35);
+      --success-text: #4ade80;
+      --shadow: 0 1px 3px rgba(0,0,0,0.3);
+      --shadow-lg: 0 4px 6px rgba(0,0,0,0.25);
+      color-scheme: dark;
+    }
+    html.dark .badge-warning, html.dark .badge-pending, html.dark .badge-requires { background: rgba(234,179,8,0.15); color: #fbbf24; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    [hidden] { display: none !important; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.6;
+      color: var(--text);
+      background: var(--bg);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 2.5rem 1rem;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Links (ilia fork): a link with no class of its own is in the accent and
+       underlined, so it reads as a link in running text (translated strings
+       with a link, empty states, settings). :where() keeps the specificity
+       at zero, so every class or descendant rule (.powered a, .lang-switch a,
+       .week-nav a, the sidebar) and every inline style still wins, and a
+       link inside a .btn is left to the button. */
+    :where(a:not([class]):not(.btn *)) {
+      color: var(--accent);
+      text-decoration: underline;
+      text-decoration-thickness: 1px;
+      text-underline-offset: 2px;
+    }
+    :where(a:not([class]):not(.btn *):hover) {
+      color: var(--accent-hover);
+      text-decoration-thickness: 2px;
+    }
+
+    /* Inline icon (ilia fork): a 1em svg icon sitting on the text line, in place
+       of an emoji. Markup: <svg class="icon" viewBox="0 0 24 24" fill="none"
+       stroke="currentColor" ... aria-hidden="true">. */
+    svg.icon {
+      display: inline-block;
+      width: 1em;
+      height: 1em;
+      flex: none;
+      vertical-align: -0.125em;
+    }
+
+    .container {
+      max-width: 800px;
+      width: 100%;
+      margin-top: auto;
+      margin-bottom: auto;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 2rem;
+      margin-bottom: 1.25rem;
+      box-shadow: var(--shadow);
+    }
+
+    /* One narrow centred column (ilia fork) for single-column pages (sign
+       in, guest results), the width of the payment page's .ton-wrap. Only
+       the side margins are set, so a margin-top on the same element stays. */
+    .page-narrow, .card-narrow {
+      max-width: 30rem;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    h1 {
+      font-size: 1.375rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.25rem;
+    }
+    h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      color: var(--text-secondary);
+    }
+    /* ilia fork: sub-headings inside a card, under the card's h2. */
+    h3 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      line-height: 1.4;
+      margin-bottom: 0.5rem;
+    }
+
+    .subtitle {
+      color: var(--text-secondary);
+      font-size: 0.925rem;
+      margin-bottom: 1.5rem;
+      line-height: 1.5;
+    }
+
+    .meta {
+      display: flex;
+      gap: 1.25rem;
+      margin-bottom: 1.5rem;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+    .meta span {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    /* Week navigation */
+    .week-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.25rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .week-nav .range {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .week-nav .nav-links {
+      display: flex;
+      gap: 0.5rem;
+    }
+    .week-nav a, .week-nav span.disabled {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 2rem;
+      height: 2rem;
+      border-radius: var(--radius);
+      font-size: 0.85rem;
+      text-decoration: none;
+      transition: all 0.15s ease;
+    }
+    .week-nav a {
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .week-nav a:hover {
+      border-color: var(--border-hover);
+      background: var(--surface-hover);
+    }
+    .week-nav span.disabled {
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      opacity: 0.4;
+      cursor: default;
+    }
+
+    /* Day groups */
+    .day { margin-bottom: 1.5rem; }
+    .day:last-child { margin-bottom: 0; }
+    .day-label {
+      font-weight: 600;
+      font-size: 0.875rem;
+      margin-bottom: 0.5rem;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .slots { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .slot-btn {
+      display: inline-block;
+      padding: 0.5rem 1rem;
+      border: 1px solid var(--field-border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.15s ease;
+    }
+    .slot-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: var(--accent-subtle);
+      box-shadow: var(--shadow);
+      transform: scale(1.03);
+    }
+    .slot-btn:active {
+      transform: scale(0.97);
+      box-shadow: none;
+    }
+    .slot-btn:focus-visible, .slot-pill:focus-visible, .btn:focus-visible, .ton-copy:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    /* Form */
+    .form-group { margin-bottom: 1.25rem; }
+    .form-group label {
+      display: block;
+      font-weight: 500;
+      margin-bottom: 0.375rem;
+      font-size: 0.875rem;
+      color: var(--text);
+    }
+    .form-group .hint {
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+    /* ilia fork: a hint on its own line under a field (not inside the
+       label) is the small muted line under it. Inline styles still win. */
+    .form-group > .hint {
+      display: block;
+      font-size: 0.8rem;
+      margin-top: 0.25rem;
+    }
+    .form-group input, .form-group textarea, .form-group > select {
+      width: 100%;
+      padding: 0.625rem 0.875rem;
+      border: 1px solid var(--field-border);
+      border-radius: var(--radius);
+      font-size: 0.925rem;
+      font-family: inherit;
+      background: var(--surface);
+      color: var(--text);
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .form-group input:focus, .form-group textarea:focus, .form-group > select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-border);
+    }
+    /* ilia fork: a select is the height of a text field (Safari draws its own
+       menu height otherwise); the child combinator leaves the selects inside
+       a flex row of a .form-group (a number and its unit) as they are. */
+    .form-group > select { min-height: 2.5rem; line-height: 1.25; }
+    /* ilia fork: a text field directly in a .form-group gets the select's floor, so a field
+       and a select side by side end on the same line. */
+    .form-group > input:not([type=checkbox]):not([type=radio]) { min-height: 2.5rem; }
+    /* ilia fork: checkboxes and radios keep their own size. The text-field
+       rule above (width 100%, padding, border) stretched them across the
+       row and squeezed their label into a narrow column. This comes after
+       the :focus rule, so they do not get the text field's focus ring;
+       that rule's outline: none would leave them with no ring at all, so
+       the :focus-visible rule after this one gives the outline back.
+       Inline sizes still win. */
+    input[type=checkbox], input[type=radio] { accent-color: var(--accent); }
+    .form-group input[type=checkbox], .form-group input[type=radio] {
+      width: auto;
+      padding: 0;
+      border: 0;
+      box-shadow: none;
+      flex: none;
+    }
+    .form-group input[type=checkbox]:focus-visible, .form-group input[type=radio]:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .form-group input::placeholder, .form-group textarea::placeholder {
+      color: var(--text-muted);
+    }
+    textarea { resize: vertical; min-height: 80px; }
+    cap-widget {
+      --cap-background: var(--surface);
+      --cap-border-color: var(--border);
+      --cap-color: var(--text);
+      --cap-checkbox-background: var(--surface-hover);
+      --cap-spinner-color: var(--text);
+      --cap-spinner-background-color: var(--border);
+      --cap-widget-width: 480px;
+    }
+
+    /* intl-tel-input (guest phone field). Same approach as cap-widget above:
+       map the widget's own custom properties onto the theme variables, so it
+       follows dark mode and every custom preset without extra CSS. Its
+       defaults are hard-coded greys and a white dropdown, which would sit
+       badly on a dark surface. */
+    .iti {
+      --iti-border-color: var(--field-border);
+      --iti-dropdown-bg: var(--surface);
+      --iti-hover-color: var(--surface-hover);
+      --iti-dialcode-color: var(--text-muted);
+      --iti-arrow-color: var(--text-muted);
+      width: 100%;
+    }
+    .iti__search-input {
+      background: var(--surface);
+      color: var(--text);
+      border-bottom: 1px solid var(--border);
+    }
+    .iti__country.iti__highlight {
+      background-color: var(--surface-hover);
+    }
+
+    /* Buttons (ilia fork): one shape for every action. .btn is the primary
+       fill, full width by default as upstream's form submits are;
+       .btn-secondary is outlined, .btn-ghost is text only; .btn-auto sizes to
+       the label, .btn-sm is the compact one (copy), .btn-row lays them out.
+       Hover rules are gated with :where(:not(:disabled)...), which adds no
+       specificity: a disabled button keeps its own variant's fill, faded
+       (the rule after .btn-row), and reacts to neither hover nor press. */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      min-height: 2.75rem;
+      padding: 0.625rem 1.25rem;
+      background: var(--accent);
+      color: var(--on-accent);
+      border: 1px solid transparent;
+      border-radius: var(--radius);
+      font: inherit;
+      font-size: 0.95rem;
+      font-weight: 600;
+      line-height: 1.25;
+      text-align: center;
+      text-decoration: none;
+      cursor: pointer;
+      width: 100%;
+      transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+      letter-spacing: -0.01em;
+    }
+    .btn:hover:where(:not(:disabled):not([aria-disabled="true"])) { background: var(--accent-hover); color: var(--on-accent); box-shadow: var(--shadow-lg); }
+    .btn:active { transform: scale(0.98); box-shadow: none; }
+    .btn svg { width: 1.125em; height: 1.125em; flex: none; }
+    .btn-secondary { background: var(--surface); color: var(--text); border-color: var(--field-border); font-weight: 500; }
+    .btn-secondary:hover:where(:not(:disabled):not([aria-disabled="true"])) { background: var(--surface-hover); color: var(--text); border-color: var(--border-hover); box-shadow: none; }
+    .btn-ghost { background: transparent; color: var(--text-secondary); font-weight: 500; }
+    .btn-ghost:hover:where(:not(:disabled):not([aria-disabled="true"])) { background: var(--surface-hover); color: var(--text); box-shadow: none; }
+    .btn-danger { background: #dc2626; color: #fff; }
+    .btn-danger:hover:where(:not(:disabled):not([aria-disabled="true"])) { background: #b91c1c; color: #fff; }
+    /* Telegram's own blue on the shared shape (Telegram settings, the
+       booking's Telegram card). */
+    .btn-telegram { background: #229ED9; color: #fff; }
+    .btn-telegram:hover:where(:not(:disabled):not([aria-disabled="true"])) { background: #1b8bc2; color: #fff; }
+    .btn-auto { width: auto; }
+    .btn-sm { min-height: 2rem; padding: 0.3125rem 0.75rem; font-size: 0.8125rem; font-weight: 500; border-radius: 8px; }
+    .btn-lg { min-height: 3.25rem; font-size: 1rem; }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
+    .btn-row > form { margin: 0; display: contents; }
+    .btn:disabled, .btn[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+    .btn:disabled:active, .btn[aria-disabled="true"]:active { transform: none; }
+
+    /* File picker (ilia fork): the browser's own file control speaks the
+       browser's language, not the page's, so a label button opens the
+       visually hidden input and the chosen name shows beside it:
+       <label class="btn btn-secondary btn-sm btn-auto file-pick">LABEL<input
+       type="file" ... class="file-pick-input"></label><span
+       class="file-pick-name" data-file-name>NO FILE</span>. The script that
+       fills in the name is in dashboard_base.html. */
+    .file-pick { position: relative; }
+    .file-pick-input { position: absolute; left: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
+    .file-pick:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .file-pick-name { font-size: 0.8125rem; color: var(--text-muted); min-width: 0; overflow-wrap: anywhere; }
+    @media (prefers-reduced-motion: reduce) { .btn, .slot-btn { transition: none; } .btn:active, .slot-btn:hover, .slot-btn:active { transform: none; } }
+
+    /* Confirmation */
+    .check {
+      width: 3rem;
+      height: 3rem;
+      border-radius: 50%;
+      background: var(--success);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      margin: 0 auto 1rem;
+    }
+
+    .detail { margin-bottom: 0.625rem; color: var(--text-secondary); font-size: 0.925rem; overflow-wrap: anywhere; }
+    .detail strong { color: var(--text); }
+
+    .empty {
+      color: var(--text-muted);
+      text-align: center;
+      padding: 2rem 1rem;
+    }
+    .empty-icon {
+      font-size: 2.5rem;
+      margin-bottom: 0.75rem;
+      opacity: 0.5;
+    }
+    /* ilia fork: an empty state draws a stroke icon, not an emoji:
+       <div class="empty-icon"><svg class="icon" viewBox="0 0 24 24" ...></div>. */
+    .empty-icon svg { width: 2.5rem; height: 2.5rem; }
+    .empty-text {
+      font-size: 0.925rem;
+      max-width: 320px;
+      margin: 0 auto;
+      line-height: 1.5;
+    }
+    /* ilia fork: the link of an empty state ("Add a source") stands out from
+       the muted sentence by weight too, not by shade alone. */
+    .empty a:not([class]) { font-weight: 500; }
+
+    .logo { text-align: center; margin-bottom: 1.5rem; }
+    .logo img { max-height: 80px; max-width: 280px; object-fit: contain; }
+
+    .powered {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      margin-top: 1.5rem;
+    }
+    .powered a { color: var(--text-muted); text-decoration: none; }
+    .powered a:hover { color: var(--text-secondary); }
+    /* ilia fork: the dashboard has no made-by part, and without a source URL nothing is left. */
+    .powered:empty { display: none; }
+
+    .error {
+      color: var(--error-text);
+      background: var(--error-bg);
+      padding: 1rem;
+      border-radius: var(--radius);
+      margin-bottom: 1.25rem;
+      font-size: 0.9rem;
+    }
+    /* ilia fork: the green notice beside .error ("saved", "sent"):
+       <div class="success" role="status">text</div>. */
+    .success {
+      color: var(--success-text);
+      background: var(--success-bg);
+      border: 1px solid var(--success-border);
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius);
+      margin: 1rem 0 1.25rem;
+      font-size: 0.9rem;
+    }
+
+    /* Selected slot summary */
+    .selected-summary {
+      background: var(--accent-subtle);
+      border: 1px solid var(--accent-border);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      margin-bottom: 1.5rem;
+      font-size: 0.925rem;
+      font-weight: 500;
+    }
+
+    /* Back link */
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 500;
+      margin-bottom: 1rem;
+      transition: color 0.15s ease;
+    }
+    .back-link:hover { color: var(--text); }
+
+    .meta { flex-wrap: wrap; }
+    .week-nav .range { min-width: 0; }
+
+    @media (max-width: 480px) {
+      body { padding: 1.5rem 0.75rem; }
+      .card { padding: 1.25rem; }
+      .week-nav { flex-wrap: wrap; gap: 0.5rem; }
+      .week-nav .range { font-size: 0.8rem; }
+    }
+
+    /* Interactive card hover lift */
+    a.card, .card.card-link {
+      transition: border-color 0.15s ease, box-shadow 0.2s ease, transform 0.2s ease;
+    }
+    a.card:hover, .card.card-link:hover {
+      border-color: var(--accent-border);
+      box-shadow: var(--shadow-lg);
+      transform: translateY(-2px);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      a.card, .card.card-link { transition: border-color 0.15s ease, box-shadow 0.2s ease; }
+      a.card:hover, .card.card-link:hover { transform: none; }
+    }
+
+    /* Clickable card that may contain its own links (e.g. a markdown
+       description). A link cannot be nested in another link, so the card is a
+       <div> and the title link stretches over it with ::after. Inner links
+       are lifted above that overlay so they keep their own target. */
+    .card.card-link { position: relative; }
+    .card-link-title { color: inherit; text-decoration: none; }
+    .card-link-title::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: var(--radius-lg);
+    }
+    .card-link-title:focus-visible { outline: none; }
+    .card-link-title:focus-visible::after {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .card.card-link a:not(.card-link-title) { position: relative; z-index: 1; }
+
+    /* Status badges */
+    .badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-weight: 500;
+      padding: 0.15rem 0.5rem;
+      border-radius: 999px;
+      vertical-align: middle;
+    }
+    .badge-success {
+      background: var(--success-bg, rgba(34,197,94,0.1));
+      color: var(--success, #16a34a);
+    }
+    .badge-warning {
+      background: rgba(234,179,8,0.1);
+      color: #a16207;
+    }
+    .badge-info {
+      background: var(--accent-subtle, rgba(99,102,241,0.1));
+      color: var(--accent);
+    }
+    .badge-muted {
+      background: var(--surface-hover);
+      color: var(--text-muted);
+    }
+    .badge-error {
+      background: rgba(239,68,68,0.1);
+      color: var(--error-text, #dc2626);
+    }
+    /* Legacy aliases */
+    .badge-disabled { background: var(--error-bg); color: var(--error-text); }
+    .badge-pending { background: rgba(234,179,8,0.1); color: #a16207; }
+    .badge-confirmed { background: var(--success-bg, rgba(34,197,94,0.1)); color: var(--success); }
+    .badge-requires { background: rgba(234,179,8,0.1); color: #a16207; }
+
+    /* Result icon (ilia fork): the 3rem disc of every result page (the payment
+       page, the guest action pages, the 404). One inline <svg> inside (24x24
+       viewBox, stroke currentColor); the modifier sets the colour:
+       <span class="result-icon ok" aria-hidden="true"><svg ...></svg></span> */
+    .result-icon {
+      display: grid;
+      place-items: center;
+      flex: none;
+      width: 3rem;
+      height: 3rem;
+      border-radius: 50%;
+      margin: 0 auto 1rem;
+      background: #6b7280;
+      color: #fff;
+      box-shadow: 0 0 0 6px rgba(107,114,128,0.15);
+    }
+    .result-icon svg { width: 1.5rem; height: 1.5rem; }
+    .result-icon.ok { background: var(--success); box-shadow: 0 0 0 6px rgba(34,197,94,0.2); }
+    .result-icon.wait { background: #d97706; box-shadow: 0 0 0 6px rgba(245,158,11,0.2); }
+    .result-icon.info { background: #3b82f6; box-shadow: 0 0 0 6px rgba(59,130,246,0.2); }
+    .result-icon.bad { background: var(--error-text); box-shadow: 0 0 0 6px rgba(239,68,68,0.15); }
+    /* Muted: the secondary text colour with the card's colour for the glyph,
+       over 7:1 in both themes (the muted grey with white was 2.6:1 in dark). */
+    .result-icon.muted { background: var(--text-secondary); color: var(--surface); box-shadow: 0 0 0 6px rgba(107,114,128,0.15); }
+    /* Dark mode lightens --success and --error-text for text; a white glyph
+       on those is under 3:1, so the discs keep the light theme's fills. */
+    html.dark .result-icon.ok { background: #16a34a; }
+    html.dark .result-icon.bad { background: #dc2626; }
+    @media (prefers-reduced-motion: no-preference) {
+      .result-icon { animation: checkPop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+    }
+
+    /* Checkmark animation */
+    @keyframes checkPop {
+      0% { transform: scale(0); opacity: 0; }
+      60% { transform: scale(1.15); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    @media (prefers-reduced-motion: no-preference) {
+      .check { animation: checkPop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+    }
+  </style>
+  <style>:root{--bg:#f6f6f6;--surface:#ffffff;--text:#313131;--accent:#313131;--accent-hover:#111111;--on-accent:#ffffff;--accent-subtle:rgba(49,49,49,0.08);--accent-border:rgba(49,49,49,0.25);--accent-muted:rgba(49,49,49,0.5)}html.dark{--bg:#0a0a0a;--surface:#181818;--surface-hover:#262626;--text:#f7f7f7;--text-secondary:#a5a5a5;--text-muted:#a0a0a0;--border:#262626;--border-hover:#535353;--accent:#ededed;--accent-hover:#d1d1d1;--on-accent:#0a0a0a;--accent-subtle:rgba(237,237,237,0.12);--accent-border:rgba(237,237,237,0.3);--accent-muted:rgba(237,237,237,0.5)}</style>
+  
+  
+<style>
+  /* ilia fork: the card's padding stays even below the last element. */
+  .err-card > :last-child { margin-bottom: 0; }
+</style>
+
+</head>
+<body>
+  <!-- Global sync loader overlay -->
+  <div id="calrs-sync-loader" style="display:none; position:fixed; inset:0; z-index:10000; background:var(--bg); align-items:center; justify-content:center; flex-direction:column; gap:1.25rem;">
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: calrs-spin 1s linear infinite;"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+    <div style="font-size:1.125rem; font-weight:600; color:var(--text); text-align:center;">Проверяем свободное время</div>
+    <div style="font-size:0.875rem; color:var(--text-muted); text-align:center;">Подождите, загружаем актуальные данные календаря…</div>
+  </div>
+  <style>
+    @keyframes calrs-spin { to { transform: rotate(360deg); } }
+  </style>
+  <script>
+  var calrsLoader = {
+    show: function() {
+      var el = document.getElementById('calrs-sync-loader');
+      if (el) el.style.display = 'flex';
+    },
+    hide: function() {
+      var el = document.getElementById('calrs-sync-loader');
+      if (el) el.style.display = 'none';
+    }
+  };
+  </script>
+  
+  <div class="container">
+    
+
+<div class="page-narrow">
+<div class="logo"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='40'%3E%3Crect width='120' height='40' rx='8' fill='%23888'/%3E%3Ccircle cx='20' cy='20' r='9' fill='%23fff'/%3E%3C/svg%3E" alt="" onerror="this.closest('.logo').style.display='none'"></div>
+<div class="card err-card" style="text-align: center;">
+  <span class="result-icon muted" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v6M12 16.5v.5"/></svg></span>
+  <h1>Не найдено</h1>
+  <p class="subtitle">Тип встречи не найден.</p>
+  
+</div>
+</div>
+
+    <div class="powered"><span class="made-by">based on <a href="https://cal.rs" target="_blank" rel="noopener noreferrer">calrs</a></span></div>
+    
+    <button id="theme-toggle" type="button" title="Сменить тему" aria-label="Сменить тему" class="theme-pill">
+      <span class="theme-pill-track">
+        <svg class="theme-pill-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        <svg class="theme-pill-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <span class="theme-pill-knob"></span>
+      </span>
+    </button>
+    <style>
+      .theme-pill { position: fixed; top: 0.75rem; right: 0.75rem; background: none; border: none; cursor: pointer; padding: 0; z-index: 10; }
+      .theme-pill-track { display: flex; align-items: center; justify-content: space-between; width: 52px; height: 28px; background: var(--border); border-radius: 999px; padding: 0 5px; position: relative; transition: background 0.3s ease; }
+      .theme-pill:hover .theme-pill-track { background: var(--text-muted); }
+      .theme-pill-sun, .theme-pill-moon { width: 14px; height: 14px; flex-shrink: 0; transition: opacity 0.3s ease; }
+      .theme-pill-sun { color: #f59e0b; }
+      .theme-pill-moon { color: var(--text-muted); }
+      .theme-pill-knob { position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; background: var(--surface, #fff); border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.2); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+      html.dark .theme-pill-knob { transform: translateX(24px); }
+      html.dark .theme-pill-track { background: var(--border-hover); }
+      html.dark .theme-pill:hover .theme-pill-track { background: var(--text-muted); }
+      html.dark .theme-pill-sun { opacity: 0.4; }
+      html:not(.dark) .theme-pill-moon { opacity: 0.4; }
+      @media (prefers-reduced-motion: reduce) { .theme-pill-knob, .theme-pill-track { transition: none; } }
+    </style>
+    
+    
+  </div>
+<script>
+// CSRF protection: inject _csrf hidden field into all POST forms
+(function() {
+  function getCsrfToken() {
+    var match = document.cookie.match(/(?:^|;\s*)__Host-calrs_csrf=([^;]+)/);
+    return match ? match[1] : '';
+  }
+  function injectCsrf() {
+    var token = getCsrfToken();
+    if (!token) return;
+    var forms = document.querySelectorAll('form[method="post"], form[method="POST"]');
+    for (var i = 0; i < forms.length; i++) {
+      var form = forms[i];
+      if (form.querySelector('input[name="_csrf"]')) continue;
+      // For multipart forms, add token to action URL as query param instead
+      if (form.enctype === 'multipart/form-data') {
+        var action = form.getAttribute('action') || '';
+        var sep = action.indexOf('?') >= 0 ? '&' : '?';
+        form.setAttribute('action', action + sep + '_csrf=' + encodeURIComponent(token));
+        continue;
+      }
+      var input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = '_csrf';
+      input.value = token;
+      form.appendChild(input);
+    }
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', injectCsrf);
+  } else {
+    injectCsrf();
+  }
+})();
+</script>
+<script>
+// Theme toggle (light / dark / system)
+(function() {
+  var btn = document.getElementById('theme-toggle');
+  // In embed mode the parent controls the theme via ?theme=, so we must read
+  // that instead of localStorage — otherwise this script would clobber the
+  // dark/light class the early head script already set from the URL param.
+  var embed = false;
+  var embedTheme = "";
+  function getTheme() {
+    if (embed) return embedTheme || 'system';
+    return localStorage.getItem('calrs_theme') || 'system';
+  }
+  function followsSystem(t) { return t === 'system' || t === 'auto' || t === ''; }
+  function isDark() {
+    var t = getTheme();
+    return t === 'dark' || (followsSystem(t) && matchMedia('(prefers-color-scheme:dark)').matches);
+  }
+  function apply() {
+    if (isDark()) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }
+  // The toggle button is hidden in embed mode; only wire it when present and
+  // when the visitor (not the parent) owns the theme.
+  if (btn && !embed) {
+    btn.addEventListener('click', function() {
+      var next = isDark() ? 'light' : 'dark';
+      localStorage.setItem('calrs_theme', next);
+      apply();
+    });
+  }
+  apply();
+  matchMedia('(prefers-color-scheme:dark)').addEventListener('change', function() {
+    if (followsSystem(getTheme())) apply();
+  });
+})();
+</script>
+<script>
+// Show sync loader on links/forms with data-calrs-sync attribute
+(function() {
+  document.addEventListener('click', function(e) {
+    var link = e.target.closest('a[data-calrs-sync]');
+    if (link && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+      calrsLoader.show();
+    }
+  });
+  document.addEventListener('submit', function(e) {
+    var form = e.target.closest('form[data-calrs-sync]');
+    if (form) calrsLoader.show();
+  });
+  document.addEventListener('change', function(e) {
+    var el = e.target.closest('[data-calrs-sync-onchange]');
+    if (el) calrsLoader.show();
+  });
+})();
+</script>
+<script>
+window.calrsFormat12h = function(time24) {
+  var parts = time24.split(':');
+  var h = parseInt(parts[0], 10);
+  var m = parts[1];
+  var suffix = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return h + ':' + m + ' ' + suffix;
+};
+</script>
+
+</body>
+</html>

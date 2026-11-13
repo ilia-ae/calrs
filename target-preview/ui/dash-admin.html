@@ -1,0 +1,2965 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  
+  
+  <meta name="color-scheme" content="light dark">
+  
+  <title>Панель администратора — calrs</title>
+  <link rel="icon" href="/favicon">
+  <script>
+  // Apply theme ASAP to avoid flash. In embed mode the parent controls theme
+  // via ?theme= so we skip localStorage and respect the URL param only.
+  (function(){
+    var embed = false;
+    var embedTheme = "";
+    var t = embed ? embedTheme : (localStorage.getItem('calrs_theme') || '');
+    var prefersDark = matchMedia('(prefers-color-scheme:dark)').matches;
+    var dark = t === 'dark' || ((t === '' || t === 'auto' || t === 'system') && prefersDark);
+    if (dark) document.documentElement.classList.add('dark');
+  })();
+  </script>
+  <style>
+    @font-face {
+      font-family: 'Inter';
+      font-style: normal;
+      font-weight: 400 700;
+      font-display: swap;
+      src: url(/fonts/inter-latin-ext.woff2) format('woff2');
+      unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+    }
+    @font-face {
+      font-family: 'Inter';
+      font-style: normal;
+      font-weight: 400 700;
+      font-display: swap;
+      src: url(/fonts/inter-latin.woff2) format('woff2');
+      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+    }
+    :root {
+      --bg: #f4f4f5;
+      --surface: #fff;
+      --surface-hover: #fafafa;
+      --text: #18181b;
+      --text-secondary: #52525b;
+      --text-muted: #6b7280;
+      --border: #e4e4e7;
+      --border-hover: #a1a1aa;
+      /* ilia fork: the outline of a text field; dark mode takes a stronger one. */
+      --field-border: var(--border);
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --accent-subtle: #eff6ff;
+      --accent-border: #bfdbfe;
+      --accent-muted: #93c5fd;
+      --success: #16a34a;
+      --error-bg: #fef2f2;
+      --error-text: #dc2626;
+      --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+      --shadow-lg: 0 4px 6px rgba(0,0,0,0.05), 0 2px 4px rgba(0,0,0,0.03);
+      --radius: 10px;
+      --radius-lg: 14px;
+      --on-accent: #fff;
+      --warn: #b45309;
+      --warn-bg: rgba(245,158,11,0.08);
+      --warn-border: rgba(217,119,6,0.45);
+      /* ilia fork: the status tokens templates use, in both themes. The
+         var() aliases are computed on <html>, so html.dark's --warn wins
+         there. The .success notice's green is fixed (presets set only
+         --success, which badges and the ok disc keep using). */
+      --success-bg: rgba(34,197,94,0.1);
+      --success-border: rgba(22,163,74,0.4);
+      --success-text: #15803d;
+      --warning: var(--warn);
+      --warning-bg: var(--warn-bg);
+      --warning-text: var(--warn);
+      --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+      /* ilia fork: native controls (checkboxes, radios, selects, date pickers,
+         scrollbars) follow the page theme, not the OS one. The property wins
+         over the color-scheme meta tag, which still sets the first paint. */
+      color-scheme: light;
+    }
+
+    html.dark {
+      --bg: #09090b;
+      --surface: #18181b;
+      --surface-hover: #27272a;
+      --text: #fafafa;
+      --text-secondary: #a1a1aa;
+      --text-muted: #9ca3af;
+      --border: #27272a;
+      --border-hover: #52525b;
+      --field-border: var(--border-hover);
+      --accent: #3b82f6;
+      --accent-hover: #60a5fa;
+      --accent-subtle: rgba(59,130,246,0.1);
+      --accent-border: rgba(59,130,246,0.25);
+      --accent-muted: #1e40af;
+      --success: #22c55e;
+      --error-bg: rgba(220,38,38,0.1);
+      --error-text: #f87171;
+      --warn: #fbbf24;
+      --warn-bg: rgba(245,158,11,0.07);
+      --warn-border: rgba(251,191,36,0.35);
+      --success-bg: rgba(34,197,94,0.12);
+      --success-border: rgba(34,197,94,0.35);
+      --success-text: #4ade80;
+      --shadow: 0 1px 3px rgba(0,0,0,0.3);
+      --shadow-lg: 0 4px 6px rgba(0,0,0,0.25);
+      color-scheme: dark;
+    }
+    html.dark .badge-warning, html.dark .badge-pending, html.dark .badge-requires { background: rgba(234,179,8,0.15); color: #fbbf24; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    [hidden] { display: none !important; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.6;
+      color: var(--text);
+      background: var(--bg);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 2.5rem 1rem;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Links (ilia fork): a link with no class of its own is in the accent and
+       underlined, so it reads as a link in running text (translated strings
+       with a link, empty states, settings). :where() keeps the specificity
+       at zero, so every class or descendant rule (.powered a, .lang-switch a,
+       .week-nav a, the sidebar) and every inline style still wins, and a
+       link inside a .btn is left to the button. */
+    :where(a:not([class]):not(.btn *)) {
+      color: var(--accent);
+      text-decoration: underline;
+      text-decoration-thickness: 1px;
+      text-underline-offset: 2px;
+    }
+    :where(a:not([class]):not(.btn *):hover) {
+      color: var(--accent-hover);
+      text-decoration-thickness: 2px;
+    }
+
+    /* Inline icon (ilia fork): a 1em svg icon sitting on the text line, in place
+       of an emoji. Markup: <svg class="icon" viewBox="0 0 24 24" fill="none"
+       stroke="currentColor" ... aria-hidden="true">. */
+    svg.icon {
+      display: inline-block;
+      width: 1em;
+      height: 1em;
+      flex: none;
+      vertical-align: -0.125em;
+    }
+
+    .container {
+      max-width: 800px;
+      width: 100%;
+      margin-top: auto;
+      margin-bottom: auto;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 2rem;
+      margin-bottom: 1.25rem;
+      box-shadow: var(--shadow);
+    }
+
+    /* One narrow centred column (ilia fork) for single-column pages (sign
+       in, guest results), the width of the payment page's .ton-wrap. Only
+       the side margins are set, so a margin-top on the same element stays. */
+    .page-narrow, .card-narrow {
+      max-width: 30rem;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    h1 {
+      font-size: 1.375rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.25rem;
+    }
+    h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      color: var(--text-secondary);
+    }
+    /* ilia fork: sub-headings inside a card, under the card's h2. */
+    h3 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      line-height: 1.4;
+      margin-bottom: 0.5rem;
+    }
+
+    .subtitle {
+      color: var(--text-secondary);
+      font-size: 0.925rem;
+      margin-bottom: 1.5rem;
+      line-height: 1.5;
+    }
+
+    .meta {
+      display: flex;
+      gap: 1.25rem;
+      margin-bottom: 1.5rem;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+    .meta span {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    /* Week navigation */
+    .week-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.25rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .week-nav .range {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .week-nav .nav-links {
+      display: flex;
+      gap: 0.5rem;
+    }
+    .week-nav a, .week-nav span.disabled {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 2rem;
+      height: 2rem;
+      border-radius: var(--radius);
+      font-size: 0.85rem;
+      text-decoration: none;
+      transition: all 0.15s ease;
+    }
+    .week-nav a {
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .week-nav a:hover {
+      border-color: var(--border-hover);
+      background: var(--surface-hover);
+    }
+    .week-nav span.disabled {
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      opacity: 0.4;
+      cursor: default;
+    }
+
+    /* Day groups */
+    .day { margin-bottom: 1.5rem; }
+    .day:last-child { margin-bottom: 0; }
+    .day-label {
+      font-weight: 600;
+      font-size: 0.875rem;
+      margin-bottom: 0.5rem;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .slots { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .slot-btn {
+      display: inline-block;
+      padding: 0.5rem 1rem;
+      border: 1px solid var(--field-border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.15s ease;
+    }
+    .slot-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: var(--accent-subtle);
+      box-shadow: var(--shadow);
+      transform: scale(1.03);
+    }
+    .slot-btn:active {
+      transform: scale(0.97);
+      box-shadow: none;
+    }
+    .slot-btn:focus-visible, .slot-pill:focus-visible, .btn:focus-visible, .ton-copy:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    /* Form */
+    .form-group { margin-bottom: 1.25rem; }
+    .form-group label {
+      display: block;
+      font-weight: 500;
+      margin-bottom: 0.375rem;
+      font-size: 0.875rem;
+      color: var(--text);
+    }
+    .form-group .hint {
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+    /* ilia fork: a hint on its own line under a field (not inside the
+       label) is the small muted line under it. Inline styles still win. */
+    .form-group > .hint {
+      display: block;
+      font-size: 0.8rem;
+      margin-top: 0.25rem;
+    }
+    .form-group input, .form-group textarea, .form-group > select {
+      width: 100%;
+      padding: 0.625rem 0.875rem;
+      border: 1px solid var(--field-border);
+      border-radius: var(--radius);
+      font-size: 0.925rem;
+      font-family: inherit;
+      background: var(--surface);
+      color: var(--text);
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .form-group input:focus, .form-group textarea:focus, .form-group > select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-border);
+    }
+    /* ilia fork: a select is the height of a text field (Safari draws its own
+       menu height otherwise); the child combinator leaves the selects inside
+       a flex row of a .form-group (a number and its unit) as they are. */
+    .form-group > select { min-height: 2.5rem; line-height: 1.25; }
+    /* ilia fork: a text field directly in a .form-group gets the select's floor, so a field
+       and a select side by side end on the same line. */
+    .form-group > input:not([type=checkbox]):not([type=radio]) { min-height: 2.5rem; }
+    /* ilia fork: checkboxes and radios keep their own size. The text-field
+       rule above (width 100%, padding, border) stretched them across the
+       row and squeezed their label into a narrow column. This comes after
+       the :focus rule, so they do not get the text field's focus ring;
+       that rule's outline: none would leave them with no ring at all, so
+       the :focus-visible rule after this one gives the outline back.
+       Inline sizes still win. */
+    input[type=checkbox], input[type=radio] { accent-color: var(--accent); }
+    .form-group input[type=checkbox], .form-group input[type=radio] {
+      width: auto;
+      padding: 0;
+      border: 0;
+      box-shadow: none;
+      flex: none;
+    }
+    .form-group input[type=checkbox]:focus-visible, .form-group input[type=radio]:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .form-group input::placeholder, .form-group textarea::placeholder {
+      color: var(--text-muted);
+    }
+    textarea { resize: vertical; min-height: 80px; }
+    cap-widget {
+      --cap-background: var(--surface);
+      --cap-border-color: var(--border);
+      --cap-color: var(--text);
+      --cap-checkbox-background: var(--surface-hover);
+      --cap-spinner-color: var(--text);
+      --cap-spinner-background-color: var(--border);
+      --cap-widget-width: 480px;
+    }
+
+    /* intl-tel-input (guest phone field). Same approach as cap-widget above:
+       map the widget's own custom properties onto the theme variables, so it
+       follows dark mode and every custom preset without extra CSS. Its
+       defaults are hard-coded greys and a white dropdown, which would sit
+       badly on a dark surface. */
+    .iti {
+      --iti-border-color: var(--field-border);
+      --iti-dropdown-bg: var(--surface);
+      --iti-hover-color: var(--surface-hover);
+      --iti-dialcode-color: var(--text-muted);
+      --iti-arrow-color: var(--text-muted);
+      width: 100%;
+    }
+    .iti__search-input {
+      background: var(--surface);
+      color: var(--text);
+      border-bottom: 1px solid var(--border);
+    }
+    .iti__country.iti__highlight {
+      background-color: var(--surface-hover);
+    }
+
+    /* Buttons (ilia fork): one shape for every action. .btn is the primary
+       fill, full width by default as upstream's form submits are;
+       .btn-secondary is outlined, .btn-ghost is text only; .btn-auto sizes to
+       the label, .btn-sm is the compact one (copy), .btn-row lays them out.
+       Hover rules are gated with :where(:not(:disabled)...), which adds no
+       specificity: a disabled button keeps its own variant's fill, faded
+       (the rule after .btn-row), and reacts to neither hover nor press. */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      min-height: 2.75rem;
+      padding: 0.625rem 1.25rem;
+      background: var(--accent);
+      color: var(--on-accent);
+      border: 1px solid transparent;
+      border-radius: var(--radius);
+      font: inherit;
+      font-size: 0.95rem;
+      font-weight: 600;
+      line-height: 1.25;
+      text-align: center;
+      text-decoration: none;
+      cursor: pointer;
+      width: 100%;
+      transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+      letter-spacing: -0.01em;
+    }
+    .btn:hover:where(:not(:disabled):not([aria-disabled="true"])) { background: var(--accent-hover); color: var(--on-accent); box-shadow: var(--shadow-lg); }
+    .btn:active { transform: scale(0.98); box-shadow: none; }
+    .btn svg { width: 1.125em; height: 1.125em; flex: none; }
+    .btn-secondary { background: var(--surface); color: var(--text); border-color: var(--field-border); font-weight: 500; }
+    .btn-secondary:hover:where(:not(:disabled):not([aria-disabled="true"])) { background: var(--surface-hover); color: var(--text); border-color: var(--border-hover); box-shadow: none; }
+    .btn-ghost { background: transparent; color: var(--text-secondary); font-weight: 500; }
+    .btn-ghost:hover:where(:not(:disabled):not([aria-disabled="true"])) { background: var(--surface-hover); color: var(--text); box-shadow: none; }
+    .btn-danger { background: #dc2626; color: #fff; }
+    .btn-danger:hover:where(:not(:disabled):not([aria-disabled="true"])) { background: #b91c1c; color: #fff; }
+    /* Telegram's own blue on the shared shape (Telegram settings, the
+       booking's Telegram card). */
+    .btn-telegram { background: #229ED9; color: #fff; }
+    .btn-telegram:hover:where(:not(:disabled):not([aria-disabled="true"])) { background: #1b8bc2; color: #fff; }
+    .btn-auto { width: auto; }
+    .btn-sm { min-height: 2rem; padding: 0.3125rem 0.75rem; font-size: 0.8125rem; font-weight: 500; border-radius: 8px; }
+    .btn-lg { min-height: 3.25rem; font-size: 1rem; }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
+    .btn-row > form { margin: 0; display: contents; }
+    .btn:disabled, .btn[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+    .btn:disabled:active, .btn[aria-disabled="true"]:active { transform: none; }
+
+    /* File picker (ilia fork): the browser's own file control speaks the
+       browser's language, not the page's, so a label button opens the
+       visually hidden input and the chosen name shows beside it:
+       <label class="btn btn-secondary btn-sm btn-auto file-pick">LABEL<input
+       type="file" ... class="file-pick-input"></label><span
+       class="file-pick-name" data-file-name>NO FILE</span>. The script that
+       fills in the name is in dashboard_base.html. */
+    .file-pick { position: relative; }
+    .file-pick-input { position: absolute; left: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
+    .file-pick:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .file-pick-name { font-size: 0.8125rem; color: var(--text-muted); min-width: 0; overflow-wrap: anywhere; }
+    @media (prefers-reduced-motion: reduce) { .btn, .slot-btn { transition: none; } .btn:active, .slot-btn:hover, .slot-btn:active { transform: none; } }
+
+    /* Confirmation */
+    .check {
+      width: 3rem;
+      height: 3rem;
+      border-radius: 50%;
+      background: var(--success);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      margin: 0 auto 1rem;
+    }
+
+    .detail { margin-bottom: 0.625rem; color: var(--text-secondary); font-size: 0.925rem; overflow-wrap: anywhere; }
+    .detail strong { color: var(--text); }
+
+    .empty {
+      color: var(--text-muted);
+      text-align: center;
+      padding: 2rem 1rem;
+    }
+    .empty-icon {
+      font-size: 2.5rem;
+      margin-bottom: 0.75rem;
+      opacity: 0.5;
+    }
+    /* ilia fork: an empty state draws a stroke icon, not an emoji:
+       <div class="empty-icon"><svg class="icon" viewBox="0 0 24 24" ...></div>. */
+    .empty-icon svg { width: 2.5rem; height: 2.5rem; }
+    .empty-text {
+      font-size: 0.925rem;
+      max-width: 320px;
+      margin: 0 auto;
+      line-height: 1.5;
+    }
+    /* ilia fork: the link of an empty state ("Add a source") stands out from
+       the muted sentence by weight too, not by shade alone. */
+    .empty a:not([class]) { font-weight: 500; }
+
+    .logo { text-align: center; margin-bottom: 1.5rem; }
+    .logo img { max-height: 80px; max-width: 280px; object-fit: contain; }
+
+    .powered {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      margin-top: 1.5rem;
+    }
+    .powered a { color: var(--text-muted); text-decoration: none; }
+    .powered a:hover { color: var(--text-secondary); }
+    /* ilia fork: the dashboard has no made-by part, and without a source URL nothing is left. */
+    .powered:empty { display: none; }
+
+    .error {
+      color: var(--error-text);
+      background: var(--error-bg);
+      padding: 1rem;
+      border-radius: var(--radius);
+      margin-bottom: 1.25rem;
+      font-size: 0.9rem;
+    }
+    /* ilia fork: the green notice beside .error ("saved", "sent"):
+       <div class="success" role="status">text</div>. */
+    .success {
+      color: var(--success-text);
+      background: var(--success-bg);
+      border: 1px solid var(--success-border);
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius);
+      margin: 1rem 0 1.25rem;
+      font-size: 0.9rem;
+    }
+
+    /* Selected slot summary */
+    .selected-summary {
+      background: var(--accent-subtle);
+      border: 1px solid var(--accent-border);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      margin-bottom: 1.5rem;
+      font-size: 0.925rem;
+      font-weight: 500;
+    }
+
+    /* Back link */
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 500;
+      margin-bottom: 1rem;
+      transition: color 0.15s ease;
+    }
+    .back-link:hover { color: var(--text); }
+
+    .meta { flex-wrap: wrap; }
+    .week-nav .range { min-width: 0; }
+
+    @media (max-width: 480px) {
+      body { padding: 1.5rem 0.75rem; }
+      .card { padding: 1.25rem; }
+      .week-nav { flex-wrap: wrap; gap: 0.5rem; }
+      .week-nav .range { font-size: 0.8rem; }
+    }
+
+    /* Interactive card hover lift */
+    a.card, .card.card-link {
+      transition: border-color 0.15s ease, box-shadow 0.2s ease, transform 0.2s ease;
+    }
+    a.card:hover, .card.card-link:hover {
+      border-color: var(--accent-border);
+      box-shadow: var(--shadow-lg);
+      transform: translateY(-2px);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      a.card, .card.card-link { transition: border-color 0.15s ease, box-shadow 0.2s ease; }
+      a.card:hover, .card.card-link:hover { transform: none; }
+    }
+
+    /* Clickable card that may contain its own links (e.g. a markdown
+       description). A link cannot be nested in another link, so the card is a
+       <div> and the title link stretches over it with ::after. Inner links
+       are lifted above that overlay so they keep their own target. */
+    .card.card-link { position: relative; }
+    .card-link-title { color: inherit; text-decoration: none; }
+    .card-link-title::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: var(--radius-lg);
+    }
+    .card-link-title:focus-visible { outline: none; }
+    .card-link-title:focus-visible::after {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .card.card-link a:not(.card-link-title) { position: relative; z-index: 1; }
+
+    /* Status badges */
+    .badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-weight: 500;
+      padding: 0.15rem 0.5rem;
+      border-radius: 999px;
+      vertical-align: middle;
+    }
+    .badge-success {
+      background: var(--success-bg, rgba(34,197,94,0.1));
+      color: var(--success, #16a34a);
+    }
+    .badge-warning {
+      background: rgba(234,179,8,0.1);
+      color: #a16207;
+    }
+    .badge-info {
+      background: var(--accent-subtle, rgba(99,102,241,0.1));
+      color: var(--accent);
+    }
+    .badge-muted {
+      background: var(--surface-hover);
+      color: var(--text-muted);
+    }
+    .badge-error {
+      background: rgba(239,68,68,0.1);
+      color: var(--error-text, #dc2626);
+    }
+    /* Legacy aliases */
+    .badge-disabled { background: var(--error-bg); color: var(--error-text); }
+    .badge-pending { background: rgba(234,179,8,0.1); color: #a16207; }
+    .badge-confirmed { background: var(--success-bg, rgba(34,197,94,0.1)); color: var(--success); }
+    .badge-requires { background: rgba(234,179,8,0.1); color: #a16207; }
+
+    /* Result icon (ilia fork): the 3rem disc of every result page (the payment
+       page, the guest action pages, the 404). One inline <svg> inside (24x24
+       viewBox, stroke currentColor); the modifier sets the colour:
+       <span class="result-icon ok" aria-hidden="true"><svg ...></svg></span> */
+    .result-icon {
+      display: grid;
+      place-items: center;
+      flex: none;
+      width: 3rem;
+      height: 3rem;
+      border-radius: 50%;
+      margin: 0 auto 1rem;
+      background: #6b7280;
+      color: #fff;
+      box-shadow: 0 0 0 6px rgba(107,114,128,0.15);
+    }
+    .result-icon svg { width: 1.5rem; height: 1.5rem; }
+    .result-icon.ok { background: var(--success); box-shadow: 0 0 0 6px rgba(34,197,94,0.2); }
+    .result-icon.wait { background: #d97706; box-shadow: 0 0 0 6px rgba(245,158,11,0.2); }
+    .result-icon.info { background: #3b82f6; box-shadow: 0 0 0 6px rgba(59,130,246,0.2); }
+    .result-icon.bad { background: var(--error-text); box-shadow: 0 0 0 6px rgba(239,68,68,0.15); }
+    /* Muted: the secondary text colour with the card's colour for the glyph,
+       over 7:1 in both themes (the muted grey with white was 2.6:1 in dark). */
+    .result-icon.muted { background: var(--text-secondary); color: var(--surface); box-shadow: 0 0 0 6px rgba(107,114,128,0.15); }
+    /* Dark mode lightens --success and --error-text for text; a white glyph
+       on those is under 3:1, so the discs keep the light theme's fills. */
+    html.dark .result-icon.ok { background: #16a34a; }
+    html.dark .result-icon.bad { background: #dc2626; }
+    @media (prefers-reduced-motion: no-preference) {
+      .result-icon { animation: checkPop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+    }
+
+    /* Checkmark animation */
+    @keyframes checkPop {
+      0% { transform: scale(0); opacity: 0; }
+      60% { transform: scale(1.15); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    @media (prefers-reduced-motion: no-preference) {
+      .check { animation: checkPop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+    }
+  </style>
+  <style>:root{--bg:#f6f6f6;--surface:#ffffff;--text:#313131;--accent:#313131;--accent-hover:#111111;--on-accent:#ffffff;--accent-subtle:rgba(49,49,49,0.08);--accent-border:rgba(49,49,49,0.25);--accent-muted:rgba(49,49,49,0.5)}html.dark{--bg:#0a0a0a;--surface:#181818;--surface-hover:#262626;--text:#f7f7f7;--text-secondary:#a5a5a5;--text-muted:#a0a0a0;--border:#262626;--border-hover:#535353;--accent:#ededed;--accent-hover:#d1d1d1;--on-accent:#0a0a0a;--accent-subtle:rgba(237,237,237,0.12);--accent-border:rgba(237,237,237,0.3);--accent-muted:rgba(237,237,237,0.5)}</style>
+  
+  
+</head>
+<body>
+  <!-- Global sync loader overlay -->
+  <div id="calrs-sync-loader" style="display:none; position:fixed; inset:0; z-index:10000; background:var(--bg); align-items:center; justify-content:center; flex-direction:column; gap:1.25rem;">
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: calrs-spin 1s linear infinite;"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+    <div style="font-size:1.125rem; font-weight:600; color:var(--text); text-align:center;">Проверяем свободное время</div>
+    <div style="font-size:0.875rem; color:var(--text-muted); text-align:center;">Подождите, загружаем актуальные данные календаря…</div>
+  </div>
+  <style>
+    @keyframes calrs-spin { to { transform: rotate(360deg); } }
+  </style>
+  <script>
+  var calrsLoader = {
+    show: function() {
+      var el = document.getElementById('calrs-sync-loader');
+      if (el) el.style.display = 'flex';
+    },
+    hide: function() {
+      var el = document.getElementById('calrs-sync-loader');
+      if (el) el.style.display = 'none';
+    }
+  };
+  </script>
+  
+  <div class="container">
+    
+<style>
+  /* Override base body for dashboard layout */
+  body {
+    padding: 0;
+    justify-content: flex-start;
+  }
+  .container { max-width: none; }
+
+  .dashboard-layout {
+    display: flex;
+    min-height: 100vh;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    width: 260px;
+    min-width: 260px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    position: sticky;
+    top: 0;
+    overflow-y: auto;
+    z-index: 100;
+  }
+
+  .sidebar-brand {
+    padding: 1.25rem 1.25rem 1rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+  }
+  /* ilia fork: a calendar icon instead of the crab, drawn in the text colour. */
+  .sidebar-brand-mark {
+    flex: none;
+    width: 36px;
+    height: 36px;
+    color: var(--text);
+  }
+  .sidebar-brand-name {
+    font-weight: 700;
+    font-size: 1.6rem;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    color: var(--text);
+  }
+
+  .sidebar-user {
+    padding: 0.75rem 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+  }
+
+  .avatar-circle {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--on-accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.75rem;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+  .avatar-circle img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .sidebar-user-info {
+    min-width: 0;
+  }
+  .sidebar-user-name {
+    font-weight: 600;
+    font-size: 0.825rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .sidebar-user-title {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .sidebar-nav {
+    flex: 1;
+    padding: 0.75rem 0;
+  }
+
+  .sidebar-section {
+    padding: 0 0.75rem;
+    margin-bottom: 0.5rem;
+  }
+  .sidebar-section-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    padding: 0.5rem 0.5rem 0.25rem;
+  }
+
+  .sidebar-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all 0.15s ease;
+  }
+  .sidebar-link:hover {
+    background: var(--surface-hover);
+    color: var(--text);
+  }
+  .sidebar-link.active {
+    background: var(--accent-subtle);
+    color: var(--accent);
+    font-weight: 600;
+  }
+  /* ilia fork: monochrome stroke icons in the text colour, so they follow
+     hover and the active accent (the emoji kept their own colours). A 16px
+     icon centred in the old 1.25rem slot, so the labels stay where they were. */
+  .sidebar-link .icon {
+    width: 1.25rem;
+    height: 1rem;
+    flex: none;
+  }
+  /* Empty states draw the same kind of icon, muted by .empty-icon (base.html
+     sizes it, for the public pages too). */
+
+  .sidebar-bottom {
+    padding: 0.75rem 1rem;
+    border-top: 1px solid var(--border);
+  }
+  .sidebar-bottom form { margin: 0; }
+  .sidebar-bottom-row {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.375rem 0;
+  }
+  .sidebar-bottom-row a {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    text-decoration: none;
+    color: inherit;
+    min-width: 0;
+    flex: 1;
+    border-radius: 8px;
+    padding: 0.375rem 0.5rem;
+    transition: background 0.15s ease;
+  }
+  .sidebar-bottom-row a:hover {
+    background: var(--surface-hover);
+  }
+  .sidebar-signout {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    font-size: 1rem;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+  }
+  .sidebar-signout:hover {
+    background: var(--surface-hover);
+    color: var(--error-text);
+  }
+
+  /* Main content */
+  .dashboard-main {
+    flex: 1;
+    min-width: 0;
+    padding: 2rem 2rem 2.5rem;
+    overflow-y: auto;
+  }
+  .dashboard-main .container {
+    max-width: 900px;
+    width: 100%;
+  }
+
+  /* Mobile hamburger */
+  .hamburger {
+    display: none;
+    position: fixed;
+    top: 0.75rem;
+    left: 0.75rem;
+    z-index: 200;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    width: 2.5rem;
+    height: 2.5rem;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1.25rem;
+    color: var(--text);
+    box-shadow: var(--shadow);
+  }
+
+  .sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 99;
+  }
+
+  @media (max-width: 768px) {
+    .hamburger { display: flex; }
+    .sidebar {
+      position: fixed;
+      left: -280px;
+      top: 0;
+      height: 100vh;
+      /* Hidden once it has slid out, so its links leave the Tab order and
+         the screen reader's view while the menu is closed. */
+      transition: left 0.25s ease, visibility 0s linear 0.25s;
+      visibility: hidden;
+      box-shadow: var(--shadow-lg);
+    }
+    .sidebar.open { left: 0; visibility: visible; transition: left 0.25s ease; }
+    .sidebar-overlay.open { display: block; }
+    .dashboard-main { padding: 3.75rem 1rem 2rem; }
+    .dashboard-main .card { padding: 1.25rem; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .sidebar, .sidebar.open { transition: none; }
+  }
+
+  /* Markdown editor toolbar (description, bio):
+     <div class="md-toolbar" data-target="ID"><button type="button"
+     data-action="bold">B</button>...<button type="button"
+     class="md-preview-toggle">Preview</button></div>. The script at the
+     end of this file wires it; the preview toggle sets aria-pressed. */
+  .md-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.375rem 0.5rem;
+    background: var(--surface-hover);
+    border-bottom: 1px solid var(--border);
+  }
+  .md-toolbar button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.25rem 0.5rem;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.85rem;
+    line-height: 1;
+    color: var(--text);
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+  }
+  /* The bar itself is --surface-hover, so a hovered button takes the
+     card's surface and a border to stand out from it. */
+  .md-toolbar button:hover { background: var(--surface); border-color: var(--border); }
+  .md-toolbar button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .md-toolbar [data-action="bold"] { font-weight: 700; }
+  .md-toolbar [data-action="italic"] { font-style: italic; }
+  .md-toolbar button svg { width: 14px; height: 14px; }
+  .md-toolbar .md-preview-toggle { margin-left: auto; font-size: 0.75rem; color: var(--text-muted); }
+  .md-toolbar .md-preview-toggle[aria-pressed="true"] { color: var(--accent); font-weight: 600; }
+
+  /* Responsive helpers used by dashboard pages */
+  .booking-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 0.75rem 0;
+    gap: 0.75rem;
+  }
+  .booking-row .booking-info { flex: 1; min-width: 0; }
+  /* Guest's note: keep line breaks, never widen the row, scroll when long. */
+  .booking-row .booking-notes {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    max-height: 6.5em;
+    overflow-y: auto;
+    margin-top: 0.25rem;
+    padding-left: 0.5rem;
+    border-left: 2px solid var(--border);
+  }
+  /* Focusable so keyboard users can scroll a long note. */
+  .booking-row .booking-notes:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .booking-row .booking-actions {
+    display: flex;
+    gap: 0.375rem;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .et-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 0;
+    gap: 0.75rem;
+  }
+  .et-row .et-info { flex: 1; min-width: 0; }
+  .et-row .et-actions {
+    display: flex;
+    gap: 0.375rem;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  /* Two-column form grids that stack on mobile */
+  .form-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+
+  @media (max-width: 480px) {
+    .booking-row { flex-direction: column; gap: 0.5rem; }
+    .booking-row .booking-actions { width: 100%; }
+    .et-row { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+    .et-row .et-actions { width: 100%; justify-content: flex-start; }
+    .dashboard-main { padding: 3.75rem 0.75rem 1.5rem; }
+    .dashboard-main .card { padding: 1rem; }
+    /* Stacked, the fields' own .form-group margin is the gap between them. */
+    .form-grid-2 { grid-template-columns: 1fr; row-gap: 0; }
+  }
+</style>
+
+<div class="dashboard-layout">
+  <button type="button" class="hamburger" aria-label="Меню" aria-controls="dashboard-sidebar" aria-expanded="false" onclick="var o = document.querySelector('.sidebar').classList.toggle('open'); document.querySelector('.sidebar-overlay').classList.toggle('open', o); this.setAttribute('aria-expanded', o);"><span aria-hidden="true">&#9776;</span></button>
+  <div class="sidebar-overlay" onclick="document.querySelector('.sidebar').classList.remove('open'); this.classList.remove('open'); document.querySelector('.hamburger').setAttribute('aria-expanded', 'false');"></div>
+
+  <nav class="sidebar" id="dashboard-sidebar">
+    <a href="/dashboard" class="sidebar-brand" style="text-decoration: none; color: inherit;">
+      <svg class="sidebar-brand-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="18" height="16.5" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/><g fill="currentColor" stroke="none"><circle cx="8" cy="13.5" r="1.1"/><circle cx="12" cy="13.5" r="1.1"/><circle cx="16" cy="13.5" r="1.1"/><circle cx="8" cy="17.25" r="1.1"/><circle cx="12" cy="17.25" r="1.1"/></g></svg>
+      <span class="sidebar-brand-name">ilia.ae</span>
+    </a>
+
+    <div class="sidebar-nav">
+      <div class="sidebar-section">
+        <div class="sidebar-section-label">Планирование</div>
+        <a href="/dashboard" class="sidebar-link ">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></svg> Обзор
+        </a>
+        <a href="/dashboard/event-types" class="sidebar-link ">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="18" height="16.5" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4M8 14h3M8 17.5h6"/></svg> Типы встреч
+        </a>
+        <a href="/dashboard/bookings" class="sidebar-link ">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17.5" rx="2"/><path d="M9 2.5h6v3H9zM9 11h6M9 15h4"/></svg> Записи
+        </a>
+        <a href="/dashboard/teams" class="sidebar-link ">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20.5a6.5 6.5 0 0 1 13 0M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 14.3a6.5 6.5 0 0 1 3 6.2"/></svg> Команды
+        </a>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-label">Общие ссылки</div>
+        <a href="/dashboard/directory" class="sidebar-link ">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.8l2.85 5.78 6.38.93-4.62 4.5 1.09 6.35L12 17.36l-5.7 3 1.09-6.35-4.62-4.5 6.38-.93z"/></svg> Каталог встреч
+        </a>
+        <a href="/dashboard/invite-links" class="sidebar-link ">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13.5a4.5 4.5 0 0 0 6.8.5l3-3a4.5 4.5 0 0 0-6.36-6.36l-1.72 1.7"/><path d="M14 10.5a4.5 4.5 0 0 0-6.8-.5l-3 3a4.5 4.5 0 0 0 6.36 6.36l1.7-1.7"/></svg> Ссылки-приглашения
+        </a>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-label">Календари</div>
+        <a href="/dashboard/sources" class="sidebar-link ">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5.5" rx="8" ry="3"/><path d="M4 5.5v13c0 1.66 3.58 3 8 3s8-1.34 8-3v-13M4 12c0 1.66 3.58 3 8 3s8-1.34 8-3"/></svg> Источники
+        </a>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-label">Личное</div>
+        <a href="/dashboard/settings" class="sidebar-link ">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> Профиль и настройки
+        </a>
+        <a href="/dashboard/troubleshoot" data-calrs-sync class="sidebar-link ">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5l-4.55-4.55"/></svg> Диагностика
+        </a>
+      </div>
+
+      
+      <div class="sidebar-section">
+        <div class="sidebar-section-label">Администрирование</div>
+        <a href="/dashboard/admin" class="sidebar-link active">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21.5s7.5-3.5 7.5-9.5V5.5L12 2.5l-7.5 3V12c0 6 7.5 9.5 7.5 9.5z"/><path d="M9 12l2 2 4-4"/></svg> Панель администратора
+        </a>
+        <a href="/dashboard/admin/ton" class="sidebar-link ">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.2 4h13.6a1 1 0 0 1 .86 1.5L12 20.5 4.34 5.5A1 1 0 0 1 5.2 4z"/><path d="M12 4v16.5"/></svg> Оплата TON
+        </a>
+        <a href="/dashboard/admin/debug-booking" class="sidebar-link ">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 2.5h6M10 2.5v6.3L4.7 18.3A2 2 0 0 0 6.45 21.5h11.1a2 2 0 0 0 1.75-3.2L14 8.8V2.5M7 15h10"/></svg> Отладочная бронь
+        </a>
+        
+      </div>
+      
+    </div>
+
+    <div class="sidebar-bottom">
+      <div class="sidebar-bottom-row">
+        <a href="/dashboard/settings">
+          <div class="avatar-circle">
+            
+              TU
+            
+          </div>
+          <div class="sidebar-user-info">
+            <div class="sidebar-user-name">Test User</div>
+            
+          </div>
+        </a>
+        <form method="post" action="/auth/logout" style="flex-shrink: 0;">
+          <button type="submit" class="sidebar-signout" title="Выйти" aria-label="Выйти">&#8592;</button>
+        </form>
+      </div>
+      <div style="font-size: 0.7rem; color: var(--text-muted); padding: 0.25rem 0.75rem 0; opacity: 0.6;"><a href="https://github.com/olivierlambert/calrs/releases/tag/v1.23.3" target="_blank" rel="noopener" style="color: inherit; text-decoration: none;" title="Список изменений">v1.23.3</a></div>
+    </div>
+  </nav>
+
+  <main class="dashboard-main">
+    <div class="container">
+      <div id="tz-banner" style="display:none; margin-bottom: 1rem; padding: 0.75rem 1rem; border-radius: var(--radius); background: var(--accent-subtle); border: 1px solid var(--accent-border); font-size: 0.875rem;">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap;">
+          <span>Часовой пояс браузера — <strong id="tz-detected"></strong>, а для записей у вас указан <strong id="tz-current"></strong>.</span>
+          <span class="btn-row" style="gap: 0.5rem; flex-shrink: 0;">
+            <button id="tz-update" type="button" class="btn btn-sm btn-auto">Обновить</button>
+            <button id="tz-dismiss" type="button" class="btn btn-ghost btn-sm btn-auto">Скрыть</button>
+          </span>
+        </div>
+      </div>
+      <script>
+      (function() {
+        var userTz = 'UTC';
+        var browserTz;
+        try { browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch(e) { return; }
+        if (!browserTz || browserTz === userTz) return;
+        // Skip if both timezones resolve to the same UTC offset right now
+        // (e.g. Europe/Paris and Europe/Berlin are identical)
+        try {
+          var now = new Date();
+          var browserOffset = new Date(now.toLocaleString('en-US', {timeZone: browserTz})).getTime();
+          var userOffset = new Date(now.toLocaleString('en-US', {timeZone: userTz})).getTime();
+          if (browserOffset === userOffset) return;
+        } catch(e) { /* fall through to show banner if offset check fails */ }
+        var dismissed = sessionStorage.getItem('calrs_tz_dismissed');
+        if (dismissed === browserTz + ':' + userTz) return;
+        var banner = document.getElementById('tz-banner');
+        document.getElementById('tz-detected').textContent = browserTz;
+        document.getElementById('tz-current').textContent = userTz;
+        banner.style.display = 'block';
+        document.getElementById('tz-dismiss').addEventListener('click', function() {
+          banner.style.display = 'none';
+          sessionStorage.setItem('calrs_tz_dismissed', browserTz + ':' + userTz);
+        });
+        document.getElementById('tz-update').addEventListener('click', function() {
+          var btn = this;
+          btn.disabled = true;
+          var csrfCookie = document.cookie.split(';').map(function(c){return c.trim();}).find(function(c){return c.startsWith('__Host-calrs_csrf=');});
+          var csrf = csrfCookie ? csrfCookie.split('=')[1] : '';
+          fetch('/dashboard/settings/timezone', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrf},
+            body: JSON.stringify({timezone: browserTz})
+          }).then(function(r) {
+            if (r.ok) { banner.style.display = 'none'; location.reload(); } else { btn.disabled = false; }
+          }).catch(function() { btn.disabled = false; });
+        });
+      })();
+      </script>
+      
+<div class="card">
+  <h1>Панель администратора</h1>
+</div>
+
+
+
+<!-- Logo -->
+<div class="card">
+  <h2>Логотип компании</h2>
+  <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1rem;">Показывается на публичных страницах записи. PNG, JPEG, GIF или WebP, не более 2 МБ.</p>
+  
+  <div style="display: flex; gap: 0.75rem; align-items: flex-start; flex-wrap: wrap;">
+    <form method="post" action="/dashboard/admin/logo" enctype="multipart/form-data" style="margin: 0; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+      <label class="btn btn-secondary btn-sm btn-auto file-pick">Выбрать файл<input type="file" name="logo" accept="image/png,image/jpeg,image/gif,image/webp" data-max-bytes="2097152" data-too-big="Логотип не сохранён. Загрузите изображение PNG, JPEG, GIF или WebP размером не более 2 МБ." required class="file-pick-input"></label>
+      <span class="file-pick-name" data-file-name>Файл не выбран</span>
+      <button type="submit" class="btn btn-sm btn-auto">Загрузить</button>
+    </form>
+    
+  </div>
+  
+  <div style="margin-top: 1rem;">
+    <form method="post" action="/dashboard/admin/company-link" style="margin: 0; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+      <label for="company_link" style="font-size: 0.875rem; font-weight: 500; white-space: nowrap;">Сайт компании</label>
+      <div class="form-group" style="flex: 1; min-width: 12rem; margin: 0;"><input type="url" id="company_link" name="company_link" value="" placeholder="https://yourcompany.com"></div>
+      <button type="submit" class="btn btn-secondary btn-auto">Сохранить</button>
+    </form>
+    <span style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">Логотип на публичных страницах записи ведёт на этот адрес. Оставьте пустым, чтобы логотип не был ссылкой.</span>
+  </div>
+</div>
+
+<!-- Favicon -->
+<div class="card">
+  <h2>Значок сайта</h2>
+  <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1rem;">Показывается во вкладках браузера и в закладках. Рекомендуется квадратный PNG размером от 32×32 пикселей и не более 512 КБ. Если значка нет, показывается краб calrs.</p>
+  <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+    <img src="/favicon" alt="Значок сайта" width="32" height="32" style="object-fit: contain;">
+    <form method="post" action="/dashboard/admin/favicon" enctype="multipart/form-data" style="margin: 0; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+      <label class="btn btn-secondary btn-sm btn-auto file-pick">Выбрать файл<input type="file" name="favicon" accept="image/png,image/jpeg,image/gif,image/webp" data-max-bytes="524288" data-too-big="Значок сайта не сохранён. Загрузите изображение PNG, JPEG, GIF или WebP размером не более 512 КБ." required class="file-pick-input"></label>
+      <span class="file-pick-name" data-file-name>Файл не выбран</span>
+      <button type="submit" class="btn btn-sm btn-auto">Загрузить</button>
+    </form>
+    
+  </div>
+  
+</div>
+
+<!-- Theme -->
+<div class="card">
+  <h2>Тема</h2>
+  <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1rem;">Выберите цветовую тему для всех страниц. Светлый и тёмный режим переключаются отдельно: каждая тема поддерживает оба режима.</p>
+  <form id="theme-form" method="post" action="/dashboard/admin/accent" style="margin: 0;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 0.75rem; margin-bottom: 1rem;">
+      
+      
+      <label style="cursor: pointer;">
+        <input type="radio" name="theme" value="default" checked style="position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden;" onchange="themeChanged(this.value)">
+        <div class="theme-card theme-card-active" data-theme="default" style="border: 2px solid var(--accent); border-radius: var(--radius); padding: 0.75rem; transition: border-color 0.15s, box-shadow 0.15s;">
+          
+          <div style="display: flex; gap: 4px; margin-bottom: 0.5rem;">
+            
+            <span style="width: 18px; height: 18px; border-radius: 50%; background: #2563eb; border: 1px solid var(--border-hover);"></span>
+            
+            <span style="width: 18px; height: 18px; border-radius: 50%; background: #eff6ff; border: 1px solid var(--border-hover);"></span>
+            
+            <span style="width: 18px; height: 18px; border-radius: 50%; background: #f4f4f5; border: 1px solid var(--border-hover);"></span>
+            
+            <span style="width: 18px; height: 18px; border-radius: 50%; background: #18181b; border: 1px solid var(--border-hover);"></span>
+            
+          </div>
+          
+          <div style="font-weight: 600; font-size: 0.875rem;">По умолчанию</div>
+          <div style="font-size: 0.75rem; color: var(--text-muted);">Чистый синий</div>
+        </div>
+      </label>
+      
+      <label style="cursor: pointer;">
+        <input type="radio" name="theme" value="nord"  style="position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden;" onchange="themeChanged(this.value)">
+        <div class="theme-card" data-theme="nord" style="border: 2px solid var(--border); border-radius: var(--radius); padding: 0.75rem; transition: border-color 0.15s, box-shadow 0.15s;">
+          
+          <div style="display: flex; gap: 4px; margin-bottom: 0.5rem;">
+            
+            <span style="width: 18px; height: 18px; border-radius: 50%; background: #5e81ac; border: 1px solid var(--border-hover);"></span>
+            
+            <span style="width: 18px; height: 18px; border-radius: 50%; background: #e8eef5; border: 1px solid var(--border-hover);"></span>
+            
+            <span style="width: 18px; height: 18px; border-radius: 50%; background: #eceff4; border: 1px solid var(--border-hover);"></span>
+            
+            <span style="width: 18px; height: 18px; border-radius: 50%; background: #2e3440; border: 1px solid var(--border-hover);"></span>
+            
+          </div>
+          
+          <div style="font-weight: 600; font-size: 0.875rem;">Nord</div>
+          <div style="font-size: 0.75rem; color: var(--text-muted);">Арктический иней</div>
+        </div>
+      </label>
+      
+      <label style="cursor: pointer;">
+        <input type="radio" name="theme" value="dracula"  style="position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden;" onchange="themeChanged(this.value)">
+        <div class="theme-card" data-theme="dracula" style="border: 2px solid var(--border); border-radius: var(--radius); padding: 0.75rem; transition: border-color 0.15s, box-shadow 0.15s;">
+          
+          <div style="display: flex; gap: 4px; margin-bottom: 0.5rem;">
+            
+            <span style="width: 18px; height: 18px; border-radius: 50%; background: #bd93f9; border: 1px solid var(--border-hover);"></span>
+            
+            <span style="width: 18px; height: 18px; border-radius: 50%; background: #f3eefe; border: 1px solid var(--border-hover);"></span>
+            
+            <span style="width: 18px; height: 18px; border-radius: 50%; background: #f0edf5; border: 1px solid var(--border-hover);"></span>
+            
+            <span style="width: 18px; height: 18px; border-radius: 50%; background: #282a36; border: 1px solid var(--border-hover);"></span>
+            
+          </div>
+          
+          <div style="font-weight: 600; font-size: 0.875rem;">Dracula</div>
+          <div style="font-size: 0.75rem; color: var(--text-muted);">Тёмный фиолетовый</div>
+        </div>
+      </label>
+      
+      <label style="cursor: pointer;">
+        <input type="radio" name="theme" value="gruvbox"  style="position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden;" onchange="themeChanged(this.value)">
+        <div class="theme-card" data-theme="gruvbox" style="border: 2px solid var(--border); border-radius: var(--radius); padding: 0.75rem; transition: border-color 0.15s, box-shadow 0.15s;">
+          
+          <div style="display: flex; gap: 4px; margin-bottom: 0.5rem;">
+            
+            <span style="width: 18px; height: 18px; border-radius: 50%; background: #d65d0e; border: 1px solid var(--border-hover);"></span>
+            
+            <span style="width: 18px; height: 18px; border-radius: 50%; background: #fabd2f; border: 1px solid var(--border-hover);"></span>
+            
+            <span style="width: 18px; height: 18px; border-radius: 50%; background: #f9f5d7; border: 1px solid var(--border-hover);"></span>
+            
+            <span style="width: 18px; height: 18px; border-radius: 50%; background: #282828; border: 1px solid var(--border-hover);"></span>
+            
+          </div>
+          
+          <div style="font-weight: 600; font-size: 0.875rem;">Gruvbox</div>
+          <div style="font-size: 0.75rem; color: var(--text-muted);">Тёплое ретро</div>
+        </div>
+      </label>
+      
+      <label style="cursor: pointer;">
+        <input type="radio" name="theme" value="solarized"  style="position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden;" onchange="themeChanged(this.value)">
+        <div class="theme-card" data-theme="solarized" style="border: 2px solid var(--border); border-radius: var(--radius); padding: 0.75rem; transition: border-color 0.15s, box-shadow 0.15s;">
+          
+          <div style="display: flex; gap: 4px; margin-bottom: 0.5rem;">
+            
+            <span style="width: 18px; height: 18px; border-radius: 50%; background: #268bd2; border: 1px solid var(--border-hover);"></span>
+            
+            <span style="width: 18px; height: 18px; border-radius: 50%; background: #859900; border: 1px solid var(--border-hover);"></span>
+            
+            <span style="width: 18px; height: 18px; border-radius: 50%; background: #fdf6e3; border: 1px solid var(--border-hover);"></span>
+            
+            <span style="width: 18px; height: 18px; border-radius: 50%; background: #002b36; border: 1px solid var(--border-hover);"></span>
+            
+          </div>
+          
+          <div style="font-weight: 600; font-size: 0.875rem;">Solarized</div>
+          <div style="font-size: 0.75rem; color: var(--text-muted);">Классика от Итана</div>
+        </div>
+      </label>
+      
+      <label style="cursor: pointer;">
+        <input type="radio" name="theme" value="tokyo-night"  style="position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden;" onchange="themeChanged(this.value)">
+        <div class="theme-card" data-theme="tokyo-night" style="border: 2px solid var(--border); border-radius: var(--radius); padding: 0.75rem; transition: border-color 0.15s, box-shadow 0.15s;">
+          
+          <div style="display: flex; gap: 4px; margin-bottom: 0.5rem;">
+            
+            <span style="width: 18px; height: 18px; border-radius: 50%; background: #7a5af5; border: 1px solid var(--border-hover);"></span>
+            
+            <span style="width: 18px; height: 18px; border-radius: 50%; background: #7aa2f7; border: 1px solid var(--border-hover);"></span>
+            
+            <span style="width: 18px; height: 18px; border-radius: 50%; background: #f0f0f5; border: 1px solid var(--border-hover);"></span>
+            
+            <span style="width: 18px; height: 18px; border-radius: 50%; background: #1a1b26; border: 1px solid var(--border-hover);"></span>
+            
+          </div>
+          
+          <div style="font-weight: 600; font-size: 0.875rem;">Tokyo Night</div>
+          <div style="font-size: 0.75rem; color: var(--text-muted);">Неоновый город</div>
+        </div>
+      </label>
+      
+      <label style="cursor: pointer;">
+        <input type="radio" name="theme" value="vates"  style="position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden;" onchange="themeChanged(this.value)">
+        <div class="theme-card" data-theme="vates" style="border: 2px solid var(--border); border-radius: var(--radius); padding: 0.75rem; transition: border-color 0.15s, box-shadow 0.15s;">
+          
+          <div style="display: flex; gap: 4px; margin-bottom: 0.5rem;">
+            
+            <span style="width: 18px; height: 18px; border-radius: 50%; background: #be1621; border: 1px solid var(--border-hover);"></span>
+            
+            <span style="width: 18px; height: 18px; border-radius: 50%; background: #ef7f18; border: 1px solid var(--border-hover);"></span>
+            
+            <span style="width: 18px; height: 18px; border-radius: 50%; background: #1a1b38; border: 1px solid var(--border-hover);"></span>
+            
+            <span style="width: 18px; height: 18px; border-radius: 50%; background: #2ca878; border: 1px solid var(--border-hover);"></span>
+            
+          </div>
+          
+          <div style="font-weight: 600; font-size: 0.875rem;">Vates</div>
+          <div style="font-size: 0.75rem; color: var(--text-muted);">Красный и космический синий</div>
+        </div>
+      </label>
+      
+      <label style="cursor: pointer;">
+        <input type="radio" name="theme" value="custom"  style="position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden;" onchange="themeChanged(this.value)">
+        <div class="theme-card" data-theme="custom" style="border: 2px solid var(--border); border-radius: var(--radius); padding: 0.75rem; transition: border-color 0.15s, box-shadow 0.15s;">
+          
+          <div style="display: flex; gap: 4px; margin-bottom: 0.5rem;">
+            <span style="width: 18px; height: 18px; border-radius: 50%; background: conic-gradient(#ef4444, #f59e0b, #10b981, #3b82f6, #8b5cf6, #ef4444); border: 1px solid var(--border-hover);"></span>
+            <span style="width: 18px; height: 18px; border-radius: 50%; background: linear-gradient(135deg, #ddd, #888); border: 1px solid var(--border-hover);"></span>
+          </div>
+          
+          <div style="font-weight: 600; font-size: 0.875rem;">Своя</div>
+          <div style="font-size: 0.75rem; color: var(--text-muted);">Ваши цвета</div>
+        </div>
+      </label>
+      
+    </div>
+
+    <!-- Custom color pickers (shown only when custom is selected) -->
+    <div id="custom-colors" style="display: none; border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; margin-bottom: 1rem;">
+      <div style="font-weight: 600; font-size: 0.875rem; margin-bottom: 0.75rem;">Свои цвета</div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.75rem;">
+        <div>
+          <label style="font-size: 0.8rem; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">Акцентный цвет</label>
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <input type="color" name="custom_accent" value="#2563eb" style="width: 32px; height: 32px; border: none; cursor: pointer; background: none;">
+            <input type="text" value="#2563eb" style="width: 80px; font-size: 0.8rem; padding: 0.25rem 0.4rem; border: 1px solid var(--field-border); border-radius: 6px; background: var(--surface); color: var(--text); font-family: monospace;" oninput="this.previousElementSibling.value=this.value" data-sync="custom_accent">
+          </div>
+        </div>
+        <div>
+          <label style="font-size: 0.8rem; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">Акцентный цвет при наведении</label>
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <input type="color" name="custom_accent_hover" value="#1d4ed8" style="width: 32px; height: 32px; border: none; cursor: pointer; background: none;">
+            <input type="text" value="#1d4ed8" style="width: 80px; font-size: 0.8rem; padding: 0.25rem 0.4rem; border: 1px solid var(--field-border); border-radius: 6px; background: var(--surface); color: var(--text); font-family: monospace;" oninput="this.previousElementSibling.value=this.value" data-sync="custom_accent_hover">
+          </div>
+        </div>
+        <div>
+          <label style="font-size: 0.8rem; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">Фон</label>
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <input type="color" name="custom_bg" value="#f4f4f5" style="width: 32px; height: 32px; border: none; cursor: pointer; background: none;">
+            <input type="text" value="#f4f4f5" style="width: 80px; font-size: 0.8rem; padding: 0.25rem 0.4rem; border: 1px solid var(--field-border); border-radius: 6px; background: var(--surface); color: var(--text); font-family: monospace;" oninput="this.previousElementSibling.value=this.value" data-sync="custom_bg">
+          </div>
+        </div>
+        <div>
+          <label style="font-size: 0.8rem; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">Фон карточек</label>
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <input type="color" name="custom_surface" value="#ffffff" style="width: 32px; height: 32px; border: none; cursor: pointer; background: none;">
+            <input type="text" value="#ffffff" style="width: 80px; font-size: 0.8rem; padding: 0.25rem 0.4rem; border: 1px solid var(--field-border); border-radius: 6px; background: var(--surface); color: var(--text); font-family: monospace;" oninput="this.previousElementSibling.value=this.value" data-sync="custom_surface">
+          </div>
+        </div>
+        <div>
+          <label style="font-size: 0.8rem; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">Текст</label>
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <input type="color" name="custom_text" value="#18181b" style="width: 32px; height: 32px; border: none; cursor: pointer; background: none;">
+            <input type="text" value="#18181b" style="width: 80px; font-size: 0.8rem; padding: 0.25rem 0.4rem; border: 1px solid var(--field-border); border-radius: 6px; background: var(--surface); color: var(--text); font-family: monospace;" oninput="this.previousElementSibling.value=this.value" data-sync="custom_text">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <button type="submit" class="btn">Сохранить тему</button>
+  </form>
+</div>
+<script>
+function themeChanged(val) {
+  document.getElementById('custom-colors').style.display = val === 'custom' ? 'block' : 'none';
+  document.querySelectorAll('.theme-card').forEach(function(c) {
+    var active = c.dataset.theme === val;
+    c.classList.toggle('theme-card-active', active);
+    c.style.borderColor = active ? 'var(--accent)' : 'var(--border)';
+  });
+}
+// Sync color picker → text input
+document.querySelectorAll('input[type="color"]').forEach(function(picker) {
+  picker.addEventListener('input', function() {
+    var text = this.nextElementSibling;
+    if (text) text.value = this.value;
+  });
+});
+</script>
+<style>
+.theme-card:hover { border-color: var(--border-hover) !important; box-shadow: var(--shadow); }
+.theme-card-active:hover { border-color: var(--accent) !important; }
+input[name=theme]:focus-visible + .theme-card { outline: 2px solid var(--accent); outline-offset: 2px; }
+.user-item .user-actions { opacity: 0; max-height: 0; overflow: hidden; transition: opacity 0.15s ease, max-height 0.15s ease; padding-top: 0; padding-bottom: 0; justify-content: flex-end; }
+.user-item:hover .user-actions, .user-item:focus-within .user-actions { opacity: 1; max-height: 6rem; overflow: visible; }
+@media (max-width: 768px) {
+  .user-item .user-actions { opacity: 1; max-height: none; overflow: visible; justify-content: flex-start; }
+}
+</style>
+
+<!-- Users -->
+<div class="card">
+  <h2>Пользователи (2)</h2>
+  <div style="margin-bottom: 1rem;">
+    <input type="text" id="user-search" placeholder="Фильтр по имени или эл. почте…" oninput="filterUsers()" style="width: 100%; max-width: 360px; padding: 0.5rem 0.875rem; border: 1px solid var(--field-border); border-radius: 9999px; font-size: 0.875rem; font-family: inherit; background: var(--surface); color: var(--text); outline: none; transition: border-color 0.15s ease, box-shadow 0.15s ease;" onfocus="this.style.borderColor='var(--accent)';this.style.boxShadow='0 0 0 3px var(--accent-subtle)'" onblur="this.style.borderColor='var(--field-border)';this.style.boxShadow='none'">
+  </div>
+  
+  <div id="user-list" style="display: flex; flex-direction: column; gap: 0.75rem;">
+    
+    <div class="user-item" data-name="test user" data-email="test@example.com" style="border: 1px solid var(--border); border-radius: var(--radius); padding: 0.875rem 1rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+        <div style="min-width: 0; flex: 1;">
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;">
+            <span style="font-weight: 600; font-size: 0.925rem;">Test User</span>
+            <span style="font-size: 0.825rem; color: var(--text-secondary); overflow-wrap: break-word;">test@example.com</span>
+            <span class="badge badge-info">администратор</span>
+            
+            <span style="font-size: 0.75rem; color: var(--text-muted);">Пароль</span>
+            <span style="font-size: 0.75rem; color: var(--text-muted);">(вы)</span>
+          </div>
+          
+        </div>
+      </div>
+      
+    </div>
+    
+    <div class="user-item" data-name="анна-мария константинопольская-длинная" data-email="anna@example.com" style="border: 1px solid var(--border); border-radius: var(--radius); padding: 0.875rem 1rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+        <div style="min-width: 0; flex: 1;">
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;">
+            <span style="font-weight: 600; font-size: 0.925rem;">Анна-Мария Константинопольская-Длинная</span>
+            <span style="font-size: 0.825rem; color: var(--text-secondary); overflow-wrap: break-word;">anna@example.com</span>
+            
+            
+            <span style="font-size: 0.75rem; color: var(--text-muted);">Пароль</span>
+            
+          </div>
+          
+        </div>
+      </div>
+      
+      <div class="user-actions btn-row" style="margin-top: 0.25rem; gap: 0.5rem;">
+        <form method="post" action="/dashboard/admin/impersonate/f7f968a3-7367-43fe-9495-ea6762a7dd9f" style="margin: 0;">
+          <button type="submit" class="btn btn-secondary btn-sm btn-auto">Войти от имени</button>
+        </form>
+        <form method="post" action="/dashboard/admin/users/f7f968a3-7367-43fe-9495-ea6762a7dd9f/toggle-role" style="margin: 0;">
+          <button type="submit" class="btn btn-secondary btn-sm btn-auto">Сделать администратором</button>
+        </form>
+        <form method="post" action="/dashboard/admin/users/f7f968a3-7367-43fe-9495-ea6762a7dd9f/toggle-enabled" style="margin: 0;">
+          <button type="submit" class="btn btn-secondary btn-sm btn-auto">Заблокировать</button>
+        </form>
+        <form method="post" action="/dashboard/admin/users/f7f968a3-7367-43fe-9495-ea6762a7dd9f/delete" style="margin: 0;" data-confirm="Удалить пользователя anna@example.com навсегда?
+
+Будут удалены его профиль, аккаунт календаря, источники календарей, типы встреч и все данные, которые принадлежат только ему. Прошлые записи удаляются вместе с типами встреч.
+
+Для пользователей OIDC&#x2f;SSO: если включена автоматическая регистрация, пользователь будет создан заново при следующем входе.
+
+Это действие нельзя отменить." onsubmit="return confirm(this.dataset.confirm);">
+          <button type="submit" class="btn btn-danger btn-sm btn-auto">Удалить</button>
+        </form>
+      </div>
+      
+    </div>
+    
+  </div>
+  <div id="user-pagination" style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; margin-top: 1rem;"></div>
+  <div id="user-no-results" style="display: none; padding: 1rem; color: var(--text-muted); font-size: 0.875rem;">Пользователи по фильтру не найдены.</div>
+  
+</div>
+
+<!-- Groups -->
+<div class="card">
+  <h2>Группы (0)</h2>
+  
+  <p class="empty" style="padding: 1rem; color: var(--text-muted); font-size: 0.875rem;">Группы пока не синхронизированы. Они загружаются автоматически из вашего провайдера OIDC.</p>
+  
+</div>
+
+<!-- Auth settings -->
+<div class="card">
+  <h2>Настройки входа</h2>
+  <form method="post" action="/dashboard/admin/auth">
+    <div style="margin-bottom: 1rem;">
+      <label style="display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.925rem; cursor: pointer;">
+        <input type="checkbox" name="registration_enabled" value="on" checked style="width: 1rem; height: 1rem; margin-top: 0.18rem; flex-shrink: 0;">
+        Разрешить регистрацию
+      </label>
+    </div>
+    <div class="form-group">
+      <label>Разрешённые домены эл. почты <span class="hint">(через запятую; оставьте пустым, чтобы разрешить любые)</span></label>
+      <input type="text" name="allowed_email_domains" value="" placeholder="example.com, company.org">
+    </div>
+    <button type="submit" class="btn">Сохранить настройки входа</button>
+  </form>
+</div>
+
+<!-- Two-factor authentication policy for local accounts -->
+<div class="card">
+  <h2>Двухфакторная аутентификация</h2>
+  <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 0.75rem;">Эта политика действует для локальных аккаунтов. При входе через SSO используется двухфакторная аутентификация поставщика удостоверений. Прежде чем менять политику, локальные администраторы должны настроить двухфакторную аутентификацию у себя. Если сделать её обязательной, локальные сеансы без второго фактора будут завершены, а при следующем входе её нужно будет настроить.</p>
+  <p style="font-size: 0.875rem; margin-bottom: 1rem;"><a href="/dashboard/settings/mfa">Настройка двухфакторной аутентификации</a></p>
+  
+  <form method="get" action="/dashboard/settings/mfa/confirm">
+    <input type="hidden" name="action" value="policy">
+    <div class="form-group">
+      <label for="mfa-policy">Двухфакторная аутентификация для локальных аккаунтов</label>
+      <select id="mfa-policy" name="policy">
+        <option value="optional" selected>Необязательна</option>
+        <option value="required" >Обязательна</option>
+      </select>
+    </div>
+    <button class="btn" type="submit">Продолжить</button>
+  </form>
+</div>
+
+<!-- System settings (base URL, SSRF private-host allowlist) -->
+<div class="card">
+  <h2>Системные настройки</h2>
+  <p style="color: var(--text-muted); font-size: 0.875rem; margin-bottom: 1rem;">
+    Публичный адрес и настройки сетевой безопасности. Их также можно задать переменными окружения <code>CALRS_BASE_URL</code> и <code>CALRS_ALLOW_PRIVATE_HOSTS</code>. Если переменная окружения задана, она <strong>имеет приоритет</strong> над значением ниже.
+  </p>
+  <form method="post" action="/dashboard/admin/general">
+    <div class="form-group">
+      <label>Публичный адрес
+        
+      </label>
+      <input type="url" name="base_url"
+        value=""
+        placeholder="https://cal.example.com"
+        >
+      <span class="hint">
+        Публичный адрес этого сервера. Используется для перенаправлений OIDC и ссылок в письмах (подтверждение и отклонение, отмена, напоминания).
+        
+      </span>
+    </div>
+    <div class="form-group">
+      <label>Разрешённые внутренние хосты
+        
+      </label>
+      <input type="text" name="allow_private_hosts"
+        value=""
+        placeholder="radicale, 127.0.0.1"
+        >
+      <span class="hint">
+        Имена хостов через запятую, которым разрешено указывать на частные или зарезервированные IP-адреса в источниках CalDAV&#x2f;EWS (исключение из защиты от SSRF). Добавляйте только хосты, которыми управляете сами (например, сервер календарей в той же сети Docker). Оставьте пустым, чтобы защита действовала для всех хостов.
+        
+      </span>
+    </div>
+    
+<div class="form-group">
+  <label for="week_start">Первый день недели</label>
+  <select id="week_start" name="week_start" data-inherited="mon" style="width: 100%; padding: 0.625rem 0.75rem; border: 1px solid var(--field-border); border-radius: var(--radius); font-size: 0.925rem; font-family: inherit; background: var(--surface); color: var(--text);">
+    
+    
+    
+    <option value="mon" selected>понедельник</option>
+    
+    
+    <option value="tue" >вторник</option>
+    
+    
+    <option value="wed" >среда</option>
+    
+    
+    <option value="thu" >четверг</option>
+    
+    
+    <option value="fri" >пятница</option>
+    
+    
+    <option value="sat" >суббота</option>
+    
+    
+    <option value="sun" >воскресенье</option>
+    
+  </select>
+</div>
+    <div class="form-group">
+      <label for="german_formal">Обращение на немецком</label>
+      <select id="german_formal" name="german_formal">
+        <option value="du" selected>Неформальное (du)</option>
+        <option value="sie" >Формальное (Sie)</option>
+      </select>
+      <span class="hint">Как страницы и письма обращаются к посетителям, чей браузер запрашивает немецкий язык. У пользователей, выбравших язык в разделе «Профиль и настройки», остаётся их выбор.</span>
+    </div>
+    <button type="submit" class="btn">Сохранить системные настройки</button>
+  </form>
+</div>
+
+<!-- OIDC settings -->
+<div class="card">
+  <h2>Настройки OIDC</h2>
+  <div style="margin-bottom: 1rem; font-size: 0.875rem; color: var(--text-secondary);">
+    Статус: <span style="color: var(--text-muted);">выключено</span>
+    
+    
+  </div>
+  <form method="post" action="/dashboard/admin/oidc">
+    <div style="margin-bottom: 1rem;">
+      <label style="display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.925rem; cursor: pointer;">
+        <input type="checkbox" name="oidc_enabled" value="on"  style="width: 1rem; height: 1rem; margin-top: 0.18rem; flex-shrink: 0;">
+        Включить OIDC
+      </label>
+    </div>
+    <div class="form-group">
+      <label>Адрес издателя (Issuer URL)</label>
+      <input type="url" name="oidc_issuer_url" value="" placeholder="https://auth.example.com">
+    </div>
+    <div class="form-group">
+      <label>ID клиента</label>
+      <input type="text" name="oidc_client_id" value="" placeholder="calrs">
+    </div>
+    <div class="form-group">
+      <label>Секретный ключ клиента <span class="hint">(оставьте пустым, чтобы не менять)</span></label>
+      <input type="password" name="oidc_client_secret" value="" placeholder="Оставьте пустым, чтобы не менять">
+    </div>
+    <div style="margin-bottom: 1rem;">
+      <label style="display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.925rem; cursor: pointer;">
+        <input type="checkbox" name="oidc_auto_register" value="on" checked style="width: 1rem; height: 1rem; margin-top: 0.18rem; flex-shrink: 0;">
+        Автоматически регистрировать новых пользователей при входе через OIDC
+      </label>
+    </div>
+    <button type="submit" class="btn">Сохранить настройки OIDC</button>
+  </form>
+</div>
+
+<!-- Google Calendar OAuth2 -->
+<div class="card">
+  <h2>Google Calendar (OAuth2)</h2>
+  <div style="margin-bottom: 1rem; font-size: 0.875rem; color: var(--text-secondary);">
+    Статус: <span style="color: var(--text-muted);">не настроено</span>
+    
+  </div>
+  <form method="post" action="/dashboard/admin/google-oauth2">
+    <p style="font-size: 0.825rem; color: var(--text-muted); margin-bottom: 1rem;">
+      Чтобы подключить Google Calendar, создайте учётные данные OAuth2 в <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color: var(--accent);">Google Cloud Console</a>. Включите <strong>CalDAV API</strong> (проверка занятости и добавление записей в календарь) и <strong>Google Calendar API</strong> (ссылки Google Meet), затем добавьте <code>/dashboard/sources/google/callback</code> в разрешённые URI переадресации.
+    </p>
+    <div class="form-group">
+      <label>ID клиента</label>
+      <input type="text" name="google_oauth2_client_id" value="" placeholder="123456789.apps.googleusercontent.com">
+    </div>
+    <div class="form-group">
+      <label>Секретный ключ клиента <span class="hint">(оставьте пустым, чтобы не менять)</span></label>
+      <input type="password" name="google_oauth2_client_secret" value="" placeholder="Оставьте пустым, чтобы не менять">
+    </div>
+    <button type="submit" class="btn">Сохранить настройки Google OAuth2</button>
+  </form>
+</div>
+
+<!-- Captcha settings -->
+<div class="card">
+  <h2>Капча</h2>
+  <div style="margin-bottom: 1rem; font-size: 0.875rem; color: var(--text-secondary);">
+    Статус: <span style="color: var(--text-muted);">выключено</span>
+    
+  </div>
+  <form method="post" action="/dashboard/admin/captcha">
+    <div class="form-group">
+      <label for="captcha_instance_url">Адрес сервера</label>
+      <input type="url" id="captcha_instance_url" name="captcha_instance_url" value="" placeholder="https://captcha.example.com">
+    </div>
+    <div class="form-group">
+      <label for="captcha_site_key">Ключ сайта</label>
+      <input type="text" id="captcha_site_key" name="captcha_site_key" value="" placeholder="your-site-key">
+    </div>
+    <div class="form-group">
+      <label for="captcha_secret">Секретный ключ <span class="hint">(оставьте пустым, чтобы не менять)</span></label>
+      <input type="password" id="captcha_secret" name="captcha_secret" value="" placeholder="Оставьте пустым, чтобы не менять">
+    </div>
+    <div class="form-group">
+      <label for="captcha_widget_url">Адрес скрипта виджета <span class="hint">(необязательно)</span></label>
+      <input type="url" id="captcha_widget_url" name="captcha_widget_url" value="https:&#x2f;&#x2f;cdn.jsdelivr.net&#x2f;npm&#x2f;cap-widget" placeholder="https://cdn.jsdelivr.net/npm/cap-widget">
+      <span class="hint">Укажите свой адрес, если CDN заблокирован. Изменения вступают в силу сразу после сохранения.</span>
+    </div>
+    <div class="form-group">
+      <label for="captcha_wasm_url">Адрес WASM виджета <span class="hint">(необязательно)</span></label>
+      <input type="url" id="captcha_wasm_url" name="captcha_wasm_url" value="" placeholder="https://captcha.example.com/assets/cap_wasm_bg.wasm">
+      <span class="hint">Адрес, с которого виджет загружает решатель. Укажите WASM-файл, который отдаёт ваш сервер Cap, чтобы страницы записи не обращались к cdn.jsdelivr.net. Оставьте пустым для значения по умолчанию.</span>
+    </div>
+    <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.75rem;">Оставьте адрес сервера, ключ сайта и секретный ключ пустыми, чтобы выключить капчу на страницах записи.</p>
+    <button type="submit" class="btn">Сохранить настройки капчи</button>
+  </form>
+</div>
+
+<!-- Shared bookable resources -->
+<div class="card">
+  <h2>Ресурсы</h2>
+  <p style="color: var(--text-muted); font-size: 0.875rem; margin-bottom: 1rem;">
+    Общие ресурсы для бронирования (демолаборатория, переговорные), занятость которых берётся из календаря по ICS-ссылке. Если ресурс привязан к типу встречи и занят, на это время записаться нельзя.
+  </p>
+  
+  
+
+  
+
+  <h3 style="font-size: 0.95rem; margin-bottom: 0.75rem;">Добавить ресурс</h3>
+  <form method="post" action="/dashboard/admin/resources">
+    <div class="form-group">
+      <label>ICS-ссылка (адрес публикации)</label>
+      <input type="url" name="feed_url" required placeholder="https://mail.example.com/calendar/publish/...">
+      <span class="hint">BlueMind: публичный или закрытый адрес календаря ресурса.</span>
+    </div>
+    <div class="form-group">
+      <label>Название <span class="hint">(необязательно)</span></label>
+      <input type="text" name="name" value="">
+      <span class="hint">Оставьте пустым, чтобы взять название из ICS-ссылки.</span>
+    </div>
+    <div class="form-group">
+      <label>Адрес коллекции CalDAV (для добавления в календарь)</label>
+      <input type="url" name="caldav_url" value="">
+      <span class="hint">Необязательно. Для BlueMind определяется автоматически по ICS-ссылке.</span>
+    </div>
+    <div class="form-group">
+      <label>Имя пользователя CalDAV</label>
+      <input type="text" name="caldav_username" value="">
+    </div>
+    <div class="form-group">
+      <label>Пароль CalDAV</label>
+      <input type="password" name="caldav_password" value="">
+    </div>
+    <div class="form-group">
+      <label>Команды, которым доступен ресурс</label>
+      
+      <div style="display: flex; flex-wrap: wrap; gap: 0.5rem 1rem;">
+        
+        <label style="display: flex; align-items: center; gap: 0.375rem; font-weight: 400; font-size: 0.875rem;">
+          <input type="checkbox" class="res-team-check" value="f47f93e3-c247-48a9-a4ae-838a61ee3d9c">
+          Команда
+        </label>
+        
+      </div>
+      <span class="hint">Администраторы этих команд могут привязывать ресурс к типам встреч своей команды. Пусто — только глобальные администраторы.</span>
+      
+      <input type="hidden" name="team_ids" value="">
+    </div>
+    <button type="submit" class="btn">Добавить ресурс</button>
+  </form>
+  <script>
+    document.querySelectorAll('.res-team-check').forEach(function (cb) {
+      cb.addEventListener('change', function () {
+        var form = cb.closest('form');
+        var ids = Array.prototype.filter.call(
+          form.querySelectorAll('.res-team-check'),
+          function (c) { return c.checked; }
+        ).map(function (c) { return c.value; }).join(',');
+        form.querySelector('input[name="team_ids"]').value = ids;
+      });
+    });
+  </script>
+</div>
+
+<!-- Jitsi auto-generated meeting links -->
+<div class="card">
+  <h2>Jitsi (ссылки на встречи создаются автоматически)</h2>
+  <div style="margin-bottom: 1rem; font-size: 0.875rem; color: var(--text-secondary);">
+    Статус: <span style="color: var(--text-muted);">выключено</span>
+    
+  </div>
+  <p style="color: var(--text-muted); font-size: 0.875rem; margin-bottom: 0.75rem;">
+    Если в типе встречи выбрано место «Jitsi (комната создаётся автоматически)», calrs создаёт для каждой записи новую комнату: добавляет шаблон ниже к базовому адресу Jitsi. Обращаться к внешнему API не нужно.
+  </p>
+  <form method="post" action="/dashboard/admin/jitsi">
+    <div class="form-group">
+      <label>Публичный адрес</label>
+      <input type="url" name="jitsi_base_url" value="" placeholder="https://meet.example.com">
+    </div>
+    <div class="form-group">
+      <label>Отображаемое название <span class="hint">(необязательно)</span></label>
+      <input type="text" name="jitsi_display_name" value="" placeholder="например, Meet DYB">
+      <span class="hint">Показывается гостям при выборе времени и в форме записи. Если не указано, показывается «Видеозвонок».</span>
+    </div>
+    <div class="form-group">
+      <label>Шаблон названия комнаты</label>
+      <input type="text" id="jitsi_pattern" name="jitsi_pattern" value="{event}-{random}" placeholder="{event}-{random}" oninput="updateJitsiRandomWarning()">
+      <span class="hint">
+        Доступные подстановки: <code>{username}</code> (организатор), <code>{event}</code> (короткий адрес типа встречи), <code>{date}</code> (ГГГГММДД), <code>{random}</code> (8 символов). По умолчанию: <code>{event}-{random}</code>.
+      </span>
+      <span id="jitsi_pattern_random_warning" style="display: none; font-size: 0.8rem; color: var(--warn); margin-top: 0.25rem;">
+        ⚠ Без <code>{random}</code> название комнаты предсказуемо: два гостя, записавшиеся на один тип встречи в один день, попадут в одну комнату и смогут видеть встречи друг друга. Постоянные комнаты допустимы (например, одна личная комната на организатора), но включайте этот режим, только если понимаете последствия.
+      </span>
+    </div>
+    <script>
+      function updateJitsiRandomWarning() {
+        var v = document.getElementById('jitsi_pattern').value || '';
+        var def = "{event}-{random}";
+        var effective = v.trim() === '' ? def : v;
+        document.getElementById('jitsi_pattern_random_warning').style.display =
+          effective.indexOf('{random}') === -1 ? '' : 'none';
+      }
+      updateJitsiRandomWarning();
+    </script>
+    <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.75rem;">Оставьте базовый адрес пустым, чтобы выключить автоматическое создание комнат Jitsi.</p>
+    <button type="submit" class="btn">Сохранить настройки Jitsi</button>
+  </form>
+</div>
+
+<!-- Generic meeting webhook -->
+<div class="card">
+  <h2>Вебхук для встреч (свой сервис видеосвязи)</h2>
+  <div style="margin-bottom: 1rem; font-size: 0.875rem; color: var(--text-secondary);">
+    Статус: <span style="color: var(--text-muted);">выключено</span>
+    
+  </div>
+  <p style="color: var(--text-muted); font-size: 0.875rem; margin-bottom: 0.75rem;">
+    Если для типа встречи выбрано место «Вебхук (свой сервис)», при подтверждении записи calrs отправляет её данные POST-запросом на этот адрес и ожидает в ответ JSON <code>{"url": "https://..."}</code>.
+  </p>
+  <form method="post" action="/dashboard/admin/meeting-webhook">
+    <div class="form-group">
+      <label>Адрес вебхука</label>
+      <input type="url" name="meeting_webhook_url" value="" placeholder="https://hooks.example.com/calrs">
+    </div>
+    <div class="form-group">
+      <label>Отображаемое название <span class="hint">(необязательно)</span></label>
+      <input type="text" name="meeting_webhook_display_name" value="" placeholder="например, Zoom, Whereby, Custom Meet">
+      <span class="hint">Показывается гостям вместо общей метки «Видеозвонок».</span>
+    </div>
+    <div class="form-group">
+      <label>Аутентификация</label>
+      <select name="meeting_webhook_auth_mode">
+        <option value="none" selected>Нет</option>
+        <option value="hmac">HMAC-SHA256 (заголовок X-Calrs-Signature)</option>
+      </select>
+      <span class="hint">С HMAC calrs подписывает исходное тело запроса и передаёт подпись в заголовке <code>X-Calrs-Signature: sha256=&lt;hex&gt;</code>.</span>
+    </div>
+    <div class="form-group">
+      <label>Общий секретный ключ <span class="hint">(оставьте пустым, чтобы не менять)</span></label>
+      <input type="password" name="meeting_webhook_secret" value="" placeholder="Оставьте пустым, чтобы не менять">
+    </div>
+    <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.75rem;">Оставьте адрес пустым, чтобы выключить вебхук для встреч.</p>
+    <button type="submit" class="btn">Сохранить настройки вебхука</button>
+  </form>
+</div>
+
+<!-- SMTP settings -->
+<div class="card">
+  <h2>Настройки SMTP</h2>
+
+  
+
+  
+  <div style="margin-bottom: 1rem; font-size: 0.875rem; color: var(--text-secondary);">
+    Статус: <span style="color: var(--text-muted);">не настроено</span>
+  </div>
+  <form method="post" action="/dashboard/admin/smtp">
+    <div style="margin-bottom: 1rem;">
+      <label style="display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.925rem; cursor: pointer;">
+        <input type="checkbox" name="enabled" value="on" checked style="width: 1rem; height: 1rem; margin-top: 0.18rem; flex-shrink: 0;">
+        SMTP включён
+      </label>
+    </div>
+    <div class="form-group">
+      <label>Сервер</label>
+      <input type="text" name="host" value="" placeholder="smtp.example.com" required>
+    </div>
+    <div class="form-group">
+      <label>Порт</label>
+      <input type="number" name="port" min="1" max="65535" value="587" placeholder="587">
+    </div>
+    <div class="form-group">
+      <label>Режим TLS</label>
+      <select name="tls_mode">
+        <option value="starttls" selected>STARTTLS (порт 587)</option>
+        <option value="tls" >Неявный TLS (порт 465)</option>
+        <option value="none" >Без шифрования (только для локального MTA)</option>
+      </select>
+      <p class="hint" style="font-size: 0.8rem; margin-top: 0.35rem;">Выбирайте <strong>Без шифрования</strong>, только если почтовый сервер работает на этой же машине и не поддерживает STARTTLS или использует самоподписанный сертификат. Письма и учётные данные передаются по сети открытым текстом.</p>
+    </div>
+    <div class="form-group">
+      <label>Имя пользователя <span class="hint">(оставьте пустым, если сервер не требует аутентификации)</span></label>
+      <input type="text" name="username" value="" placeholder="user@example.com">
+    </div>
+    <div class="form-group">
+      <label>Пароль <span class="hint">(оставьте пустым, чтобы не менять)</span></label>
+      <input type="password" name="password" value="" placeholder="Оставьте пустым, чтобы не менять">
+    </div>
+    <div class="form-group">
+      <label>Адрес отправителя</label>
+      <input type="email" name="from_email" value="" placeholder="noreply@example.com" required>
+    </div>
+    <div class="form-group">
+      <label>Имя отправителя <span class="hint">(необязательно)</span></label>
+      <input type="text" name="from_name" value="" placeholder="calrs">
+    </div>
+    <button type="submit" class="btn">Сохранить настройки SMTP</button>
+  </form>
+
+  
+
+  <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 1rem;">Настройки можно задать и переменными окружения (они имеют приоритет над этой формой): <code>CALRS_SMTP_HOST</code>, <code>CALRS_SMTP_PORT</code>, <code>CALRS_SMTP_TLS_MODE</code> (<code>starttls</code>, <code>tls</code> или <code>none</code>), <code>CALRS_SMTP_USERNAME</code>, <code>CALRS_SMTP_PASSWORD</code>, <code>CALRS_SMTP_FROM_EMAIL</code>, <code>CALRS_SMTP_FROM_NAME</code>. Обязательны только <code>CALRS_SMTP_HOST</code> и <code>CALRS_SMTP_FROM_EMAIL</code>. Чтобы отправлять письма через локальный MTA без аутентификации, не указывайте имя пользователя и пароль.</p>
+  
+</div>
+
+<!-- SMS gateway settings -->
+<div class="card">
+  <h2>Настройки SMS</h2>
+  <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: -0.5rem; margin-bottom: 1rem;">
+    Необязательно. SMS отправляются только по записям на типы встреч, где включены «SMS-уведомления», и только если гость указал номер телефона.
+  </p>
+
+  
+
+  
+
+  
+
+  
+
+  
+  <div style="margin-bottom: 1rem; font-size: 0.875rem; color: var(--text-secondary);">
+    Статус: <span style="color: var(--text-muted);">не настроено</span>
+  </div>
+  <form method="post" action="/dashboard/admin/sms">
+    <div style="margin-bottom: 1rem;">
+      <label style="display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.925rem; cursor: pointer;">
+        <input type="checkbox" name="enabled" value="on" checked style="width: 1rem; height: 1rem; margin-top: 0.18rem; flex-shrink: 0;">
+        SMS включены
+      </label>
+    </div>
+    <div class="form-group">
+      <label>Шлюз</label>
+      <select name="provider" id="sms-provider">
+        
+        <option value="twilio" selected>Twilio</option>
+        
+        <option value="gatewayapi" >GatewayAPI</option>
+        
+        <option value="sevenio" >seven.io</option>
+        
+        <option value="webhook" >Свой вебхук</option>
+        
+      </select>
+    </div>
+
+    
+    
+    <div class="sms-provider-fields" data-provider="twilio" style="display: block;">
+      
+      <div class="form-group">
+        <label>Account SID</label>
+        <input type="text" name="api_key" value="">
+      </div>
+      
+      <div class="form-group">
+        <label>Auth token <span class="hint">(оставьте пустым, чтобы не менять)</span></label>
+        <input type="password" name="api_secret" value="" placeholder="Оставьте пустым, чтобы не менять">
+      </div>
+      <div class="form-group">
+        <label>Отправитель</label>
+        <input type="text" name="sender" value="">
+        <span class="hint">Номер Twilio в формате E.164 (+15551234567) или буквенно-цифровое имя отправителя, если страна получателя его допускает.</span>
+      </div>
+      
+      <div class="form-group">
+        <label>Базовый URL API</label>
+        <input type="text" name="base_url" value="">
+        <span class="hint">Необязательно. По умолчанию https:&#x2f;&#x2f;api.twilio.com. Используйте https: по этому соединению передаются учётные данные.</span>
+      </div>
+      
+      
+      <p style="color: var(--text-muted); font-size: 0.8rem; margin: -0.25rem 0 1.25rem;"><a href="https:&#x2f;&#x2f;www.twilio.com&#x2f;docs&#x2f;sms&#x2f;api" target="_blank" rel="noopener noreferrer">Документация API Twilio</a></p>
+      
+    </div>
+    
+    <div class="sms-provider-fields" data-provider="gatewayapi" style="display: none;">
+      
+      <div class="form-group">
+        <label>API token</label>
+        <input type="password" name="api_secret" value="" placeholder="Обязательно при смене шлюза" disabled>
+      </div>
+      <div class="form-group">
+        <label>Отправитель</label>
+        <input type="text" name="sender" value="" disabled>
+        <span class="hint">До 11 букв и цифр или до 15 цифр.</span>
+      </div>
+      
+      <div class="form-group">
+        <label>Базовый URL региона</label>
+        <input type="text" name="base_url" value="" disabled>
+        <span class="hint">Необязательно. По умолчанию https:&#x2f;&#x2f;gatewayapi.com; укажите https:&#x2f;&#x2f;gatewayapi.eu, чтобы трафик оставался в ЕС.</span>
+      </div>
+      
+      
+      <p style="color: var(--text-muted); font-size: 0.8rem; margin: -0.25rem 0 1.25rem;"><a href="https:&#x2f;&#x2f;gatewayapi.com&#x2f;docs&#x2f;apis&#x2f;rest&#x2f;" target="_blank" rel="noopener noreferrer">Документация API GatewayAPI</a></p>
+      
+    </div>
+    
+    <div class="sms-provider-fields" data-provider="sevenio" style="display: none;">
+      
+      <div class="form-group">
+        <label>API key</label>
+        <input type="password" name="api_secret" value="" placeholder="Обязательно при смене шлюза" disabled>
+      </div>
+      <div class="form-group">
+        <label>Отправитель</label>
+        <input type="text" name="sender" value="" disabled>
+        <span class="hint">До 11 букв и цифр или до 16 цифр.</span>
+      </div>
+      
+      <div class="form-group">
+        <label>Базовый URL API</label>
+        <input type="text" name="base_url" value="" disabled>
+        <span class="hint">Необязательно. По умолчанию https:&#x2f;&#x2f;gateway.seven.io.</span>
+      </div>
+      
+      
+      <p style="color: var(--text-muted); font-size: 0.8rem; margin: -0.25rem 0 1.25rem;"><a href="https:&#x2f;&#x2f;docs.seven.io&#x2f;en&#x2f;rest-api&#x2f;endpoints&#x2f;sms" target="_blank" rel="noopener noreferrer">Документация API seven.io</a></p>
+      
+    </div>
+    
+    <div class="sms-provider-fields" data-provider="webhook" style="display: none;">
+      
+      <div class="form-group">
+        <label>Секрет HMAC</label>
+        <input type="password" name="api_secret" value="" placeholder="Обязательно при смене шлюза" disabled>
+      </div>
+      <div class="form-group">
+        <label>Отправитель</label>
+        <input type="text" name="sender" value="" disabled>
+        <span class="hint">Необязательно. Передаётся вашему адресу как «sender».</span>
+      </div>
+      
+      <div class="form-group">
+        <label>URL вебхука</label>
+        <input type="text" name="base_url" value="" disabled>
+        <span class="hint">calrs отправляет сюда POST с {&quot;to&quot;, &quot;text&quot;, &quot;sender&quot;} и ждёт ответа 2xx.</span>
+      </div>
+      
+      
+    </div>
+    
+
+    <div class="form-group">
+      <label>Код страны по умолчанию <span class="hint">(используется, когда гость вводит местный номер телефона)</span></label>
+      <select name="default_country_code">
+        
+        <option value="+1" data-regions="US CA" >United States &#x2f; Canada (+1)</option>
+        
+        <option value="+20" data-regions="EG" >Egypt (+20)</option>
+        
+        <option value="+27" data-regions="ZA" >South Africa (+27)</option>
+        
+        <option value="+30" data-regions="GR" >Greece (+30)</option>
+        
+        <option value="+31" data-regions="NL" >Netherlands (+31)</option>
+        
+        <option value="+32" data-regions="BE" >Belgium (+32)</option>
+        
+        <option value="+33" data-regions="FR" selected>France (+33)</option>
+        
+        <option value="+34" data-regions="ES" >Spain (+34)</option>
+        
+        <option value="+36" data-regions="HU" >Hungary (+36)</option>
+        
+        <option value="+39" data-regions="IT" >Italy (+39)</option>
+        
+        <option value="+40" data-regions="RO" >Romania (+40)</option>
+        
+        <option value="+41" data-regions="CH" >Switzerland (+41)</option>
+        
+        <option value="+43" data-regions="AT" >Austria (+43)</option>
+        
+        <option value="+44" data-regions="GB" >United Kingdom (+44)</option>
+        
+        <option value="+45" data-regions="DK" >Denmark (+45)</option>
+        
+        <option value="+46" data-regions="SE" >Sweden (+46)</option>
+        
+        <option value="+47" data-regions="NO" >Norway (+47)</option>
+        
+        <option value="+48" data-regions="PL" >Poland (+48)</option>
+        
+        <option value="+49" data-regions="DE" >Germany (+49)</option>
+        
+        <option value="+52" data-regions="MX" >Mexico (+52)</option>
+        
+        <option value="+53" data-regions="CU" >Cuba (+53)</option>
+        
+        <option value="+54" data-regions="AR" >Argentina (+54)</option>
+        
+        <option value="+55" data-regions="BR" >Brazil (+55)</option>
+        
+        <option value="+56" data-regions="CL" >Chile (+56)</option>
+        
+        <option value="+57" data-regions="CO" >Colombia (+57)</option>
+        
+        <option value="+58" data-regions="VE" >Venezuela (+58)</option>
+        
+        <option value="+60" data-regions="MY" >Malaysia (+60)</option>
+        
+        <option value="+61" data-regions="AU" >Australia (+61)</option>
+        
+        <option value="+62" data-regions="ID" >Indonesia (+62)</option>
+        
+        <option value="+63" data-regions="PH" >Philippines (+63)</option>
+        
+        <option value="+64" data-regions="NZ" >New Zealand (+64)</option>
+        
+        <option value="+65" data-regions="SG" >Singapore (+65)</option>
+        
+        <option value="+66" data-regions="TH" >Thailand (+66)</option>
+        
+        <option value="+7" data-regions="RU KZ" >Russia &#x2f; Kazakhstan (+7)</option>
+        
+        <option value="+81" data-regions="JP" >Japan (+81)</option>
+        
+        <option value="+82" data-regions="KR" >South Korea (+82)</option>
+        
+        <option value="+84" data-regions="VN" >Vietnam (+84)</option>
+        
+        <option value="+86" data-regions="CN" >China (+86)</option>
+        
+        <option value="+90" data-regions="TR" >Turkey (+90)</option>
+        
+        <option value="+91" data-regions="IN" >India (+91)</option>
+        
+        <option value="+92" data-regions="PK" >Pakistan (+92)</option>
+        
+        <option value="+93" data-regions="AF" >Afghanistan (+93)</option>
+        
+        <option value="+94" data-regions="LK" >Sri Lanka (+94)</option>
+        
+        <option value="+95" data-regions="MM" >Myanmar (+95)</option>
+        
+        <option value="+98" data-regions="IR" >Iran (+98)</option>
+        
+        <option value="+212" data-regions="MA" >Morocco (+212)</option>
+        
+        <option value="+213" data-regions="DZ" >Algeria (+213)</option>
+        
+        <option value="+216" data-regions="TN" >Tunisia (+216)</option>
+        
+        <option value="+218" data-regions="LY" >Libya (+218)</option>
+        
+        <option value="+220" data-regions="GM" >Gambia (+220)</option>
+        
+        <option value="+221" data-regions="SN" >Senegal (+221)</option>
+        
+        <option value="+222" data-regions="MR" >Mauritania (+222)</option>
+        
+        <option value="+223" data-regions="ML" >Mali (+223)</option>
+        
+        <option value="+224" data-regions="GN" >Guinea (+224)</option>
+        
+        <option value="+225" data-regions="CI" >Côte d&#x27;Ivoire (+225)</option>
+        
+        <option value="+226" data-regions="BF" >Burkina Faso (+226)</option>
+        
+        <option value="+227" data-regions="NE" >Niger (+227)</option>
+        
+        <option value="+228" data-regions="TG" >Togo (+228)</option>
+        
+        <option value="+229" data-regions="BJ" >Benin (+229)</option>
+        
+        <option value="+230" data-regions="MU" >Mauritius (+230)</option>
+        
+        <option value="+231" data-regions="LR" >Liberia (+231)</option>
+        
+        <option value="+232" data-regions="SL" >Sierra Leone (+232)</option>
+        
+        <option value="+233" data-regions="GH" >Ghana (+233)</option>
+        
+        <option value="+234" data-regions="NG" >Nigeria (+234)</option>
+        
+        <option value="+235" data-regions="TD" >Chad (+235)</option>
+        
+        <option value="+236" data-regions="CF" >Central African Republic (+236)</option>
+        
+        <option value="+237" data-regions="CM" >Cameroon (+237)</option>
+        
+        <option value="+238" data-regions="CV" >Cape Verde (+238)</option>
+        
+        <option value="+239" data-regions="ST" >São Tomé and Príncipe (+239)</option>
+        
+        <option value="+240" data-regions="GQ" >Equatorial Guinea (+240)</option>
+        
+        <option value="+241" data-regions="GA" >Gabon (+241)</option>
+        
+        <option value="+242" data-regions="CG" >Republic of the Congo (+242)</option>
+        
+        <option value="+243" data-regions="CD" >DR Congo (+243)</option>
+        
+        <option value="+244" data-regions="AO" >Angola (+244)</option>
+        
+        <option value="+245" data-regions="GW" >Guinea-Bissau (+245)</option>
+        
+        <option value="+248" data-regions="SC" >Seychelles (+248)</option>
+        
+        <option value="+249" data-regions="SD" >Sudan (+249)</option>
+        
+        <option value="+250" data-regions="RW" >Rwanda (+250)</option>
+        
+        <option value="+251" data-regions="ET" >Ethiopia (+251)</option>
+        
+        <option value="+252" data-regions="SO" >Somalia (+252)</option>
+        
+        <option value="+253" data-regions="DJ" >Djibouti (+253)</option>
+        
+        <option value="+254" data-regions="KE" >Kenya (+254)</option>
+        
+        <option value="+255" data-regions="TZ" >Tanzania (+255)</option>
+        
+        <option value="+256" data-regions="UG" >Uganda (+256)</option>
+        
+        <option value="+257" data-regions="BI" >Burundi (+257)</option>
+        
+        <option value="+258" data-regions="MZ" >Mozambique (+258)</option>
+        
+        <option value="+260" data-regions="ZM" >Zambia (+260)</option>
+        
+        <option value="+261" data-regions="MG" >Madagascar (+261)</option>
+        
+        <option value="+262" data-regions="RE YT" >Réunion &#x2f; Mayotte (+262)</option>
+        
+        <option value="+263" data-regions="ZW" >Zimbabwe (+263)</option>
+        
+        <option value="+264" data-regions="NA" >Namibia (+264)</option>
+        
+        <option value="+265" data-regions="MW" >Malawi (+265)</option>
+        
+        <option value="+266" data-regions="LS" >Lesotho (+266)</option>
+        
+        <option value="+267" data-regions="BW" >Botswana (+267)</option>
+        
+        <option value="+268" data-regions="SZ" >Eswatini (+268)</option>
+        
+        <option value="+269" data-regions="KM" >Comoros (+269)</option>
+        
+        <option value="+290" data-regions="SH" >Saint Helena (+290)</option>
+        
+        <option value="+291" data-regions="ER" >Eritrea (+291)</option>
+        
+        <option value="+297" data-regions="AW" >Aruba (+297)</option>
+        
+        <option value="+298" data-regions="FO" >Faroe Islands (+298)</option>
+        
+        <option value="+299" data-regions="GL" >Greenland (+299)</option>
+        
+        <option value="+350" data-regions="GI" >Gibraltar (+350)</option>
+        
+        <option value="+351" data-regions="PT" >Portugal (+351)</option>
+        
+        <option value="+352" data-regions="LU" >Luxembourg (+352)</option>
+        
+        <option value="+353" data-regions="IE" >Ireland (+353)</option>
+        
+        <option value="+354" data-regions="IS" >Iceland (+354)</option>
+        
+        <option value="+355" data-regions="AL" >Albania (+355)</option>
+        
+        <option value="+356" data-regions="MT" >Malta (+356)</option>
+        
+        <option value="+357" data-regions="CY" >Cyprus (+357)</option>
+        
+        <option value="+358" data-regions="FI" >Finland (+358)</option>
+        
+        <option value="+359" data-regions="BG" >Bulgaria (+359)</option>
+        
+        <option value="+370" data-regions="LT" >Lithuania (+370)</option>
+        
+        <option value="+371" data-regions="LV" >Latvia (+371)</option>
+        
+        <option value="+372" data-regions="EE" >Estonia (+372)</option>
+        
+        <option value="+373" data-regions="MD" >Moldova (+373)</option>
+        
+        <option value="+374" data-regions="AM" >Armenia (+374)</option>
+        
+        <option value="+375" data-regions="BY" >Belarus (+375)</option>
+        
+        <option value="+376" data-regions="AD" >Andorra (+376)</option>
+        
+        <option value="+377" data-regions="MC" >Monaco (+377)</option>
+        
+        <option value="+378" data-regions="SM" >San Marino (+378)</option>
+        
+        <option value="+380" data-regions="UA" >Ukraine (+380)</option>
+        
+        <option value="+381" data-regions="RS" >Serbia (+381)</option>
+        
+        <option value="+382" data-regions="ME" >Montenegro (+382)</option>
+        
+        <option value="+383" data-regions="XK" >Kosovo (+383)</option>
+        
+        <option value="+385" data-regions="HR" >Croatia (+385)</option>
+        
+        <option value="+386" data-regions="SI" >Slovenia (+386)</option>
+        
+        <option value="+387" data-regions="BA" >Bosnia and Herzegovina (+387)</option>
+        
+        <option value="+389" data-regions="MK" >North Macedonia (+389)</option>
+        
+        <option value="+420" data-regions="CZ" >Czech Republic (+420)</option>
+        
+        <option value="+421" data-regions="SK" >Slovakia (+421)</option>
+        
+        <option value="+423" data-regions="LI" >Liechtenstein (+423)</option>
+        
+        <option value="+500" data-regions="FK" >Falkland Islands (+500)</option>
+        
+        <option value="+501" data-regions="BZ" >Belize (+501)</option>
+        
+        <option value="+502" data-regions="GT" >Guatemala (+502)</option>
+        
+        <option value="+503" data-regions="SV" >El Salvador (+503)</option>
+        
+        <option value="+504" data-regions="HN" >Honduras (+504)</option>
+        
+        <option value="+505" data-regions="NI" >Nicaragua (+505)</option>
+        
+        <option value="+506" data-regions="CR" >Costa Rica (+506)</option>
+        
+        <option value="+507" data-regions="PA" >Panama (+507)</option>
+        
+        <option value="+508" data-regions="PM" >Saint Pierre and Miquelon (+508)</option>
+        
+        <option value="+509" data-regions="HT" >Haiti (+509)</option>
+        
+        <option value="+590" data-regions="GP MF" >Guadeloupe &#x2f; Saint Martin (+590)</option>
+        
+        <option value="+591" data-regions="BO" >Bolivia (+591)</option>
+        
+        <option value="+592" data-regions="GY" >Guyana (+592)</option>
+        
+        <option value="+593" data-regions="EC" >Ecuador (+593)</option>
+        
+        <option value="+594" data-regions="GF" >French Guiana (+594)</option>
+        
+        <option value="+595" data-regions="PY" >Paraguay (+595)</option>
+        
+        <option value="+596" data-regions="MQ" >Martinique (+596)</option>
+        
+        <option value="+597" data-regions="SR" >Suriname (+597)</option>
+        
+        <option value="+598" data-regions="UY" >Uruguay (+598)</option>
+        
+        <option value="+599" data-regions="BQ CW" >Caribbean Netherlands &#x2f; Curaçao (+599)</option>
+        
+        <option value="+670" data-regions="TL" >Timor-Leste (+670)</option>
+        
+        <option value="+672" data-regions="NF AQ" >Australian External Territories (+672)</option>
+        
+        <option value="+673" data-regions="BN" >Brunei (+673)</option>
+        
+        <option value="+674" data-regions="NR" >Nauru (+674)</option>
+        
+        <option value="+675" data-regions="PG" >Papua New Guinea (+675)</option>
+        
+        <option value="+676" data-regions="TO" >Tonga (+676)</option>
+        
+        <option value="+677" data-regions="SB" >Solomon Islands (+677)</option>
+        
+        <option value="+678" data-regions="VU" >Vanuatu (+678)</option>
+        
+        <option value="+679" data-regions="FJ" >Fiji (+679)</option>
+        
+        <option value="+680" data-regions="PW" >Palau (+680)</option>
+        
+        <option value="+681" data-regions="WF" >Wallis and Futuna (+681)</option>
+        
+        <option value="+682" data-regions="CK" >Cook Islands (+682)</option>
+        
+        <option value="+683" data-regions="NU" >Niue (+683)</option>
+        
+        <option value="+685" data-regions="WS" >Samoa (+685)</option>
+        
+        <option value="+686" data-regions="KI" >Kiribati (+686)</option>
+        
+        <option value="+687" data-regions="NC" >New Caledonia (+687)</option>
+        
+        <option value="+688" data-regions="TV" >Tuvalu (+688)</option>
+        
+        <option value="+689" data-regions="PF" >French Polynesia (+689)</option>
+        
+        <option value="+690" data-regions="TK" >Tokelau (+690)</option>
+        
+        <option value="+691" data-regions="FM" >Micronesia (+691)</option>
+        
+        <option value="+692" data-regions="MH" >Marshall Islands (+692)</option>
+        
+        <option value="+850" data-regions="KP" >North Korea (+850)</option>
+        
+        <option value="+852" data-regions="HK" >Hong Kong (+852)</option>
+        
+        <option value="+853" data-regions="MO" >Macau (+853)</option>
+        
+        <option value="+855" data-regions="KH" >Cambodia (+855)</option>
+        
+        <option value="+856" data-regions="LA" >Laos (+856)</option>
+        
+        <option value="+880" data-regions="BD" >Bangladesh (+880)</option>
+        
+        <option value="+886" data-regions="TW" >Taiwan (+886)</option>
+        
+        <option value="+960" data-regions="MV" >Maldives (+960)</option>
+        
+        <option value="+961" data-regions="LB" >Lebanon (+961)</option>
+        
+        <option value="+962" data-regions="JO" >Jordan (+962)</option>
+        
+        <option value="+963" data-regions="SY" >Syria (+963)</option>
+        
+        <option value="+964" data-regions="IQ" >Iraq (+964)</option>
+        
+        <option value="+965" data-regions="KW" >Kuwait (+965)</option>
+        
+        <option value="+966" data-regions="SA" >Saudi Arabia (+966)</option>
+        
+        <option value="+967" data-regions="YE" >Yemen (+967)</option>
+        
+        <option value="+968" data-regions="OM" >Oman (+968)</option>
+        
+        <option value="+970" data-regions="PS" >Palestine (+970)</option>
+        
+        <option value="+971" data-regions="AE" >United Arab Emirates (+971)</option>
+        
+        <option value="+972" data-regions="IL" >Israel (+972)</option>
+        
+        <option value="+973" data-regions="BH" >Bahrain (+973)</option>
+        
+        <option value="+974" data-regions="QA" >Qatar (+974)</option>
+        
+        <option value="+975" data-regions="BT" >Bhutan (+975)</option>
+        
+        <option value="+976" data-regions="MN" >Mongolia (+976)</option>
+        
+        <option value="+977" data-regions="NP" >Nepal (+977)</option>
+        
+        <option value="+992" data-regions="TJ" >Tajikistan (+992)</option>
+        
+        <option value="+993" data-regions="TM" >Turkmenistan (+993)</option>
+        
+        <option value="+994" data-regions="AZ" >Azerbaijan (+994)</option>
+        
+        <option value="+995" data-regions="GE" >Georgia (+995)</option>
+        
+        <option value="+996" data-regions="KG" >Kyrgyzstan (+996)</option>
+        
+        <option value="+998" data-regions="UZ" >Uzbekistan (+998)</option>
+        
+      </select>
+    </div>
+    <div class="form-group" style="margin-top: 1rem;">
+      <label>Дневной лимит <span class="hint">(сообщений в день на весь сервер, 0 — без ограничений)</span></label>
+      <input type="number" name="daily_cap" min="0" step="1" value="0">
+      <span class="hint" style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">Когда лимит исчерпан, calrs перестаёт отправлять SMS, но письма уходят как обычно, поэтому записи не сорвутся, даже если бюджет на SMS закончился.</span>
+    </div>
+    <button type="submit" class="btn">Сохранить настройки SMS</button>
+  </form>
+
+  
+
+  <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 1rem;">Настройки можно задать и переменными окружения (они имеют приоритет над этой формой): <code>CALRS_SMS_PROVIDER</code>, <code>CALRS_SMS_API_KEY</code>, <code>CALRS_SMS_API_SECRET</code>, <code>CALRS_SMS_SENDER</code>, <code>CALRS_SMS_BASE_URL</code>, <code>CALRS_SMS_DAILY_CAP</code>, <code>CALRS_SMS_DEFAULT_COUNTRY_CODE</code>.</p>
+  
+
+  
+  <form method="post" action="/dashboard/admin/sms/policy" style="margin-top: 1.25rem; padding-top: 1.25rem; border-top: 1px solid var(--border);">
+    <label style="display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.925rem; cursor: pointer;">
+      <input type="checkbox" name="allow_all_users" value="on"  style="width: 1rem; height: 1rem; margin-top: 0.18rem; flex-shrink: 0;">
+      Разрешить всем пользователям включать SMS в своих типах встреч
+    </label>
+    <span class="hint" style="font-size: 0.8rem; color: var(--text-muted); display: block; margin: 0.375rem 0 0.75rem;">По умолчанию выключено: SMS расходуют баланс аккаунта, настроенного здесь, поэтому включать SMS в типе встречи могут только администраторы.</span>
+    <button type="submit" class="btn">Сохранить правило</button>
+  </form>
+
+  <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 1.25rem;">
+    <strong>Перед запуском:</strong> ограничьте страны назначения в настройках шлюза (в Twilio это Geo Permissions), используйте предоплаченный счёт без автопополнения и не выключайте капчу. Вместе эти три меры ограничивают, во сколько вам может обойтись атака с накруткой SMS-трафика.
+  </p>
+</div>
+
+<script>
+(function() {
+  // Show only the selected gateway's fields, and keep the hidden ones
+  // disabled so the browser never submits a second gateway's values. The
+  // server renders the selected gateway's inputs enabled already, so the
+  // form still works with JavaScript off.
+  var select = document.getElementById('sms-provider');
+  if (!select) return;
+  var blocks = document.querySelectorAll('.sms-provider-fields');
+
+  function sync() {
+    blocks.forEach(function(block) {
+      var active = block.dataset.provider === select.value;
+      block.style.display = active ? 'block' : 'none';
+      block.querySelectorAll('input').forEach(function(input) {
+        input.disabled = !active;
+      });
+    });
+  }
+
+  select.addEventListener('change', sync);
+  sync();
+})();
+</script>
+
+<script>
+(function() {
+  // Country names in the page language: each option carries its ISO 3166
+  // region(s), and the browser's own Intl.DisplayNames names them. Without
+  // it the server's English labels stay, in the server's order.
+  var select = document.querySelector('select[name=default_country_code]');
+  if (!select || !window.Intl || !Intl.DisplayNames) return;
+  try {
+    var lang = document.documentElement.lang || 'en';
+    var dn = new Intl.DisplayNames([lang], { type: 'region' });
+    var value = select.value;
+    var options = Array.prototype.slice.call(select.options);
+    options.forEach(function(opt) {
+      var regions = (opt.dataset.regions || '').split(' ').filter(Boolean);
+      if (!regions.length) return;
+      var names = regions.map(function(r) { return dn.of(r); });
+      if (names.some(function(n, i) { return !n || n === regions[i]; })) return;
+      opt.textContent = names.join(' / ') + ' (' + opt.value + ')';
+    });
+    options.sort(function(a, b) { return a.textContent.localeCompare(b.textContent, lang); });
+    options.forEach(function(opt) { select.appendChild(opt); });
+    select.value = value;
+  } catch (e) { /* keep the English labels */ }
+})();
+</script>
+
+<script>
+// %1/%2 are substituted client-side: the values depend on the live filter.
+var ADMIN_I18N = {
+  page: "Страница %1 из %2",
+  showMore: "Показать ещё %1",
+  showFewer: "Свернуть"
+};
+(function() {
+  var USER_PAGE_SIZE = 5;
+  var userPage = 1;
+
+  function getFilteredUsers() {
+    var q = document.getElementById('user-search').value.toLowerCase();
+    var items = document.querySelectorAll('.user-item');
+    var filtered = [];
+    items.forEach(function(el) {
+      if (!q || el.dataset.name.indexOf(q) !== -1 || el.dataset.email.indexOf(q) !== -1) {
+        filtered.push(el);
+      }
+    });
+    return filtered;
+  }
+
+  function renderUserPage() {
+    var items = document.querySelectorAll('.user-item');
+    var filtered = getFilteredUsers();
+    var totalPages = Math.max(1, Math.ceil(filtered.length / USER_PAGE_SIZE));
+    if (userPage > totalPages) userPage = totalPages;
+    var start = (userPage - 1) * USER_PAGE_SIZE;
+    var end = start + USER_PAGE_SIZE;
+
+    items.forEach(function(el) { el.style.display = 'none'; });
+    filtered.forEach(function(el, i) {
+      el.style.display = (i >= start && i < end) ? '' : 'none';
+    });
+
+    var noResults = document.getElementById('user-no-results');
+    if (noResults) noResults.style.display = (items.length > 0 && filtered.length === 0) ? '' : 'none';
+
+    var pag = document.getElementById('user-pagination');
+    if (!pag) return;
+    if (totalPages <= 1) { pag.innerHTML = ''; return; }
+
+    var html = '<span style="font-size:0.8rem;color:var(--text-muted);">' + ADMIN_I18N.page.replace('%1', userPage).replace('%2', totalPages) + '</span> ';
+    if (userPage > 1) html += '<button onclick="window._userPageNav(-1)" class="btn btn-secondary btn-sm btn-auto">&larr;</button> ';
+    if (userPage < totalPages) html += '<button onclick="window._userPageNav(1)" class="btn btn-secondary btn-sm btn-auto">&rarr;</button>';
+    pag.innerHTML = html;
+  }
+
+  window._userPageNav = function(dir) { userPage += dir; renderUserPage(); };
+
+  window.filterUsers = function() { userPage = 1; renderUserPage(); };
+
+  // Initial render
+  if (document.getElementById('user-list')) renderUserPage();
+})();
+
+(function() {
+  var GROUP_PAGE_SIZE = 5;
+  var groupPage = 1;
+
+  function getFilteredGroups() {
+    var q = document.getElementById('group-search').value.toLowerCase();
+    var items = document.querySelectorAll('.group-item');
+    var filtered = [];
+    items.forEach(function(el) {
+      if (!q || el.dataset.name.indexOf(q) !== -1) {
+        filtered.push(el);
+      }
+    });
+    return filtered;
+  }
+
+  function renderGroupPage() {
+    var items = document.querySelectorAll('.group-item');
+    var filtered = getFilteredGroups();
+    var totalPages = Math.max(1, Math.ceil(filtered.length / GROUP_PAGE_SIZE));
+    if (groupPage > totalPages) groupPage = totalPages;
+    var start = (groupPage - 1) * GROUP_PAGE_SIZE;
+    var end = start + GROUP_PAGE_SIZE;
+
+    items.forEach(function(el) { el.style.display = 'none'; });
+    filtered.forEach(function(el, i) {
+      el.style.display = (i >= start && i < end) ? '' : 'none';
+    });
+
+    var noResults = document.getElementById('group-no-results');
+    if (noResults) noResults.style.display = (items.length > 0 && filtered.length === 0) ? '' : 'none';
+
+    var pag = document.getElementById('group-pagination');
+    if (!pag) return;
+    if (totalPages <= 1) { pag.innerHTML = ''; return; }
+
+    var html = '<span style="font-size:0.8rem;color:var(--text-muted);">' + ADMIN_I18N.page.replace('%1', groupPage).replace('%2', totalPages) + '</span> ';
+    if (groupPage > 1) html += '<button onclick="window._groupPageNav(-1)" class="btn btn-secondary btn-sm btn-auto">&larr;</button> ';
+    if (groupPage < totalPages) html += '<button onclick="window._groupPageNav(1)" class="btn btn-secondary btn-sm btn-auto">&rarr;</button>';
+    pag.innerHTML = html;
+  }
+
+  window._groupPageNav = function(dir) { groupPage += dir; renderGroupPage(); };
+  window.filterGroups = function() { groupPage = 1; renderGroupPage(); };
+
+  if (document.getElementById('group-list')) renderGroupPage();
+})();
+
+window.toggleGroupMembers = function(groupId) {
+  var extras = document.querySelectorAll('.group-member-extra[data-group="' + groupId + '"]');
+  var btn = document.querySelector('.group-expand-btn[data-group="' + groupId + '"]');
+  if (!btn) return;
+  var hidden = extras[0] && extras[0].style.display === 'none';
+  extras.forEach(function(el) {
+    el.style.display = hidden ? 'flex' : 'none';
+  });
+  btn.textContent = hidden
+    ? ADMIN_I18N.showFewer
+    : ADMIN_I18N.showMore.replace('%1', extras.length) + '\u2026';
+};
+</script>
+
+    </div>
+  </main>
+</div>
+<script>
+// Shared markdown preview renderer
+function renderMdPreview(md) {
+  return md
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/~~(.+?)~~/g, '<del>$1</del>')
+    .replace(/`(.+?)`/g, '<code style="background:rgba(127,127,127,0.15);padding:0.1em 0.3em;border-radius:3px;font-size:0.85em;">$1</code>')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" style="color:var(--accent);text-decoration:underline;">$1</a>')
+    .replace(/\n/g, '<br>')
+  || '<span style="color:var(--text-muted);">' + "Нечего показать" + '</span>';
+}
+
+// Shared markdown toolbar handler
+document.querySelectorAll('.md-toolbar').forEach(function(toolbar) {
+  var ta = document.getElementById(toolbar.dataset.target);
+  if (!ta) return;
+  function wrap(before, after) {
+    var start = ta.selectionStart, end = ta.selectionEnd;
+    var sel = ta.value.substring(start, end);
+    var rep = before + (sel || "текст") + after;
+    ta.value = ta.value.substring(0, start) + rep + ta.value.substring(end);
+    ta.focus();
+    ta.selectionStart = start + before.length;
+    ta.selectionEnd = start + before.length + (sel || "текст").length;
+  }
+  toolbar.addEventListener('click', function(e) {
+    var btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    var a = btn.dataset.action;
+    if (a === 'bold') wrap('**', '**');
+    else if (a === 'italic') wrap('*', '*');
+    else if (a === 'strikethrough') wrap('~~', '~~');
+    else if (a === 'code') wrap('`', '`');
+    else if (a === 'link') {
+      var start = ta.selectionStart, end = ta.selectionEnd;
+      var sel = ta.value.substring(start, end);
+      var url = prompt("Введите адрес ссылки:", 'https://');
+      if (url) {
+        var label = sel || "текст ссылки";
+        ta.value = ta.value.substring(0, start) + '[' + label + '](' + url + ')' + ta.value.substring(end);
+        ta.focus();
+      }
+    }
+  });
+  // Keyboard shortcuts
+  ta.addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey) {
+      if (e.key === 'b') { e.preventDefault(); wrap('**', '**'); }
+      else if (e.key === 'i') { e.preventDefault(); wrap('*', '*'); }
+      else if (e.key === 'k') { e.preventDefault(); toolbar.querySelector('[data-action="link"]').click(); }
+    }
+  });
+  // Preview toggle
+  var previewBtn = toolbar.querySelector('.md-preview-toggle');
+  var previewDiv = document.getElementById(toolbar.dataset.target + '-preview');
+  if (previewBtn && previewDiv) {
+    var showing = false;
+    previewBtn.setAttribute('aria-pressed', 'false');
+    previewBtn.addEventListener('click', function() {
+      showing = !showing;
+      previewBtn.setAttribute('aria-pressed', showing ? 'true' : 'false');
+      if (showing) {
+        previewDiv.innerHTML = renderMdPreview(ta.value);
+        previewDiv.style.display = '';
+        ta.style.display = 'none';
+      } else {
+        previewDiv.style.display = 'none';
+        ta.style.display = '';
+        ta.focus();
+      }
+    });
+  }
+});
+// Refuse an oversized upload (logo, favicon, avatar) before sending it: past
+// the limit the server stops reading, and browsers often show a reset
+// connection rather than the redirect that explains why.
+document.querySelectorAll('input[type=file][data-max-bytes]').forEach(function(input) {
+  input.addEventListener('change', function() {
+    var file = input.files[0];
+    input.setCustomValidity(file && file.size > Number(input.dataset.maxBytes) ? input.dataset.tooBig : '');
+    input.reportValidity();
+  });
+});
+// File picker (.file-pick in base.html): show the chosen file's name in the
+// [data-file-name] beside the label button, back to its first text when the
+// choice is cleared.
+document.querySelectorAll('.file-pick-input').forEach(function(input) {
+  var label = input.closest('.file-pick');
+  var next = label && label.nextElementSibling;
+  var form = input.closest('form');
+  var name = next && next.matches('[data-file-name]') ? next : (form && form.querySelector('[data-file-name]'));
+  if (!name) return;
+  var none = name.textContent;
+  input.addEventListener('change', function() {
+    name.textContent = input.files[0] ? input.files[0].name : none;
+  });
+});
+</script>
+
+    <div class="powered"></div>
+    
+    
+  </div>
+<script>
+// CSRF protection: inject _csrf hidden field into all POST forms
+(function() {
+  function getCsrfToken() {
+    var match = document.cookie.match(/(?:^|;\s*)__Host-calrs_csrf=([^;]+)/);
+    return match ? match[1] : '';
+  }
+  function injectCsrf() {
+    var token = getCsrfToken();
+    if (!token) return;
+    var forms = document.querySelectorAll('form[method="post"], form[method="POST"]');
+    for (var i = 0; i < forms.length; i++) {
+      var form = forms[i];
+      if (form.querySelector('input[name="_csrf"]')) continue;
+      // For multipart forms, add token to action URL as query param instead
+      if (form.enctype === 'multipart/form-data') {
+        var action = form.getAttribute('action') || '';
+        var sep = action.indexOf('?') >= 0 ? '&' : '?';
+        form.setAttribute('action', action + sep + '_csrf=' + encodeURIComponent(token));
+        continue;
+      }
+      var input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = '_csrf';
+      input.value = token;
+      form.appendChild(input);
+    }
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', injectCsrf);
+  } else {
+    injectCsrf();
+  }
+})();
+</script>
+<script>
+// Theme toggle (light / dark / system)
+(function() {
+  var btn = document.getElementById('theme-toggle');
+  // In embed mode the parent controls the theme via ?theme=, so we must read
+  // that instead of localStorage — otherwise this script would clobber the
+  // dark/light class the early head script already set from the URL param.
+  var embed = false;
+  var embedTheme = "";
+  function getTheme() {
+    if (embed) return embedTheme || 'system';
+    return localStorage.getItem('calrs_theme') || 'system';
+  }
+  function followsSystem(t) { return t === 'system' || t === 'auto' || t === ''; }
+  function isDark() {
+    var t = getTheme();
+    return t === 'dark' || (followsSystem(t) && matchMedia('(prefers-color-scheme:dark)').matches);
+  }
+  function apply() {
+    if (isDark()) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }
+  // The toggle button is hidden in embed mode; only wire it when present and
+  // when the visitor (not the parent) owns the theme.
+  if (btn && !embed) {
+    btn.addEventListener('click', function() {
+      var next = isDark() ? 'light' : 'dark';
+      localStorage.setItem('calrs_theme', next);
+      apply();
+    });
+  }
+  apply();
+  matchMedia('(prefers-color-scheme:dark)').addEventListener('change', function() {
+    if (followsSystem(getTheme())) apply();
+  });
+})();
+</script>
+<script>
+// Show sync loader on links/forms with data-calrs-sync attribute
+(function() {
+  document.addEventListener('click', function(e) {
+    var link = e.target.closest('a[data-calrs-sync]');
+    if (link && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+      calrsLoader.show();
+    }
+  });
+  document.addEventListener('submit', function(e) {
+    var form = e.target.closest('form[data-calrs-sync]');
+    if (form) calrsLoader.show();
+  });
+  document.addEventListener('change', function(e) {
+    var el = e.target.closest('[data-calrs-sync-onchange]');
+    if (el) calrsLoader.show();
+  });
+})();
+</script>
+<script>
+window.calrsFormat12h = function(time24) {
+  var parts = time24.split(':');
+  var h = parseInt(parts[0], 10);
+  var m = parts[1];
+  var suffix = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return h + ':' + m + ' ' + suffix;
+};
+</script>
+
+</body>
+</html>
