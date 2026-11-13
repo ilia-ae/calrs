@@ -346,6 +346,29 @@ pub(crate) struct Profile {
         skip_serializing_if = "Option::is_none"
     )]
     pub(crate) avatar: Option<Option<Avatar>>,
+    /// ilia fork: the name, title and bio per shipped language
+    /// (`user_texts`, `web::user_texts`), keyed by locale code; the whole
+    /// set: `{}` removes every one. A language may appear once.
+    #[serde(
+        default,
+        deserialize_with = "unique_texts",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub(crate) translations: Option<std::collections::BTreeMap<String, ProfileTextItem>>,
+}
+
+/// ilia fork: one language's profile texts (`profile.translations`); a
+/// field null or left out shows the base value in that language. At least
+/// one is given.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ProfileTextItem {
+    #[serde(default)]
+    pub(crate) name: Option<String>,
+    #[serde(default)]
+    pub(crate) title: Option<String>,
+    #[serde(default)]
+    pub(crate) bio: Option<String>,
 }
 
 /// The bookable hours of one weekday (the MCP `DayHoursIn` shape).
@@ -835,21 +858,23 @@ pub(crate) struct TextItem {
     pub(crate) description: Option<String>,
 }
 
-/// ilia fork: `translations`, given (it may not be null): an object whose
-/// keys are languages, each at most once (a JSON object read into a map
-/// would otherwise keep the last of two silently).
-fn unique_texts<'de, D>(
+/// ilia fork: `translations` (an event type's, the profile's), given (it
+/// may not be null): an object whose keys are languages, each at most once
+/// (a JSON object read into a map would otherwise keep the last of two
+/// silently).
+fn unique_texts<'de, D, T>(
     deserializer: D,
-) -> Result<Option<std::collections::BTreeMap<String, TextItem>>, D::Error>
+) -> Result<Option<std::collections::BTreeMap<String, T>>, D::Error>
 where
     D: Deserializer<'de>,
+    T: Deserialize<'de>,
 {
-    struct Texts;
-    impl<'de> serde::de::Visitor<'de> for Texts {
-        type Value = std::collections::BTreeMap<String, TextItem>;
+    struct Texts<T>(std::marker::PhantomData<T>);
+    impl<'de, T: Deserialize<'de>> serde::de::Visitor<'de> for Texts<T> {
+        type Value = std::collections::BTreeMap<String, T>;
 
         fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            f.write_str("an object of languages, each {title, description}")
+            f.write_str("an object of languages, each an object of texts")
         }
 
         fn visit_map<A: serde::de::MapAccess<'de>>(
@@ -858,7 +883,7 @@ where
         ) -> Result<Self::Value, A::Error> {
             let mut out = std::collections::BTreeMap::new();
             while let Some(lang) = map.next_key::<String>()? {
-                let text: TextItem = map.next_value()?;
+                let text: T = map.next_value()?;
                 if out.insert(lang.clone(), text).is_some() {
                     return Err(serde::de::Error::custom(format!(
                         "translations: language {lang:?} given twice"
@@ -868,7 +893,9 @@ where
             Ok(out)
         }
     }
-    deserializer.deserialize_map(Texts).map(Some)
+    deserializer
+        .deserialize_map(Texts(std::marker::PhantomData))
+        .map(Some)
 }
 
 /// At most `count` bookings per `period` (per booker email is not a thing:

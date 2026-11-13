@@ -2539,3 +2539,7 @@ admin-threecx-api-key-env-bad = CALRS_THREECX_API_KEY ist gesetzt, aber kein Sch
 admin-threecx-api-key-env-placeholder = Wird bei der Bereitstellung gesetzt
 etf-location-threecx = 3CX-Meeting (für jede Buchung erstellt)
 etf-threecx-hint = Für jede bestätigte Buchung wird ein 3CX-Meeting erstellt, das Verschiebungen und Absagen folgt. 3CX wird auf der Verwaltungsseite eingerichtet.
+
+## ilia fork: profile translations (src/web/user_texts.rs)
+settings-translations-help = Gäste, die die Seiten in einer dieser Sprachen lesen, sehen diesen Namen, diese Funktion und dieses Kurzprofil statt der oben angegebenen, auch in ihren E-Mails und Nachrichten. Ein leeres Feld zeigt den Wert von oben; alle anderen Sprachen zeigen die oben angegebenen.
+settings-error-translation-name-length = Ein übersetzter Name darf höchstens 255 Zeichen lang sein.

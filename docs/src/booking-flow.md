@@ -210,6 +210,12 @@ German appears once in the menu; when the admin chose the formal form of address
 
 The dashboard uses the language saved in **Profile & Settings**. Only a user without a saved language sees it in the language picked with the menu (else the browser's).
 
+### Profile translations
+
+**Profile & Settings → Translations** (ilia fork) gives your public name, title and bio a version per language. **Add a language** adds a row: pick one of the languages calrs ships, then fill in any of the three fields; **Remove** drops a row, and an emptied row is dropped on save as well. Each language can appear once, and a translated name has the same limit as your name (255 bytes).
+
+A guest reading the pages in a language with a row sees its fields in place of yours: your profile (and its browser tab title), the slot picker, the booking form and its confirmation, the cancel and reschedule pages, the payment page, team pages listing you, and what is sent to the guest in the booking's language (the emails, including the name they come from and the organizer of their calendar invite, Telegram). **Each field falls back on its own**: a field the row leaves empty shows yours, so a row with only a name keeps your title and bio. German addressed as "Sie" (`de-formal`) reads the German row for a field its own row lacks. Every other language shows your own name, title and bio, exactly as before. A booking hosted by several people (a collective team event type, a dynamic group link) keeps the names it was made with. Your own side (the dashboard, your emails, your calendar) keeps your own values. `calrs config apply` declares the same rows as `profile.translations` (docs/apply-schema.md in the repository).
+
 ### Email language
 
 Every email is written in its reader's language, in any of the languages calrs ships:

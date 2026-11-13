@@ -220,6 +220,10 @@ pub(super) async fn team_profile_page(
     .await
     .unwrap_or_default();
 
+    // ilia fork: each member's name in the page language (`user_texts`).
+    let members =
+        super::user_texts::localize_names(&state.pool, lang, members, |m| (m.0.as_str(), &mut m.1))
+            .await;
     let members_ctx: Vec<minijinja::Value> = members
         .iter()
         .map(|(id, name, ap)| {
@@ -542,6 +546,12 @@ pub(super) async fn show_group_slots(
     .fetch_all(&state.pool)
     .await
     .unwrap_or_default();
+    // ilia fork: each member's name in the page language (`user_texts`).
+    let team_members_rows =
+        super::user_texts::localize_names(&state.pool, lang, team_members_rows, |m| {
+            (m.0.as_str(), &mut m.1)
+        })
+        .await;
 
     let team_members_ctx: Vec<minijinja::Value> = team_members_rows
         .iter()
@@ -862,6 +872,11 @@ pub(super) async fn user_profile(
             }
         };
     let lang = user_page_lang(host_language.as_deref(), &page_mode, &headers);
+    // ilia fork: the host's name, title and bio in the page language
+    // (`user_texts`).
+    let (user_name, user_title, user_bio) =
+        super::user_texts::localize(&state.pool, &user_id, lang, user_name, user_title, user_bio)
+            .await;
 
     let event_types: Vec<(String, String, Option<String>, i32, String)> = sqlx::query_as(
         "SELECT et.slug, et.title, et.description, et.duration_min, et.id
@@ -1477,6 +1492,10 @@ pub(super) async fn show_slots_for_user(
         };
 
     let lang = user_page_lang(host_language.as_deref(), &page_mode, &headers);
+    // ilia fork: the host's name and title in the page language (`user_texts`).
+    let (host_name, host_title) =
+        super::user_texts::name_title_in(&state.pool, &host_user_id, lang, host_name, host_title)
+            .await;
 
     let et: Option<(String, String, String, Option<String>, i32, i32, i32, i32, String, Option<String>, String, String)> = sqlx::query_as(
         "SELECT et.id, et.slug, et.title, et.description, et.duration_min, et.buffer_before, et.buffer_after, et.min_notice_min, et.location_type, et.location_value, et.visibility, et.default_calendar_view
@@ -1813,6 +1832,9 @@ pub(super) async fn show_book_form_for_user(
         .await
         .unwrap_or(None)
         .unwrap_or_else(|| "Host".to_string());
+    // ilia fork: in the page language (`user_texts`).
+    let host_name =
+        super::user_texts::name_in_for_username(&state.pool, &username, lang, host_name).await;
 
     let guest_tz = parse_guest_tz(query.tz.as_deref());
     let guest_tz_name = guest_tz.name().to_string();
@@ -2186,6 +2208,10 @@ pub(super) async fn show_slots(
 
     let (host_user_id, host_name, host_title, host_avatar_path) =
         host_info.unwrap_or_else(|| ("".to_string(), "Host".to_string(), None, None));
+    // ilia fork: the host's name and title in the page language (`user_texts`).
+    let (host_name, host_title) =
+        super::user_texts::name_title_in(&state.pool, &host_user_id, lang, host_name, host_title)
+            .await;
 
     // Sync calendars if stale before computing availability
     crate::commands::sync::sync_if_stale(&state.pool, &state.secret_key, &host_user_id).await;
@@ -2414,6 +2440,8 @@ pub(super) async fn show_book_form(
     .await
     .unwrap_or(None)
     .unwrap_or_else(|| "Host".to_string());
+    // ilia fork: in the page language (`user_texts`).
+    let host_name = super::user_texts::owner_name_in(&state.pool, &et_id, lang, host_name).await;
 
     let guest_tz = parse_guest_tz(query.tz.as_deref());
     let guest_tz_name = guest_tz.name().to_string();

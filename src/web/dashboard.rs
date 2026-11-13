@@ -685,6 +685,10 @@ pub(super) struct SettingsForm {
     lend_resource_write: Option<String>,
     #[serde(default)]
     avail_schedule: String,
+    // ilia fork: the "Translations" section (`user_texts`): its marker and
+    // its rows' fields, with every other field this struct does not name.
+    #[serde(flatten)]
+    texts: super::user_texts::TextsForm,
 }
 
 /// The two values of `users.public_page_language`. Anything else stored
@@ -729,6 +733,8 @@ pub(super) async fn settings_page(
         sidebar,
         impersonating,
         &impersonating_name,
+        // ilia fork (`user_texts`).
+        super::user_texts::form_ctx(&state.pool, &auth_user.user.id).await,
     )
 }
 
@@ -806,6 +812,7 @@ fn settings_render(
     sidebar: minijinja::Value,
     impersonating: bool,
     impersonating_name: &str,
+    profile_texts: minijinja::Value,
 ) -> Html<String> {
     let tmpl = match state.templates.get_template("settings.html") {
         Ok(t) => t,
@@ -851,6 +858,8 @@ fn settings_render(
             error => error.unwrap_or(""),
             impersonating => impersonating,
             impersonating_name => impersonating_name,
+            // ilia fork: the "Translations" section (`user_texts`).
+            profile_texts => profile_texts,
         })
         .unwrap_or_else(|e| internal_error_body("template render", &e)),
     )
@@ -952,6 +961,9 @@ pub(super) async fn settings_save(
         week_start,
         avail_schedule: &form.avail_schedule,
     };
+    // ilia fork: the "Translations" section as posted (`user_texts`), shown
+    // again with any refusal.
+    let posted_texts = super::user_texts::posted_ctx(&state.pool, &form.texts, &user.id).await;
     // The sidebar is a parameter rather than a capture, so it can be moved into
     // whichever branch ends up rendering. An error path never saves, so it keeps
     // the language the request came in with.
@@ -967,12 +979,20 @@ pub(super) async fn settings_save(
             sidebar,
             imp,
             &imp_name,
+            posted_texts.clone(),
         )
         .into_response()
     };
 
     if name.is_empty() || name.len() > 255 {
         let msg = crate::i18n::translate(auth_user.lang, "settings-error-name-length", None);
+        return render_error(&msg, sidebar);
+    }
+
+    // ilia fork: the translations are checked with the other fields, before
+    // anything is written (`user_texts`).
+    if let Err(key) = super::user_texts::parse_form(&form.texts) {
+        let msg = crate::i18n::translate(auth_user.lang, key, None);
         return render_error(&msg, sidebar);
     }
 
@@ -1050,6 +1070,8 @@ pub(super) async fn settings_save(
 
             // Save default availability schedule
             save_user_avail_schedule(&state.pool, &user.id, &form.avail_schedule).await;
+            // ilia fork: the "Translations" section, when the form carried it.
+            super::user_texts::save_form(&state.pool, &user.id, &form.texts).await;
 
             // Re-fetch user to show updated values
             let updated_user = crate::auth::get_user_by_id(&state.pool, &user.id)
@@ -1075,6 +1097,7 @@ pub(super) async fn settings_save(
                 sidebar,
                 imp,
                 &imp_name,
+                super::user_texts::form_ctx(&state.pool, &user.id).await,
             )
             .into_response()
         }

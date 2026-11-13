@@ -92,6 +92,7 @@ fn production(avatar_file: &str, avatar_sha: &str) -> Value {
     // ilia fork keys added after v1 (outside the literal: `json!` would hit
     // the recursion limit).
     doc["sources"][0]["name"] = json!("Kerio");
+    doc["profile"]["translations"] = json!({});
     for item in doc["event_types"]["items"].as_array_mut().unwrap() {
         item["busy_calendars"] = Value::Null;
         item["overrides"] = json!([]);

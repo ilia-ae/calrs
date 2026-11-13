@@ -688,6 +688,9 @@ async fn the_export_is_the_stored_profile_and_applies_as_no_change() {
         .file
         .ends_with(&format!("avatars/{}.jpg", env.admin_id)));
     wanted.avatar = exported.avatar.clone();
+    // ilia fork: the translations are exported always, `{}` for none.
+    assert_eq!(exported.translations, Some(Default::default()));
+    wanted.translations = exported.translations.clone();
     assert_eq!(exported, wanted);
 
     let round_trip = Document {

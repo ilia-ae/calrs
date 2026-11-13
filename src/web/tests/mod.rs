@@ -88,6 +88,8 @@ mod telegram;
 mod threecx;
 // ilia fork: TON payments.
 mod ton;
+// ilia fork: a user's public name, title and bio per language.
+mod user_texts;
 mod writeback_failures;
 
 // --- has_conflict tests ---

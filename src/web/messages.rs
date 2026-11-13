@@ -313,6 +313,9 @@ pub(crate) async fn send_host_message(
             mail.event_title,
         )
         .await;
+        // And its author's name (`user_texts`).
+        mail.host_name =
+            super::user_texts::name_in(pool, &author.user_id, &mail.lang, mail.host_name).await;
         let (pool, id, booking_id) = (pool.clone(), id.clone(), booking_id.to_string());
         spawn_emails(async move {
             let result = crate::email::send_guest_host_message(&smtp, &mail).await;

@@ -2541,3 +2541,7 @@ admin-threecx-api-key-env-bad = CALRS_THREECX_API_KEY is ingesteld maar is geen 
 admin-threecx-api-key-env-placeholder = Ingesteld door de uitrol
 etf-location-threecx = 3CX-vergadering (voor elke boeking gemaakt)
 etf-threecx-hint = Voor elke bevestigde boeking wordt een 3CX-vergadering gemaakt die verplaatsingen en annulering volgt. Stel 3CX in op de beheerpagina.
+
+## ilia fork: profile translations (src/web/user_texts.rs)
+settings-translations-help = Gasten die je pagina's in een van deze talen lezen, zien deze naam, functie en bio in plaats van die hierboven, ook in hun e-mails en berichten. Een leeg veld toont dat van hierboven; alle andere talen tonen die hierboven.
+settings-error-translation-name-length = Een vertaalde naam mag hoogstens 255 tekens lang zijn.

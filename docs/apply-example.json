@@ -6,6 +6,13 @@
     "username": "ilia",
     "title": "Fractional CTO",
     "bio": "Fractional CTO based in Dubai. 15 years in IT, 1000+ projects in 38 countries, 6 active patents in information security and big data.",
+    "translations": {
+      "ru": {
+        "name": "Илья Арестов",
+        "title": "Технический директор",
+        "bio": "Технический директор на аутсорсе, Дубай. 15 лет в IT, более 1000 проектов в 38 странах, 6 действующих патентов в области информационной безопасности и больших данных."
+      }
+    },
     "booking_email": null,
     "timezone": "Asia/Almaty",
     "language": "ru",

@@ -220,6 +220,9 @@ pub(super) struct NewBookingEmails {
     /// ilia fork: the event title in the guest's language
     /// (`event_texts`); `details` keeps the base title for the hosts.
     pub(super) guest_event_title: String,
+    /// ilia fork: the host's name in the guest's language (`user_texts`);
+    /// `details` keeps the base name for the hosts.
+    pub(super) guest_host_name: String,
     /// ilia fork: the 3CX organizer's link, shown to hosts in place of the
     /// guest's (`threecx::host_link`); `None` for every other location.
     pub(super) host_location: Option<String>,
@@ -242,9 +245,11 @@ pub(super) fn send_new_booking_emails(m: NewBookingEmails) {
                 ..m.details.clone()
             };
         // ilia fork: the guest's copies (their email and its .ics, the
-        // attendees') read the title in the guest's language.
+        // attendees') read the title and the host's name in the guest's
+        // language.
         let guest = crate::email::BookingDetails {
             event_title: m.guest_event_title.clone(),
+            host_name: m.guest_host_name.clone(),
             ..m.details.clone()
         };
         if m.needs_approval {
@@ -512,6 +517,8 @@ pub(super) async fn send_due_reminders(pool: SqlitePool, secret_key: [u8; 32]) {
                 },
                 None => guest_copy.clone(),
             };
+            // ilia fork: that host named in the guest's language (`user_texts`).
+            let guest_details = super::user_texts::host_for_guest(&pool, guest_details).await;
             // Inline on purpose: this loop is already off the request
             // path, and `send_email` bounds each attempt.
             log_email_result(

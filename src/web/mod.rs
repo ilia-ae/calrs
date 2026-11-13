@@ -38,6 +38,8 @@ mod telegram;
 // ilia fork: TON payments (ilia-booking docs/ton.md).
 pub(crate) mod threecx;
 pub(crate) mod ton_pay;
+// ilia fork: a user's public name, title and bio per language.
+pub(crate) mod user_texts;
 mod week_start;
 pub(crate) mod writeback;
 

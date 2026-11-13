@@ -58,7 +58,8 @@ calrs --data-dir D config apply --export [--user E]    # stored state, same sche
     "weekly_hours": [                     // default availability; the whole week
       {"day": "mon", "windows": [{"start": "10:00", "end": "19:00"}]}
     ],
-    "avatar": {"file": "/var/lib/calrs/managed/avatar", "sha256": "<64 lowercase hex>"}  // nullable: null removes
+    "avatar": {"file": "/var/lib/calrs/managed/avatar", "sha256": "<64 lowercase hex>"},  // nullable: null removes
+    "translations": {"ru": {"name": "…", "title": "…", "bio": null}}  // ilia fork; the whole set; {} = none
   },
 
   "site": {                               // Admin (auth_config); A3
@@ -143,6 +144,13 @@ calrs --data-dir D config apply --export [--user E]    # stored state, same sche
 }
 ```
 
+- **Profile translations (`profile.translations`, ilia fork, added after v1 froze; same format string):** the "Translations" section of Settings → Profile (`user_texts`, `src/web/user_texts.rs`): per language, the name, title and bio guests reading that language see instead of `name`, `title` and `bio` (pages, the guest emails' body, From display name and `.ics` ORGANIZER's name, the `.ics` downloads, Telegram). **Each field falls back on its own**: null or left out, that field reads the base language's (`de-formal` reads `de`), else the base value, so `{"ru": {"name": "…"}}` keeps the base title and bio. Only a booking with one host names them so; a multi-host booking keeps its stored organizer roster. Host-facing outputs keep the base values.
+  - An object keyed by shipped locale code, spelled as calrs spells it (`"RU"` and `"xx"` are refused under `profile.translations.<key>`), each `{"name": "…", "title": "…", "bio": "…"}` with at least one of the three given (a language with none is refused under `profile.translations.<lang>`: leave it out). A language given twice is refused when the document is read.
+  - **Always the whole set.** `{}` removes every translation. Left out, the stored ones stay (those made on the page included). The same semantics as an event type's `translations`.
+  - Checks, as the base fields: `name` 1..255 bytes, `title` and `bio` canonical (not padded, not empty: use null), `bio` with http, https, mailto or relative links only (`check_bio`). Paths `profile.translations.<lang>.name`, `.title`, `.bio`.
+  - Written after the profile form, in the run's transaction (`user_texts::replace`: one `DELETE` of the user's rows, one `INSERT` per language), only when the stored set differs. The form posted for another key carries no "Translations" section and leaves the rows as they are. The diff is one path, `profile.translations`, with the whole sets (every language with its three keys), after the form's paths and `profile.avatar`.
+  - Export: the stored set, `{}` for none; left out when a stored text is one the document could not give (a hand edit), so an export applies as no change.
+  - An older calrs refuses the key (exit 2, nothing written). Its marker is `PROFILE_TRANSLATIONS_SHAPE` in `src/web/apply/profile.rs`, `profile.translations: {<language>: {name, title, bio}}, the whole set` (part of the refusal of a language calrs does not ship).
 - **Event type items:**
   - Field names, values and ranges are the MCP `EventTypePatch` ones (`src/web/agent/dto.rs`).
   - Three things differ: `timezone` is nullable here; `translations`, `weekly_hours`, `frequency_limits`, `busy_calendars`, `overrides`, `ton_price`, `telegram_guest_mode` and `enabled` are extra keys; and there is no `version`.
@@ -235,7 +243,7 @@ The checks reuse the existing validators: `check_text`/`check_opt_text`/`check_t
 - `event_types[<slug>]` with `before: null, after: "created"` for a created event type, or `before: "present", after: null` for a deleted one. Disabling by prune is `event_types[<slug>].enabled`, true to false.
 
 **Values:**
-- `before` and `after` are JSON in the document's own shape. `weekly_hours`, `frequency_limits`, `busy_calendars` and `overrides` appear as whole lists, `translations` as the whole object (every language with its `title` and `description`), `ton_price` as the whole object with every key (or `null`).
+- `before` and `after` are JSON in the document's own shape. `weekly_hours`, `frequency_limits`, `busy_calendars` and `overrides` appear as whole lists, `translations` as the whole object (every language with its `title` and `description`; for `profile.translations` its `name`, `title` and `bio`), `ton_price` as the whole object with every key (or `null`).
 - A cleared secret column shows `"(secret set)"` changing to `null` (`SECRET_SET`).
 - `profile.avatar` shows `"sha256:<hex>"`, or `null`.
 
