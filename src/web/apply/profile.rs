@@ -12,11 +12,18 @@
 //! image under a temporary name and stages it (`files::Staged`): it replaces
 //! `avatars/<user id>.<ext>` only after the commit, and the old file with
 //! another extension is removed then.
+//!
+//! ilia fork: `translations` are the profile's name, title and bio per
+//! language (`user_texts`, `web::user_texts`), the "Translations" section of
+//! the page: the whole set, written after the form with `user_texts::replace`
+//! (one `DELETE`, an `INSERT` per language) when it differs. The form apply
+//! posts carries no section, so the stored rows stay as they are until then.
+//! Each language's fields are checked as the base fields are.
 
 use super::files::Staged;
 use super::{
     check_opt_text, check_text, check_timezone, ApplyError, Avatar, Ctx, Day, DayHours, Profile,
-    PublicPageLanguage, Window,
+    ProfileTextItem, PublicPageLanguage, Window,
 };
 use crate::web::agent::error::ToolError;
 use axum::extract::State;
@@ -47,6 +54,16 @@ const WEEK: [Day; 7] = [
 
 /// An `availability_rules` row: day of week (0 is Sunday), start, end.
 type Rule = (i32, String, String);
+
+/// ilia fork: what `profile.translations` is. The ilia-booking role greps a
+/// release for this literal before it sends the key (an older calrs refuses
+/// it as an unknown key): keep it a literal, and used at runtime (the
+/// refusal of a language calrs does not ship).
+pub(crate) const PROFILE_TRANSLATIONS_SHAPE: &str =
+    "profile.translations: {<language>: {name, title, bio}}, the whole set";
+
+/// ilia fork: the profile's translations (`translations`), by language.
+type Texts = std::collections::BTreeMap<String, ProfileTextItem>;
 
 /// The form fields of Settings → Profile as stored, in the document's terms.
 #[derive(Clone, Debug)]
@@ -267,6 +284,83 @@ fn hours_of(rules: &[Rule]) -> Vec<DayHours> {
             (!windows.is_empty()).then_some(DayHours { day, windows })
         })
         .collect()
+}
+
+// --- The translations (ilia fork) ---
+
+/// `translations` checked as the base fields are (`check_name`, the title
+/// canonical, `check_bio`), each key a shipped locale code spelled as calrs
+/// spells it, each language with at least one field (a language with none
+/// is no translation: leave it out).
+fn check_texts(texts: &Texts) -> Result<(), ApplyError> {
+    for (lang, text) in texts {
+        let here = format!("profile.translations.{lang}");
+        if crate::i18n::supported_code(lang) != Some(lang.as_str()) {
+            let known: Vec<&str> = crate::i18n::supported_with_labels()
+                .map(|(code, _)| code)
+                .collect();
+            return Err(ApplyError::invalid(
+                here,
+                format!(
+                    "not a language calrs ships; use one of {} ({PROFILE_TRANSLATIONS_SHAPE})",
+                    known.join(", ")
+                ),
+            ));
+        }
+        if text.name.is_none() && text.title.is_none() && text.bio.is_none() {
+            return Err(ApplyError::invalid(
+                here,
+                "give at least one of name, title and bio; leave the language out for none",
+            ));
+        }
+        if let Some(name) = &text.name {
+            check_name(&format!("{here}.name"), name)?;
+        }
+        check_opt_text(&format!("{here}.title"), text.title.as_deref(), None)?;
+        check_bio(&format!("{here}.bio"), text.bio.as_deref())?;
+    }
+    Ok(())
+}
+
+/// The stored translations in the document's shape.
+async fn stored_texts(ctx: &Ctx) -> Result<Texts, ApplyError> {
+    Ok(crate::web::user_texts::stored(ctx.pool(), &ctx.me.id)
+        .await?
+        .into_iter()
+        .map(|text| {
+            (
+                text.lang,
+                ProfileTextItem {
+                    name: text.name,
+                    title: text.title,
+                    bio: text.bio,
+                },
+            )
+        })
+        .collect())
+}
+
+/// Write `texts` as the whole set, on the run's connection, when the stored
+/// set differs, and record it.
+async fn apply_texts(ctx: &mut Ctx, texts: &Texts) -> Result<(), ApplyError> {
+    let before = stored_texts(ctx).await?;
+    if &before == texts {
+        return Ok(());
+    }
+    let rows: Vec<crate::web::user_texts::Text> = texts
+        .iter()
+        .map(|(lang, text)| crate::web::user_texts::Text {
+            lang: lang.clone(),
+            name: text.name.clone(),
+            title: text.title.clone(),
+            bio: text.bio.clone(),
+        })
+        .collect();
+    let mut conn = ctx.pool().acquire().await?;
+    crate::web::user_texts::replace(&mut conn, &ctx.me.id, &rows).await?;
+    drop(conn);
+    ctx.record("profile.translations", &before, texts);
+    Ok(())
 }
 
 // --- The avatar ---
@@ -605,6 +699,9 @@ pub(super) async fn check(_ctx: &Ctx, section: &Profile) -> Result<(), ApplyErro
     if let Some(Some(avatar)) = &section.avatar {
         load_image(avatar).await?;
     }
+    if let Some(texts) = &section.translations {
+        check_texts(texts)?;
+    }
     Ok(())
 }
 
@@ -623,6 +720,10 @@ pub(super) async fn apply(ctx: &mut Ctx, section: &Profile) -> Result<(), ApplyE
     if !differences.is_empty() {
         post(ctx, &wanted).await?;
     }
+    // ilia fork: after the form, which leaves them as they are.
+    if let Some(texts) = &section.translations {
+        apply_texts(ctx, texts).await?;
+    }
     Ok(())
 }
 
@@ -640,6 +741,16 @@ pub(super) async fn verify(ctx: &Ctx, section: &Profile) -> Result<(), ApplyErro
     if let Some(avatar) = &section.avatar {
         verify_avatar(ctx, avatar.as_ref()).await?;
     }
+    if let Some(texts) = &section.translations {
+        let stored = stored_texts(ctx).await?;
+        if &stored != texts {
+            return Err(ApplyError::stored_differs(
+                "profile.translations",
+                &json!(texts),
+                &json!(stored),
+            ));
+        }
+    }
     Ok(())
 }
 
@@ -654,6 +765,10 @@ pub(super) async fn export(ctx: &Ctx) -> Result<Option<Profile>, ApplyError> {
         None => Some(None),
         Some(name) => export_avatar(ctx, name).await.map(Some),
     };
+    // ilia fork: the stored set (`{}` for none), left out when a stored
+    // text is one the document could not give (a hand edit).
+    let texts = stored_texts(ctx).await?;
+    let translations = ok(check_texts(&texts)).then_some(texts);
     Ok(Some(Profile {
         name: ok(check_name("", &s.name)).then(|| s.name.clone()),
         username: s.username.clone().filter(|u| ok(check_username("", u))),
@@ -671,6 +786,7 @@ pub(super) async fn export(ctx: &Ctx) -> Result<Option<Profile>, ApplyError> {
         lend_resource_write: Some(s.lend_resource_write),
         weekly_hours: (!hours.is_empty() && desired_rules("", &hours).is_ok()).then_some(hours),
         avatar,
+        translations,
     }))
 }
 

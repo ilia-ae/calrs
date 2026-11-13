@@ -1,0 +1,126 @@
+{#- ilia fork: the "Translations" section of Profile & Settings
+    (src/web/user_texts.rs), inside the settings form. `profile_texts.rows`
+    are the stored (or posted) rows, `profile_texts.languages` every shipped
+    locale. The marker field `profile_translations` tells the save that the
+    form carried the section. The labels are translated out here and passed
+    in: inside a macro `t()` might not see the page's `lang`. The layout
+    follows the event type form's section (partials/ilia_event_texts_form.html). -#}
+{% set labels = {
+  "language": t("etf-translation-language"),
+  "name": t("settings-display-name"),
+  "title": t("settings-title"),
+  "bio": t("settings-bio"),
+  "remove": t("etf-translation-remove"),
+} %}
+{% macro profile_row(n, code, name, title, bio, languages, labels, removable=true) -%}
+<div class="profile-translation-row" data-profile-translation-row style="padding: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius);">
+  <div class="form-grid-2" style="align-items: start;">
+    <div class="form-group">
+      <label for="profile_translation_lang_{{ n }}">{{ labels.language }}</label>
+      <select id="profile_translation_lang_{{ n }}" name="profile_translation_lang_{{ n }}">
+        {% for l in languages %}
+        <option value="{{ l.code }}"{% if l.code == code %} selected{% endif %}>{{ l.label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="profile_translation_name_{{ n }}">{{ labels.name }}</label>
+      <input type="text" id="profile_translation_name_{{ n }}" name="profile_translation_name_{{ n }}" maxlength="255" value="{{ name }}">
+    </div>
+  </div>
+  <div class="form-group">
+    <label for="profile_translation_title_{{ n }}">{{ labels.title }}</label>
+    <input type="text" id="profile_translation_title_{{ n }}" name="profile_translation_title_{{ n }}" value="{{ title }}">
+  </div>
+  <div class="form-group" style="margin-bottom: 0.5rem;">
+    <label for="profile_translation_bio_{{ n }}">{{ labels.bio }}</label>
+    <textarea id="profile_translation_bio_{{ n }}" name="profile_translation_bio_{{ n }}" rows="3">{{ bio }}</textarea>
+  </div>
+  {% if removable %}
+  <div class="btn-row" style="justify-content: flex-end;">
+    <button type="button" class="btn btn-ghost btn-sm btn-auto" data-profile-translation-remove>{{ labels.remove }}</button>
+  </div>
+  {% endif %}
+</div>
+{%- endmacro %}
+<style>
+  /* ilia fork: the event type form's collapsible section, for this one. */
+  #profile-translations { border-top: 1px solid var(--border); padding-top: 1.25rem; margin-top: 1.25rem; }
+  #profile-translations > summary { display: flex; align-items: center; gap: 0.75rem; cursor: pointer; list-style: none; user-select: none; }
+  #profile-translations > summary::-webkit-details-marker { display: none; }
+  #profile-translations > summary h3 { font-size: 0.95rem; margin: 0; flex-shrink: 0; }
+  #profile-translations .collapsible-hint { flex: 1; text-align: right; font-size: 0.825rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  #profile-translations .collapsible-chevron { flex-shrink: 0; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; }
+  #profile-translations .collapsible-chevron::after { content: ''; display: block; width: 7px; height: 7px; border-right: 2px solid var(--text-muted); border-bottom: 2px solid var(--text-muted); transform: rotate(-45deg); transition: transform 0.2s ease; }
+  #profile-translations[open] .collapsible-chevron::after { transform: rotate(45deg); }
+  #profile-translations > .collapsible-body { padding-top: 0.75rem; }
+  @media (prefers-reduced-motion: reduce) { #profile-translations .collapsible-chevron::after { transition: none; } }
+</style>
+<!-- Collapsible: Translations (ilia fork) -->
+<details id="profile-translations"{% if profile_texts.rows %} open{% endif %}>
+  <summary>
+    <h3>{{ t("etf-translations") }}</h3>
+    <span class="collapsible-hint" id="profile-translations-hint">{% for row in profile_texts.rows %}{% for l in profile_texts.languages %}{% if l.code == row.lang %}{{ l.label }}{% endif %}{% endfor %}{% if not loop.last %}, {% endif %}{% endfor %}</span>
+    <span class="collapsible-chevron"></span>
+  </summary>
+  <div class="collapsible-body">
+    <span class="hint" style="font-size: 0.825rem; color: var(--text-muted); display: block; margin-bottom: 0.75rem;">{{ t("settings-translations-help") }}</span>
+    <input type="hidden" name="{{ profile_texts.marker }}" value="1">
+    <div id="profile-translations-list" style="display: flex; flex-direction: column; gap: 0.75rem;">
+      {% for row in profile_texts.rows %}
+      {{ profile_row(row.n, row.lang, row.name, row.title, row.bio, profile_texts.languages, labels) }}
+      {% endfor %}
+      {#- Without JavaScript: one spare row (left empty, it is dropped). -#}
+      <noscript>{{ profile_row(profile_texts.rows | length, "", "", "", "", profile_texts.languages, labels, false) }}</noscript>
+    </div>
+    <template id="profile-translation-row-template">{{ profile_row("__N__", "", "", "", "", profile_texts.languages, labels) }}</template>
+    <button type="button" id="add-profile-translation" class="btn btn-secondary btn-sm btn-auto" style="margin-top: 0.75rem;" hidden>+ {{ t("etf-translation-add") }}</button>
+  </div>
+</details>
+<script>
+  // ilia fork: add and remove profile translation rows. Rows keep the
+  // numbers they were given; the server reads them in order.
+  (function() {
+    var list = document.getElementById('profile-translations-list');
+    var template = document.getElementById('profile-translation-row-template');
+    var add = document.getElementById('add-profile-translation');
+    var hint = document.getElementById('profile-translations-hint');
+    if (!list || !template || !add || !template.content) return;
+    var total = template.content.querySelector('select').options.length;
+    function rows() { return list.querySelectorAll('[data-profile-translation-row]'); }
+    function refresh() {
+      var names = [];
+      rows().forEach(function(row) {
+        var select = row.querySelector('select');
+        names.push(select.options[select.selectedIndex].text);
+      });
+      if (hint) hint.textContent = names.join(', ');
+      add.hidden = rows().length >= total;
+    }
+    function wire(row) {
+      row.querySelector('[data-profile-translation-remove]').addEventListener('click', function() {
+        row.remove();
+        refresh();
+      });
+      row.querySelector('select').addEventListener('change', refresh);
+    }
+    rows().forEach(wire);
+    var next = rows().length;
+    add.addEventListener('click', function() {
+      var taken = [];
+      rows().forEach(function(row) { taken.push(row.querySelector('select').value); });
+      var holder = document.createElement('div');
+      holder.innerHTML = template.innerHTML.split('__N__').join(String(next++)).trim();
+      var row = holder.firstElementChild;
+      var select = row.querySelector('select');
+      for (var i = 0; i < select.options.length; i++) {
+        if (taken.indexOf(select.options[i].value) === -1) { select.selectedIndex = i; break; }
+      }
+      list.appendChild(row);
+      wire(row);
+      refresh();
+      row.querySelector('input[type=text]').focus();
+    });
+    refresh();
+  })();
+</script>

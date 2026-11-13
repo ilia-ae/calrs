@@ -401,6 +401,13 @@ pub(crate) async fn pay_page(
             .unwrap_or_default(),
         _ => Default::default(),
     };
+    // ilia fork: the host's name in the page language (`user_texts`).
+    let host_name = match row.booking_uid.as_deref() {
+        Some(uid) if !host_name.is_empty() => {
+            crate::web::user_texts::booking_host_name(&state.pool, uid, lang, host_name).await
+        }
+        _ => host_name,
+    };
     // Offered only when it can work: a base URL for the link, and SMTP.
     let show_email = address.is_some()
         && row.link_emailed_at.is_none()
@@ -671,6 +678,8 @@ pub(crate) async fn guest_mail(
         .await
         .map(|(n, e, _)| (n, e))
         .unwrap_or_default();
+    // ilia fork: the host's name in the email's language (`user_texts`).
+    let host_name = crate::web::user_texts::booking_host_name(pool, &uid, lang, host_name).await;
     let start = if time_version == 1 {
         parse_stamp(&start_at)
     } else {

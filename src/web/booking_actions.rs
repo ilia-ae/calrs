@@ -1062,6 +1062,14 @@ pub(super) async fn guest_cancel_form(
         event_title,
     )
     .await;
+    // ilia fork: the host's name too (`user_texts`).
+    let host_name = super::user_texts::token_host_name(
+        &state.pool,
+        super::event_texts::Token::Cancel(&token),
+        lang,
+        host_name,
+    )
+    .await;
 
     // Block the GET form before any state mutation if the booking falls
     // inside the host's configured cancel-notice window.
@@ -1351,6 +1359,8 @@ pub(super) async fn guest_cancel_booking(
             event_title: guest_title.clone(),
             ..guest_details
         };
+        // ilia fork: the host named in the guest's language (`user_texts`).
+        let guest_details = super::user_texts::host_for_guest(&state.pool, guest_details).await;
         spawn_emails(async move {
             log_email_result(
                 crate::email::send_guest_cancellation(&smtp_config, &guest_details).await,
@@ -1402,6 +1412,9 @@ pub(super) async fn guest_cancel_booking(
         .await;
     }
 
+    // ilia fork: the host's name in the page language (`user_texts`).
+    let host_name =
+        super::user_texts::booking_host_name(&state.pool, &details.uid, lang, host_name).await;
     let tmpl = match state.templates.get_template("booking_cancelled_guest.html") {
         Ok(t) => t,
         Err(e) => return internal_error_response("internal", &e),
@@ -1578,6 +1591,8 @@ pub(super) async fn guest_reschedule_slots(
     // guest both have to follow the booking.
     let hosts = reschedule_hosts(&state.pool, &uid, &owner_user_id).await;
     let host = reschedule_host_profile(&state.pool, &hosts, &et_id).await;
+    // ilia fork: in the page language (`user_texts`).
+    let host = super::user_texts::reschedule_host(&state.pool, host, lang).await;
 
     // ilia fork: the current time in the zone this page shows slots in (the
     // selector's zone: ?tz=, else UTC, as for the slots below), so the banner,
@@ -2250,6 +2265,11 @@ pub(super) async fn guest_reschedule_booking(
         }
     };
     let booking_language = Some(lang.to_string());
+    // ilia fork: the host as the guest reads them, in that language
+    // (`user_texts`): their page, emails and invite; the host's keep the
+    // base name.
+    let guest_host =
+        super::user_texts::booking_host_name(&state.pool, &uid, lang, host_name.clone()).await;
 
     // Legacy values use the event-type timezone; new values are UTC. Convert into the
     // guest's tz so `RescheduleDetails` carries guest-local wall-clock for
@@ -2347,7 +2367,7 @@ pub(super) async fn guest_reschedule_booking(
                 guest_name: guest_name.clone(),
                 guest_email: guest_email.clone(),
                 guest_timezone: new_guest_timezone,
-                host_name: host_name.clone(),
+                host_name: guest_host.clone(),
                 host_email,
                 uid: uid.clone(),
                 notes: guest_notes,
@@ -2455,7 +2475,7 @@ pub(super) async fn guest_reschedule_booking(
                 guest_name: guest_name.clone(),
                 guest_email: guest_email.clone(),
                 guest_timezone: new_guest_timezone,
-                host_name: host_name.clone(),
+                host_name: guest_host.clone(),
                 host_email: host_email.clone(),
                 uid,
                 location: loc_value,
@@ -2473,6 +2493,7 @@ pub(super) async fn guest_reschedule_booking(
             // keeps `push_details` (`event_texts`).
             let attendee_details = crate::email::BookingDetails {
                 event_title: guest_title.clone(),
+                host_name: guest_host.clone(),
                 ..push_details.clone()
             };
             // ilia fork: the host gets the 3CX organizer's link (`threecx::for_host`).
@@ -2591,7 +2612,7 @@ pub(super) async fn guest_reschedule_booking(
             date_label => date_label,
             time_start => form.time,
             time_end => guest_end_time,
-            host_name => host_name,
+            host_name => guest_host,
             guest_email => guest_email,
             pending => needs_approval,
             rescheduled => true,
@@ -2799,6 +2820,14 @@ pub(super) async fn host_reschedule_booking(
             &et_id,
             super::event_texts::email_lang(guest_language.as_deref()),
             event_title,
+        )
+        .await;
+        // ilia fork: the host's name in that language too (`user_texts`).
+        let host_name = super::user_texts::booking_host_name(
+            &state.pool,
+            &uid,
+            super::event_texts::email_lang(guest_language.as_deref()),
+            host_name,
         )
         .await;
         let details = crate::email::BookingDetails {

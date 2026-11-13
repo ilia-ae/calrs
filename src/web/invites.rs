@@ -360,9 +360,16 @@ pub(super) async fn send_invite_bulk(
         None => return Redirect::to("/dashboard/event-types").into_response(),
     };
     // ilia fork: the invite email is written in the inviter's language and
-    // names the event in it (`event_texts`).
+    // names the event (`event_texts`) and the inviter (`user_texts`) in it.
     let et_title =
         super::event_texts::title_in(&state.pool, &et_id, auth_user.lang, et_title).await;
+    let inviter_name = super::user_texts::name_in(
+        &state.pool,
+        &auth_user.user.id,
+        auth_user.lang,
+        auth_user.user.name.clone(),
+    )
+    .await;
 
     // Private event types: invite issuance is management (admin / owner / team
     // admin only). Internal event types: any authenticated user can issue
@@ -447,7 +454,7 @@ pub(super) async fn send_invite_bulk(
                     &name,
                     &email,
                     &et_title,
-                    &auth_user.user.name,
+                    &inviter_name,
                     // Account email, not booking_email: invites go to
                     // recipients the sender picks, and booking_email is an
                     // unverified free-form address, so replies must not be

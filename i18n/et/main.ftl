@@ -2539,3 +2539,7 @@ admin-threecx-api-key-env-bad = CALRS_THREECX_API_KEY on määratud, kuid see po
 admin-threecx-api-key-env-placeholder = Määratakse paigaldusel
 etf-location-threecx = 3CX kohtumine (iga broneeringu jaoks)
 etf-threecx-hint = Iga kinnitatud broneeringu jaoks luuakse 3CX kohtumine, mis järgib selle teisaldamist ja tühistamist. 3CX seadistatakse halduslehel.
+
+## ilia fork: profile translations (src/web/user_texts.rs)
+settings-translations-help = Külalised, kes loevad sinu lehti ühes neist keeltest, näevad ülaltoodu asemel seda nime, ametinimetust ja tutvustust, ka oma e-kirjades ja sõnumites. Tühjaks jäetud väli näitab ülaltoodut; teistes keeltes näidatakse ülaltoodut.
+settings-error-translation-name-length = Tõlgitud nimi võib olla kuni 255 tähemärki.

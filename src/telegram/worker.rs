@@ -278,6 +278,9 @@ async fn guest_view(
         .await
         .map(|(name, _, _)| name)
         .unwrap_or_default();
+    // ilia fork: the host as the guest's pages name them, in the reader's
+    // language (`web::user_texts`).
+    let host = crate::web::user_texts::booking_host_name(pool, &booking.uid, lang, host).await;
     let pending = booking.status == "pending";
     let link = |path: String| base.map(|b| format!("{b}{path}"));
     let rebook = match base {

@@ -160,11 +160,13 @@ pub(crate) async fn localize_rows<T>(
 // --- What guests are sent ---
 
 /// Email details a guest reads: the booking they are about, the language
-/// they are written in, and the event title in them.
+/// they are written in, the event title and (`user_texts`) the host's name
+/// in them.
 pub(crate) trait GuestCopy: Clone {
     fn booking_uid(&self) -> &str;
     fn reader_lang(&self) -> Option<&str>;
     fn event_title_mut(&mut self) -> &mut String;
+    fn host_name_mut(&mut self) -> &mut String;
 }
 
 impl GuestCopy for crate::email::BookingDetails {
@@ -176,6 +178,9 @@ impl GuestCopy for crate::email::BookingDetails {
     }
     fn event_title_mut(&mut self) -> &mut String {
         &mut self.event_title
+    }
+    fn host_name_mut(&mut self) -> &mut String {
+        &mut self.host_name
     }
 }
 
@@ -189,6 +194,9 @@ impl GuestCopy for crate::email::CancellationDetails {
     fn event_title_mut(&mut self) -> &mut String {
         &mut self.event_title
     }
+    fn host_name_mut(&mut self) -> &mut String {
+        &mut self.host_name
+    }
 }
 
 impl GuestCopy for crate::email::RescheduleDetails {
@@ -201,6 +209,9 @@ impl GuestCopy for crate::email::RescheduleDetails {
     fn event_title_mut(&mut self) -> &mut String {
         &mut self.event_title
     }
+    fn host_name_mut(&mut self) -> &mut String {
+        &mut self.host_name
+    }
 }
 
 /// The language a guest email is written in: the stored booking language
@@ -211,8 +222,9 @@ pub(crate) fn email_lang(stored: Option<&str>) -> &'static str {
 
 /// The copy of `details` for the guest (their email and its `.ics`, the
 /// copies to additional attendees, the SMS): the event title of the
-/// booking's event type in the language those are written in. Host emails
-/// keep `details` as it is. Unchanged when there is no translation.
+/// booking's event type in the language those are written in, and the
+/// host's name too (`user_texts::host_for_guest`). Host emails keep
+/// `details` as it is. Unchanged when there is no translation.
 pub(crate) async fn for_guest<D: GuestCopy>(pool: &SqlitePool, details: &D) -> D {
     let mut copy = details.clone();
     let et_id: Option<String> =
@@ -230,11 +242,12 @@ pub(crate) async fn for_guest<D: GuestCopy>(pool: &SqlitePool, details: &D) -> D
             *copy.event_title_mut() = title;
         }
     }
-    copy
+    super::user_texts::host_for_guest(pool, copy).await
 }
 
 /// [`for_guest`] for details built without the guest's language (the
-/// guest `.ics` downloads): the booking's stored language, as its emails.
+/// guest `.ics` downloads): the booking's stored language, as its emails,
+/// for the title and the host's name.
 pub(crate) async fn in_booking_language<D: GuestCopy>(pool: &SqlitePool, details: &D) -> D {
     let mut copy = details.clone();
     let row: Option<(String, Option<String>)> =
@@ -251,6 +264,10 @@ pub(crate) async fn in_booking_language<D: GuestCopy>(pool: &SqlitePool, details
         if let Some((title, _)) = translation(pool, &et_id, lang).await {
             *copy.event_title_mut() = title;
         }
+        // ilia fork (`user_texts`): the host's name in that language too.
+        let shown = std::mem::take(copy.host_name_mut());
+        *copy.host_name_mut() =
+            super::user_texts::booking_host_name(pool, details.booking_uid(), lang, shown).await;
     }
     copy
 }

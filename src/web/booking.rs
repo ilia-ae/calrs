@@ -806,6 +806,11 @@ pub(super) async fn handle_group_booking(
         )
         .await;
     }
+    // ilia fork: the host as the guest reads them (`user_texts`): the
+    // assigned member's name in the page language; a collective roster as
+    // stored.
+    let guest_host =
+        super::user_texts::booking_host_name(&state.pool, &uid, lang, host_name.clone()).await;
 
     let (cancel_notice_min, reschedule_notice_min) =
         fetch_event_type_notice_minutes(&state.pool, &et_id).await;
@@ -855,8 +860,9 @@ pub(super) async fn handle_group_booking(
         let host_location =
             super::threecx::host_link(&state.pool, &state.secret_key, &details.uid).await;
         send_new_booking_emails(NewBookingEmails {
-            // ilia fork (`event_texts`).
+            // ilia fork (`event_texts`, `user_texts`).
             guest_event_title: guest_title.clone(),
+            guest_host_name: guest_host.clone(),
             host_location,
             smtp_config,
             details,
@@ -900,7 +906,7 @@ pub(super) async fn handle_group_booking(
             date_label => date_label,
             time_start => form.time,
             time_end => guest_end_time,
-            host_name => host_name,
+            host_name => guest_host,
             guest_email => form.email,
             notes => form.notes,
             pending => needs_approval,
@@ -1478,8 +1484,10 @@ async fn handle_dynamic_group_booking(
         let host_location =
             super::threecx::host_link(&state.pool, &state.secret_key, &details.uid).await;
         send_new_booking_emails(NewBookingEmails {
-            // ilia fork (`event_texts`).
+            // ilia fork (`event_texts`). The roster is the stored organizer
+            // (#161): the guest reads it as stored (`user_texts`).
             guest_event_title: guest_title.clone(),
+            guest_host_name: details.host_name.clone(),
             host_location,
             smtp_config,
             details,
@@ -2124,9 +2132,19 @@ pub(super) async fn handle_booking_for_user(
             // ilia fork: hosts get the 3CX organizer's link (`threecx::for_host`).
             let host_location =
                 super::threecx::host_link(&state.pool, &state.secret_key, &details.uid).await;
+            // ilia fork: the host's name in the guest's language
+            // (`user_texts`); `details` keeps it for the host.
+            let guest_host = super::user_texts::booking_host_name(
+                &state.pool,
+                &uid,
+                lang,
+                details.host_name.clone(),
+            )
+            .await;
             send_new_booking_emails(NewBookingEmails {
-                // ilia fork (`event_texts`).
+                // ilia fork (`event_texts`, `user_texts`).
                 guest_event_title: guest_title.clone(),
+                guest_host_name: guest_host,
                 host_location,
                 smtp_config,
                 details,
@@ -2165,6 +2183,8 @@ pub(super) async fn handle_booking_for_user(
         .await
         .unwrap_or(None)
         .unwrap_or_else(|| "Host".to_string());
+    // ilia fork: in the page language (`user_texts`).
+    let host_name = super::user_texts::booking_host_name(&state.pool, &uid, lang, host_name).await;
 
     let date_label = crate::i18n::format_long_date(date, lang);
     let (cancel_notice_min, reschedule_notice_min) =
@@ -3019,9 +3039,19 @@ pub(super) async fn handle_booking(
             // ilia fork: hosts get the 3CX organizer's link (`threecx::for_host`).
             let host_location =
                 super::threecx::host_link(&state.pool, &state.secret_key, &details.uid).await;
+            // ilia fork: the host's name in the guest's language
+            // (`user_texts`); `details` keeps it for the host.
+            let guest_host = super::user_texts::booking_host_name(
+                &state.pool,
+                &uid,
+                lang,
+                details.host_name.clone(),
+            )
+            .await;
             send_new_booking_emails(NewBookingEmails {
-                // ilia fork (`event_texts`).
+                // ilia fork (`event_texts`, `user_texts`).
                 guest_event_title: guest_title.clone(),
+                guest_host_name: guest_host,
                 host_location,
                 smtp_config,
                 details,
@@ -3063,6 +3093,8 @@ pub(super) async fn handle_booking(
     .await
     .unwrap_or(None)
     .unwrap_or_else(|| "Host".to_string());
+    // ilia fork: in the page language (`user_texts`).
+    let host_name = super::user_texts::booking_host_name(&state.pool, &uid, lang, host_name).await;
 
     let date_label = crate::i18n::format_long_date(date, lang);
     let (cancel_notice_min, reschedule_notice_min) =
