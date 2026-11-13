@@ -16,6 +16,8 @@ mod directory;
 mod error_page;
 // ilia fork: which sites may frame the embedded booking pages.
 pub(crate) mod embed_origins;
+// ilia fork: an event type's title and description per language.
+pub(crate) mod event_texts;
 mod event_types;
 mod format;
 mod hosts;
@@ -34,6 +36,7 @@ mod teams;
 // ilia fork: Telegram notifications (ilia-booking docs/operations.md).
 mod telegram;
 // ilia fork: TON payments (ilia-booking docs/ton.md).
+pub(crate) mod threecx;
 pub(crate) mod ton_pay;
 mod week_start;
 pub(crate) mod writeback;
@@ -1017,6 +1020,8 @@ pub(crate) fn router(state: Arc<AppState>) -> Router {
         .route("/dashboard/admin/sms/clear", post(admin_update_sms_clear))
         .route("/dashboard/admin/sms/policy", post(admin_update_sms_policy))
         .route("/dashboard/admin/jitsi", post(admin_update_jitsi))
+        // ilia fork: the 3CX card (save, test, remove).
+        .route("/dashboard/admin/threecx", post(threecx::admin_save))
         .route(
             "/dashboard/admin/meeting-webhook",
             post(admin_update_meeting_webhook),

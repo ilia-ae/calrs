@@ -371,7 +371,11 @@ pub async fn run(pool: &SqlitePool, key: &[u8; 32], cmd: BookingCommands) -> Res
                         guest_email
                     );
                     io::stdout().flush().unwrap();
-                    match crate::email::send_guest_confirmation(&smtp_config, &details, None).await
+                    // ilia fork: the guest's copy names the event in the
+                    // language it is written in (`web::event_texts`).
+                    let guest_details = crate::web::event_texts::for_guest(pool, &details).await;
+                    match crate::email::send_guest_confirmation(&smtp_config, &guest_details, None)
+                        .await
                     {
                         Ok(_) => println!("{}", "sent".green()),
                         Err(e) => println!("{} {}", "failed:".red(), e),
@@ -597,6 +601,10 @@ pub async fn run(pool: &SqlitePool, key: &[u8; 32], cmd: BookingCommands) -> Res
                                     }
                                     None => details.clone(),
                                 };
+                            // ilia fork: the event in the guest's language
+                            // (`web::event_texts`).
+                            let guest_details =
+                                crate::web::event_texts::for_guest(pool, &guest_details).await;
                             match crate::email::send_guest_cancellation(
                                 &smtp_config,
                                 &guest_details,

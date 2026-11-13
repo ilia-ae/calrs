@@ -55,6 +55,9 @@ pub(super) async fn check(ctx: &Ctx, site: &Site) -> Result<(), ApplyError> {
     if let Some(ton) = &site.ton {
         super::ton::check(ctx, ton).await?;
     }
+    if let Some(threecx) = &site.threecx {
+        super::threecx::check(ctx, threecx).await?;
+    }
     match (site.theme, &site.custom) {
         (Some(Theme::Custom), None) => {
             return Err(ApplyError::invalid(
@@ -99,6 +102,9 @@ pub(super) async fn check(ctx: &Ctx, site: &Site) -> Result<(), ApplyError> {
 pub(super) async fn apply(ctx: &mut Ctx, site: &Site) -> Result<(), ApplyError> {
     if let Some(ton) = &site.ton {
         super::ton::apply(ctx, ton).await?;
+    }
+    if let Some(threecx) = &site.threecx {
+        super::threecx::apply(ctx, threecx).await?;
     }
     let before = Stored::load(ctx).await?;
     let pairs = pairs(site, &before);
@@ -274,6 +280,9 @@ pub(super) async fn verify(ctx: &Ctx, site: &Site) -> Result<(), ApplyError> {
     if let Some(ton) = &site.ton {
         super::ton::verify(ctx, ton).await?;
     }
+    if let Some(threecx) = &site.threecx {
+        super::threecx::verify(ctx, threecx).await?;
+    }
     let stored = Stored::load(ctx).await?;
     match pairs(site, &stored).into_iter().find(Pair::differs) {
         Some(pair) => Err(ApplyError::stored_differs(
@@ -326,6 +335,7 @@ pub(super) async fn export(ctx: &Ctx) -> Result<Option<Site>, ApplyError> {
         sms: off(s.sms.is_none() && !crate::sms::sms_env_active()),
         sms_allow_all_users: Some(s.sms_allow_all_users),
         ton: super::ton::export(ctx).await?,
+        threecx: super::threecx::export(ctx).await?,
     }))
 }
 

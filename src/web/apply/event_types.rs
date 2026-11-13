@@ -42,6 +42,14 @@
 //!   before today is left out, so an inventory still applies after a day
 //!   off has passed.
 //!
+//! And one more (ilia fork):
+//! - `translations` are the event type's titles and descriptions per
+//!   language (`event_type_texts`, `web::event_texts`), the form's
+//!   "Translations" section: the whole set, written after the form with
+//!   `event_texts::replace` (one `DELETE`, an `INSERT` per language) when
+//!   it differs. Checked as MCP checks a title and a description, with a
+//!   shipped locale code (`i18n::supported_code`) as each key.
+//!
 //! `weekly_hours: null` means the profile's default hours: the event type's
 //! rules are a copy of `user_availability_rules` as they are once the
 //! profile section has run (the web form copies them the same way when its
@@ -56,7 +64,7 @@
 use super::{
     answered, check_opt_text, check_text, check_timezone, form, ApplyError, CalendarView, Ctx,
     DateOverride, Day, DayHours, EventTypeItem, EventTypes, FrequencyLimit, GuestMode,
-    LocationType, Period, PhoneMode, Prune, TonPrice, Visibility, Window,
+    LocationType, Period, PhoneMode, Prune, TextItem, TonPrice, Visibility, Window,
 };
 use crate::booking_window::{today_in, MAX_DAYS_AHEAD};
 use crate::web::agent::dto;
@@ -73,7 +81,7 @@ use axum::response::IntoResponse;
 use chrono::{NaiveDate, NaiveTime};
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// The days of a week in the document's order.
 const WEEK: [Day; 7] = [
@@ -96,9 +104,10 @@ const SEED_END: &str = "17:00";
 
 /// The keys of an item after `slug`, in the document's order: the order
 /// of a report's changes.
-const KEYS: [&str; 33] = [
+const KEYS: [&str; 34] = [
     "title",
     "description",
+    "translations",
     "duration_min",
     "slot_interval_min",
     "buffer_before",
@@ -133,12 +142,13 @@ const KEYS: [&str; 33] = [
 ];
 
 /// Settings not carried by the event type form (see the module comment).
-const OFF_FORM: [&str; 5] = [
+const OFF_FORM: [&str; 6] = [
     "timezone",
     "enabled",
     "overrides",
     "ton_price",
     "telegram_guest_mode",
+    "translations",
 ];
 
 /// What an item's `ton_price` is. The release guards of the role grep for
@@ -165,6 +175,15 @@ pub(crate) const BUSY_CALENDARS_SHAPE: &str = "busy_calendars: null or a list of
 /// shape).
 pub(crate) const OVERRIDES_SHAPE: &str =
     "overrides: [{date, blocked: true} | {date, start, end}], from today on";
+
+/// ilia fork: what an item's `translations` is; the role's marker, like
+/// [`OVERRIDES_SHAPE`] (used in the refusal of a language calrs does not
+/// ship).
+pub(crate) const TRANSLATIONS_SHAPE: &str =
+    "translations: {<language>: {title, description}}, the whole set";
+
+/// The translations (`translations`) stored for `et_id`.
+type Texts = BTreeMap<String, TextItem>;
 
 fn item_path(slug: &str) -> String {
     format!("event_types[{slug}]")
@@ -440,6 +459,8 @@ struct Current {
     price: Option<TonPrice>,
     overrides: Vec<DateOverride>,
     today: NaiveDate,
+    /// ilia fork: `translations`.
+    texts: Texts,
 }
 
 impl Current {
@@ -454,6 +475,7 @@ impl Current {
             overrides: stored_overrides(ctx, et_id, today).await?,
             today,
             state,
+            texts: stored_texts(ctx, et_id).await?,
         })
     }
 
@@ -465,6 +487,7 @@ impl Current {
             mode: GuestMode::Off,
             price: None,
             overrides: Vec::new(),
+            texts: Texts::new(),
         }
     }
 
@@ -474,9 +497,27 @@ impl Current {
             self.mode,
             &self.price,
             &self.overrides,
+            &self.texts,
             calendars,
         )
     }
+}
+
+/// The stored translations of `et_id` in the document's shape.
+async fn stored_texts(ctx: &Ctx, et_id: &str) -> Result<Texts, ApplyError> {
+    Ok(crate::web::event_texts::stored(ctx.pool(), et_id)
+        .await?
+        .into_iter()
+        .map(|text| {
+            (
+                text.lang,
+                TextItem {
+                    title: text.title,
+                    description: text.description,
+                },
+            )
+        })
+        .collect())
 }
 
 /// The stored guest Telegram mode (`off` when none is stored).
@@ -521,19 +562,21 @@ fn limits_of(limits: &[(i64, String, bool)]) -> Vec<FrequencyLimit> {
     out
 }
 
-/// A form state, its Telegram mode, its price and its date overrides as a
-/// document item, every key given.
+/// A form state, its Telegram mode, its price, its date overrides and its
+/// translations as a document item, every key given.
 fn item_of(
     state: &EditState,
     mode: GuestMode,
     price: &Option<TonPrice>,
     overrides: &[DateOverride],
+    texts: &Texts,
     calendars: &Calendars,
 ) -> EventTypeItem {
     EventTypeItem {
         slug: state.slug.clone(),
         title: Some(state.title.clone()),
         description: Some(state.description.clone()),
+        translations: Some(texts.clone()),
         duration_min: Some(state.duration_min),
         slot_interval_min: Some(state.slot_interval_min),
         buffer_before: state.buffer_before,
@@ -593,6 +636,9 @@ struct Wanted {
     /// The item gives `overrides`.
     overrides_given: bool,
     today: NaiveDate,
+    /// ilia fork: `translations`, and whether the item gives them.
+    texts: Texts,
+    texts_given: bool,
 }
 
 impl Wanted {
@@ -602,9 +648,41 @@ impl Wanted {
             self.mode,
             &self.price,
             &self.overrides,
+            &self.texts,
             calendars,
         )
     }
+}
+
+/// ilia fork: `translations` checked as MCP checks a title and a
+/// description (`ops_write::check_title`, `check_description`), each key a
+/// shipped locale code spelled as calrs spells it, the text canonical (as
+/// `check_item` wants every text).
+fn check_texts(slug: &str, texts: &Texts) -> Result<(), ApplyError> {
+    for (lang, text) in texts {
+        let here = format!("translations.{lang}");
+        if crate::i18n::supported_code(lang) != Some(lang.as_str()) {
+            let known: Vec<&str> = crate::i18n::supported_with_labels()
+                .map(|(code, _)| code)
+                .collect();
+            return Err(ApplyError::invalid(
+                at(slug, &here),
+                format!(
+                    "not a language calrs ships; use one of {} ({TRANSLATIONS_SHAPE})",
+                    known.join(", ")
+                ),
+            ));
+        }
+        check_text(&at(slug, &format!("{here}.title")), &text.title, None)?;
+        ops_write::check_title(&format!("{here}.title"), &text.title)
+            .map_err(|e| tool_error(slug, e))?;
+        let description = format!("{here}.description");
+        check_opt_text(&at(slug, &description), text.description.as_deref(), None)?;
+        if let Some(d) = &text.description {
+            ops_write::check_description(&description, d).map_err(|e| tool_error(slug, e))?;
+        }
+    }
+    Ok(())
 }
 
 /// `busy_calendars` as the form's `calendar_ids`, sorted as stored.
@@ -844,6 +922,7 @@ async fn wanted(
         price: base_price,
         overrides: base_overrides,
         today,
+        texts: base_texts,
     } = base;
     state
         .apply(ctx.pool(), "", "", patch_of(item)?)
@@ -884,6 +963,13 @@ async fn wanted(
         Some(price) => (price.clone(), Some(price_wanted(slug, price.as_ref())?)),
         None => (base_price, None),
     };
+    let texts = match &item.translations {
+        Some(texts) => {
+            check_texts(slug, texts)?;
+            texts.clone()
+        }
+        None => base_texts,
+    };
     Ok(Wanted {
         state,
         mode: item.telegram_guest_mode.unwrap_or(base_mode),
@@ -893,6 +979,8 @@ async fn wanted(
         overrides,
         overrides_given: item.overrides.is_some(),
         today,
+        texts,
+        texts_given: item.translations.is_some(),
     })
 }
 
@@ -1340,6 +1428,19 @@ async fn off_form(
     if want.overrides_given && stored_overrides(ctx, et_id, want.today).await? != want.overrides {
         write_overrides(ctx, et_id, want).await?;
     }
+    if want.texts_given && stored_texts(ctx, et_id).await? != want.texts {
+        let texts: Vec<crate::web::event_texts::Text> = want
+            .texts
+            .iter()
+            .map(|(lang, text)| crate::web::event_texts::Text {
+                lang: lang.clone(),
+                title: text.title.clone(),
+                description: text.description.clone(),
+            })
+            .collect();
+        let mut conn = ctx.pool().acquire().await?;
+        crate::web::event_texts::replace(&mut conn, et_id, &texts).await?;
+    }
     if now.timezone != want.state.timezone {
         sqlx::query("UPDATE event_types SET timezone = ? WHERE id = ?")
             .bind(&want.state.timezone)
@@ -1463,7 +1564,8 @@ pub(super) async fn verify(ctx: &Ctx, section: &EventTypes) -> Result<(), ApplyE
 /// and `prune` is left out (`none`). A key is left out where the document
 /// cannot say what is stored: `busy_calendars` naming a calendar whose name
 /// another one shares (or one no source lists), `overrides` with a row the
-/// document could not give (a hand edit).
+/// document could not give (a hand edit), `translations` with a text the
+/// checks would refuse.
 pub(super) async fn export(ctx: &Ctx) -> Result<Option<EventTypes>, ApplyError> {
     let profile = profile_rules(ctx).await?;
     let calendars = Calendars::load(ctx).await?;
@@ -1494,6 +1596,12 @@ pub(super) async fn export(ctx: &Ctx) -> Result<Option<EventTypes>, ApplyError> 
         if !canonical || !unique {
             item.overrides = None;
         }
+        // ilia fork: left out when a stored translation is one the document
+        // could not give (a description the dashboard saved with a trailing
+        // line break, or past MCP's limits).
+        if check_texts(&current.state.slug, &current.texts).is_err() {
+            item.translations = None;
+        }
         items.push(item);
     }
     Ok(Some(EventTypes { prune: None, items }))
@@ -1521,6 +1629,7 @@ mod tests {
             LocationType::JitsiAuto,
             LocationType::WebhookAuto,
             LocationType::GoogleMeet,
+            LocationType::ThreeCxAuto,
         ] {
             assert_eq!(mcp::<dto::LocationType>(v.key()).unwrap().key(), v.key());
         }
@@ -1587,6 +1696,7 @@ mod tests {
             GuestMode::Off,
             &None,
             &[],
+            &Texts::new(),
             &Calendars(Vec::new()),
         ))
         .unwrap();

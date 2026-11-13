@@ -108,6 +108,7 @@ Every user-facing string goes through Fluent (`i18n/`).
 | `telegram.rs` | ilia fork: Profile & Settings → Telegram (host linking, guest field per event type), the booking form's Telegram helpers, dashboard labels |
 | `debug_booking.rs` | ilia fork: the admin's debug booking page `/dashboard/admin/debug-booking` and its switch (`crate::ton::settings::DEBUG_BOOKING`: env `CALRS_DEBUG_BOOKING` > `ton_settings` row > off, resolved per `/dashboard` request by `middleware`, which answers the page 404 while off; the toggle `POST /dashboard/admin/ton/debug-booking` at the top of the TON page; the sidebar link through the `debug_booking_on()` template function; the TEST badge marks): the prefilled guest form, booking through `handle_booking_for_user`, the guest language (`guest_headers`: the chosen language as the switcher's `calrs_lang` on the forwarded headers), the own-chat Telegram routing and the no-chat notice, `debug_bookings` and "cancel all my test bookings" through `cancel_booking`; template `templates/ilia/debug_booking.html`, tests in `tests/debug_booking.rs` (a child of `tests/ton.rs`) |
 | `lang_switch.rs` | ilia fork: the language menu of public pages: `?lang=` sets the `calrs_lang` cookie and redirects to the same page, and the `lang_switcher()` template function (`templates/partials/lang_switcher.html`) |
+| `event_texts.rs` | ilia fork: an event type's title and description per language (`event_type_texts`, migration `ilia_015`): the fallback (`translation`, `localize`, `title_in`, `localize_rows`: the language, its base, else the base text), the guest copies of email details (`for_guest`, `in_booking_language`, the `GuestCopy` trait), the guest token pages (`token_title`), the form's "Translations" section (`TextsForm` flattened into `EventTypeForm`, `parse_form`, `save_form`, `form_ctx`/`posted_ctx`, `templates/partials/ilia_event_texts_form.html`) and storage (`stored`, `replace`, also used by `config apply`); see CLAUDE.md "Event type translations (ilia fork)"; tests in `tests/event_texts.rs` |
 | `embed_origins.rs` | ilia fork: which sites may frame an embedded booking page (`CALRS_EMBED_ORIGINS`, `AppState::embed_origins`): the `frame-ancestors` that `csp_middleware` puts in place of `'self'` for `?embed=1`, see CLAUDE.md "Embed origins (ilia fork)" |
 | `messages.rs` | ilia fork: host <-> guest messages, one thread per booking: `send_host_message` (the one path for the dashboard, the agent and Telegram replies, with the limits), guest texts, the thread page `/dashboard/bookings/{id}/messages`, see CLAUDE.md "Messages with guests" |
 | `error_page.rs` | ilia fork: the layer right above `lang_switch` (the innermost) giving upstream's bare error answers a real status (404, 410, 403, 400) and a styled page (`templates/ilia/error_page.html`): a bare message of `BARE`, the booking error page's title (`booking_error`, a task-local), an empty 404 to a browser; tests in `tests/error_page.rs` |
@@ -283,6 +284,12 @@ Call sites use `crate::email::name` whatever file `name` lives in.
   `src/web/apply/ton.rs`. Migrations `ilia_011_ton_ladder.sql` and
   `ilia_012_ton_settings_audit.sql`; tests in
   `src/web/tests/{ton_ladder,ton_settings,apply_ton}.rs`.
+- **Event type translations** (ilia fork, `src/web/event_texts.rs`, see
+  CLAUDE.md "Event type translations (ilia fork)"): guest pages call
+  `event_texts::localize`/`title_in` with the page language right after
+  they read the event type; guest emails, their `.ics`, SMS and Telegram
+  read `event_texts::for_guest` copies in the booking's language, while the
+  host copies keep the base title. Migration `ilia_015_event_type_texts.sql`.
 - **Captcha** (`src/web/captcha.rs`, CSP in `src/web/mod.rs`, widget in
   `templates/book.html`).
 - **Migrations** (`migrations/`, `src/db.rs`). A new file must also be added

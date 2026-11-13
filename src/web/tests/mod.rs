@@ -34,6 +34,8 @@ mod emails;
 mod error_page;
 // ilia fork: CALRS_EMBED_ORIGINS.
 mod embed_origins;
+// ilia fork: event type titles and descriptions per language.
+mod event_texts;
 mod event_types;
 mod fail_closed;
 // ilia fork: the theme button in the footer, next to the language menu.
@@ -82,6 +84,8 @@ mod security;
 mod sources;
 // ilia fork: Telegram notifications.
 mod telegram;
+// ilia fork: 3CX video meetings.
+mod threecx;
 // ilia fork: TON payments.
 mod ton;
 mod writeback_failures;

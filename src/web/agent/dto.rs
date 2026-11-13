@@ -643,6 +643,10 @@ pub(crate) enum LocationType {
     WebhookAuto,
     /// A Google Meet made for each booking; needs Google Calendar connected.
     GoogleMeet,
+    /// ilia fork: a meeting on the site's 3CX PBX made for each booking;
+    /// needs 3CX set up on the admin page; no location_value.
+    #[serde(rename = "threecx_auto")]
+    ThreeCxAuto,
 }
 
 impl LocationType {
@@ -655,6 +659,7 @@ impl LocationType {
             LocationType::JitsiAuto => "jitsi_auto",
             LocationType::WebhookAuto => "webhook_auto",
             LocationType::GoogleMeet => "google_meet",
+            LocationType::ThreeCxAuto => "threecx_auto",
         }
     }
 }

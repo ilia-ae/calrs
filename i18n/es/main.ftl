@@ -2495,3 +2495,43 @@ ton-admin-debug-tg-locked-apply = Bloqueado por config apply (site.ton.debug_boo
 ton-admin-debug-tg-saved = Usuario de Telegram del invitado guardado.
 ton-admin-debug-tg-invalid = No se guardó nada: no es un usuario de Telegram (una letra latina, luego letras, dígitos y _, de 4 a 32 caracteres).
 ton-admin-f-debug_booking_telegram = Reserva de prueba: usuario de Telegram del invitado
+
+## ilia fork: event type translations (src/web/event_texts.rs)
+etf-translations = Traducciones
+etf-translations-help = Los invitados que ven las páginas de reserva en uno de estos idiomas ven este título y esta descripción en lugar de los de arriba, también en sus correos y mensajes. Los demás idiomas muestran los de arriba.
+etf-translation-language = Idioma
+etf-translation-description-help = Admite **negrita**, *cursiva* y [enlaces](url). Si la dejas vacía, este idioma no muestra descripción.
+etf-translation-add = Añadir un idioma
+etf-translation-remove = Quitar
+form-error-translation-language = Elige un idioma para cada traducción.
+form-error-translation-duplicate = Cada idioma solo puede tener una traducción.
+form-error-translation-title-required = Cada traducción necesita un título.
+form-error-translation-title-length = Un título traducido debe tener como máximo 255 caracteres.
+
+## ilia fork: 3CX video meetings (src/web/threecx.rs)
+admin-threecx = Reuniones de vídeo 3CX
+admin-threecx-help = Cada reserva confirmada de un tipo de evento cuyo lugar es «Reunión 3CX» obtiene su propia reunión programada en esta centralita 3CX. Los invitados reciben el enlace de la reunión; los anfitriones, el enlace del organizador en su calendario y sus correos. Mover o cancelar la reserva mueve o elimina la reunión. La dirección de correo del invitado nunca se envía a 3CX, así que 3CX no le escribe.
+admin-threecx-base-url = Dirección de la centralita
+admin-threecx-extension = Extensión del organizador
+admin-threecx-extension-help = La extensión a la que pertenecen las reuniones, por ejemplo 100.
+admin-threecx-api-key = Clave de la API de videoconferencia
+admin-threecx-api-key-help = La clave de la API de videoconferencia de 3CX, desde la consola de administración de 3CX. Se guarda cifrada y no vuelve a mostrarse.
+admin-threecx-display-name-help = Lo que los invitados ven como lugar, por ejemplo «3CX». Vacío: «Videollamada».
+admin-threecx-save = Guardar ajustes de 3CX
+admin-threecx-test = Probar la conexión
+admin-threecx-clear = Eliminar ajustes de 3CX
+admin-threecx-notice-saved = Ajustes de 3CX guardados.
+admin-threecx-notice-cleared = Ajustes de 3CX eliminados, junto con la clave.
+admin-threecx-notice-ok = 3CX respondió: la dirección y la clave funcionan.
+admin-threecx-notice-auth = 3CX rechazó la clave. Las llamadas a 3CX se pausan una hora para que la centralita no bloquee este servidor; guardar una clave nueva o volver a probar quita la pausa.
+admin-threecx-notice-transport = 3CX no respondió. Comprueba la dirección y que este servidor puede alcanzarla.
+admin-threecx-notice-service = 3CX respondió con un error. Comprueba que la videoconferencia está activada para la extensión.
+admin-threecx-notice-bad-link = 3CX devolvió un enlace de reunión en otra dirección. Comprueba la dirección de la centralita.
+admin-threecx-notice-not-set = Introduce primero la dirección, la extensión y la clave.
+admin-threecx-notice-bad-base-url = No guardado: la dirección debe empezar por https:// y ser solo el host, sin ruta.
+admin-threecx-notice-bad-extension = No guardado: la extensión debe tener de 1 a 10 dígitos.
+admin-threecx-notice-bad-api-key = No guardado: la clave debe tener de 16 a 256 caracteres sin espacios.
+admin-threecx-notice-bad-display-name = No guardado: la etiqueta no puede pasar de 100 caracteres.
+admin-threecx-notice-bad-pair = No guardado: la dirección y la extensión van juntas, y una clave necesita ambas.
+etf-location-threecx = Reunión 3CX (creada para cada reserva)
+etf-threecx-hint = Se crea una reunión 3CX para cada reserva confirmada, que sigue sus cambios y su cancelación. Configura 3CX en la página de administración.

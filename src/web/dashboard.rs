@@ -1424,6 +1424,9 @@ pub(super) async fn cancel_booking(
         },
         None => details.clone(),
     };
+    // ilia fork: the guest's copies (email, .ics, SMS) name the event in
+    // their language (`event_texts`).
+    let guest_details = super::event_texts::for_guest(&state.pool, &guest_details).await;
 
     if let Ok(Some(smtp_config)) =
         crate::email::load_smtp_config(&state.pool, &state.secret_key).await
@@ -1770,11 +1773,15 @@ pub(super) async fn confirm_booking(
         );
     }
 
+    // ilia fork: what the guest is sent (email, .ics, SMS) names the event
+    // in their language; the host's copy keeps `details` (`event_texts`).
+    let guest_details = super::event_texts::for_guest(&state.pool, &details).await;
+
     // Confirmation SMS to the guest, the same deferred send as the token
     // approve path: a pending booking stays silent until the host approves.
     // An approved reschedule says "moved".
     if let Some(ctx) = crate::sms::SmsContext::for_booking(
-        &details,
+        &guest_details,
         guest_phone.as_deref(),
         crate::sms::collects_phone(&sms_phone_mode),
     ) {
@@ -1808,10 +1815,12 @@ pub(super) async fn confirm_booking(
         });
         let (cancel_notice_min, reschedule_notice_min) =
             fetch_event_type_notice_minutes(&state.pool, &et_id).await;
+        // ilia fork: the host gets the 3CX organizer's link (`threecx::for_host`).
+        let host_view = super::threecx::for_host(&state.pool, &state.secret_key, &details).await;
         spawn_emails(async move {
             send_approval_guest_emails(
                 &smtp_config,
-                &details,
+                &guest_details,
                 guest_cancel_url.as_deref(),
                 guest_reschedule_url.as_deref(),
                 (cancel_notice_min, reschedule_notice_min),
@@ -1821,7 +1830,7 @@ pub(super) async fn confirm_booking(
 
             // Also send host a confirmation email (no ICS, event pushed via CalDAV)
             log_email_result(
-                crate::email::send_host_booking_confirmed(&smtp_config, &details).await,
+                crate::email::send_host_booking_confirmed(&smtp_config, &host_view).await,
                 "host_booking_confirmed",
                 &details.uid,
             );

@@ -2495,3 +2495,43 @@ ton-admin-debug-tg-locked-apply = Bloccato da config apply (site.ton.debug_booki
 ton-admin-debug-tg-saved = Nome utente Telegram dell'ospite salvato.
 ton-admin-debug-tg-invalid = Nulla salvato: non è un nome utente Telegram (una lettera latina, poi lettere, cifre e _, da 4 a 32 caratteri).
 ton-admin-f-debug_booking_telegram = Prenotazione di prova: nome utente Telegram dell'ospite
+
+## ilia fork: event type translations (src/web/event_texts.rs)
+etf-translations = Traduzioni
+etf-translations-help = Gli ospiti che leggono le pagine di prenotazione in una di queste lingue vedono questo titolo e questa descrizione al posto di quelli sopra, anche nelle loro email e nei messaggi. Le altre lingue mostrano quelli sopra.
+etf-translation-language = Lingua
+etf-translation-description-help = Supporta **grassetto**, *corsivo* e [link](url). Se la lasci vuota, questa lingua non mostra alcuna descrizione.
+etf-translation-add = Aggiungi una lingua
+etf-translation-remove = Rimuovi
+form-error-translation-language = Scegli una lingua per ogni traduzione.
+form-error-translation-duplicate = Ogni lingua può avere una sola traduzione.
+form-error-translation-title-required = Ogni traduzione deve avere un titolo.
+form-error-translation-title-length = Un titolo tradotto può avere al massimo 255 caratteri.
+
+## ilia fork: 3CX video meetings (src/web/threecx.rs)
+admin-threecx = Riunioni video 3CX
+admin-threecx-help = Ogni prenotazione confermata di un tipo di evento con luogo «Riunione 3CX» riceve una propria riunione pianificata su questo centralino 3CX. Gli ospiti ricevono il link della riunione; gli host il link dell’organizzatore nel calendario e nelle e-mail. Spostare o annullare la prenotazione sposta o elimina la riunione. L’indirizzo e-mail dell’ospite non viene mai inviato a 3CX, quindi 3CX non scrive all’ospite.
+admin-threecx-base-url = Indirizzo del centralino
+admin-threecx-extension = Interno dell’organizzatore
+admin-threecx-extension-help = L’interno a cui appartengono le riunioni, per esempio 100.
+admin-threecx-api-key = Chiave dell’API di videoconferenza
+admin-threecx-api-key-help = La chiave dell’API di videoconferenza 3CX, dalla console di amministrazione 3CX. Viene salvata cifrata e non viene più mostrata.
+admin-threecx-display-name-help = Ciò che gli ospiti vedono come luogo, per esempio «3CX». Vuoto: «Videochiamata».
+admin-threecx-save = Salva le impostazioni 3CX
+admin-threecx-test = Prova la connessione
+admin-threecx-clear = Rimuovi le impostazioni 3CX
+admin-threecx-notice-saved = Impostazioni 3CX salvate.
+admin-threecx-notice-cleared = Impostazioni 3CX rimosse, chiave compresa.
+admin-threecx-notice-ok = 3CX ha risposto: indirizzo e chiave funzionano.
+admin-threecx-notice-auth = 3CX ha rifiutato la chiave. Le chiamate a 3CX sono sospese per un’ora perché il centralino non blocchi questo server; salvare una nuova chiave o riprovare toglie la pausa.
+admin-threecx-notice-transport = 3CX non ha risposto. Controlla l’indirizzo e che questo server possa raggiungerlo.
+admin-threecx-notice-service = 3CX ha risposto con un errore. Controlla che la videoconferenza sia attiva per l’interno.
+admin-threecx-notice-bad-link = 3CX ha restituito un link di riunione su un altro indirizzo. Controlla l’indirizzo del centralino.
+admin-threecx-notice-not-set = Inserisci prima indirizzo, interno e chiave.
+admin-threecx-notice-bad-base-url = Non salvato: l’indirizzo deve iniziare con https:// e contenere solo l’host, senza percorso.
+admin-threecx-notice-bad-extension = Non salvato: l’interno deve avere da 1 a 10 cifre.
+admin-threecx-notice-bad-api-key = Non salvato: la chiave deve avere da 16 a 256 caratteri senza spazi.
+admin-threecx-notice-bad-display-name = Non salvato: l’etichetta può avere al massimo 100 caratteri.
+admin-threecx-notice-bad-pair = Non salvato: indirizzo e interno vanno insieme, e una chiave richiede entrambi.
+etf-location-threecx = Riunione 3CX (creata per ogni prenotazione)
+etf-threecx-hint = Per ogni prenotazione confermata viene creata una riunione 3CX che ne segue spostamenti e annullamento. Configura 3CX nella pagina di amministrazione.

@@ -2495,3 +2495,43 @@ ton-admin-debug-tg-locked-apply = Verrouillé par config apply (site.ton.debug_b
 ton-admin-debug-tg-saved = Nom d'utilisateur Telegram de l'invité enregistré.
 ton-admin-debug-tg-invalid = Rien n'a été enregistré : ce n'est pas un nom d'utilisateur Telegram (une lettre latine, puis des lettres, chiffres et _, de 4 à 32 caractères).
 ton-admin-f-debug_booking_telegram = Réservation de test : nom d'utilisateur Telegram de l'invité
+
+## ilia fork: event type translations (src/web/event_texts.rs)
+etf-translations = Traductions
+etf-translations-help = Les invités qui consultent les pages de réservation dans l’une de ces langues voient ce titre et cette description à la place de ceux ci-dessus, y compris dans leurs e-mails et messages. Les autres langues affichent ceux ci-dessus.
+etf-translation-language = Langue
+etf-translation-description-help = Prend en charge **gras**, *italique* et [liens](url). Laissée vide, cette langue n’affiche aucune description.
+etf-translation-add = Ajouter une langue
+etf-translation-remove = Retirer
+form-error-translation-language = Choisissez une langue pour chaque traduction.
+form-error-translation-duplicate = Chaque langue ne peut avoir qu’une seule traduction.
+form-error-translation-title-required = Chaque traduction doit avoir un titre.
+form-error-translation-title-length = Un titre traduit ne doit pas dépasser 255 caractères.
+
+## ilia fork: 3CX video meetings (src/web/threecx.rs)
+admin-threecx = Réunions vidéo 3CX
+admin-threecx-help = Chaque réservation confirmée d’un type de rendez-vous dont le lieu est « Réunion 3CX » reçoit sa propre réunion planifiée sur ce standard 3CX. Les invités reçoivent le lien de la réunion ; les hôtes reçoivent le lien de l’organisateur dans leur agenda et leurs e-mails. Déplacer ou annuler la réservation déplace ou supprime la réunion. L’adresse e-mail de l’invité n’est jamais transmise à 3CX : 3CX n’écrit donc pas à l’invité.
+admin-threecx-base-url = Adresse du standard
+admin-threecx-extension = Poste de l’organisateur
+admin-threecx-extension-help = Le poste auquel appartiennent les réunions, par exemple 100.
+admin-threecx-api-key = Clé de l’API de visioconférence
+admin-threecx-api-key-help = La clé de l’API de visioconférence 3CX, depuis la console d’administration 3CX. Elle est stockée chiffrée et n’est plus jamais affichée.
+admin-threecx-display-name-help = Ce que les invités voient comme lieu, par exemple « 3CX ». Vide : « Appel vidéo ».
+admin-threecx-save = Enregistrer les réglages 3CX
+admin-threecx-test = Tester la connexion
+admin-threecx-clear = Supprimer les réglages 3CX
+admin-threecx-notice-saved = Réglages 3CX enregistrés.
+admin-threecx-notice-cleared = Réglages 3CX supprimés, clé comprise.
+admin-threecx-notice-ok = 3CX a répondu : l’adresse et la clé fonctionnent.
+admin-threecx-notice-auth = 3CX a refusé la clé. Les appels à 3CX sont suspendus pendant une heure pour que le standard ne bloque pas ce serveur ; enregistrer une nouvelle clé ou tester à nouveau lève la pause.
+admin-threecx-notice-transport = 3CX n’a pas répondu. Vérifiez l’adresse et que ce serveur peut l’atteindre.
+admin-threecx-notice-service = 3CX a répondu par une erreur. Vérifiez que la visioconférence est activée pour le poste.
+admin-threecx-notice-bad-link = 3CX a renvoyé un lien de réunion sur une autre adresse. Vérifiez l’adresse du standard.
+admin-threecx-notice-not-set = Saisissez d’abord l’adresse, le poste et la clé.
+admin-threecx-notice-bad-base-url = Non enregistré : l’adresse doit commencer par https:// et ne contenir que l’hôte, sans chemin.
+admin-threecx-notice-bad-extension = Non enregistré : le poste doit comporter de 1 à 10 chiffres.
+admin-threecx-notice-bad-api-key = Non enregistré : la clé doit comporter de 16 à 256 caractères, sans espaces.
+admin-threecx-notice-bad-display-name = Non enregistré : le libellé ne doit pas dépasser 100 caractères.
+admin-threecx-notice-bad-pair = Non enregistré : l’adresse et le poste vont ensemble, et une clé a besoin des deux.
+etf-location-threecx = Réunion 3CX (créée pour chaque réservation)
+etf-threecx-hint = Une réunion 3CX est créée pour chaque réservation confirmée et suit ses déplacements et son annulation. Configurez 3CX dans la page d’administration.

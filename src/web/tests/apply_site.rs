@@ -32,6 +32,7 @@ const FULL_SITE: &str = r##"{
     "google_oauth2": "off",
     "captcha": "off",
     "meeting_webhook": "off",
+    "threecx": "off",
     "sms": "off",
     "sms_allow_all_users": false
 }"##;

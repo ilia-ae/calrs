@@ -2495,3 +2495,43 @@ ton-admin-debug-tg-locked-apply = Von config apply festgelegt (site.ton.debug_bo
 ton-admin-debug-tg-saved = Telegram-Benutzername des Gastes gespeichert.
 ton-admin-debug-tg-invalid = Nichts gespeichert: kein Telegram-Benutzername (ein lateinischer Buchstabe, dann Buchstaben, Ziffern und _, 4 bis 32 Zeichen).
 ton-admin-f-debug_booking_telegram = Testbuchung: Telegram-Benutzername des Gastes
+
+## ilia fork: event type translations (src/web/event_texts.rs)
+etf-translations = Übersetzungen
+etf-translations-help = Gäste, die die Buchungsseiten in einer dieser Sprachen lesen, sehen diesen Titel und diese Beschreibung statt der oben angegebenen, auch in ihren E-Mails und Nachrichten. Alle anderen Sprachen zeigen die oben angegebenen.
+etf-translation-language = Sprache
+etf-translation-description-help = Unterstützt **fett**, *kursiv* und [Links](url). Leer gelassen, zeigt diese Sprache keine Beschreibung.
+etf-translation-add = Sprache hinzufügen
+etf-translation-remove = Entfernen
+form-error-translation-language = Wähle für jede Übersetzung eine Sprache.
+form-error-translation-duplicate = Jede Sprache kann nur eine Übersetzung haben.
+form-error-translation-title-required = Jede Übersetzung braucht einen Titel.
+form-error-translation-title-length = Ein übersetzter Titel darf höchstens 255 Zeichen lang sein.
+
+## ilia fork: 3CX video meetings (src/web/threecx.rs)
+admin-threecx = 3CX-Videomeetings
+admin-threecx-help = Jede bestätigte Buchung eines Termintyps mit dem Ort „3CX-Meeting“ bekommt ein eigenes geplantes Meeting auf dieser 3CX-Telefonanlage. Gäste erhalten den Meeting-Link, Gastgeber den Organisator-Link in Kalender und E-Mails. Das Verschieben oder Absagen der Buchung verschiebt oder löscht das Meeting. Die E-Mail-Adresse des Gastes wird nie an 3CX übermittelt, daher schreibt 3CX dem Gast nichts.
+admin-threecx-base-url = Adresse der Telefonanlage
+admin-threecx-extension = Nebenstelle des Organisators
+admin-threecx-extension-help = Die Nebenstelle, zu der die Meetings gehören, zum Beispiel 100.
+admin-threecx-api-key = Schlüssel der Videokonferenz-API
+admin-threecx-api-key-help = Der Schlüssel der 3CX-Videokonferenz-API aus der 3CX-Verwaltungskonsole. Er wird verschlüsselt gespeichert und nie wieder angezeigt.
+admin-threecx-display-name-help = Was Gäste als Ort sehen, zum Beispiel „3CX“. Leer: „Videoanruf“.
+admin-threecx-save = 3CX-Einstellungen speichern
+admin-threecx-test = Verbindung testen
+admin-threecx-clear = 3CX-Einstellungen entfernen
+admin-threecx-notice-saved = 3CX-Einstellungen gespeichert.
+admin-threecx-notice-cleared = 3CX-Einstellungen samt Schlüssel entfernt.
+admin-threecx-notice-ok = 3CX hat geantwortet: Adresse und Schlüssel funktionieren.
+admin-threecx-notice-auth = 3CX hat den Schlüssel abgelehnt. Aufrufe an 3CX pausieren eine Stunde, damit die Telefonanlage diesen Server nicht sperrt; ein neuer Schlüssel oder ein erneuter Test beendet die Pause.
+admin-threecx-notice-transport = 3CX hat nicht geantwortet. Bitte die Adresse prüfen und ob dieser Server sie erreicht.
+admin-threecx-notice-service = 3CX hat mit einem Fehler geantwortet. Bitte prüfen, ob Videokonferenzen für die Nebenstelle aktiviert sind.
+admin-threecx-notice-bad-link = 3CX hat einen Meeting-Link auf einer anderen Adresse geliefert. Bitte die Adresse der Telefonanlage prüfen.
+admin-threecx-notice-not-set = Zuerst Adresse, Nebenstelle und Schlüssel eintragen.
+admin-threecx-notice-bad-base-url = Nicht gespeichert: Die Adresse muss mit https:// beginnen und nur den Host enthalten, ohne Pfad.
+admin-threecx-notice-bad-extension = Nicht gespeichert: Die Nebenstelle muss 1 bis 10 Ziffern haben.
+admin-threecx-notice-bad-api-key = Nicht gespeichert: Der Schlüssel muss 16 bis 256 Zeichen ohne Leerzeichen haben.
+admin-threecx-notice-bad-display-name = Nicht gespeichert: Die Bezeichnung darf höchstens 100 Zeichen haben.
+admin-threecx-notice-bad-pair = Nicht gespeichert: Adresse und Nebenstelle gehören zusammen, und ein Schlüssel braucht beide.
+etf-location-threecx = 3CX-Meeting (für jede Buchung erstellt)
+etf-threecx-hint = Für jede bestätigte Buchung wird ein 3CX-Meeting erstellt, das Verschiebungen und Absagen folgt. 3CX wird auf der Verwaltungsseite eingerichtet.

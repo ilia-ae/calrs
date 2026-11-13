@@ -287,10 +287,15 @@ pub(super) struct EventTypeForm {
     pub(super) ton_guest_telegram: Option<String>,
     // ilia fork: `fixed` (absent: fixed) or `ladder` (the demand ladder).
     pub(super) ton_price_mode: Option<String>,
+    // ilia fork: the "Translations" section (`event_texts`): its marker and
+    // its rows' fields, with every other field this struct does not name.
+    #[serde(flatten)]
+    pub(super) texts: super::event_texts::TextsForm,
 }
 
-/// Longest event type title accepted, the same limit as team names.
-const MAX_EVENT_TYPE_TITLE: usize = 255;
+/// Longest event type title accepted, the same limit as team names (ilia
+/// fork: and for a translated title, `event_texts`).
+pub(super) const MAX_EVENT_TYPE_TITLE: usize = 255;
 /// Longest meeting accepted: a day. The form's own control stops at 8 hours.
 const MAX_EVENT_TYPE_DURATION: i32 = 24 * 60;
 
@@ -343,6 +348,8 @@ pub(super) fn validate_event_type_form(form: &EventTypeForm) -> Result<String, &
         return Err("form-error-event-type-horizon");
     }
     crate::web::ton_pay::validate_price_form(&ton_price_form(form), form.team_id.as_deref())?;
+    // ilia fork: the "Translations" section.
+    super::event_texts::parse_form(&form.texts)?;
 
     let slug = form.slug.trim().to_lowercase().replace(' ', "-");
     if slug.is_empty() {
@@ -624,6 +631,7 @@ pub(super) async fn new_event_type_form(
             form_booking_horizon_days => "",
             form_pending => PendingSettings::DEFAULT.context(),
             ton_price => ton_pay::price_form_ctx(&state, None).await,
+            event_texts => super::event_texts::form_ctx(&state.pool, None).await,
             tz_options => timezone_options(&user.timezone, auth_user.lang),
             error => "",
         })
@@ -915,6 +923,8 @@ pub(super) async fn create_event_type(
 
     // Save booking frequency limits
     save_frequency_limits(&state.pool, &et_id, &form.frequency_limits).await;
+    // ilia fork: the "Translations" section (`event_texts`).
+    super::event_texts::save_form(&state.pool, &et_id, &form.texts).await;
 
     save_event_type_resources_authorized(
         &state.pool,
@@ -1212,6 +1222,7 @@ pub(super) async fn edit_event_type_form(
             form_booking_horizon_days => form_booking_horizon_days,
             form_pending => form_pending,
             ton_price => ton_pay::price_form_ctx(&state, Some(&et_id)).await,
+            event_texts => super::event_texts::form_ctx(&state.pool, Some(&et_id)).await,
             form_bookable_from => format_optional_date(booking_window.bookable_from),
             form_bookable_until => format_optional_date(booking_window.bookable_until),
             booking_window_warnings => booking_window_warnings,
@@ -1524,6 +1535,8 @@ pub(super) async fn update_event_type(
         .execute(&state.pool)
         .await;
     save_frequency_limits(&state.pool, &et_id, &form.frequency_limits).await;
+    // ilia fork: the "Translations" section (`event_texts`).
+    super::event_texts::save_form(&state.pool, &et_id, &form.texts).await;
 
     save_event_type_resources_authorized(
         &state.pool,
@@ -2139,6 +2152,12 @@ async fn render_event_type_form_error(
         FormTarget::EditPersonal { .. } => form_dg_eligible_users(pool, &user.id).await,
         _ => Vec::new(),
     };
+    // ilia fork: the event type whose stored translations show when the
+    // form did not carry the section.
+    let posted_et_id = match target {
+        FormTarget::EditPersonal { et_id, .. } | FormTarget::EditTeam { et_id, .. } => Some(et_id),
+        _ => None,
+    };
 
     let mut week_start_setting = match target {
         FormTarget::EditPersonal { et_id, .. } | FormTarget::EditTeam { et_id, .. } => {
@@ -2217,6 +2236,7 @@ async fn render_event_type_form_error(
                 .unwrap_or(PendingSettings::DEFAULT)
                 .context(),
             ton_price => ton_pay::price_form_from_post(state, &ton_price_form(form), !is_group).await,
+            event_texts => super::event_texts::posted_ctx(pool, &form.texts, posted_et_id).await,
             form_reminder_minutes => parse_int_field(&form.reminder_minutes, 0),
             form_max_additional_guests => parse_int_field(&form.max_additional_guests, 0),
             form_scheduling_mode => scheduling_mode,
@@ -2500,6 +2520,7 @@ pub(super) async fn new_group_event_type_form(
             selected_resource_ids => selected_resource_ids,
             resource_scheduling_mode => resource_scheduling_mode,
             form_team_id => groups.first().map(|(id, _)| id.as_str()).unwrap_or(""),
+            event_texts => super::event_texts::form_ctx(&state.pool, None).await,
             form_title => "",
             form_slug => "",
             form_description => "",
@@ -2767,6 +2788,8 @@ pub(super) async fn create_group_event_type(
 
     // Save booking frequency limits
     save_frequency_limits(&state.pool, &et_id, &form.frequency_limits).await;
+    // ilia fork: the "Translations" section (`event_texts`).
+    super::event_texts::save_form(&state.pool, &et_id, &form.texts).await;
 
     save_event_type_resources_authorized(
         &state.pool,
@@ -3045,6 +3068,7 @@ pub(super) async fn edit_group_event_type_form(
             is_group => true,
             form_enabled => event_type_enabled(&state.pool, &et_id).await,
             toggle_url => format!("/dashboard/group-event-types/{team_id}/{et_slug}/toggle"),
+            event_texts => super::event_texts::form_ctx(&state.pool, Some(&et_id)).await,
             form_team_id => team_id,
             original_slug => et_slug,
             resources_all => resources_all,
@@ -3421,6 +3445,8 @@ pub(super) async fn update_group_event_type(
         .execute(&state.pool)
         .await;
     save_frequency_limits(&state.pool, &et_id, &form.frequency_limits).await;
+    // ilia fork: the "Translations" section (`event_texts`).
+    super::event_texts::save_form(&state.pool, &et_id, &form.texts).await;
 
     save_event_type_resources_authorized(
         &state.pool,
@@ -3709,7 +3735,7 @@ const SQL_UUID_V4: &str = "lower(hex(randomblob(4))) || '-' || lower(hex(randomb
 
 /// Child tables copied along with an event type: table, the columns after
 /// `event_type_id`, and whether rows carry their own `id` (minted fresh).
-const COPIED_CHILD_TABLES: [(&str, &str, bool); 8] = [
+const COPIED_CHILD_TABLES: [(&str, &str, bool); 9] = [
     (
         "availability_rules",
         "day_of_week, start_time, end_time",
@@ -3731,6 +3757,8 @@ const COPIED_CHILD_TABLES: [(&str, &str, bool); 8] = [
     ("event_type_resources", "resource_id", false),
     // ilia fork: the guest Telegram field (migration ilia_002_telegram).
     ("telegram_event_types", "guest_mode", false),
+    // ilia fork: the translated titles and descriptions (`event_texts`).
+    ("event_type_texts", "lang, title, description", false),
 ];
 
 type Tx<'a> = sqlx::Transaction<'a, sqlx::Sqlite>;

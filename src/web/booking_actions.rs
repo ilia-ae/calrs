@@ -434,6 +434,10 @@ pub(super) async fn approve_booking_by_token(
         .await;
     }
 
+    // ilia fork: what the guest is sent (email, .ics, SMS) reads the title
+    // in their language (`event_texts`); the hosts' copies keep `details`.
+    let guest_details = super::event_texts::for_guest(&state.pool, &details).await;
+
     // Send confirmation email to guest
     if let Ok(Some(smtp_config)) =
         crate::email::load_smtp_config(&state.pool, &state.secret_key).await
@@ -452,10 +456,13 @@ pub(super) async fn approve_booking_by_token(
         let (cancel_notice_min, reschedule_notice_min) =
             fetch_event_type_notice_minutes(&state.pool, &event_type_id).await;
         let details = details.clone();
+        let guest_details = guest_details.clone();
+        // ilia fork: the host gets the 3CX organizer's link (`threecx::for_host`).
+        let host_view = super::threecx::for_host(&state.pool, &state.secret_key, &details).await;
         spawn_emails(async move {
             send_approval_guest_emails(
                 &smtp_config,
-                &details,
+                &guest_details,
                 guest_cancel_url.as_deref(),
                 guest_reschedule_url.as_deref(),
                 (cancel_notice_min, reschedule_notice_min),
@@ -465,7 +472,7 @@ pub(super) async fn approve_booking_by_token(
 
             // Also send host a confirmation email (no ICS, event pushed via CalDAV)
             log_email_result(
-                crate::email::send_host_booking_confirmed(&smtp_config, &details).await,
+                crate::email::send_host_booking_confirmed(&smtp_config, &host_view).await,
                 "host_booking_confirmed",
                 &details.uid,
             );
@@ -488,7 +495,7 @@ pub(super) async fn approve_booking_by_token(
     // is the deferred half of the booking flow: a pending booking stays silent
     // until the host approves it here. An approved reschedule says "moved".
     if let Some(ctx) = crate::sms::SmsContext::for_booking(
-        &details,
+        &guest_details,
         guest_phone.as_deref(),
         crate::sms::collects_phone(&sms_phone_mode),
     ) {
@@ -728,6 +735,8 @@ pub(super) async fn decline_booking_by_token(
             ..Default::default()
         };
         let details = with_invite_holders(&state.pool, details, true).await;
+        // ilia fork: guest-only emails: the title in the guest's language.
+        let details = super::event_texts::for_guest(&state.pool, &details).await;
         let bid = bid.clone();
         spawn_emails(async move {
             log_email_result(
@@ -962,6 +971,9 @@ pub(super) async fn booking_ics(
         sequence: booking_ics_sequence(&state.pool, &uid).await,
         ..Default::default()
     };
+    // ilia fork: the title the guest's emails give it, in the booking's
+    // language (`event_texts`).
+    let details = super::event_texts::in_booking_language(&state.pool, &details).await;
 
     let ics = crate::email::generate_ics(&details, "PUBLISH");
     (
@@ -1042,6 +1054,14 @@ pub(super) async fn guest_cancel_form(
         };
 
     let lang = token_page_lang(booking_language.as_deref(), &headers);
+    // ilia fork: the event title in the page language (`event_texts`).
+    let event_title = super::event_texts::token_title(
+        &state.pool,
+        super::event_texts::Token::Cancel(&token),
+        lang,
+        event_title,
+    )
+    .await;
 
     // Block the GET form before any state mutation if the booking falls
     // inside the host's configured cancel-notice window.
@@ -1184,6 +1204,10 @@ pub(super) async fn guest_cancel_booking(
 
     // The page and the emails both use the language the guest booked in.
     let lang = token_page_lang(booking_language.as_deref(), &headers);
+    // ilia fork: what the guest reads (page, email, SMS) names the event in
+    // that language; the hosts' copies keep the base title (`event_texts`).
+    let guest_title =
+        super::event_texts::title_in(&state.pool, &et_id, lang, event_title.clone()).await;
 
     // Defensive notice-window check on POST too: the GET may have been
     // cached, or the cutoff may have rolled over between page load and
@@ -1323,6 +1347,10 @@ pub(super) async fn guest_cancel_booking(
             },
             None => details.clone(),
         };
+        let guest_details = crate::email::CancellationDetails {
+            event_title: guest_title.clone(),
+            ..guest_details
+        };
         spawn_emails(async move {
             log_email_result(
                 crate::email::send_guest_cancellation(&smtp_config, &guest_details).await,
@@ -1354,8 +1382,12 @@ pub(super) async fn guest_cancel_booking(
     );
 
     // Cancellation SMS to the guest, independent of SMTP.
+    let sms_details = crate::email::CancellationDetails {
+        event_title: guest_title.clone(),
+        ..details.clone()
+    };
     if let Some(ctx) = crate::sms::SmsContext::for_cancellation(
-        &details,
+        &sms_details,
         guest_phone.as_deref(),
         crate::sms::collects_phone(&sms_phone_mode),
     )
@@ -1377,7 +1409,7 @@ pub(super) async fn guest_cancel_booking(
     let rendered = tmpl
         .render(context! {
             company_link => state.company_link_now(),
-            event_title,
+            event_title => guest_title,
             date_label,
             date,
             start_time,
@@ -1537,6 +1569,8 @@ pub(super) async fn guest_reschedule_slots(
         .fetch_one(&state.pool)
         .await
         .unwrap_or_default();
+    // ilia fork: in the page language (`event_texts`).
+    let et_title = super::event_texts::title_in(&state.pool, &et_id, lang, et_title).await;
 
     // The booking's host is not necessarily the event type owner: a team
     // booking belongs to its assigned member, or to the whole eligible roster
@@ -1705,7 +1739,8 @@ pub(super) async fn guest_reschedule_slots(
         })
         .unwrap_or_default();
 
-    let (meeting_jitsi_label, meeting_webhook_label) = meeting_provider_labels(&state).await;
+    let (meeting_jitsi_label, meeting_webhook_label, meeting_threecx_label) =
+        meeting_provider_labels(&state).await;
     let tmpl = match state.templates.get_template("slots.html") {
         Ok(t) => t,
         Err(e) => return internal_error_response("internal", &e),
@@ -1714,6 +1749,7 @@ pub(super) async fn guest_reschedule_slots(
         .render(context! {
             meeting_jitsi_label => meeting_jitsi_label,
             meeting_webhook_label => meeting_webhook_label,
+            meeting_threecx_label => meeting_threecx_label,
             event_type => context! {
                 slug => et_slug,
                 title => et_title.clone(),
@@ -1848,6 +1884,10 @@ pub(super) async fn guest_reschedule_booking(
     // Past the rate limit: the page and every email use the language stored
     // with the booking, as the slot picker did (#209).
     let lang = token_page_lang(stored_language.as_deref(), &headers);
+    // ilia fork: what the guest reads (page, emails, SMS) names the event in
+    // that language; the hosts' copies keep the base title (`event_texts`).
+    let guest_title =
+        super::event_texts::title_in(&state.pool, &et_id, lang, et_title.clone()).await;
     // ilia fork: an unpaid priced booking cannot be moved (docs/ton.md).
     if let Some(refused) = ton_pay::guest_reschedule_refused(&state, &booking_id, lang).await {
         return refused;
@@ -2300,7 +2340,7 @@ pub(super) async fn guest_reschedule_booking(
             });
             let pending_details = crate::email::BookingDetails {
                 utc_times: crate::booking_time::ics_times(&new_start_at, &new_end_at),
-                event_title: et_title.clone(),
+                event_title: guest_title.clone(),
                 date: form.date.clone(),
                 start_time: form.time.clone(),
                 end_time: guest_end_time.clone(),
@@ -2405,7 +2445,7 @@ pub(super) async fn guest_reschedule_booking(
             let reschedule_details = crate::email::RescheduleDetails {
                 old_utc_times: crate::booking_time::ics_times(&old_start_at, &old_end_at),
                 utc_times: crate::booking_time::ics_times(&new_start_at, &new_end_at),
-                event_title: et_title.clone(),
+                event_title: guest_title.clone(),
                 old_date,
                 old_start_time,
                 old_end_time,
@@ -2429,6 +2469,15 @@ pub(super) async fn guest_reschedule_booking(
                 additional_attendees: push_details.additional_attendees.clone(),
                 ..Default::default()
             };
+            // ilia fork: the attendees' copies are the guest's, the host's
+            // keeps `push_details` (`event_texts`).
+            let attendee_details = crate::email::BookingDetails {
+                event_title: guest_title.clone(),
+                ..push_details.clone()
+            };
+            // ilia fork: the host gets the 3CX organizer's link (`threecx::for_host`).
+            let host_view =
+                super::threecx::for_host(&state.pool, &state.secret_key, &push_details).await;
             spawn_emails(async move {
                 let uid = reschedule_details.uid.as_str();
                 // Notify guest with confirmation + ICS
@@ -2455,7 +2504,7 @@ pub(super) async fn guest_reschedule_booking(
                     log_email_result(
                         crate::email::send_guest_attendee_reschedule(
                             &smtp_config,
-                            &push_details,
+                            &attendee_details,
                             Some((&reschedule_details.old_date, &old_time)),
                         )
                         .await,
@@ -2466,7 +2515,7 @@ pub(super) async fn guest_reschedule_booking(
                     log_email_result(
                         crate::email::send_guest_attendee_confirmations(
                             &smtp_config,
-                            &push_details,
+                            &attendee_details,
                         )
                         .await,
                         "attendee_confirmation",
@@ -2476,7 +2525,7 @@ pub(super) async fn guest_reschedule_booking(
 
                 // Notify host
                 log_email_result(
-                    crate::email::send_host_booking_confirmed(&smtp_config, &push_details).await,
+                    crate::email::send_host_booking_confirmed(&smtp_config, &host_view).await,
                     "host_booking_confirmed",
                     uid,
                 );
@@ -2516,7 +2565,7 @@ pub(super) async fn guest_reschedule_booking(
                     crate::sms::SmsEvent::Rescheduled,
                     crate::sms::SmsContext {
                         phone,
-                        event_title: &et_title,
+                        event_title: &guest_title,
                         date: &form.date,
                         start_time: &form.time,
                         timezone: &sms_timezone,
@@ -2538,7 +2587,7 @@ pub(super) async fn guest_reschedule_booking(
     };
     let rendered = tmpl
         .render(context! {
-            event_title => et_title,
+            event_title => guest_title,
             date_label => date_label,
             time_start => form.time,
             time_end => guest_end_time,
@@ -2742,6 +2791,16 @@ pub(super) async fn host_reschedule_booking(
                     .unwrap_or_else(|| user.email.clone()),
             ),
         };
+        // ilia fork: the guest's email names the event in the language it
+        // is written in (`event_texts`).
+        let guest_language = crate::email::stored_booking_language(&state.pool, &bid).await;
+        let event_title = super::event_texts::title_in(
+            &state.pool,
+            &et_id,
+            super::event_texts::email_lang(guest_language.as_deref()),
+            event_title,
+        )
+        .await;
         let details = crate::email::BookingDetails {
             utc_times: crate::booking_time::ics_times(&start_at, &end_at),
             event_title,
@@ -2760,7 +2819,7 @@ pub(super) async fn host_reschedule_booking(
             additional_attendees: vec![],
             // The host asked for this, but the email is the guest's: written
             // in the language they booked in (#209).
-            guest_language: crate::email::stored_booking_language(&state.pool, &bid).await,
+            guest_language,
             host_timezone: host_tz.name().to_string(),
             ..Default::default()
         };

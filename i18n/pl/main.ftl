@@ -2558,3 +2558,43 @@ ton-admin-debug-tg-locked-apply = Zablokowane przez config apply (site.ton.debug
 ton-admin-debug-tg-saved = Nazwa użytkownika Telegram gościa zapisana.
 ton-admin-debug-tg-invalid = Nic nie zapisano: to nie jest nazwa użytkownika Telegram (litera łacińska, potem litery, cyfry i _, od 4 do 32 znaków).
 ton-admin-f-debug_booking_telegram = Rezerwacja testowa: nazwa użytkownika Telegram gościa
+
+## ilia fork: event type translations (src/web/event_texts.rs)
+etf-translations = Tłumaczenia
+etf-translations-help = Goście, którzy oglądają strony rezerwacji w jednym z tych języków, widzą ten tytuł i opis zamiast powyższych, także w e-mailach i wiadomościach. Pozostałe języki pokazują te powyżej.
+etf-translation-language = Język
+etf-translation-description-help = Obsługuje **pogrubienie**, *kursywę* i [linki](url). Jeśli zostawisz puste, w tym języku nie będzie opisu.
+etf-translation-add = Dodaj język
+etf-translation-remove = Usuń
+form-error-translation-language = Wybierz język dla każdego tłumaczenia.
+form-error-translation-duplicate = Każdy język może mieć tylko jedno tłumaczenie.
+form-error-translation-title-required = Każde tłumaczenie musi mieć tytuł.
+form-error-translation-title-length = Przetłumaczony tytuł może mieć najwyżej 255 znaków.
+
+## ilia fork: 3CX video meetings (src/web/threecx.rs)
+admin-threecx = Spotkania wideo 3CX
+admin-threecx-help = Każda potwierdzona rezerwacja typu wydarzenia z miejscem „Spotkanie 3CX” dostaje własne zaplanowane spotkanie w tej centrali 3CX. Goście dostają link do spotkania, gospodarze link organizatora w kalendarzu i e-mailach. Przeniesienie lub odwołanie rezerwacji przenosi lub usuwa spotkanie. Adres e-mail gościa nigdy nie trafia do 3CX, więc 3CX nic do gościa nie wysyła.
+admin-threecx-base-url = Adres centrali
+admin-threecx-extension = Numer wewnętrzny organizatora
+admin-threecx-extension-help = Numer wewnętrzny, do którego należą spotkania, na przykład 100.
+admin-threecx-api-key = Klucz API wideokonferencji
+admin-threecx-api-key-help = Klucz API wideokonferencji 3CX z konsoli administracyjnej 3CX. Jest przechowywany w postaci zaszyfrowanej i nigdy więcej nie jest pokazywany.
+admin-threecx-display-name-help = Co goście widzą jako miejsce, na przykład „3CX”. Puste: „Rozmowa wideo”.
+admin-threecx-save = Zapisz ustawienia 3CX
+admin-threecx-test = Sprawdź połączenie
+admin-threecx-clear = Usuń ustawienia 3CX
+admin-threecx-notice-saved = Ustawienia 3CX zapisane.
+admin-threecx-notice-cleared = Ustawienia 3CX usunięte razem z kluczem.
+admin-threecx-notice-ok = 3CX odpowiedziała: adres i klucz działają.
+admin-threecx-notice-auth = 3CX odrzuciła klucz. Wywołania 3CX są wstrzymane na godzinę, aby centrala nie zablokowała tego serwera; zapisanie nowego klucza lub ponowne sprawdzenie kończy przerwę.
+admin-threecx-notice-transport = 3CX nie odpowiedziała. Sprawdź adres i czy ten serwer może się z nią połączyć.
+admin-threecx-notice-service = 3CX odpowiedziała błędem. Sprawdź, czy wideokonferencje są włączone dla numeru wewnętrznego.
+admin-threecx-notice-bad-link = 3CX zwróciła link do spotkania pod innym adresem. Sprawdź adres centrali.
+admin-threecx-notice-not-set = Najpierw podaj adres, numer wewnętrzny i klucz.
+admin-threecx-notice-bad-base-url = Nie zapisano: adres musi zaczynać się od https:// i zawierać tylko host, bez ścieżki.
+admin-threecx-notice-bad-extension = Nie zapisano: numer wewnętrzny musi mieć od 1 do 10 cyfr.
+admin-threecx-notice-bad-api-key = Nie zapisano: klucz musi mieć od 16 do 256 znaków bez spacji.
+admin-threecx-notice-bad-display-name = Nie zapisano: etykieta może mieć najwyżej 100 znaków.
+admin-threecx-notice-bad-pair = Nie zapisano: adres i numer wewnętrzny idą w parze, a klucz wymaga obu.
+etf-location-threecx = Spotkanie 3CX (tworzone dla każdej rezerwacji)
+etf-threecx-hint = Dla każdej potwierdzonej rezerwacji tworzone jest spotkanie 3CX, które podąża za jej przeniesieniem i odwołaniem. 3CX konfiguruje się na stronie administracyjnej.
