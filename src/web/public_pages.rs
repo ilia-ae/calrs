@@ -202,6 +202,12 @@ pub(super) async fn team_profile_page(
             .unwrap_or_default()
         };
     let event_types = without_expired(&state.pool, event_types, |row| &row.5).await;
+    // ilia fork: each event type's text in the page language (`event_texts`).
+    let lang = crate::i18n::detect_from_headers(&headers);
+    let event_types = super::event_texts::localize_rows(&state.pool, lang, event_types, |row| {
+        (row.5.as_str(), &mut row.1, &mut row.2)
+    })
+    .await;
 
     let members: Vec<(String, String, Option<String>)> = sqlx::query_as(
         "SELECT u.id, u.name, u.avatar_path FROM users u \
@@ -263,7 +269,7 @@ pub(super) async fn team_profile_page(
             event_types => et_ctx,
             invite_token => invite_token_for_template,
             company_link => state.company_link.read().await.clone(),
-            lang => crate::i18n::detect_from_headers(&headers),
+            lang => lang,
         })
         .unwrap_or_else(|e| internal_error_body("template render", &e)),
     )
@@ -319,6 +325,9 @@ pub(super) async fn show_group_slots(
             .into_response()
         }
     };
+    // ilia fork: the event type's text in the page language (`event_texts`).
+    let (et_title, et_desc) =
+        super::event_texts::localize(&state.pool, &et_id, lang, et_title, et_desc).await;
 
     // Resolve the team id once and reuse for membership checks and downstream
     // queries. Can't fold this into the event-type SELECT above because sqlx
@@ -546,7 +555,8 @@ pub(super) async fn show_group_slots(
         })
         .collect();
 
-    let (meeting_jitsi_label, meeting_webhook_label) = meeting_provider_labels(&state).await;
+    let (meeting_jitsi_label, meeting_webhook_label, meeting_threecx_label) =
+        meeting_provider_labels(&state).await;
     let tmpl = match state.templates.get_template("slots.html") {
         Ok(t) => t,
         Err(e) => return internal_error_html("internal", &e).into_response(),
@@ -555,6 +565,7 @@ pub(super) async fn show_group_slots(
         .render(context! {
             meeting_jitsi_label => meeting_jitsi_label,
             meeting_webhook_label => meeting_webhook_label,
+            meeting_threecx_label => meeting_threecx_label,
             event_type => context! {
                 slug => et_slug,
                 title => et_title,
@@ -646,6 +657,9 @@ pub(super) async fn show_group_book_form(
             .into_response()
         }
     };
+    // ilia fork: the event type's text in the page language (`event_texts`).
+    let (et_title, et_desc) =
+        super::event_texts::localize(&state.pool, &et_id, lang, et_title, et_desc).await;
 
     // Logged-in team members (and global admins) substitute for the team
     // invite token on public events of private teams. Private/internal events
@@ -745,7 +759,8 @@ pub(super) async fn show_group_book_form(
         .to_string();
     let date_label = crate::i18n::format_long_date(date, lang);
 
-    let (meeting_jitsi_label, meeting_webhook_label) = meeting_provider_labels(&state).await;
+    let (meeting_jitsi_label, meeting_webhook_label, meeting_threecx_label) =
+        meeting_provider_labels(&state).await;
     let tmpl = match state.templates.get_template("book.html") {
         Ok(t) => t,
         Err(e) => return internal_error_html("internal", &e).into_response(),
@@ -755,6 +770,7 @@ pub(super) async fn show_group_book_form(
         .render(context! {
             meeting_jitsi_label => meeting_jitsi_label,
             meeting_webhook_label => meeting_webhook_label,
+            meeting_threecx_label => meeting_threecx_label,
             event_type => context! {
                 slug => et_slug,
                 title => et_title,
@@ -860,6 +876,11 @@ pub(super) async fn user_profile(
     .await
     .unwrap_or_default();
     let event_types = without_expired(&state.pool, event_types, |row| &row.4).await;
+    // ilia fork: each event type's text in the page language (`event_texts`).
+    let event_types = super::event_texts::localize_rows(&state.pool, lang, event_types, |row| {
+        (row.4.as_str(), &mut row.1, &mut row.2)
+    })
+    .await;
 
     let tmpl = match state.templates.get_template("profile.html") {
         Ok(t) => t,
@@ -970,6 +991,9 @@ async fn show_dynamic_group_slots(
             ))
         }
     };
+    // ilia fork: the event type's text in the page language (`event_texts`).
+    let (et_title, et_desc) =
+        super::event_texts::localize(&state.pool, &et_id, lang, et_title, et_desc).await;
 
     // Dynamic group links only for public event types
     if visibility != "public" {
@@ -1098,7 +1122,8 @@ async fn show_dynamic_group_slots(
 
     let tz_options = timezone_options(&guest_tz_name, lang);
 
-    let (meeting_jitsi_label, meeting_webhook_label) = meeting_provider_labels(state).await;
+    let (meeting_jitsi_label, meeting_webhook_label, meeting_threecx_label) =
+        meeting_provider_labels(state).await;
     let tmpl = match state.templates.get_template("slots.html") {
         Ok(t) => t,
         Err(e) => return internal_error_html("internal", &e),
@@ -1107,6 +1132,7 @@ async fn show_dynamic_group_slots(
         tmpl.render(context! {
             meeting_jitsi_label => meeting_jitsi_label,
             meeting_webhook_label => meeting_webhook_label,
+            meeting_threecx_label => meeting_threecx_label,
             event_type => context! {
                 slug => et_slug,
                 title => et_title,
@@ -1215,6 +1241,9 @@ async fn show_dynamic_group_book_form(
             ))
         }
     };
+    // ilia fork: the event type's text in the page language (`event_texts`).
+    let (et_title, et_desc) =
+        super::event_texts::localize(&state.pool, &et_id, lang, et_title, et_desc).await;
 
     if visibility != "public" {
         return Html(crate::i18n::translate(
@@ -1266,7 +1295,8 @@ async fn show_dynamic_group_book_form(
         .to_string();
     let date_label = crate::i18n::format_long_date(date, lang);
 
-    let (meeting_jitsi_label, meeting_webhook_label) = meeting_provider_labels(state).await;
+    let (meeting_jitsi_label, meeting_webhook_label, meeting_threecx_label) =
+        meeting_provider_labels(state).await;
     let tmpl = match state.templates.get_template("book.html") {
         Ok(t) => t,
         Err(e) => return internal_error_html("internal", &e),
@@ -1276,6 +1306,7 @@ async fn show_dynamic_group_book_form(
         tmpl.render(context! {
             meeting_jitsi_label => meeting_jitsi_label,
             meeting_webhook_label => meeting_webhook_label,
+            meeting_threecx_label => meeting_threecx_label,
             event_type => context! {
                 slug => et_slug,
                 title => et_title,
@@ -1483,6 +1514,9 @@ pub(super) async fn show_slots_for_user(
             .into_response()
         }
     };
+    // ilia fork: the event type's text in the page language (`event_texts`).
+    let (et_title, et_desc) =
+        super::event_texts::localize(&state.pool, &et_id, lang, et_title, et_desc).await;
 
     // Validate invite token for private event types
     let invite_guest_name;
@@ -1613,7 +1647,8 @@ pub(super) async fn show_slots_for_user(
 
     let tz_options = timezone_options(&guest_tz_name, lang);
 
-    let (meeting_jitsi_label, meeting_webhook_label) = meeting_provider_labels(&state).await;
+    let (meeting_jitsi_label, meeting_webhook_label, meeting_threecx_label) =
+        meeting_provider_labels(&state).await;
     let tmpl = match state.templates.get_template("slots.html") {
         Ok(t) => t,
         Err(e) => return internal_error_html("internal", &e).into_response(),
@@ -1624,6 +1659,7 @@ pub(super) async fn show_slots_for_user(
             ton_price => ton_pay::price_badge(&state, &et_id).await,
             meeting_jitsi_label => meeting_jitsi_label,
             meeting_webhook_label => meeting_webhook_label,
+            meeting_threecx_label => meeting_threecx_label,
             event_type => context! {
                 slug => et_slug,
                 title => et_title,
@@ -1722,6 +1758,9 @@ pub(super) async fn show_book_form_for_user(
     };
 
     let lang = user_page_lang(host_language.as_deref(), &page_mode, &headers);
+    // ilia fork: the event type's text in the page language (`event_texts`).
+    let (et_title, et_desc) =
+        super::event_texts::localize(&state.pool, &et_id, lang, et_title, et_desc).await;
 
     // Validate invite token for private event types
     let invite_guest_name;
@@ -1807,7 +1846,8 @@ pub(super) async fn show_book_form_for_user(
         .to_string();
     let date_label = crate::i18n::format_long_date(date, lang);
 
-    let (meeting_jitsi_label, meeting_webhook_label) = meeting_provider_labels(&state).await;
+    let (meeting_jitsi_label, meeting_webhook_label, meeting_threecx_label) =
+        meeting_provider_labels(&state).await;
     let tmpl = match state.templates.get_template("book.html") {
         Ok(t) => t,
         Err(e) => return internal_error_html("internal", &e).into_response(),
@@ -1837,6 +1877,7 @@ pub(super) async fn show_book_form_for_user(
             ton_price => ton_pay::price_badge(&state, &et_id).await,
             meeting_jitsi_label => meeting_jitsi_label,
             meeting_webhook_label => meeting_webhook_label,
+            meeting_threecx_label => meeting_threecx_label,
             event_type => context! {
                 slug => et_slug,
                 title => et_title,
@@ -2126,6 +2167,9 @@ pub(super) async fn show_slots(
         page_mode.as_deref().unwrap_or(""),
         &headers,
     );
+    // ilia fork: the event type's text in the page language (`event_texts`).
+    let (et_title, et_desc) =
+        super::event_texts::localize(&state.pool, &et_id, lang, et_title, et_desc).await;
 
     // Block private event types on legacy route (use /u/ or /team/ routes with invite token instead)
     if visibility == "private" || visibility == "internal" {
@@ -2227,7 +2271,8 @@ pub(super) async fn show_slots(
 
     let tz_options = timezone_options(&guest_tz_name, lang);
 
-    let (meeting_jitsi_label, meeting_webhook_label) = meeting_provider_labels(&state).await;
+    let (meeting_jitsi_label, meeting_webhook_label, meeting_threecx_label) =
+        meeting_provider_labels(&state).await;
     let tmpl = match state.templates.get_template("slots.html") {
         Ok(t) => t,
         Err(e) => return internal_error_html("internal", &e),
@@ -2238,6 +2283,7 @@ pub(super) async fn show_slots(
             ton_price => ton_pay::price_badge(&state, &et_id).await,
             meeting_jitsi_label => meeting_jitsi_label,
             meeting_webhook_label => meeting_webhook_label,
+            meeting_threecx_label => meeting_threecx_label,
             event_type => context! {
                 slug => et_slug,
                 title => et_title,
@@ -2351,6 +2397,9 @@ pub(super) async fn show_book_form(
         page_mode.as_deref().unwrap_or(""),
         &headers,
     );
+    // ilia fork: the event type's text in the page language (`event_texts`).
+    let (et_title, et_desc) =
+        super::event_texts::localize(&state.pool, &et_id, lang, et_title, et_desc).await;
 
     // Block non-public event types on legacy route
     if visibility == "private" || visibility == "internal" {
@@ -2396,7 +2445,8 @@ pub(super) async fn show_book_form(
         .to_string();
     let date_label = crate::i18n::format_long_date(date, lang);
 
-    let (meeting_jitsi_label, meeting_webhook_label) = meeting_provider_labels(&state).await;
+    let (meeting_jitsi_label, meeting_webhook_label, meeting_threecx_label) =
+        meeting_provider_labels(&state).await;
     let tmpl = match state.templates.get_template("book.html") {
         Ok(t) => t,
         Err(e) => return internal_error_html("internal", &e),
@@ -2408,6 +2458,7 @@ pub(super) async fn show_book_form(
             ton_price => ton_pay::price_badge(&state, &et_id).await,
             meeting_jitsi_label => meeting_jitsi_label,
             meeting_webhook_label => meeting_webhook_label,
+            meeting_threecx_label => meeting_threecx_label,
             event_type => context! {
                 slug => et_slug,
                 title => et_title,

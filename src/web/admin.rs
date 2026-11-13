@@ -452,6 +452,29 @@ pub(super) async fn admin_dashboard(
         .and_then(|j| j.display_name.clone())
         .unwrap_or_default();
     let meeting_webhook_configured = meeting_cfg.webhook.is_some();
+    // ilia fork: the 3CX card (`threecx`): the stored values without the
+    // key, and the notice of the last post (one of `threecx::NOTICES`).
+    let threecx_configured = meeting_cfg.threecx.is_some();
+    let threecx_paused = meeting_cfg
+        .threecx
+        .as_ref()
+        .is_some_and(|t| super::threecx::auth_blocked(&t.base_url));
+    let threecx_shown = super::threecx::shown(&state.pool).await;
+    let threecx_notice = query
+        .get("threecx")
+        .map(String::as_str)
+        .filter(|n| super::threecx::NOTICES.contains(n))
+        .unwrap_or_default();
+    let threecx_notice_text = if threecx_notice.is_empty() {
+        String::new()
+    } else {
+        crate::i18n::translate(
+            admin.lang,
+            &format!("admin-threecx-notice-{threecx_notice}"),
+            None,
+        )
+    };
+    let threecx_notice_ok = matches!(threecx_notice, "saved" | "cleared" | "ok");
     let meeting_webhook_url = meeting_cfg
         .webhook
         .as_ref()
@@ -554,6 +577,15 @@ pub(super) async fn admin_dashboard(
             meeting_webhook_auth_mode => meeting_webhook_auth_mode,
             meeting_webhook_has_secret => meeting_webhook_has_secret,
             meeting_webhook_display_name => meeting_webhook_display_name,
+            threecx_configured => threecx_configured,
+            threecx_paused => threecx_paused,
+            threecx_base_url => threecx_shown.base_url,
+            threecx_extension => threecx_shown.extension,
+            threecx_display_name => threecx_shown.display_name,
+            threecx_key_set => threecx_shown.key_set,
+            threecx_notice => threecx_notice,
+            threecx_notice_text => threecx_notice_text,
+            threecx_notice_ok => threecx_notice_ok,
             has_logo => state.data_dir.join("logo.png").exists(),
             has_favicon => state.data_dir.join(FAVICON_FILE).exists(),
             company_link => get_company_link(&state.pool).await.unwrap_or_default(),

@@ -43,6 +43,14 @@ Description fields support Markdown formatting (bold, italic, links) with a tool
 
 ![Event type edit form](images/event-type-form.png)
 
+### Translations
+
+The **Translations** section under the basics gives the event type a title and description per language (ilia fork). **Add a language** adds a row: pick one of the languages calrs ships, then type the title (required, at most 255 characters) and, if you like, a description (same formatting as the main one). **Remove** drops a row; an emptied row is dropped on save as well. Each language can appear once.
+
+A guest reading the booking pages in a language with a row sees its title and description: your profile and team pages, the slot picker, the booking form and its confirmation, the cancel and reschedule pages, the payment page, and everything sent to the guest in the booking's language (emails and their calendar invite, SMS, Telegram). German addressed as "Sie" (`de-formal`) reads the German row when it has none of its own. Every other language shows the main title and description, exactly as before. A row with no description shows none in that language: the main description is not mixed in under a translated title. Your own side (the dashboard, your emails and Telegram messages, your calendar) keeps the main title.
+
+The language is the page's (see [Page language](booking-flow.md#page-language)): the browser's, the one the guest picked in the footer, or the embedding page's for the widget; the guest's emails and messages follow the language stored with the booking. `calrs config apply` declares the same rows as `translations` (docs/apply-schema.md in the repository).
+
 ### From the CLI
 
 ```bash
@@ -234,13 +242,16 @@ Event types support these location types:
 | `jitsi_auto` | Fresh Jitsi room URL per confirmed booking (pattern configured in Admin) |
 | `webhook_auto` | calrs POSTs the booking to an admin-configured URL and uses the returned `{ "url": "..." }` |
 | `google_meet` | Fresh Google Meet conference owned by the host, attached to their Google Calendar event. Requires Google Calendar OAuth2 with write-back. See [Google Calendar](./google-calendar.md#google-meet-auto-links). |
+| `threecx_auto` | (ilia fork) A scheduled meeting on the site's 3CX phone system per confirmed booking: the guest gets the meeting's open link, the host the organizer's link (Admin → 3CX video meetings) |
 | `phone` | Phone number |
 | `in_person` | Physical address |
 | `custom` | Free-text description |
 
 The location is displayed on the public booking page, in confirmation emails, and in `.ics` calendar invites.
 
-Auto providers (`jitsi_auto`, `webhook_auto`, `google_meet`) mint the URL only when the booking is **confirmed**. Pending bookings do not get a link (so a declined request never creates a Meet or hits the webhook). The same Meet URL is kept on reschedule.
+Auto providers (`jitsi_auto`, `webhook_auto`, `google_meet`, and in the ilia fork `threecx_auto`) mint the URL only when the booking is **confirmed**. Pending bookings do not get a link (so a declined request never creates a Meet or hits the webhook). The same Meet URL is kept on reschedule.
+
+A `threecx_auto` booking's meeting follows the booking: a reschedule moves it (the links stay the same) and a cancellation, decline or expiry deletes it, within a minute (the reminder loop's sweep, retried with a back-off when 3CX does not answer). The guest's email address is never sent to 3CX, so 3CX sends the guest nothing of its own. If 3CX cannot make the meeting, the booking still goes through, with the event type's own location value, if any.
 
 Saving an event type as `google_meet` is rejected unless every scheduling-relevant host already has Google Calendar connected with a write-back calendar selected (you, for a personal event type; every eligible team member for a team event type).
 
@@ -250,7 +261,7 @@ Event types can be toggled on/off from the dashboard without deleting them. Disa
 
 ## Duplicating
 
-**Duplicate** in an event type's `⋯` menu creates a copy with every setting: duration, buffers, notice, location, confirmation and visibility, weekly availability and date overrides, calendar selection, booking limits, resources, and for team event types the member priorities and watchers. The copy is titled "*Title* (copy)" under the slug `<slug>-copy` (or `-copy-2`, `-copy-3`, ... when taken) and opens in the edit form so you can change what differs. It starts **disabled**, so nobody can book it until you are done: the edit form shows a banner with an **Enable** button, and the action row on the list has one too. The original is untouched; bookings and invite links are not copied. The copy is credited to you, and if you are not allowed to turn on SMS notifications, it starts with them off even when the original has them on.
+**Duplicate** in an event type's `⋯` menu creates a copy with every setting: duration, buffers, notice, location, confirmation and visibility, weekly availability and date overrides, calendar selection, booking limits, resources, translations, and for team event types the member priorities and watchers. The copy is titled "*Title* (copy)" under the slug `<slug>-copy` (or `-copy-2`, `-copy-3`, ... when taken) and opens in the edit form so you can change what differs. It starts **disabled**, so nobody can book it until you are done: the edit form shows a banner with an **Enable** button, and the action row on the list has one too. The original is untouched; bookings and invite links are not copied. The copy is credited to you, and if you are not allowed to turn on SMS notifications, it starts with them off even when the original has them on.
 
 ## Booking directory and favorites
 

@@ -45,6 +45,7 @@
     "google_oauth2": "off",
     "captcha": "off",
     "meeting_webhook": "off",
+    "threecx": {"base_url": "https://pbx.example.com", "extension": "100", "display_name": "3CX"},
     "sms": "off",
     "sms_allow_all_users": false,
     "ton": {
@@ -68,6 +69,12 @@
         "slug": "15min",
         "title": "Free 15-minute CTO consultation",
         "description": "A short call about your IT project. [About me](https://ilia.ae/en/about/)",
+        "translations": {
+          "ru": {
+            "title": "Бесплатная 15-минутная консультация CTO",
+            "description": "Короткий звонок о вашем IT-проекте. [Обо мне](https://ilia.ae/about/)"
+          }
+        },
         "duration_min": 15,
         "slot_interval_min": null,
         "buffer_before": 0,

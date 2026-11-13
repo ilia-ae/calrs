@@ -217,6 +217,12 @@ pub(super) struct NewBookingEmails {
     pub(super) reschedule_notice_min: Option<i32>,
     /// ilia fork: the guest's Telegram deep link (`crate::telegram`).
     pub(super) telegram_link: Option<String>,
+    /// ilia fork: the event title in the guest's language
+    /// (`event_texts`); `details` keeps the base title for the hosts.
+    pub(super) guest_event_title: String,
+    /// ilia fork: the 3CX organizer's link, shown to hosts in place of the
+    /// guest's (`threecx::host_link`); `None` for every other location.
+    pub(super) host_location: Option<String>,
 }
 
 /// Send the guest and host emails for a just-committed booking in the
@@ -229,8 +235,18 @@ pub(super) fn send_new_booking_emails(m: NewBookingEmails) {
                 host_name: name.to_string(),
                 host_email: email.to_string(),
                 host_language: language.clone(),
+                location: m
+                    .host_location
+                    .clone()
+                    .or_else(|| m.details.location.clone()),
                 ..m.details.clone()
             };
+        // ilia fork: the guest's copies (their email and its .ics, the
+        // attendees') read the title in the guest's language.
+        let guest = crate::email::BookingDetails {
+            event_title: m.guest_event_title.clone(),
+            ..m.details.clone()
+        };
         if m.needs_approval {
             for (name, email, language) in &m.host_recipients {
                 log_email_result(
@@ -249,7 +265,7 @@ pub(super) fn send_new_booking_emails(m: NewBookingEmails) {
             log_email_result(
                 crate::email::send_guest_pending_notice_tg(
                     &m.smtp_config,
-                    &m.details,
+                    &guest,
                     m.guest_cancel_url.as_deref(),
                     m.guest_reschedule_url.as_deref(),
                     m.telegram_link.as_deref(),
@@ -262,7 +278,7 @@ pub(super) fn send_new_booking_emails(m: NewBookingEmails) {
             log_email_result(
                 crate::email::send_guest_confirmation_tg(
                     &m.smtp_config,
-                    &m.details,
+                    &guest,
                     m.guest_cancel_url.as_deref(),
                     m.guest_reschedule_url.as_deref(),
                     m.cancel_notice_min,
@@ -274,7 +290,7 @@ pub(super) fn send_new_booking_emails(m: NewBookingEmails) {
                 uid,
             );
             log_email_result(
-                crate::email::send_guest_attendee_confirmations(&m.smtp_config, &m.details).await,
+                crate::email::send_guest_attendee_confirmations(&m.smtp_config, &guest).await,
                 "attendee_confirmation",
                 uid,
             );
@@ -358,6 +374,10 @@ pub async fn run_reminder_loop(pool: SqlitePool, secret_key: [u8; 32]) {
         // Calendar write-backs that failed earlier and are due another try
         // (#162).
         writeback::retry_failed_writebacks(&pool, &secret_key, Utc::now()).await;
+
+        // ilia fork: 3CX meetings follow their bookings (moved, ended).
+        let threecx = super::threecx::load(&pool, &secret_key).await;
+        super::threecx::sweep(&pool, threecx.as_ref(), Utc::now()).await;
 
         // Background sync: pick the stalest enabled source and sync it, once
         // its last attempt is at least `sync_min_age` old (#310). With ctag +
@@ -469,6 +489,10 @@ pub(super) async fn send_due_reminders(pool: SqlitePool, secret_key: [u8; 32]) {
                 .map(|base| format!("{}/booking/cancel/{}", base.trim_end_matches('/'), t))
         });
 
+        // ilia fork: the guest's reminder (email, SMS) names the event in
+        // their language; the host's keeps `details` (`event_texts`).
+        let guest_copy = super::event_texts::for_guest(&pool, &details).await;
+
         // Tracks whether any channel could actually carry this reminder.
         // Stamping `reminder_sent_at` when neither could would silently
         // swallow it, so an instance whose SMTP is missing keeps the
@@ -484,9 +508,9 @@ pub(super) async fn send_due_reminders(pool: SqlitePool, secret_key: [u8; 32]) {
                 Some((host_name, host_email, _)) => crate::email::BookingDetails {
                     host_name,
                     host_email,
-                    ..details.clone()
+                    ..guest_copy.clone()
                 },
-                None => details.clone(),
+                None => guest_copy.clone(),
             };
             // Inline on purpose: this loop is already off the request
             // path, and `send_email` bounds each attempt.
@@ -500,8 +524,9 @@ pub(super) async fn send_due_reminders(pool: SqlitePool, secret_key: [u8; 32]) {
                 "guest_reminder",
                 uid,
             );
+            let host_view = super::threecx::for_host(&pool, &secret_key, &details).await;
             log_email_result(
-                crate::email::send_host_reminder(smtp_config, &details).await,
+                crate::email::send_host_reminder(smtp_config, &host_view).await,
                 "host_reminder",
                 uid,
             );
@@ -512,9 +537,11 @@ pub(super) async fn send_due_reminders(pool: SqlitePool, secret_key: [u8; 32]) {
         // number `booking_guest_input` keeps only when the event type
         // collects one, so it needs no second lookup (#266).
         if sms_configured {
-            if let Some(ctx) =
-                crate::sms::SmsContext::for_booking(&details, details.guest_phone.as_deref(), true)
-            {
+            if let Some(ctx) = crate::sms::SmsContext::for_booking(
+                &guest_copy,
+                guest_copy.guest_phone.as_deref(),
+                true,
+            ) {
                 crate::sms::notify_guest(&pool, &secret_key, crate::sms::SmsEvent::Reminder, ctx)
                     .await;
                 notified = true;

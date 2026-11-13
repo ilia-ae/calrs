@@ -2647,6 +2647,9 @@ async fn agent_update_event_type_with_an_empty_patch_changes_nothing() {
         "INSERT INTO ton_prices (event_type_id, currency, price_usd_cents, window_min, updated_at)
          VALUES ('et-rich', 'USD', 4000, 30, '2030-01-01T00:00:00Z')",
         "INSERT INTO telegram_event_types (event_type_id, guest_mode) VALUES ('et-rich', 'optional')",
+        // ilia fork: a translation, which the agent's form post must keep.
+        "INSERT INTO event_type_texts (event_type_id, lang, title, description)
+         VALUES ('et-rich', 'ru', 'Богатый', 'Описание')",
     ];
     for statement in statements {
         sqlx::query(statement).execute(pool).await.unwrap();

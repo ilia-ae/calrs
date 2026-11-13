@@ -2495,3 +2495,43 @@ ton-admin-debug-tg-locked-apply = Lukustatud config apply poolt (site.ton.debug_
 ton-admin-debug-tg-saved = Külalise Telegrami kasutajanimi salvestatud.
 ton-admin-debug-tg-invalid = Midagi ei salvestatud: see pole Telegrami kasutajanimi (ladina täht, siis tähed, numbrid ja _, 4 kuni 32 märki).
 ton-admin-f-debug_booking_telegram = Testbroneering: külalise Telegrami kasutajanimi
+
+## ilia fork: event type translations (src/web/event_texts.rs)
+etf-translations = Tõlked
+etf-translations-help = Külalised, kes loevad broneerimislehti ühes neist keeltest, näevad ülaltoodu asemel seda pealkirja ja kirjeldust, ka oma e-kirjades ja sõnumites. Teistes keeltes näidatakse ülaltoodut.
+etf-translation-language = Keel
+etf-translation-description-help = Toetab **rasvast**, *kaldkirja* ja [linke](url). Kui jätad selle tühjaks, selles keeles kirjeldust ei näidata.
+etf-translation-add = Lisa keel
+etf-translation-remove = Eemalda
+form-error-translation-language = Vali igale tõlkele keel.
+form-error-translation-duplicate = Igal keelel saab olla ainult üks tõlge.
+form-error-translation-title-required = Igal tõlkel peab olema pealkiri.
+form-error-translation-title-length = Tõlgitud pealkiri võib olla kuni 255 tähemärki.
+
+## ilia fork: 3CX video meetings (src/web/threecx.rs)
+admin-threecx = 3CX videokohtumised
+admin-threecx-help = Iga kinnitatud broneering sündmusetüübil, mille kohaks on „3CX kohtumine“, saab sellesse 3CX telefonikeskjaama oma ajastatud kohtumise. Külalised saavad kohtumise lingi, võõrustajad korraldaja lingi oma kalendrisse ja kirjadesse. Broneeringu teisaldamine või tühistamine teisaldab või kustutab kohtumise. Külalise e-posti aadressi 3CX-ile ei saadeta, seega 3CX külalisele ei kirjuta.
+admin-threecx-base-url = Keskjaama aadress
+admin-threecx-extension = Korraldaja sisenumber
+admin-threecx-extension-help = Sisenumber, kellele kohtumised kuuluvad, näiteks 100.
+admin-threecx-api-key = Videokonverentsi API võti
+admin-threecx-api-key-help = 3CX videokonverentsi API võti 3CX haldusliidesest. Seda hoitakse krüpteeritult ega näidata enam kunagi.
+admin-threecx-display-name-help = Mida külalised näevad kohana, näiteks „3CX“. Tühi: „Videokõne“.
+admin-threecx-save = Salvesta 3CX seaded
+admin-threecx-test = Kontrolli ühendust
+admin-threecx-clear = Eemalda 3CX seaded
+admin-threecx-notice-saved = 3CX seaded salvestatud.
+admin-threecx-notice-cleared = 3CX seaded koos võtmega eemaldatud.
+admin-threecx-notice-ok = 3CX vastas: aadress ja võti töötavad.
+admin-threecx-notice-auth = 3CX lükkas võtme tagasi. Pöördumised 3CX-i poole peatatakse tunniks, et keskjaam seda serverit ei blokeeriks; uue võtme salvestamine või uus kontroll lõpetab pausi.
+admin-threecx-notice-transport = 3CX ei vastanud. Kontrolli aadressi ja seda, et see server ulatub selleni.
+admin-threecx-notice-service = 3CX vastas veaga. Kontrolli, et sisenumbril on videokonverentsid lubatud.
+admin-threecx-notice-bad-link = 3CX andis kohtumise lingi teisel aadressil. Kontrolli keskjaama aadressi.
+admin-threecx-notice-not-set = Sisesta kõigepealt aadress, sisenumber ja võti.
+admin-threecx-notice-bad-base-url = Ei salvestatud: aadress peab algama https:// ja sisaldama ainult hosti, ilma rajata.
+admin-threecx-notice-bad-extension = Ei salvestatud: sisenumber peab olema 1 kuni 10 numbrit.
+admin-threecx-notice-bad-api-key = Ei salvestatud: võti peab olema 16 kuni 256 märki ilma tühikuteta.
+admin-threecx-notice-bad-display-name = Ei salvestatud: silt võib olla kuni 100 märki.
+admin-threecx-notice-bad-pair = Ei salvestatud: aadress ja sisenumber käivad koos ning võti vajab mõlemat.
+etf-location-threecx = 3CX kohtumine (iga broneeringu jaoks)
+etf-threecx-hint = Iga kinnitatud broneeringu jaoks luuakse 3CX kohtumine, mis järgib selle teisaldamist ja tühistamist. 3CX seadistatakse halduslehel.

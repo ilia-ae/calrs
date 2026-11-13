@@ -306,8 +306,17 @@ async fn guest_view(
             .and_then(|t| link(format!("/booking/reschedule/{t}"))),
         rebook,
     };
+    // The event as the guest's pages name it, in the reader's language
+    // (`web::event_texts`); hosts keep the base title.
+    let title = crate::web::event_texts::title_in(
+        pool,
+        &booking.event_type_id,
+        lang,
+        booking.title.clone(),
+    )
+    .await;
     GuestView {
-        event: text::clean(&booking.title, text::TITLE_MAX),
+        event: text::clean(&title, text::TITLE_MAX),
         when: when_in(booking, &booking.guest_timezone, lang),
         host: text::clean(&host, text::NAME_MAX),
         pending,

@@ -2497,3 +2497,43 @@ ton-admin-debug-tg-locked-apply = Locked by config apply (site.ton.debug_booking
 ton-admin-debug-tg-saved = Guest Telegram username saved.
 ton-admin-debug-tg-invalid = Nothing saved: not a Telegram username (a Latin letter, then letters, digits and _, 4 to 32 characters).
 ton-admin-f-debug_booking_telegram = Test booking: guest Telegram username
+
+## ilia fork: event type translations (src/web/event_texts.rs)
+etf-translations = Translations
+etf-translations-help = Guests reading the booking pages in one of these languages see this title and description instead of the ones above, in their emails and messages too. Every other language shows the ones above.
+etf-translation-language = Language
+etf-translation-description-help = Supports **bold**, *italic*, and [links](url). Left empty, this language shows no description.
+etf-translation-add = Add a language
+etf-translation-remove = Remove
+form-error-translation-language = Choose a language for each translation.
+form-error-translation-duplicate = Each language can have only one translation.
+form-error-translation-title-required = Each translation needs a title.
+form-error-translation-title-length = A translated title must be at most 255 characters.
+
+## ilia fork: 3CX video meetings (src/web/threecx.rs)
+admin-threecx = 3CX video meetings
+admin-threecx-help = Each confirmed booking of an event type whose location is “3CX meeting” gets its own scheduled meeting on this 3CX phone system. Guests get the meeting link; hosts get the organizer link in their calendar and emails. Moving or cancelling the booking moves or deletes the meeting. The guest’s email address is never sent to 3CX, so 3CX sends the guest nothing.
+admin-threecx-base-url = Phone system address
+admin-threecx-extension = Organizer extension
+admin-threecx-extension-help = The extension the meetings belong to, for example 100.
+admin-threecx-api-key = Video conference API key
+admin-threecx-api-key-help = The key of the 3CX video conference API, from the 3CX admin console. It is stored encrypted and never shown again.
+admin-threecx-display-name-help = What guests see as the place, for example “3CX”. Empty: “Video call”.
+admin-threecx-save = Save 3CX settings
+admin-threecx-test = Test connection
+admin-threecx-clear = Remove 3CX settings
+admin-threecx-notice-saved = 3CX settings saved.
+admin-threecx-notice-cleared = 3CX settings removed, the key with them.
+admin-threecx-notice-ok = 3CX answered: the address and the key work.
+admin-threecx-notice-auth = 3CX refused the key. Calls to 3CX pause for an hour so that the phone system does not block this server; saving a new key or testing again ends the pause.
+admin-threecx-notice-transport = 3CX did not answer. Check the address and that this server can reach it.
+admin-threecx-notice-service = 3CX answered with an error. Check that video conferencing is enabled for the extension.
+admin-threecx-notice-bad-link = 3CX answered with a meeting link on another address. Check the phone system address.
+admin-threecx-notice-not-set = Enter the address, the extension and the key first.
+admin-threecx-notice-bad-base-url = Not saved: the address must be https:// and the host only, without a path.
+admin-threecx-notice-bad-extension = Not saved: the extension must be 1 to 10 digits.
+admin-threecx-notice-bad-api-key = Not saved: the key must be 16 to 256 characters without spaces.
+admin-threecx-notice-bad-display-name = Not saved: the label must be at most 100 characters.
+admin-threecx-notice-bad-pair = Not saved: the address and the extension go together, and a key needs both.
+etf-location-threecx = 3CX meeting (made for each booking)
+etf-threecx-hint = A 3CX meeting is made for each confirmed booking and follows its moves and cancellation. Set up 3CX on the admin page.

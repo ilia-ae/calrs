@@ -416,10 +416,19 @@ pub(crate) async fn pay_page(
         Err(e) => return internal_error_response("internal", &e),
     };
     let base = format!("/booking/pay/{token}");
+    // ilia fork: the event in the page language (`event_texts`); else the
+    // title the invoice was opened with.
+    let event_title = crate::web::event_texts::title_in(
+        &state.pool,
+        &row.event_type_id,
+        lang,
+        row.event_title.clone(),
+    )
+    .await;
     let rendered = tmpl
         .render(context! {
             lang => lang,
-            event_title => &row.event_title,
+            event_title => event_title,
             meeting_date => meeting_date,
             meeting_time => meeting_time,
             pay_state => pay_state.as_str(),
@@ -562,6 +571,9 @@ async fn confirmed_ics(pool: &SqlitePool, booking_id: &str) -> Option<String> {
         host_timezone: stored_tz.name().to_string(),
         ..Default::default()
     };
+    // The title the guest's emails give it, in the booking's language
+    // (`event_texts`).
+    let details = crate::web::event_texts::in_booking_language(pool, &details).await;
     Some(crate::email::generate_ics_payer(&details))
 }
 
@@ -666,6 +678,8 @@ pub(crate) async fn guest_mail(
     }
     .unwrap_or(DateTime::UNIX_EPOCH);
     let (date, time) = date_and_time(lang, start, tz.as_deref().unwrap_or("UTC"));
+    // The event in the email's language (`event_texts`).
+    let title = crate::web::event_texts::title_in(pool, &et_id, lang, title).await;
     Some((
         TonGuestMail {
             lang: lang.to_string(),

@@ -1,0 +1,110 @@
+{#- ilia fork: the "Translations" section of the event type form
+    (src/web/event_texts.rs). `event_texts.rows` are the stored (or posted)
+    rows, `event_texts.languages` every shipped locale. The marker field
+    `translations` tells the save that the form carried the section. The
+    labels are translated out here and passed in: inside a macro `t()`
+    might not see the page's `lang`. -#}
+{% set labels = {
+  "language": t("etf-translation-language"),
+  "title": t("etf-title"),
+  "description": t("team-form-description"),
+  "optional": t("team-form-optional"),
+  "help": t("etf-translation-description-help"),
+  "remove": t("etf-translation-remove"),
+} %}
+{% macro translation_row(n, code, title, description, languages, labels, removable=true) -%}
+<div class="translation-row" data-translation-row style="padding: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius);">
+  <div class="form-grid-2" style="align-items: start;">
+    <div class="form-group">
+      <label for="translation_lang_{{ n }}">{{ labels.language }}</label>
+      <select id="translation_lang_{{ n }}" name="translation_lang_{{ n }}">
+        {% for l in languages %}
+        <option value="{{ l.code }}"{% if l.code == code %} selected{% endif %}>{{ l.label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="translation_title_{{ n }}">{{ labels.title }}</label>
+      <input type="text" id="translation_title_{{ n }}" name="translation_title_{{ n }}" value="{{ title }}">
+    </div>
+  </div>
+  <div class="form-group" style="margin-bottom: 0.5rem;">
+    <label for="translation_description_{{ n }}">{{ labels.description }} <span class="hint">{{ labels.optional }}</span></label>
+    <textarea id="translation_description_{{ n }}" name="translation_description_{{ n }}" rows="3">{{ description }}</textarea>
+    <span class="hint">{{ labels.help }}</span>
+  </div>
+  {% if removable %}
+  <div class="btn-row" style="justify-content: flex-end;">
+    <button type="button" class="btn btn-ghost btn-sm btn-auto" data-translation-remove>{{ labels.remove }}</button>
+  </div>
+  {% endif %}
+</div>
+{%- endmacro %}
+<!-- Collapsible: Translations (ilia fork) -->
+<details class="card collapsible-section" style="margin-top: 1rem;" id="translations-section"{% if event_texts.rows %} open{% endif %}>
+  <summary class="collapsible-header">
+    <h2>{{ t("etf-translations") }}</h2>
+    <span class="collapsible-hint" id="translations-hint">{% for row in event_texts.rows %}{% for l in event_texts.languages %}{% if l.code == row.lang %}{{ l.label }}{% endif %}{% endfor %}{% if not loop.last %}, {% endif %}{% endfor %}</span>
+    <span class="collapsible-chevron"></span>
+  </summary>
+  <div class="collapsible-body">
+    <span class="hint" style="font-size: 0.825rem; color: var(--text-muted); display: block; margin-bottom: 0.75rem;">{{ t("etf-translations-help") }}</span>
+    <input type="hidden" name="translations" value="1">
+    <div id="translations-list" style="display: flex; flex-direction: column; gap: 0.75rem;">
+      {% for row in event_texts.rows %}
+      {{ translation_row(row.n, row.lang, row.title, row.description, event_texts.languages, labels) }}
+      {% endfor %}
+      {#- Without JavaScript: one spare row (left empty, it is dropped). -#}
+      <noscript>{{ translation_row(event_texts.rows | length, "", "", "", event_texts.languages, labels, false) }}</noscript>
+    </div>
+    <template id="translation-row-template">{{ translation_row("__N__", "", "", "", event_texts.languages, labels) }}</template>
+    <button type="button" id="add-translation" class="btn btn-secondary btn-sm btn-auto" style="margin-top: 0.75rem;" hidden>+ {{ t("etf-translation-add") }}</button>
+  </div>
+</details>
+<script>
+  // ilia fork: add and remove translation rows. Rows keep the numbers they
+  // were given; the server reads them in order.
+  (function() {
+    var list = document.getElementById('translations-list');
+    var template = document.getElementById('translation-row-template');
+    var add = document.getElementById('add-translation');
+    var hint = document.getElementById('translations-hint');
+    if (!list || !template || !add || !template.content) return;
+    var total = template.content.querySelector('select').options.length;
+    function rows() { return list.querySelectorAll('[data-translation-row]'); }
+    function refresh() {
+      var names = [];
+      rows().forEach(function(row) {
+        var select = row.querySelector('select');
+        names.push(select.options[select.selectedIndex].text);
+      });
+      if (hint) hint.textContent = names.join(', ');
+      add.hidden = rows().length >= total;
+    }
+    function wire(row) {
+      row.querySelector('[data-translation-remove]').addEventListener('click', function() {
+        row.remove();
+        refresh();
+      });
+      row.querySelector('select').addEventListener('change', refresh);
+    }
+    rows().forEach(wire);
+    var next = rows().length;
+    add.addEventListener('click', function() {
+      var taken = [];
+      rows().forEach(function(row) { taken.push(row.querySelector('select').value); });
+      var holder = document.createElement('div');
+      holder.innerHTML = template.innerHTML.split('__N__').join(String(next++)).trim();
+      var row = holder.firstElementChild;
+      var select = row.querySelector('select');
+      for (var i = 0; i < select.options.length; i++) {
+        if (taken.indexOf(select.options[i].value) === -1) { select.selectedIndex = i; break; }
+      }
+      list.appendChild(row);
+      wire(row);
+      refresh();
+      row.querySelector('input[type=text]').focus();
+    });
+    refresh();
+  })();
+</script>

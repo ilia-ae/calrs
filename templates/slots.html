@@ -802,13 +802,13 @@
         <span>{{ host_name }}</span>
       </div>
       {% endif %}
-      {% if (event_type.location_value is defined and event_type.location_value) or (event_type.location_type is defined and (event_type.location_type == "jitsi_auto" or event_type.location_type == "webhook_auto" or event_type.location_type == "google_meet")) %}
+      {% if (event_type.location_value is defined and event_type.location_value) or (event_type.location_type is defined and (event_type.location_type == "jitsi_auto" or event_type.location_type == "webhook_auto" or event_type.location_type == "google_meet" or event_type.location_type == "threecx_auto")) %}
       <div class="slots-info-meta-item">
         <span class="slots-info-meta-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
         {% if event_type.location_type is defined and event_type.location_type == "in_person" %}
           <span>{{ event_type.location_value }}</span>
         {% else %}
-          <span>{% if event_type.location_type == "jitsi_auto" %}{% if meeting_jitsi_label %}{{ meeting_jitsi_label }}{% else %}{{ t("slots-location-video") }}{% endif %}{% elif event_type.location_type == "webhook_auto" %}{% if meeting_webhook_label %}{{ meeting_webhook_label }}{% else %}{{ t("slots-location-video") }}{% endif %}{% elif event_type.location_type == "google_meet" %}{{ t("slots-location-google-meet") }}{% elif event_type.location_type == "link" %}{{ t("slots-location-video") }}{% elif event_type.location_type == "phone" %}{{ t("slots-location-phone") }}{% else %}{{ event_type.location_type }}{% endif %}</span>
+          <span>{% if event_type.location_type == "jitsi_auto" %}{% if meeting_jitsi_label %}{{ meeting_jitsi_label }}{% else %}{{ t("slots-location-video") }}{% endif %}{% elif event_type.location_type == "webhook_auto" %}{% if meeting_webhook_label %}{{ meeting_webhook_label }}{% else %}{{ t("slots-location-video") }}{% endif %}{% elif event_type.location_type == "threecx_auto" %}{% if meeting_threecx_label %}{{ meeting_threecx_label }}{% else %}{{ t("slots-location-video") }}{% endif %}{% elif event_type.location_type == "google_meet" %}{{ t("slots-location-google-meet") }}{% elif event_type.location_type == "link" %}{{ t("slots-location-video") }}{% elif event_type.location_type == "phone" %}{{ t("slots-location-phone") }}{% else %}{{ event_type.location_type }}{% endif %}</span>
         {% endif %}
       </div>
       {% endif %}

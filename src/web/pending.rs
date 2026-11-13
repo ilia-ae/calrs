@@ -427,17 +427,24 @@ async fn notify_pending_expired(
     // An expired reschedule of a confirmed booking withdraws the invite the
     // guest and the attendees hold (#267).
     let details = with_invite_holders(pool, details, true).await;
+    // ilia fork: the guest's copies (email, .ics, SMS) name the event in
+    // their language; the hosts' keep `details` (`event_texts`).
+    let guest_details = super::event_texts::for_guest(pool, &details).await;
 
     if let Some(smtp_config) = smtp_config {
         let rebook_url = event_type_rebook_url(pool, &et_id).await;
         log_email_result(
-            crate::email::send_guest_pending_expired(smtp_config, &details, rebook_url.as_deref())
-                .await,
+            crate::email::send_guest_pending_expired(
+                smtp_config,
+                &guest_details,
+                rebook_url.as_deref(),
+            )
+            .await,
             "guest_pending_expired",
             &uid,
         );
         log_email_result(
-            crate::email::send_guest_attendee_cancellations(smtp_config, &details).await,
+            crate::email::send_guest_attendee_cancellations(smtp_config, &guest_details).await,
             "attendee_cancellation",
             &uid,
         );
@@ -457,7 +464,7 @@ async fn notify_pending_expired(
     }
 
     if let Some(ctx) = crate::sms::SmsContext::for_cancellation(
-        &details,
+        &guest_details,
         guest_phone.as_deref(),
         crate::sms::collects_phone(&sms_phone_mode),
     ) {

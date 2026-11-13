@@ -76,6 +76,10 @@ pub(super) async fn push_and_record(
     kind: PushKind,
 ) -> Vec<(String, String)> {
     let mut failures = Vec::new();
+    // ilia fork: a host's calendar holds the 3CX organizer's link, not the
+    // guest's (`threecx::for_host`); unchanged for every other location.
+    let host_view = super::threecx::for_host(pool, key, details).await;
+    let details = &host_view;
     let targets = super::booking_write_targets(pool, booking_uid, user_id).await;
     for target in &targets {
         // The only host-language text in the event is the phone label, and

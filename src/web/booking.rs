@@ -6,7 +6,7 @@ use super::*;
 /// the cached `MeetingConfig`. Returns empty strings when no display name is
 /// configured — slot/book templates fall back to the generic "Video call"
 /// label in that case.
-pub(super) async fn meeting_provider_labels(state: &AppState) -> (String, String) {
+pub(super) async fn meeting_provider_labels(state: &AppState) -> (String, String, String) {
     let cfg = state.meeting_config.read().await;
     let jitsi = cfg
         .jitsi
@@ -18,7 +18,13 @@ pub(super) async fn meeting_provider_labels(state: &AppState) -> (String, String
         .as_ref()
         .and_then(|w| w.display_name.clone())
         .unwrap_or_default();
-    (jitsi, webhook)
+    // ilia fork: the 3CX PBX's label (`threecx_auto`).
+    let threecx = cfg
+        .threecx
+        .as_ref()
+        .and_then(|t| t.display_name.clone())
+        .unwrap_or_default();
+    (jitsi, webhook, threecx)
 }
 
 /// Pick the location URL to expose on a freshly-created booking.
@@ -221,6 +227,10 @@ pub(super) async fn handle_group_booking(
             .into_response()
         }
     };
+    // ilia fork: the event title the guest reads (page, emails, SMS), in the
+    // page language, which the booking stores (`event_texts`).
+    let guest_title =
+        super::event_texts::title_in(&state.pool, &et_id, lang, et_title.clone()).await;
     // ilia fork: priced types are booked on personal pages only (docs/ton.md).
     if ton_pay::is_priced(&state.pool, &et_id).await {
         return ton_pay::refuse_group(&state, lang);
@@ -841,7 +851,13 @@ pub(super) async fn handle_group_booking(
             )]
         };
 
+        // ilia fork: hosts get the 3CX organizer's link (`threecx::for_host`).
+        let host_location =
+            super::threecx::host_link(&state.pool, &state.secret_key, &details.uid).await;
         send_new_booking_emails(NewBookingEmails {
+            // ilia fork (`event_texts`).
+            guest_event_title: guest_title.clone(),
+            host_location,
             smtp_config,
             details,
             host_recipients,
@@ -864,7 +880,7 @@ pub(super) async fn handle_group_booking(
         crate::sms::collects_phone(&sms_phone_mode),
         phone_to_store.as_deref(),
         needs_approval,
-        &et_title,
+        &guest_title,
         &form.date,
         &form.time,
         &guest_timezone,
@@ -880,7 +896,7 @@ pub(super) async fn handle_group_booking(
     };
     let rendered = tmpl
         .render(context! {
-            event_title => et_title,
+            event_title => guest_title,
             date_label => date_label,
             time_start => form.time,
             time_end => guest_end_time,
@@ -998,6 +1014,10 @@ async fn handle_dynamic_group_booking(
             .into_response()
         }
     };
+    // ilia fork: the event title the guest reads (page, emails, SMS), in the
+    // page language, which the booking stores (`event_texts`).
+    let guest_title =
+        super::event_texts::title_in(&state.pool, &et_id, lang, et_title.clone()).await;
 
     if visibility != "public" {
         return Html(crate::i18n::translate(
@@ -1454,7 +1474,13 @@ async fn handle_dynamic_group_booking(
             details.host_email.clone(),
             details.host_language.clone(),
         )];
+        // ilia fork: hosts get the 3CX organizer's link (`threecx::for_host`).
+        let host_location =
+            super::threecx::host_link(&state.pool, &state.secret_key, &details.uid).await;
         send_new_booking_emails(NewBookingEmails {
+            // ilia fork (`event_texts`).
+            guest_event_title: guest_title.clone(),
+            host_location,
             smtp_config,
             details,
             host_recipients,
@@ -1483,7 +1509,7 @@ async fn handle_dynamic_group_booking(
     };
     Html(
         tmpl.render(context! {
-            event_title => et_title,
+            event_title => guest_title,
             date_label => date_label,
             time_start => form.time,
             time_end => guest_end_time,
@@ -1601,6 +1627,10 @@ pub(super) async fn handle_booking_for_user(
     };
 
     let lang = user_page_lang(user_lang.as_deref(), &page_mode, &headers);
+    // ilia fork: the event title the guest reads (page, emails, SMS), in the
+    // page language, which the booking stores (`event_texts`).
+    let guest_title =
+        super::event_texts::title_in(&state.pool, &et_id, lang, et_title.clone()).await;
     let needs_approval = requires_confirmation != 0;
     // ilia fork: the guest's Telegram username, when the event type asks.
     let telegram_username = match super::telegram::resolve_guest_telegram(
@@ -2091,7 +2121,13 @@ pub(super) async fn handle_booking_for_user(
                 details.host_email.clone(),
                 details.host_language.clone(),
             )];
+            // ilia fork: hosts get the 3CX organizer's link (`threecx::for_host`).
+            let host_location =
+                super::threecx::host_link(&state.pool, &state.secret_key, &details.uid).await;
             send_new_booking_emails(NewBookingEmails {
+                // ilia fork (`event_texts`).
+                guest_event_title: guest_title.clone(),
+                host_location,
                 smtp_config,
                 details,
                 host_recipients,
@@ -2115,7 +2151,7 @@ pub(super) async fn handle_booking_for_user(
         crate::sms::collects_phone(&sms_phone_mode),
         phone_to_store.as_deref(),
         needs_approval,
-        &et_title,
+        &guest_title,
         &form.date,
         &form.time,
         &guest_timezone,
@@ -2140,7 +2176,7 @@ pub(super) async fn handle_booking_for_user(
     };
     let rendered = tmpl
         .render(context! {
-            event_title => et_title,
+            event_title => guest_title,
             date_label => date_label,
             time_start => form.time,
             time_end => guest_end_time,
@@ -2510,6 +2546,10 @@ pub(super) async fn handle_booking(
         page_mode.as_deref().unwrap_or(""),
         &headers,
     );
+    // ilia fork: the event title the guest reads (page, emails, SMS), in the
+    // page language, which the booking stores (`event_texts`).
+    let guest_title =
+        super::event_texts::title_in(&state.pool, &et_id, lang, et_title.clone()).await;
     let needs_approval = requires_confirmation != 0;
     // ilia fork: the guest's Telegram username, when the event type asks.
     let telegram_username = match super::telegram::resolve_guest_telegram(
@@ -2976,7 +3016,13 @@ pub(super) async fn handle_booking(
                 details.host_email.clone(),
                 details.host_language.clone(),
             )];
+            // ilia fork: hosts get the 3CX organizer's link (`threecx::for_host`).
+            let host_location =
+                super::threecx::host_link(&state.pool, &state.secret_key, &details.uid).await;
             send_new_booking_emails(NewBookingEmails {
+                // ilia fork (`event_texts`).
+                guest_event_title: guest_title.clone(),
+                host_location,
                 smtp_config,
                 details,
                 host_recipients,
@@ -3000,7 +3046,7 @@ pub(super) async fn handle_booking(
         crate::sms::collects_phone(&sms_phone_mode),
         phone_to_store.as_deref(),
         needs_approval,
-        &et_title,
+        &guest_title,
         &form.date,
         &form.time,
         &guest_timezone,
@@ -3028,7 +3074,7 @@ pub(super) async fn handle_booking(
     };
     let rendered = tmpl
         .render(context! {
-            event_title => et_title,
+            event_title => guest_title,
             date_label => date_label,
             time_start => form.time,
             time_end => guest_end_time,

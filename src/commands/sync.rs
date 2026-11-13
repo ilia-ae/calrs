@@ -1596,6 +1596,9 @@ async fn cancel_orphaned_booking(
     };
     // Its attendees hold the invite too (#267).
     let details = crate::web::with_invite_holders(pool, details, false).await;
+    // ilia fork: the guest's copies name the event in their language
+    // (`web::event_texts`); the host's keeps the base title.
+    let details = crate::web::event_texts::for_guest(pool, &details).await;
 
     if let Err(e) = crate::email::send_guest_cancellation(&smtp_config, &details).await {
         tracing::warn!(

@@ -43,12 +43,17 @@ pub const DEFAULT_JITSI_PATTERN: &str = "{event}-{random}";
 pub const LOCATION_TYPE_JITSI: &str = "jitsi_auto";
 pub const LOCATION_TYPE_WEBHOOK: &str = "webhook_auto";
 pub const LOCATION_TYPE_GOOGLE_MEET: &str = crate::google_meet::LOCATION_TYPE;
+/// ilia fork: a meeting on the site's 3CX PBX (`super::threecx`).
+pub const LOCATION_TYPE_THREECX: &str = super::threecx::LOCATION_TYPE;
 
 /// True when the event type mints a per-booking URL instead of a static value.
 pub fn is_auto_location(location_type: &str) -> bool {
     matches!(
         location_type,
-        LOCATION_TYPE_JITSI | LOCATION_TYPE_WEBHOOK | LOCATION_TYPE_GOOGLE_MEET
+        LOCATION_TYPE_JITSI
+            | LOCATION_TYPE_WEBHOOK
+            | LOCATION_TYPE_GOOGLE_MEET
+            | LOCATION_TYPE_THREECX
     )
 }
 
@@ -79,6 +84,8 @@ pub const WEBHOOK_AUTH_HMAC: &str = "hmac";
 pub struct MeetingConfig {
     pub jitsi: Option<JitsiConfig>,
     pub webhook: Option<WebhookConfig>,
+    /// ilia fork: the 3CX PBX (`super::threecx::load`).
+    pub threecx: Option<super::threecx::ThreeCxConfig>,
 }
 
 #[derive(Clone)]
@@ -208,7 +215,12 @@ pub async fn load_config(pool: &SqlitePool, key: &[u8; 32]) -> MeetingConfig {
             }
         });
 
-    MeetingConfig { jitsi, webhook }
+    let threecx = super::threecx::load(pool, key).await;
+    MeetingConfig {
+        jitsi,
+        webhook,
+        threecx,
+    }
 }
 
 /// Pick the guest-facing label for a `location_type`, falling back to `None`
@@ -218,6 +230,7 @@ pub fn provider_label(location_type: &str, cfg: &MeetingConfig) -> Option<String
     match location_type {
         LOCATION_TYPE_JITSI => cfg.jitsi.as_ref().and_then(|j| j.display_name.clone()),
         LOCATION_TYPE_WEBHOOK => cfg.webhook.as_ref().and_then(|w| w.display_name.clone()),
+        LOCATION_TYPE_THREECX => cfg.threecx.as_ref().and_then(|t| t.display_name.clone()),
         _ => None,
     }
 }
@@ -438,10 +451,7 @@ pub async fn generate_and_persist(
     .flatten();
     let (location_type, event_slug, pattern_override) = et?;
 
-    if location_type != LOCATION_TYPE_JITSI
-        && location_type != LOCATION_TYPE_WEBHOOK
-        && location_type != LOCATION_TYPE_GOOGLE_MEET
-    {
+    if !is_auto_location(&location_type) {
         return None;
     }
 
@@ -511,6 +521,12 @@ pub async fn generate_and_persist(
             )
             .await
         }
+        LOCATION_TYPE_THREECX => match cfg.threecx.as_ref() {
+            Some(threecx) => {
+                super::threecx::create_for_booking(pool, secret_key, threecx, booking_id).await
+            }
+            None => None,
+        },
         _ => None,
     }?;
 

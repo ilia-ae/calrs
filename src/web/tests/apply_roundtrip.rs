@@ -95,6 +95,7 @@ fn production(avatar_file: &str, avatar_sha: &str) -> Value {
     for item in doc["event_types"]["items"].as_array_mut().unwrap() {
         item["busy_calendars"] = Value::Null;
         item["overrides"] = json!([]);
+        item["translations"] = json!({});
     }
     doc
 }
@@ -135,6 +136,7 @@ fn production_v1(avatar_file: &str, avatar_sha: &str) -> Value {
             "google_oauth2": "off",
             "captcha": "off",
             "meeting_webhook": "off",
+            "threecx": "off",
             "sms": "off",
             "sms_allow_all_users": false
         },

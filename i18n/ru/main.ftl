@@ -2560,3 +2560,43 @@ ton-admin-debug-tg-locked-apply = Задано через config apply (site.ton
 ton-admin-debug-tg-saved = Имя гостя в Telegram сохранено.
 ton-admin-debug-tg-invalid = Ничего не сохранено: это не имя пользователя Telegram (латинская буква, затем буквы, цифры и _, от 4 до 32 символов).
 ton-admin-f-debug_booking_telegram = Отладочная бронь: имя гостя в Telegram
+
+## ilia fork: event type translations (src/web/event_texts.rs)
+etf-translations = Переводы
+etf-translations-help = Гости, которые открывают страницы записи на одном из этих языков, видят это название и описание вместо указанных выше, в том числе в письмах и сообщениях. На остальных языках показываются название и описание выше.
+etf-translation-language = Язык
+etf-translation-description-help = Можно использовать **жирный**, *курсив* и [ссылки](url). Если оставить поле пустым, на этом языке описания не будет.
+etf-translation-add = Добавить язык
+etf-translation-remove = Удалить
+form-error-translation-language = Выберите язык для каждого перевода.
+form-error-translation-duplicate = Для каждого языка можно добавить только один перевод.
+form-error-translation-title-required = Укажите название для каждого перевода.
+form-error-translation-title-length = Название перевода должно быть не длиннее 255 символов.
+
+## ilia fork: 3CX video meetings (src/web/threecx.rs)
+admin-threecx = Видеовстречи 3CX
+admin-threecx-help = На каждую подтверждённую запись типа встречи с местом «Встреча в 3CX» в этой АТС 3CX создаётся своя запланированная встреча. Гость получает ссылку на встречу, хозяин — ссылку организатора в календаре и письмах. Перенос и отмена записи переносят и удаляют встречу. Адрес почты гостя в 3CX не передаётся, поэтому 3CX ничего гостю не пишет.
+admin-threecx-base-url = Адрес АТС
+admin-threecx-extension = Внутренний номер организатора
+admin-threecx-extension-help = Номер, которому принадлежат встречи, например 100.
+admin-threecx-api-key = Ключ API видеоконференций
+admin-threecx-api-key-help = Ключ API видеоконференций 3CX из консоли администратора 3CX. Хранится зашифрованным и больше не показывается.
+admin-threecx-display-name-help = Что гость видит как место встречи, например «3CX». Пусто — «Видеозвонок».
+admin-threecx-save = Сохранить настройки 3CX
+admin-threecx-test = Проверить связь
+admin-threecx-clear = Удалить настройки 3CX
+admin-threecx-notice-saved = Настройки 3CX сохранены.
+admin-threecx-notice-cleared = Настройки 3CX удалены вместе с ключом.
+admin-threecx-notice-ok = 3CX ответила: адрес и ключ работают.
+admin-threecx-notice-auth = 3CX не приняла ключ. Обращения к 3CX приостановлены на час, чтобы АТС не заблокировала этот сервер; сохранение нового ключа или повторная проверка снимают паузу.
+admin-threecx-notice-transport = 3CX не ответила. Проверьте адрес и что этот сервер до неё достаёт.
+admin-threecx-notice-service = 3CX ответила ошибкой. Проверьте, что для номера включены видеоконференции.
+admin-threecx-notice-bad-link = 3CX вернула ссылку на встречу с другим адресом. Проверьте адрес АТС.
+admin-threecx-notice-not-set = Сначала укажите адрес, номер и ключ.
+admin-threecx-notice-bad-base-url = Не сохранено: адрес должен начинаться с https:// и содержать только хост, без пути.
+admin-threecx-notice-bad-extension = Не сохранено: номер — от 1 до 10 цифр.
+admin-threecx-notice-bad-api-key = Не сохранено: ключ — от 16 до 256 символов без пробелов.
+admin-threecx-notice-bad-display-name = Не сохранено: подпись — не длиннее 100 символов.
+admin-threecx-notice-bad-pair = Не сохранено: адрес и номер задаются вместе, а ключу нужны оба.
+etf-location-threecx = Встреча в 3CX (на каждую запись)
+etf-threecx-hint = На каждую подтверждённую запись создаётся встреча в 3CX; она переносится и удаляется вместе с записью. 3CX настраивается на странице администратора.

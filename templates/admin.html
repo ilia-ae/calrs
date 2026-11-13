@@ -661,6 +661,58 @@ input[name=theme]:focus-visible + .theme-card { outline: 2px solid var(--accent)
   </form>
 </div>
 
+<!-- ilia fork: 3CX video meetings (src/web/threecx.rs) -->
+<div class="card" id="threecx">
+  <h2>{{ t("admin-threecx") }}</h2>
+  <div style="margin-bottom: 1rem; font-size: 0.875rem; color: var(--text-secondary);">
+    {{ t("admin-status") }} {% if threecx_configured %}<strong style="color: var(--success);">{{ t("admin-status-enabled") }}</strong>{% else %}<span style="color: var(--text-muted);">{{ t("admin-status-disabled") }}</span>{% endif %}
+    {% if threecx_base_url %}&middot; <span style="color: var(--text-muted);">{{ threecx_base_url }}</span>{% endif %}
+  </div>
+  {% if threecx_notice_text %}
+    {% if threecx_notice_ok %}
+      <div class="success" role="status">{{ threecx_notice_text }}</div>
+    {% else %}
+      <div class="error" role="alert">{{ threecx_notice_text }}</div>
+    {% endif %}
+  {% endif %}
+  {% if threecx_paused and threecx_notice != "auth" %}
+    <div class="error" role="alert">{{ t("admin-threecx-notice-auth") }}</div>
+  {% endif %}
+  <p style="color: var(--text-muted); font-size: 0.875rem; margin-bottom: 0.75rem;">
+    {{ t("admin-threecx-help") }}
+  </p>
+  <form method="post" action="/dashboard/admin/threecx">
+    <div class="form-grid-2">
+      <div class="form-group">
+        <label for="threecx_base_url">{{ t("admin-threecx-base-url") }}</label>
+        <input type="url" id="threecx_base_url" name="threecx_base_url" value="{{ threecx_base_url }}" placeholder="https://pbx.example.com" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label for="threecx_extension">{{ t("admin-threecx-extension") }}</label>
+        <input type="text" id="threecx_extension" name="threecx_extension" value="{{ threecx_extension }}" placeholder="100" inputmode="numeric" pattern="[0-9]{1,10}" autocomplete="off">
+        <span class="hint">{{ t("admin-threecx-extension-help") }}</span>
+      </div>
+    </div>
+    <div class="form-group">
+      <label for="threecx_api_key">{{ t("admin-threecx-api-key") }} <span class="hint">{% if threecx_key_set %}{{ t("admin-keep-current-set-hint") }}{% else %}{{ t("admin-keep-current-hint") }}{% endif %}</span></label>
+      <input type="password" id="threecx_api_key" name="threecx_api_key" value="" placeholder="{{ t('admin-keep-unchanged') }}" autocomplete="new-password">
+      <span class="hint">{{ t("admin-threecx-api-key-help") }}</span>
+    </div>
+    <div class="form-group">
+      <label for="threecx_display_name">{{ t("admin-display-name") }} <span class="hint">{{ t("team-form-optional") }}</span></label>
+      <input type="text" id="threecx_display_name" name="threecx_display_name" value="{{ threecx_display_name }}" placeholder="3CX" maxlength="100">
+      <span class="hint">{{ t("admin-threecx-display-name-help") }}</span>
+    </div>
+    <div class="btn-row">
+      <button type="submit" class="btn btn-auto" name="action" value="save">{{ t("admin-threecx-save") }}</button>
+      <button type="submit" class="btn btn-secondary btn-auto" name="action" value="test">{{ t("admin-threecx-test") }}</button>
+      {% if threecx_base_url or threecx_key_set %}
+      <button type="submit" class="btn btn-danger btn-auto" name="action" value="clear">{{ t("admin-threecx-clear") }}</button>
+      {% endif %}
+    </div>
+  </form>
+</div>
+
 <!-- Generic meeting webhook -->
 <div class="card">
   <h2>{{ t("admin-meeting-webhook") }}</h2>

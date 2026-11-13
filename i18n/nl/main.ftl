@@ -2497,3 +2497,43 @@ ton-admin-debug-tg-locked-apply = Vergrendeld door config apply (site.ton.debug_
 ton-admin-debug-tg-saved = Telegram-gebruikersnaam van de gast opgeslagen.
 ton-admin-debug-tg-invalid = Niets opgeslagen: geen Telegram-gebruikersnaam (een Latijnse letter, dan letters, cijfers en _, 4 tot 32 tekens).
 ton-admin-f-debug_booking_telegram = Testboeking: Telegram-gebruikersnaam van de gast
+
+## ilia fork: event type translations (src/web/event_texts.rs)
+etf-translations = Vertalingen
+etf-translations-help = Gasten die de boekingspagina's in een van deze talen lezen, zien deze titel en beschrijving in plaats van die hierboven, ook in hun e-mails en berichten. Alle andere talen tonen die hierboven.
+etf-translation-language = Taal
+etf-translation-description-help = Ondersteunt **vet**, *cursief* en [links](url). Laat je hem leeg, dan toont deze taal geen beschrijving.
+etf-translation-add = Taal toevoegen
+etf-translation-remove = Verwijderen
+form-error-translation-language = Kies een taal voor elke vertaling.
+form-error-translation-duplicate = Elke taal kan maar één vertaling hebben.
+form-error-translation-title-required = Elke vertaling heeft een titel nodig.
+form-error-translation-title-length = Een vertaalde titel mag hoogstens 255 tekens lang zijn.
+
+## ilia fork: 3CX video meetings (src/web/threecx.rs)
+admin-threecx = 3CX-videovergaderingen
+admin-threecx-help = Elke bevestigde boeking van een afspraaktype met als locatie ‘3CX-vergadering’ krijgt een eigen geplande vergadering op deze 3CX-telefooncentrale. Gasten krijgen de vergaderlink, hosts de organisatorlink in hun agenda en e-mails. Verplaatsen of annuleren van de boeking verplaatst of verwijdert de vergadering. Het e-mailadres van de gast gaat nooit naar 3CX, dus 3CX stuurt de gast niets.
+admin-threecx-base-url = Adres van de centrale
+admin-threecx-extension = Toestel van de organisator
+admin-threecx-extension-help = Het toestel waar de vergaderingen bij horen, bijvoorbeeld 100.
+admin-threecx-api-key = Sleutel van de videoconferentie-API
+admin-threecx-api-key-help = De sleutel van de 3CX-videoconferentie-API, uit de 3CX-beheerconsole. Hij wordt versleuteld opgeslagen en nooit meer getoond.
+admin-threecx-display-name-help = Wat gasten als locatie zien, bijvoorbeeld ‘3CX’. Leeg: ‘Videogesprek’.
+admin-threecx-save = 3CX-instellingen opslaan
+admin-threecx-test = Verbinding testen
+admin-threecx-clear = 3CX-instellingen verwijderen
+admin-threecx-notice-saved = 3CX-instellingen opgeslagen.
+admin-threecx-notice-cleared = 3CX-instellingen verwijderd, de sleutel ook.
+admin-threecx-notice-ok = 3CX antwoordde: het adres en de sleutel werken.
+admin-threecx-notice-auth = 3CX weigerde de sleutel. Aanroepen naar 3CX pauzeren een uur, zodat de centrale deze server niet blokkeert; een nieuwe sleutel opslaan of opnieuw testen beëindigt de pauze.
+admin-threecx-notice-transport = 3CX antwoordde niet. Controleer het adres en of deze server het kan bereiken.
+admin-threecx-notice-service = 3CX antwoordde met een fout. Controleer of videoconferenties voor het toestel aanstaan.
+admin-threecx-notice-bad-link = 3CX gaf een vergaderlink op een ander adres. Controleer het adres van de centrale.
+admin-threecx-notice-not-set = Vul eerst het adres, het toestel en de sleutel in.
+admin-threecx-notice-bad-base-url = Niet opgeslagen: het adres moet met https:// beginnen en alleen de host bevatten, zonder pad.
+admin-threecx-notice-bad-extension = Niet opgeslagen: het toestel moet 1 tot 10 cijfers hebben.
+admin-threecx-notice-bad-api-key = Niet opgeslagen: de sleutel moet 16 tot 256 tekens zonder spaties hebben.
+admin-threecx-notice-bad-display-name = Niet opgeslagen: het label mag hoogstens 100 tekens hebben.
+admin-threecx-notice-bad-pair = Niet opgeslagen: het adres en het toestel horen bij elkaar, en een sleutel heeft beide nodig.
+etf-location-threecx = 3CX-vergadering (voor elke boeking gemaakt)
+etf-threecx-hint = Voor elke bevestigde boeking wordt een 3CX-vergadering gemaakt die verplaatsingen en annulering volgt. Stel 3CX in op de beheerpagina.

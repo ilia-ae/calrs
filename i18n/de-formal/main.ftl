@@ -593,3 +593,6 @@ dbg-telegram-from-chat = Aus Ihrem verknüpften Telegram-Chat übernommen.
 dbg-err-timing = Wählen Sie die Fristen. Eigene Minuten: Fenster 2–240, verlängertes Fenster 2–1440, Verlängerungen 0–5.
 ton-admin-debug-tg-help = Wird auf der Testbuchungsseite vorausgefüllt, wenn Ihr verknüpfter Telegram-Chat keinen Benutzernamen hat (für Termintypen, die danach fragen). Ohne @; leer: keiner.
 ton-admin-debug-tg-locked-apply = Von config apply festgelegt (site.ton.debug_booking_telegram). Ändern Sie es im Dokument von config apply oder lassen Sie den Schlüssel weg, um es an diese Seite zu übergeben.
+
+## ilia fork: event type translations (src/web/event_texts.rs)
+form-error-translation-language = Wählen Sie für jede Übersetzung eine Sprache.

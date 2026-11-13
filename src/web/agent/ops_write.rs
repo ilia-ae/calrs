@@ -214,14 +214,16 @@ pub(crate) fn check_line(field: &str, text: &str, max: usize) -> Result<Option<S
     Ok((!text.is_empty()).then(|| text.to_string()))
 }
 
-fn check_title(field: &str, title: &str) -> Result<String, ToolError> {
+/// (ilia fork: also `config apply`'s translated titles, `apply::event_types`.)
+pub(crate) fn check_title(field: &str, title: &str) -> Result<String, ToolError> {
     check_line(field, title, TITLE_MAX)?
         .ok_or_else(|| ToolError::invalid(field, "must not be empty"))
 }
 
 /// A description: Markdown of at most `OWNER_TEXT_MAX` characters whose
-/// links are http, https or mailto. Empty becomes `None`.
-fn check_description(field: &str, text: &str) -> Result<Option<String>, ToolError> {
+/// links are http, https or mailto. Empty becomes `None`. (ilia fork: also
+/// `config apply`'s translated descriptions.)
+pub(crate) fn check_description(field: &str, text: &str) -> Result<Option<String>, ToolError> {
     let text = text.trim();
     if text
         .chars()

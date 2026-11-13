@@ -2495,3 +2495,43 @@ ton-admin-debug-tg-locked-apply = Bloqueado pelo config apply (site.ton.debug_bo
 ton-admin-debug-tg-saved = Usuário do Telegram do convidado salvo.
 ton-admin-debug-tg-invalid = Nada foi salvo: não é um usuário do Telegram (uma letra latina, depois letras, dígitos e _, de 4 a 32 caracteres).
 ton-admin-f-debug_booking_telegram = Reserva de teste: usuário do Telegram do convidado
+
+## ilia fork: event type translations (src/web/event_texts.rs)
+etf-translations = Traduções
+etf-translations-help = Os convidados que leem as páginas de agendamento em um destes idiomas veem este título e esta descrição no lugar dos de cima, também nos e-mails e mensagens. Os demais idiomas mostram os de cima.
+etf-translation-language = Idioma
+etf-translation-description-help = Aceita **negrito**, *itálico* e [links](url). Se ficar vazia, este idioma não mostra descrição.
+etf-translation-add = Adicionar um idioma
+etf-translation-remove = Remover
+form-error-translation-language = Escolha um idioma para cada tradução.
+form-error-translation-duplicate = Cada idioma pode ter só uma tradução.
+form-error-translation-title-required = Cada tradução precisa de um título.
+form-error-translation-title-length = Um título traduzido deve ter no máximo 255 caracteres.
+
+## ilia fork: 3CX video meetings (src/web/threecx.rs)
+admin-threecx = Reuniões de vídeo 3CX
+admin-threecx-help = Cada reserva confirmada de um tipo de evento cujo local é “Reunião 3CX” ganha sua própria reunião agendada neste PABX 3CX. Os convidados recebem o link da reunião; os anfitriões, o link do organizador na agenda e nos e-mails. Mover ou cancelar a reserva move ou exclui a reunião. O e-mail do convidado nunca é enviado ao 3CX, então o 3CX não escreve para o convidado.
+admin-threecx-base-url = Endereço do PABX
+admin-threecx-extension = Ramal do organizador
+admin-threecx-extension-help = O ramal ao qual as reuniões pertencem, por exemplo 100.
+admin-threecx-api-key = Chave da API de videoconferência
+admin-threecx-api-key-help = A chave da API de videoconferência do 3CX, do console de administração do 3CX. Ela é guardada criptografada e nunca mais é mostrada.
+admin-threecx-display-name-help = O que os convidados veem como local, por exemplo “3CX”. Vazio: “Videochamada”.
+admin-threecx-save = Salvar configurações do 3CX
+admin-threecx-test = Testar conexão
+admin-threecx-clear = Remover configurações do 3CX
+admin-threecx-notice-saved = Configurações do 3CX salvas.
+admin-threecx-notice-cleared = Configurações do 3CX removidas, junto com a chave.
+admin-threecx-notice-ok = O 3CX respondeu: o endereço e a chave funcionam.
+admin-threecx-notice-auth = O 3CX recusou a chave. As chamadas ao 3CX ficam pausadas por uma hora para que o PABX não bloqueie este servidor; salvar uma nova chave ou testar de novo encerra a pausa.
+admin-threecx-notice-transport = O 3CX não respondeu. Verifique o endereço e se este servidor consegue alcançá-lo.
+admin-threecx-notice-service = O 3CX respondeu com um erro. Verifique se a videoconferência está ativada para o ramal.
+admin-threecx-notice-bad-link = O 3CX devolveu um link de reunião em outro endereço. Verifique o endereço do PABX.
+admin-threecx-notice-not-set = Informe primeiro o endereço, o ramal e a chave.
+admin-threecx-notice-bad-base-url = Não salvo: o endereço deve começar com https:// e ter só o host, sem caminho.
+admin-threecx-notice-bad-extension = Não salvo: o ramal deve ter de 1 a 10 dígitos.
+admin-threecx-notice-bad-api-key = Não salvo: a chave deve ter de 16 a 256 caracteres sem espaços.
+admin-threecx-notice-bad-display-name = Não salvo: o rótulo pode ter no máximo 100 caracteres.
+admin-threecx-notice-bad-pair = Não salvo: o endereço e o ramal andam juntos, e uma chave precisa dos dois.
+etf-location-threecx = Reunião 3CX (criada para cada reserva)
+etf-threecx-hint = Uma reunião 3CX é criada para cada reserva confirmada e acompanha suas mudanças e o cancelamento. Configure o 3CX na página de administração.

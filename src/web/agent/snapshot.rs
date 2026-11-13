@@ -25,6 +25,8 @@ pub(crate) const CHILD_TABLES: &[&str] = &[
     "ton_prices",
     // ilia fork: the guest Telegram field (migration ilia_002_telegram).
     "telegram_event_types",
+    // ilia fork: the titles and descriptions per language (`event_texts`).
+    "event_type_texts",
 ];
 
 /// Tables with an `event_type_id` column that are not configuration: what

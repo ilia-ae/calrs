@@ -33,6 +33,7 @@ mod files;
 mod profile;
 mod site;
 mod sources;
+mod threecx;
 mod ton;
 
 use crate::auth::{AdminUser, AuthUser};
@@ -156,6 +157,8 @@ keyword!(
         JitsiAuto => "jitsi_auto",
         WebhookAuto => "webhook_auto",
         GoogleMeet => "google_meet",
+        // ilia fork: a meeting on the site's 3CX PBX (`web::threecx`).
+        ThreeCxAuto => "threecx_auto",
     }
 );
 keyword!(
@@ -500,6 +503,14 @@ pub(crate) struct Site {
         skip_serializing_if = "Option::is_none"
     )]
     pub(crate) ton: Option<TonSection>,
+    /// ilia fork: the 3CX card (`apply/threecx.rs`): `"off"`, or the
+    /// address, extension, label and (null keeps it) the key.
+    #[serde(
+        default,
+        deserialize_with = "present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub(crate) threecx: Option<threecx::ThreeCx>,
 }
 
 /// `site.ton`: the `crate::ton::settings::SPECS` fields, each a value or
@@ -605,6 +616,15 @@ pub(crate) struct EventTypeItem {
         skip_serializing_if = "Option::is_none"
     )]
     pub(crate) description: Option<Option<String>>,
+    /// ilia fork: the title and description per shipped language
+    /// (`event_type_texts`, `web::event_texts`), keyed by locale code; the
+    /// whole set: `{}` removes every one. A language may appear once.
+    #[serde(
+        default,
+        deserialize_with = "unique_texts",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub(crate) translations: Option<std::collections::BTreeMap<String, TextItem>>,
     #[serde(
         default,
         deserialize_with = "present",
@@ -803,6 +823,52 @@ pub(crate) struct EventTypeItem {
         skip_serializing_if = "Option::is_none"
     )]
     pub(crate) enabled: Option<bool>,
+}
+
+/// ilia fork: one language's title and description of an event type
+/// (`translations`); `description` null or left out: none in that language.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct TextItem {
+    pub(crate) title: String,
+    #[serde(default)]
+    pub(crate) description: Option<String>,
+}
+
+/// ilia fork: `translations`, given (it may not be null): an object whose
+/// keys are languages, each at most once (a JSON object read into a map
+/// would otherwise keep the last of two silently).
+fn unique_texts<'de, D>(
+    deserializer: D,
+) -> Result<Option<std::collections::BTreeMap<String, TextItem>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct Texts;
+    impl<'de> serde::de::Visitor<'de> for Texts {
+        type Value = std::collections::BTreeMap<String, TextItem>;
+
+        fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            f.write_str("an object of languages, each {title, description}")
+        }
+
+        fn visit_map<A: serde::de::MapAccess<'de>>(
+            self,
+            mut map: A,
+        ) -> Result<Self::Value, A::Error> {
+            let mut out = std::collections::BTreeMap::new();
+            while let Some(lang) = map.next_key::<String>()? {
+                let text: TextItem = map.next_value()?;
+                if out.insert(lang.clone(), text).is_some() {
+                    return Err(serde::de::Error::custom(format!(
+                        "translations: language {lang:?} given twice"
+                    )));
+                }
+            }
+            Ok(out)
+        }
+    }
+    deserializer.deserialize_map(Texts).map(Some)
 }
 
 /// At most `count` bookings per `period` (per booker email is not a thing:

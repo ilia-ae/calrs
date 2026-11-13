@@ -102,6 +102,7 @@
         <option value="jitsi_auto" {% if form_location_type == "jitsi_auto" %}selected{% endif %}>{{ t("etf-location-jitsi") }}</option>
         <option value="webhook_auto" {% if form_location_type == "webhook_auto" %}selected{% endif %}>{{ t("etf-location-webhook") }}</option>
         <option value="google_meet" {% if form_location_type == "google_meet" %}selected{% endif %}>{{ t("event-type-form-location-google-meet") }}</option>
+        <option value="threecx_auto" {% if form_location_type == "threecx_auto" %}selected{% endif %}>{{ t("etf-location-threecx") }}</option>
         <option value="phone" {% if form_location_type == "phone" %}selected{% endif %}>{{ t("etf-location-phone") }}</option>
         <option value="in_person" {% if form_location_type == "in_person" %}selected{% endif %}>{{ t("etf-location-in-person") }}</option>
         <option value="custom" {% if form_location_type == "custom" %}selected{% endif %}>{{ t("etf-location-custom") }}</option>
@@ -122,6 +123,9 @@
       </span>
       <span id="meeting-google-hint" class="hint" style="font-size: 0.8rem; color: var(--text-muted); display: none; margin-top: 0.25rem;">
         {{ t("event-type-form-location-google-meet-hint") }}
+      </span>
+      <span id="meeting-threecx-hint" class="hint" style="font-size: 0.8rem; color: var(--text-muted); display: none; margin-top: 0.25rem;">
+        {{ t("etf-threecx-hint") }}
       </span>
     </div>
   </div>
@@ -144,8 +148,10 @@
       var patternHint = document.getElementById('meeting-pattern-hint');
       var webhookHint = document.getElementById('meeting-webhook-hint');
       var googleHint = document.getElementById('meeting-google-hint');
+      var threecxHint = document.getElementById('meeting-threecx-hint');
       function refresh() {
         var v = sel.value;
+        threecxHint.style.display = v === 'threecx_auto' ? 'block' : 'none';
         if (v === 'jitsi_auto') {
           staticVal.style.display = 'none';
           staticVal.required = false;
@@ -160,13 +166,13 @@
           patternHint.style.display = 'none';
           webhookHint.style.display = 'block';
           googleHint.style.display = 'none';
-        } else if (v === 'google_meet') {
+        } else if (v === 'google_meet' || v === 'threecx_auto') {
           staticVal.style.display = 'none';
           staticVal.required = false;
           patternIn.style.display = 'none';
           patternHint.style.display = 'none';
           webhookHint.style.display = 'none';
-          googleHint.style.display = 'block';
+          googleHint.style.display = v === 'google_meet' ? 'block' : 'none';
         } else {
           staticVal.style.display = '';
           staticVal.required = (v === 'link' || v === 'phone' || v === 'in_person' || v === 'custom');
@@ -273,6 +279,8 @@
   .priority-btn.active-medium { background: var(--text-muted); color: var(--surface); border-color: var(--text-muted); }
   .priority-btn.active-low { background: var(--surface-hover); color: var(--text); border-color: var(--border-hover); font-style: italic; }
 </style>
+
+{% if event_texts is defined and event_texts %}{% include "partials/ilia_event_texts_form.html" %}{% endif %}
 
 <!-- Card 2: Members (round-robin priority OR collective inclusion) -->
 {% if priority_members is defined and priority_members %}

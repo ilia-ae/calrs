@@ -78,6 +78,9 @@ calrs --data-dir D config apply --export [--user E]    # stored state, same sche
     "google_oauth2": "off",
     "captcha": "off",
     "meeting_webhook": "off",
+    "threecx": {"base_url": "https://sip.ilia.ae", "extension": "100",
+                "display_name": "3CX", "api_key": null},
+                                          // ilia fork; or "off" (see "3CX" below)
     "sms": "off",                         // ilia fork; only "off" (see "SMS gateway" below)
     "sms_allow_all_users": false,
     "ton": {                              // ilia fork; left out = no change (see "TON settings" below)
@@ -104,6 +107,7 @@ calrs --data-dir D config apply --export [--user E]    # stored state, same sche
         "slug": "15min",                  // required; the key
         "title": "…",                     // 1..255
         "description": "…",               // nullable; Markdown, MCP's check_description
+        "translations": {"ru": {"title": "…", "description": "…"}},  // ilia fork; the whole set; {} = none
         "duration_min": 15,               // 1..1440
         "slot_interval_min": null,        // nullable
         "buffer_before": 0, "buffer_after": 15, "min_notice_min": 240,
@@ -141,7 +145,7 @@ calrs --data-dir D config apply --export [--user E]    # stored state, same sche
 
 - **Event type items:**
   - Field names, values and ranges are the MCP `EventTypePatch` ones (`src/web/agent/dto.rs`).
-  - Three things differ: `timezone` is nullable here; `weekly_hours`, `frequency_limits`, `busy_calendars`, `overrides`, `ton_price`, `telegram_guest_mode` and `enabled` are extra keys; and there is no `version`.
+  - Three things differ: `timezone` is nullable here; `translations`, `weekly_hours`, `frequency_limits`, `busy_calendars`, `overrides`, `ton_price`, `telegram_guest_mode` and `enabled` are extra keys; and there is no `version`.
   - A key that is left out keeps the stored value. On creation, a missing key takes the new event type form's default.
   - These are not in v1 and are left as they are: resources, watchers and team fields (not used on a single-owner server).
 - **Busy calendars (`busy_calendars`, ilia fork, added after v1 froze; same format string):** the event type form's calendar choice (`calendar_ids`, stored in `event_type_calendars`): the calendars whose events block this type's slots.
@@ -151,6 +155,13 @@ calrs --data-dir D config apply --export [--user E]    # stored state, same sche
   - Export: the sorted names, `null` for no choice; left out when a chosen calendar shares its name with another one (or no source lists it), so an export applies as no change.
   - Calendars of a source added in the same run are not known until `calrs serve` syncs it: the ilia-booking role leaves the key out of such a run.
   - An older calrs refuses the key (`deny_unknown_fields`, exit 2, nothing written). The marker of a calrs that knows it is `BUSY_CALENDARS_SHAPE` in `src/web/apply/event_types.rs`, `busy_calendars: null or a list of calendar names` (part of the refusal of `[]`, so it is in the binary).
+- **Translations (`translations`, ilia fork, added after v1 froze; same format string):** the "Translations" section of the event type form (`event_type_texts`, `src/web/event_texts.rs`): per language, the title and description guests reading that language see instead of `title` and `description` (pages, emails, the guest `.ics`, SMS, Telegram); a language without one reads its base language's (`de-formal` reads `de`), else the base text. Host-facing outputs keep `title`.
+  - An object keyed by shipped locale code, spelled as calrs spells it (`en`, `fr`, `es`, `pl`, `de`, `de-formal`, `it`, `et`, `pt`, `nl`, `ru`; `"RU"` and `"xx"` are refused under `event_types[<slug>].translations.<key>`), each `{"title": "…", "description": "…"}`; `description` null or left out is none in that language (the base description is not shown under a translated title). A language given twice is refused when the document is read (a JSON object would otherwise keep the last one).
+  - **Always the whole set.** `{}` removes every translation. Left out, the stored ones stay (those made in the form included). The same semantics as `frequency_limits` and `overrides`.
+  - Checks, as MCP checks a title and a description (`ops_write::check_title`, `check_description`): the title 1..255 characters on one line, the description at most 4000 characters with http, https or mailto links only; both canonical (not padded, not empty: use null). Paths `event_types[<slug>].translations.<lang>.title` and `.description`.
+  - Written after the form, in the run's transaction (`event_texts::replace`: one `DELETE` of the type's rows, one `INSERT` per language), only when the stored set differs. The form posted for another key carries no "Translations" section and leaves the rows as they are. The diff gives the whole sets (`event_types[<slug>].translations`).
+  - Export: the stored set, `{}` for none; left out when a stored text is one the document could not give (a description the dashboard saved with a trailing line break, or past MCP's limits), so an export applies as no change.
+  - An older calrs refuses the key (exit 2, nothing written). Its marker is `TRANSLATIONS_SHAPE` in `src/web/apply/event_types.rs`, `translations: {<language>: {title, description}}, the whole set` (part of the refusal of a language calrs does not ship).
 - **Date overrides (`overrides`, ilia fork, added after v1 froze; same format string):** the type's overrides page (`/dashboard/event-types/{slug}/overrides`, `availability_overrides`): `{"date": "YYYY-MM-DD", "blocked": true}` is a day off, `{"date", "start": "HH:MM", "end": "HH:MM"}` replaces that day's weekly hours.
   - Always the whole list **from today on**, today in the type's timezone (its own, else the profile's). `[]` removes every override from today on. Left out, the stored rows stay (those made on the page or by MCP included).
   - Rows dated before today are never compared, written or exported, and an entry dated before today is left out of the run: an inventory still applies after a day off has passed.
@@ -183,6 +194,11 @@ calrs --data-dir D config apply --export [--user E]    # stored state, same sche
   - Refused (exit 2, nothing written) when the `CALRS_SMS_*` environment block of the `config apply` process sets the gateway: that block wins over the database and the card's handler does not clear while it is set. `config apply` does not see `calrs serve`'s environment, so on a server whose `calrs.env` sets the gateway the stored row is deleted and the environment still governs.
   - Export: `"off"` when no gateway is stored and the environment sets none; otherwise left out, so applying an export changes nothing.
   - An older calrs refuses the key (`deny_unknown_fields`, exit 2, nothing written). The marker of a calrs that knows it is `SMS_OFF_SHAPE` in `src/web/apply/site.rs`, `site.sms: "off" deletes the stored SMS gateway` (part of the environment refusal, so in the binary). The ilia-booking role checks it before it sends the key.
+- **3CX (`site.threecx`, ilia fork, added after v1 froze; same format string):** the 3CX card of the admin page (`auth_config.threecx_*`, `src/web/apply/threecx.rs`, written through `web::threecx::store`, the card's own statement).
+  - `"off"` removes the settings, the stored key with them. An object gives `base_url` (`https://host[:port]`, lower-case, no path, no trailing slash; plain `http://` only for `localhost`/`127.0.0.1`), `extension` (1..10 digits) and `display_name` (what guests see as the place; `null` shows the generic "Video call"), all three required, and `api_key`: the 3CX video conference API key to store, or `null`/left out to keep the stored one, so the admin page can own the key (owner's request 2026-11-13). Values must be written as stored (`"https://SIP.ilia.ae/"` is refused with the spelling to use).
+  - Report: one path, `site.threecx`, before and after in the document's shape with the key as `"(secret set)"` (or absent when none is stored); a change sets `restart` (`calrs serve` caches the settings). The key never appears in the report, the export or a log line.
+  - Export: the stored address, extension and label without `api_key` (which keeps the stored key), or `"off"`; left out when a stored value is one the checks refuse (a hand edit).
+  - An older calrs refuses the key (`deny_unknown_fields`, exit 2, nothing written). The marker of a calrs that knows it is `THREECX_SHAPE` in `src/web/apply/threecx.rs`, `site.threecx: "off" or {base_url, extension, display_name, api_key|null}` (part of every refusal of the section, so in the binary). The ilia-booking role checks it before it sends the key.
 - **Not in the document:** `base_url` and `allow_private_hosts` belong to the environment, so they are unknown keys. There are no secrets in v1. (The ilia-booking role keeps the stored `allow_private_hosts` empty with `calrs config general --allow-private-hosts ""` when its environment sets none.)
 
 ### Canonical values
@@ -219,7 +235,7 @@ The checks reuse the existing validators: `check_text`/`check_opt_text`/`check_t
 - `event_types[<slug>]` with `before: null, after: "created"` for a created event type, or `before: "present", after: null` for a deleted one. Disabling by prune is `event_types[<slug>].enabled`, true to false.
 
 **Values:**
-- `before` and `after` are JSON in the document's own shape. `weekly_hours`, `frequency_limits`, `busy_calendars` and `overrides` appear as whole lists, `ton_price` as the whole object with every key (or `null`).
+- `before` and `after` are JSON in the document's own shape. `weekly_hours`, `frequency_limits`, `busy_calendars` and `overrides` appear as whole lists, `translations` as the whole object (every language with its `title` and `description`), `ton_price` as the whole object with every key (or `null`).
 - A cleared secret column shows `"(secret set)"` changing to `null` (`SECRET_SET`).
 - `profile.avatar` shows `"sha256:<hex>"`, or `null`.
 

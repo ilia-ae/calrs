@@ -304,7 +304,15 @@ pub(crate) async fn send_host_message(
         "host message sent to the guest"
     );
     if let (Channel::Queued, Some(smtp)) = (email, smtp) {
-        let mail = host_message_mail(&booking, author, &body);
+        let mut mail = host_message_mail(&booking, author, &body);
+        // The event as the guest's pages name it (`event_texts`).
+        mail.event_title = super::event_texts::title_in(
+            pool,
+            &booking.event_type_id,
+            &mail.lang,
+            mail.event_title,
+        )
+        .await;
         let (pool, id, booking_id) = (pool.clone(), id.clone(), booking_id.to_string());
         spawn_emails(async move {
             let result = crate::email::send_guest_host_message(&smtp, &mail).await;
