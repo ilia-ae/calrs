@@ -1820,6 +1820,7 @@ ton-pay-scan = Or scan this code with your wallet app.
 ton-pay-qr-alt-tonkeeper = QR code for Tonkeeper with the payment details
 ton-pay-scan-tonkeeper = Or scan this code with Tonkeeper or your phone's camera.
 ton-pay-qr-other = QR code for another wallet (MyTonWallet etc.)
+ton-pay-qr-tonkeeper = QR code for Tonkeeper
 ton-pay-address = Address
 ton-pay-comment = Comment
 ton-pay-copy = Copy

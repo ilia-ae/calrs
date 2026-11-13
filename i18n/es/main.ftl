@@ -1818,6 +1818,7 @@ ton-pay-scan = O escanea este código con la app de tu billetera.
 ton-pay-qr-alt-tonkeeper = Código QR para Tonkeeper con los datos del pago
 ton-pay-scan-tonkeeper = O escanea este código con Tonkeeper o con la cámara del teléfono.
 ton-pay-qr-other = Código QR para otra billetera (MyTonWallet, etc.)
+ton-pay-qr-tonkeeper = Código QR para Tonkeeper
 ton-pay-address = Dirección
 ton-pay-comment = Comentario
 ton-pay-copy = Copiar

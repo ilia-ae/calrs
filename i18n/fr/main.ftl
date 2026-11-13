@@ -1818,6 +1818,7 @@ ton-pay-scan = Ou scannez ce code avec l’application de votre portefeuille.
 ton-pay-qr-alt-tonkeeper = QR code pour Tonkeeper contenant les informations de paiement
 ton-pay-scan-tonkeeper = Ou scannez ce code avec Tonkeeper ou l’appareil photo de votre téléphone.
 ton-pay-qr-other = QR code pour un autre portefeuille (MyTonWallet, etc.)
+ton-pay-qr-tonkeeper = QR code pour Tonkeeper
 ton-pay-address = Adresse
 ton-pay-comment = Commentaire
 ton-pay-copy = Copier

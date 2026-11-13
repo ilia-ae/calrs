@@ -73,6 +73,8 @@ mod ov5_admin;
 mod ov5_dash;
 mod ov5_guest;
 mod page_language;
+// ilia fork: the payment page's one QR code, switched by the wallet buttons.
+mod pay_wallet;
 mod pending_hold;
 mod public_pages;
 mod resources;

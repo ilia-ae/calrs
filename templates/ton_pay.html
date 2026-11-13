@@ -54,10 +54,10 @@
   .ton-contact { font-size: 0.8125rem; margin-top: 1.25rem; }
 
   .ton-wallets { display: flex; flex-direction: column; gap: 0.625rem; margin-top: 1.25rem; }
-  .ton-scan { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; width: 14rem; max-width: 100%; margin: 1.5rem auto 0; }
-  .ton-qr { width: 100%; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); background: #fff; }
+  .ton-scan { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; margin: 1.5rem auto 0; }
+  .ton-qr { width: 14rem; max-width: 100%; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); background: #fff; }
   .ton-qr svg { display: block; width: 100%; height: auto; }
-  .ton-scan p { color: var(--text-muted); font-size: 0.8125rem; line-height: 1.4; text-align: center; margin: 0; }
+  .ton-scan p { max-width: 14rem; color: var(--text-muted); font-size: 0.8125rem; line-height: 1.4; text-align: center; margin: 0; }
   .ton-other { margin-top: 0.75rem; text-align: center; }
   .ton-other summary { display: inline-block; cursor: pointer; color: var(--text-secondary); font-size: 0.875rem; list-style: none; text-wrap: balance; }
   .ton-other summary::-webkit-details-marker { display: none; }
@@ -67,6 +67,18 @@
   .ton-other summary:hover { color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
   .ton-other summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
   .ton-other .ton-scan { margin-top: 0.75rem; }
+  /* With JavaScript one code shows (BTCPay's checkout: one QR code and a
+     switch for it): «Another wallet» swaps it to the plain one as it opens
+     the wallet, and this quiet text button under the caption swaps it either
+     way, so a desktop user reaches the other code without the handoff. The
+     disclosure above is the fallback without JavaScript; the script hides it. */
+  .ton-qr-switch { text-wrap: balance; padding: 0.25rem 0.5rem; border: 0; border-radius: 6px; background: none; color: var(--text-secondary); font: inherit; font-size: 0.8125rem; line-height: 1.4; text-decoration: underline; text-decoration-color: var(--border-hover); text-underline-offset: 3px; cursor: pointer; }
+  .ton-qr-switch:hover { color: var(--text); text-decoration-color: currentColor; }
+  .ton-qr-switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  /* A click or tap on a wallet button leaves no ring: coming back from the
+     wallet app can give the link :focus-visible, which on the outlined
+     button reads as a double ring. A key press brings the ring back. */
+  .ton-wallets .btn[data-pointer]:focus-visible { outline: none; }
 
   /* Copy rows after BTCPay's copy field: label over the value on one line,
      the address cut in the middle (start…end) so its tail stays readable,
@@ -98,7 +110,8 @@
   @media (max-width: 600px) {
     .ton-wrap > .card { padding: 1.5rem 1.25rem; }
     .ton-amount { font-size: 2.125rem; }
-    .ton-scan { width: 12rem; }
+    .ton-qr { width: 12rem; }
+    .ton-scan p { max-width: 12rem; }
     .ton-status:not(.ton-result) { padding: 0.75rem; }
   }
 </style>
@@ -158,33 +171,88 @@
   {#- Tonkeeper first: its link names the coin (asset_id), so a multichain Tonkeeper keeps the
       amount and opens the confirmation; the plain ton:// link is for other wallets. #}
   <div class="ton-wallets">
-    <a class="btn btn-lg" href="{{ keeper_link }}" rel="noopener noreferrer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 6.5h15L12 20.5z"/><path d="M12 6.5v14"/></svg>{{ t("ton-pay-open-tonkeeper") }}</a>
-    <a class="btn btn-secondary" href="{{ ton_link }}" rel="noopener noreferrer">{{ t("ton-pay-open-wallet") }}</a>
+    <a class="btn btn-lg" id="ton-open-keeper" href="{{ keeper_link }}" rel="noopener noreferrer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 6.5h15L12 20.5z"/><path d="M12 6.5v14"/></svg>{{ t("ton-pay-open-tonkeeper") }}</a>
+    <a class="btn btn-secondary" id="ton-open-other" href="{{ ton_link }}" rel="noopener noreferrer">{{ t("ton-pay-open-wallet") }}</a>
   </div>
 
   {#- Two codes (`crate::ton::link`): Tonkeeper's link names the coin, which
-      other wallets refuse; the plain `ton://` one waits behind a toggle. -#}
+      other wallets refuse. One shows: with JavaScript «Another wallet» swaps
+      it to the plain `ton://` one (the script under the disclosure); without,
+      the `ton://` one waits behind the disclosure. -#}
   {% if keeper_qr_svg %}
-  <div class="ton-scan">
-    <div class="ton-qr" role="img"
+  <div class="ton-scan" id="ton-scan" data-shown="keeper">
+    <div class="ton-qr" id="ton-qr" role="img"
          aria-label="{{ t('ton-pay-qr-alt-tonkeeper') }}">
-      {{ keeper_qr_svg | safe }}
+      <div data-qr="keeper">{{ keeper_qr_svg | safe }}</div>
     </div>
-    <p>{{ t("ton-pay-scan-tonkeeper") }}</p>
+    <p id="ton-qr-caption" aria-live="polite">{{ t("ton-pay-scan-tonkeeper") }}</p>
+    {% if qr_svg %}<button type="button" class="ton-qr-switch" id="ton-qr-switch" hidden>{{ t("ton-pay-qr-other") }}</button>{% endif %}
   </div>
   {% endif %}
   {% if qr_svg %}
-  <details class="ton-other">
+  <details class="ton-other" id="ton-other">
     <summary><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>{{ t("ton-pay-qr-other") }}</summary>
     <div class="ton-scan">
       <div class="ton-qr" role="img"
            aria-label="{{ t('ton-pay-qr-alt') }}">
-        {{ qr_svg | safe }}
+        <div data-qr="other">{{ qr_svg | safe }}</div>
       </div>
       <p>{{ t("ton-pay-scan") }}</p>
     </div>
   </details>
   {% endif %}
+  {#- Right after the codes, so the disclosure never paints: the `ton://` code
+      moves into the one QR box, «Another wallet» stays a link (a tap still
+      opens the wallet) and also shows that code, and the switch under the
+      caption swaps either way. The choice is kept for the tab
+      (sessionStorage), so the poll's reload keeps the code shown. -#}
+  <script>
+  (function () {
+    var qr = document.getElementById('ton-qr'), other = document.getElementById('ton-other');
+    var otherCode = other && other.querySelector('[data-qr="other"]');
+    var keeperCode = qr && qr.querySelector('[data-qr="keeper"]');
+    var scan = document.getElementById('ton-scan'), caption = document.getElementById('ton-qr-caption');
+    var toggle = document.getElementById('ton-qr-switch');
+    var keeperBtn = document.getElementById('ton-open-keeper'), otherBtn = document.getElementById('ton-open-other');
+    if (!otherCode || !keeperCode || !caption || !toggle || !keeperBtn || !otherBtn) return;
+    var TEXT = {
+      keeper: { label: {{ t("ton-pay-qr-alt-tonkeeper") | tojson }}, caption: {{ t("ton-pay-scan-tonkeeper") | tojson }}, toggle: {{ t("ton-pay-qr-other") | tojson }} },
+      other: { label: {{ t("ton-pay-qr-alt") | tojson }}, caption: {{ t("ton-pay-scan") | tojson }}, toggle: {{ t("ton-pay-qr-tonkeeper") | tojson }} }
+    };
+    var KEY = 'ton-pay-qr';
+    otherCode.hidden = true;
+    qr.appendChild(otherCode);
+    other.hidden = true;
+    toggle.hidden = false;
+    var show = function (which) {
+      try { sessionStorage.setItem(KEY, which); } catch (e) {}
+      if (scan.getAttribute('data-shown') === which) return;
+      scan.setAttribute('data-shown', which);
+      keeperCode.hidden = which !== 'keeper';
+      otherCode.hidden = which !== 'other';
+      qr.setAttribute('aria-label', TEXT[which].label);
+      caption.textContent = TEXT[which].caption;
+      toggle.textContent = TEXT[which].toggle;
+    };
+    // A reload (the status poll's) keeps the code this tab chose.
+    try { if (sessionStorage.getItem(KEY) === 'other') show('other'); } catch (e) {}
+    // The links keep their default: the swap rides along with the handoff.
+    otherBtn.addEventListener('click', function () { show('other'); });
+    keeperBtn.addEventListener('click', function () { show('keeper'); });
+    // The switch stays in place, so focus stays on it.
+    toggle.addEventListener('click', function () {
+      show(scan.getAttribute('data-shown') === 'other' ? 'keeper' : 'other');
+    });
+    [keeperBtn, otherBtn].forEach(function (btn) {
+      btn.addEventListener('pointerdown', function () { btn.setAttribute('data-pointer', ''); });
+    });
+    document.addEventListener('keydown', function (e) {
+      if (['Shift', 'Control', 'Alt', 'Meta'].indexOf(e.key) >= 0) return;
+      keeperBtn.removeAttribute('data-pointer');
+      otherBtn.removeAttribute('data-pointer');
+    }, true);
+  })();
+  </script>
 
   <div class="ton-fields">
     <div class="ton-field">
