@@ -16,7 +16,7 @@ fn base_css() -> &'static str {
 
 /// The declarations of the first rule of `css` whose selector list is
 /// exactly `selector` (alone on its line, or after a `}`).
-fn rule<'a>(css: &'a str, selector: &str) -> &'a str {
+pub(super) fn rule<'a>(css: &'a str, selector: &str) -> &'a str {
     let mut from = 0;
     while let Some(at) = css[from..].find(selector) {
         let at = from + at;
@@ -178,14 +178,16 @@ fn result_discs_are_readable_in_both_themes() {
 }
 
 #[test]
-fn theme_pill_uses_the_neutral_tokens() {
-    let start = BASE.find(".theme-pill {").unwrap();
-    let pill = &BASE[start..start + BASE[start..].find("</style>").unwrap()];
-    for slate in ["#374151", "#4b5563", "#94a3b8"] {
-        assert!(!pill.contains(slate), "{slate}");
+fn theme_button_uses_the_neutral_tokens() {
+    let start = BASE.find(".theme-btn {").unwrap();
+    let css = &BASE[start..start + BASE[start..].find("</style>").unwrap()];
+    for slate in ["#374151", "#4b5563", "#94a3b8", "#f59e0b"] {
+        assert!(!css.contains(slate), "{slate}");
     }
-    assert!(pill.contains("html.dark .theme-pill-track { background: var(--border-hover); }"));
-    assert!(pill.contains("prefers-reduced-motion: reduce"));
+    assert!(rule(css, ".theme-btn").contains("color: var(--text-muted);"));
+    assert!(rule(css, ".theme-btn:hover").contains("background: var(--surface-hover);"));
+    assert!(rule(css, ".theme-btn:focus-visible").contains("outline: 2px solid var(--accent);"));
+    assert!(css.contains("prefers-reduced-motion: reduce"));
 }
 
 #[test]
