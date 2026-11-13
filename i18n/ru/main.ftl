@@ -1873,6 +1873,7 @@ ton-pay-scan = Или отсканируйте этот код в приложе
 ton-pay-qr-alt-tonkeeper = QR-код для Tonkeeper с данными для оплаты
 ton-pay-scan-tonkeeper = Или отсканируйте этот код в Tonkeeper или камерой телефона.
 ton-pay-qr-other = QR‑код для другого кошелька (MyTonWallet и др.)
+ton-pay-qr-tonkeeper = QR-код для Tonkeeper
 ton-pay-address = Адрес
 ton-pay-comment = Комментарий
 ton-pay-copy = Скопировать

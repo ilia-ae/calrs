@@ -1818,6 +1818,7 @@ ton-pay-scan = Või skanni see kood oma rahakoti rakendusega.
 ton-pay-qr-alt-tonkeeper = Makseandmetega QR-kood Tonkeeperi jaoks
 ton-pay-scan-tonkeeper = Või skanni see kood Tonkeeperi või telefoni kaameraga.
 ton-pay-qr-other = QR-kood muu rahakoti jaoks (nt MyTonWallet)
+ton-pay-qr-tonkeeper = QR-kood Tonkeeperi jaoks
 ton-pay-address = Aadress
 ton-pay-comment = Kommentaar
 ton-pay-copy = Kopeeri

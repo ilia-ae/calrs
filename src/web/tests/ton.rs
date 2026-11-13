@@ -1866,9 +1866,12 @@ async fn a_paid_booking_goes_to_its_payment_page_and_holds_the_slot() {
     // Only Tonkeeper's link names the coin: MyTonWallet refuses `asset_id`.
     assert!(page.contains("&amp;asset_id=ton/mainnet/coin\""));
     assert_eq!(page.matches("asset_id=").count(), 1);
-    // A QR code per link, the plain one behind a toggle.
+    // A QR code per link: one box shows Tonkeeper's, «Another wallet»
+    // swaps it to the plain one (tests/pay_wallet.rs); without JavaScript
+    // the plain one waits behind a toggle.
     assert_eq!(page.matches("class=\"ton-qr\"").count(), 2);
-    assert!(page.contains("<details class=\"ton-other\">"));
+    assert!(page.contains("<details class=\"ton-other\" id=\"ton-other\">"));
+    assert!(page.contains("id=\"ton-qr-switch\""));
     // Its toggle draws an svg chevron, no font glyph.
     assert!(page.contains("<summary><svg class=\"icon\""), "{page}");
     assert!(!page.contains("\\25B8"));

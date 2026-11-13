@@ -1820,6 +1820,7 @@ ton-pay-scan = Of scan deze code met de app van je wallet.
 ton-pay-qr-alt-tonkeeper = QR-code voor Tonkeeper met de betaalgegevens
 ton-pay-scan-tonkeeper = Of scan deze code met Tonkeeper of de camera van je telefoon.
 ton-pay-qr-other = QR-code voor een andere wallet (bijv. MyTonWallet)
+ton-pay-qr-tonkeeper = QR-code voor Tonkeeper
 ton-pay-address = Adres
 ton-pay-comment = Opmerking
 ton-pay-copy = Kopiëren
