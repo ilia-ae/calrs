@@ -486,18 +486,161 @@ fn embedded_pages_have_no_switcher() {
 }
 
 /// Embedded, `?lang=` is not a switch (a third-party iframe keeps no
-/// `SameSite=Lax` cookie) and the widget still renders.
+/// `SameSite=Lax` cookie, so nothing is set and nothing redirects) but the
+/// language of the page framing the widget (`embed.js` sends it): a bundled
+/// code beats the browser and an earlier pick, anything else is ignored.
+/// There is never a switcher.
 #[tokio::test]
-async fn embedded_booking_pages_ignore_lang_and_show_no_switcher() {
+async fn embedded_booking_pages_speak_the_host_page_language() {
     let (app, _, _, _) = setup_test_app().await;
-    for uri in [
-        "/u/testuser/test-meeting?embed=1",
-        "/u/testuser/test-meeting?embed=1&lang=ru",
+    for (uri, cookie, expected) in [
+        ("/u/testuser/test-meeting?embed=1", None, "en"),
+        ("/u/testuser/test-meeting?embed=1&lang=ru", None, "ru"),
+        (
+            "/u/testuser/test-meeting?embed=1&lang=ru",
+            Some("calrs_lang=fr"),
+            "ru",
+        ),
+        (
+            "/u/testuser/test-meeting?embed=1",
+            Some("calrs_lang=fr"),
+            "fr",
+        ),
+        ("/u/testuser/test-meeting?embed=1&lang=xx", None, "en"),
+        ("/u/testuser/test-meeting?embed=1&lang=RU", None, "en"),
+        (
+            "/u/testuser/test-meeting?embed=1&lang=de-formal",
+            None,
+            "de",
+        ),
+        ("/u/testuser?embed=1&lang=ru", None, "ru"),
     ] {
-        let body = page(&app, uri, None, Some("en")).await;
+        let response = app
+            .clone()
+            .oneshot(request(uri, cookie, Some("en")))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), 200, "{uri}");
+        assert!(lang_cookies(&response).is_empty(), "{uri}: sets no cookie");
+        let body = body_string(response).await;
         assert!(!body.contains(SWITCHER), "{uri}");
-        assert_eq!(html_lang(&body), "en", "{uri}");
+        assert_eq!(html_lang(&body), expected, "{uri} {cookie:?}");
     }
+    // Not embedded, the same parameter is the switch (303 and the cookie).
+    let response = app
+        .oneshot(request(
+            "/u/testuser/test-meeting?lang=ru",
+            None,
+            Some("en"),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 303);
+}
+
+/// The host page's language rides with every link of the embedded flow (the
+/// slot page's script, the form's back link and its POST), and only when
+/// calrs ships it: an unknown value is never echoed.
+#[tokio::test]
+async fn the_embedded_flow_keeps_the_host_page_language() {
+    let (app, _, _, _) = setup_test_app().await;
+    let slots = page(
+        &app,
+        "/u/testuser/test-meeting?embed=1&lang=ru",
+        None,
+        Some("en"),
+    )
+    .await;
+    let suffix = &slots[slots.find("var embedSuffix").expect("embed suffix")..];
+    let suffix = &suffix[..suffix.find('\n').unwrap()];
+    assert!(
+        suffix.contains("embed=1") && suffix.contains("lang=ru"),
+        "{suffix}"
+    );
+    let form = page(
+        &app,
+        &format!(
+            "/u/testuser/test-meeting/book?date={}&time=10:00&tz=UTC&embed=1&lang=ru",
+            far_future_monday()
+        ),
+        None,
+        Some("en"),
+    )
+    .await;
+    assert_eq!(html_lang(&form), "ru");
+    let action = &form[form.find("<form method=\"POST\"").expect("form")..];
+    let action = &action[..action.find('>').unwrap()];
+    assert!(
+        action.contains("embed=1") && action.contains("lang=ru"),
+        "{action}"
+    );
+    let odd = page(
+        &app,
+        "/u/testuser/test-meeting?embed=1&lang=%22%3E%3Cb%3E",
+        None,
+        Some("en"),
+    )
+    .await;
+    let suffix = &odd[odd.find("var embedSuffix").unwrap()..];
+    let suffix = &suffix[..suffix.find('\n').unwrap()];
+    assert!(!suffix.contains("lang="), "{suffix}");
+    assert!(!odd.contains("%3Cb%3E") && !odd.contains("\"><b>"));
+}
+
+/// A booking made in the widget stores the host page's language, so the
+/// guest's emails follow it; the host reads theirs in their own.
+#[tokio::test]
+async fn a_booking_in_the_widget_stores_the_host_page_language() {
+    let _env = crate::test_support::ENV_LOCK.lock().await;
+    let (app, pool, _, _) = setup_test_app().await;
+    let (port, mails) = spawn_capturing_mta().await;
+    use_capturing_mta(&pool, port).await;
+    set_user_language(&pool, "test@example.com", "fr").await;
+    let csrf = "csrf-embed-lang";
+    let response = app
+        .oneshot(
+            axum::http::Request::builder()
+                .method("POST")
+                .uri("/u/testuser/test-meeting/book?embed=1&lang=ru")
+                .header("cookie", format!("__Host-calrs_csrf={csrf}"))
+                .header("accept-language", "en-US,en;q=0.9")
+                .header("content-type", "application/x-www-form-urlencoded")
+                .body(Body::from(book_body(csrf)))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 200);
+    assert!(lang_cookies(&response).is_empty());
+    assert_eq!(html_lang(&body_string(response).await), "ru");
+    let stored: Option<String> =
+        sqlx::query_scalar("SELECT language FROM bookings WHERE guest_email = 'guest@test.com'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(stored.as_deref(), Some("ru"));
+    let guest = mail_to(&mails, "guest@test.com").await;
+    assert!(guest.contains("<html lang=\"ru\">"), "{guest}");
+    let host = mail_to(&mails, "test@example.com").await;
+    assert!(host.contains("<html lang=\"fr\">"), "{host}");
+}
+
+/// `with_pick` keeps every other cookie, replaces any earlier pick and
+/// leaves one `Cookie` header.
+#[test]
+fn with_pick_replaces_only_the_language_cookie() {
+    let mut headers = headers_with(&[
+        ("cookie", "__Host-calrs_csrf=abc; calrs_lang=fr"),
+        ("cookie", "other=1"),
+    ]);
+    crate::web::lang_switch::with_pick(&mut headers, "ru");
+    let all: Vec<_> = headers.get_all("cookie").iter().collect();
+    assert_eq!(all.len(), 1);
+    assert_eq!(all[0], "__Host-calrs_csrf=abc; other=1; calrs_lang=ru");
+    assert_eq!(crate::i18n::chosen_from_headers(&headers), Some("ru"));
+    let mut empty = HeaderMap::new();
+    crate::web::lang_switch::with_pick(&mut empty, "pl");
+    assert_eq!(empty.get("cookie").unwrap(), "calrs_lang=pl");
 }
 
 /// A page answering a form POST has no URL to come back to.
@@ -938,4 +1081,41 @@ async fn the_middleware_gives_no_page_to_embedded_and_dashboard_requests() {
     // Not embedded, `?lang=` is a switch.
     let (status, _) = answer("GET", "/u/testuser/test-meeting?lang=ru").await;
     assert_eq!(status, 303);
+    // Embedded, a bundled `lang` is this request's pick; elsewhere and for
+    // an unknown value nothing changes.
+    let picked = axum::Router::new()
+        .fallback(|headers: HeaderMap| async move {
+            crate::i18n::chosen_from_headers(&headers)
+                .unwrap_or("none")
+                .to_string()
+        })
+        .layer(axum::middleware::from_fn(
+            crate::web::lang_switch::middleware,
+        ));
+    for (method, uri, expected) in [
+        ("GET", "/u/testuser/test-meeting?embed=1&lang=ru", "ru"),
+        (
+            "POST",
+            "/u/testuser/test-meeting/book?embed=1&lang=pl",
+            "pl",
+        ),
+        ("GET", "/team/t/m?embed=true&lang=es", "es"),
+        ("GET", "/u/testuser/test-meeting?embed=1&lang=zz", "none"),
+        ("POST", "/dashboard?embed=1&lang=ru", "none"),
+        ("POST", "/auth/login?embed=1&lang=ru", "none"),
+    ] {
+        let response = picked
+            .clone()
+            .oneshot(
+                axum::http::Request::builder()
+                    .method(method)
+                    .uri(uri)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), 200, "{method} {uri}");
+        assert_eq!(body_string(response).await, expected, "{method} {uri}");
+    }
 }

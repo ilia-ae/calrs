@@ -18,11 +18,23 @@ pub(super) struct EmbedParams {
     pub(super) theme: Option<String>,
     #[serde(default)]
     pub(super) brand: Option<String>,
+    /// ilia fork: the host page's language (`embed.js` sends the `lang` of
+    /// the page that frames the widget). Only a bundled locale code counts
+    /// (`lang_code`); `lang_switch::middleware` makes it the visitor's pick
+    /// for an embedded request, so the widget speaks the page's language.
+    #[serde(default)]
+    pub(super) lang: Option<String>,
 }
 
 impl EmbedParams {
     pub(super) fn is_embedded(&self) -> bool {
         matches!(self.embed.as_deref(), Some("1") | Some("true"))
+    }
+
+    /// ilia fork: the `lang` parameter when it names a bundled locale;
+    /// anything else is dropped, never echoed.
+    pub(super) fn lang_code(&self) -> Option<&'static str> {
+        self.lang.as_deref().and_then(crate::i18n::supported_code)
     }
 
     /// Full set of accent CSS variable declarations derived from `brand`,
@@ -49,7 +61,7 @@ impl EmbedParams {
         ))
     }
 
-    /// "?embed=1&layout=month&theme=dark&brand=ff0000" — used to keep params
+    /// "?embed=1&layout=month&theme=dark&brand=ff0000&lang=ru" — used to keep params
     /// alive across page transitions inside the iframe. Returns empty string
     /// when not embedded so callers can unconditionally append it.
     pub(super) fn query_suffix(&self, leading_amp: bool) -> String {
@@ -65,6 +77,9 @@ impl EmbedParams {
         }
         if let Some(v) = self.brand.as_deref().filter(|s| !s.is_empty()) {
             parts.push(format!("brand={}", urlencode_simple(v)));
+        }
+        if let Some(code) = self.lang_code() {
+            parts.push(format!("lang={}", urlencode_simple(code)));
         }
         let sep = if leading_amp { "&" } else { "?" };
         format!("{}{}", sep, parts.join("&"))

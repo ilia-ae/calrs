@@ -1900,6 +1900,8 @@ pub(super) struct SlotsQuery {
     theme: Option<String>,
     #[serde(default)]
     brand: Option<String>,
+    #[serde(default)]
+    lang: Option<String>,
 }
 
 impl SlotsQuery {
@@ -1909,6 +1911,7 @@ impl SlotsQuery {
             layout: self.layout.clone(),
             theme: self.theme.clone(),
             brand: self.brand.clone(),
+            lang: self.lang.clone(),
         }
     }
 }
@@ -2284,6 +2287,8 @@ pub(super) struct BookQuery {
     theme: Option<String>,
     #[serde(default)]
     brand: Option<String>,
+    #[serde(default)]
+    lang: Option<String>,
 }
 
 impl BookQuery {
@@ -2293,6 +2298,7 @@ impl BookQuery {
             layout: self.layout.clone(),
             theme: self.theme.clone(),
             brand: self.brand.clone(),
+            lang: self.lang.clone(),
         }
     }
 }

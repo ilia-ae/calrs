@@ -48,9 +48,14 @@ tokio::task_local! {
 }
 
 /// Handle `?lang=` (cookie and redirect) and remember the page for
-/// `lang_switcher()`. Embedded booking pages are left alone: a third-party
+/// `lang_switcher()`. Embedded booking pages get neither: a third-party
 /// iframe can neither keep a `SameSite=Lax` cookie nor show the switcher.
-pub(super) async fn middleware(request: Request, next: Next) -> Response {
+/// There `lang` is the language of the page framing the widget (`embed.js`
+/// sends it, and `EmbedParams::query_suffix` carries it through the booking
+/// flow, the form's POST included): a bundled code becomes this request's
+/// pick ([`with_pick`]), so every page and the language stored with the
+/// booking follow the host page, with no cookie set.
+pub(super) async fn middleware(mut request: Request, next: Next) -> Response {
     let uri = request.uri();
     let path = uri.path();
     let query = uri.query();
@@ -61,8 +66,37 @@ pub(super) async fn middleware(request: Request, next: Next) -> Response {
             return switch(path, query, value, request.headers());
         }
     }
+    if embedded {
+        if let Some(code) = param_value(query).and_then(crate::i18n::supported_code) {
+            with_pick(request.headers_mut(), code);
+        }
+    }
+    let uri = request.uri();
+    let (path, query) = (uri.path(), uri.query());
     let page = (get && !embedded && shows_switcher(path)).then(|| same_origin_target(path, query));
     PAGE.scope(page, next.run(request)).await
+}
+
+/// Make `code` the visitor's pick for this request: one `Cookie` header with
+/// every other cookie kept and `calrs_lang=<code>` in place of any earlier
+/// one, which `i18n::chosen_from_headers` reads first. The response sets no
+/// cookie, so the pick lasts only as long as the URL carries it.
+pub(crate) fn with_pick(headers: &mut HeaderMap, code: &'static str) {
+    let prefix = format!("{}=", crate::i18n::LANG_COOKIE);
+    let mut parts: Vec<String> = headers
+        .get_all(header::COOKIE)
+        .iter()
+        .filter_map(|v| v.to_str().ok())
+        .flat_map(|s| s.split(';'))
+        .map(str::trim)
+        .filter(|p| !p.is_empty() && !p.starts_with(prefix.as_str()))
+        .map(str::to_string)
+        .collect();
+    parts.push(format!("{prefix}{code}"));
+    if let Ok(value) = HeaderValue::from_str(&parts.join("; ")) {
+        headers.remove(header::COOKIE);
+        headers.insert(header::COOKIE, value);
+    }
 }
 
 /// The dashboard has its own language setting (Profile & Settings).
