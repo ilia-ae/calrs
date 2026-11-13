@@ -29,6 +29,19 @@
 //!   with no Telegram mode chosen ask for it (`required`), as on the form;
 //!   `telegram_guest_mode` in the item is written after it.
 //!
+//! Two more keys (ilia fork) go their own way too:
+//! - `busy_calendars` is the form's calendar choice (`calendar_ids`, posted
+//!   with the form, stored in `event_type_calendars`), named by display name
+//!   among the calendars of the admin's sources as the `sources` section
+//!   names them; null is no choice (every synced calendar blocks).
+//! - `overrides` are the date overrides of the type's overrides page
+//!   (`availability_overrides`), from today on (in the type's timezone):
+//!   written after the form with one `DELETE` of the rows from today on and
+//!   an `INSERT` per entry, the columns `create_override` writes. Rows
+//!   before today are never compared, written or exported, and an entry
+//!   before today is left out, so an inventory still applies after a day
+//!   off has passed.
+//!
 //! `weekly_hours: null` means the profile's default hours: the event type's
 //! rules are a copy of `user_availability_rules` as they are once the
 //! profile section has run (the web form copies them the same way when its
@@ -41,10 +54,11 @@
 //! written, for a type that still has pending or confirmed bookings.
 
 use super::{
-    answered, check_opt_text, check_text, check_timezone, form, ApplyError, CalendarView, Ctx, Day,
-    DayHours, EventTypeItem, EventTypes, FrequencyLimit, GuestMode, LocationType, Period,
-    PhoneMode, Prune, TonPrice, Visibility, Window,
+    answered, check_opt_text, check_text, check_timezone, form, ApplyError, CalendarView, Ctx,
+    DateOverride, Day, DayHours, EventTypeItem, EventTypes, FrequencyLimit, GuestMode,
+    LocationType, Period, PhoneMode, Prune, TonPrice, Visibility, Window,
 };
+use crate::booking_window::{today_in, MAX_DAYS_AHEAD};
 use crate::web::agent::dto;
 use crate::web::agent::error::ToolError;
 use crate::web::agent::ops_write::{self, EditState, Rule};
@@ -56,6 +70,7 @@ use crate::web::ton_pay::{
 };
 use axum::extract::{Path, State};
 use axum::response::IntoResponse;
+use chrono::{NaiveDate, NaiveTime};
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 use std::collections::BTreeSet;
@@ -81,7 +96,7 @@ const SEED_END: &str = "17:00";
 
 /// The keys of an item after `slug`, in the document's order: the order
 /// of a report's changes.
-const KEYS: [&str; 31] = [
+const KEYS: [&str; 33] = [
     "title",
     "description",
     "duration_min",
@@ -110,13 +125,21 @@ const KEYS: [&str; 31] = [
     "reschedule_notice_min",
     "sms_phone_mode",
     "frequency_limits",
+    "busy_calendars",
+    "overrides",
     "ton_price",
     "telegram_guest_mode",
     "enabled",
 ];
 
 /// Settings not carried by the event type form (see the module comment).
-const OFF_FORM: [&str; 4] = ["timezone", "enabled", "ton_price", "telegram_guest_mode"];
+const OFF_FORM: [&str; 5] = [
+    "timezone",
+    "enabled",
+    "overrides",
+    "ton_price",
+    "telegram_guest_mode",
+];
 
 /// What an item's `ton_price` is. The release guards of the role grep for
 /// this string in the source and in the binary (as for `FORMAT`): keep it a
@@ -130,6 +153,18 @@ pub(crate) const TON_PRICE_SHAPE: &str = "ton_price: null or {ton|usd, window_mi
 /// still matches).
 pub(crate) const TON_PRICE_LADDER_SHAPE: &str =
     "ton_price: null or {ton|usd, window_min, enabled} or {ladder: true, window_min, enabled}";
+
+/// ilia fork: what an item's `busy_calendars` is. The role greps for this
+/// literal in the binary before it sends the key (an older calrs refuses it
+/// as an unknown key): keep it a literal, and used at runtime (the refusal
+/// of `[]`).
+pub(crate) const BUSY_CALENDARS_SHAPE: &str = "busy_calendars: null or a list of calendar names";
+
+/// ilia fork: what an item's `overrides` is; the role's marker, like
+/// [`BUSY_CALENDARS_SHAPE`] (used in the refusal of an entry of another
+/// shape).
+pub(crate) const OVERRIDES_SHAPE: &str =
+    "overrides: [{date, blocked: true} | {date, start, end}], from today on";
 
 fn item_path(slug: &str) -> String {
     format!("event_types[{slug}]")
@@ -237,6 +272,213 @@ fn price_item(terms: Terms, window_min: Option<i64>, enabled: bool) -> TonPrice 
     }
 }
 
+/// The calendars of the admin's sources: id and name (the display name, its
+/// address when it has none, as the `sources` section names them).
+struct Calendars(Vec<(String, String)>);
+
+impl Calendars {
+    async fn load(ctx: &Ctx) -> Result<Self, ApplyError> {
+        let rows: Vec<(String, Option<String>, String)> = sqlx::query_as(
+            "SELECT c.id, c.display_name, c.href FROM calendars c
+             JOIN caldav_sources cs ON cs.id = c.source_id
+             JOIN accounts a ON a.id = cs.account_id
+             WHERE a.user_id = ? ORDER BY c.id",
+        )
+        .bind(&ctx.me.id)
+        .fetch_all(ctx.pool())
+        .await?;
+        Ok(Self(
+            rows.into_iter()
+                .map(|(id, display_name, href)| {
+                    let name = display_name
+                        .map(|n| n.trim().to_string())
+                        .filter(|n| !n.is_empty())
+                        .unwrap_or(href);
+                    (id, name)
+                })
+                .collect(),
+        ))
+    }
+
+    fn sharing(&self, name: &str) -> usize {
+        self.0.iter().filter(|(_, n)| n == name).count()
+    }
+
+    /// Calendar `id` in a document: its name when no other calendar of the
+    /// admin has it, else its id (which no document names, so it never
+    /// equals a desired list).
+    fn label(&self, id: &str) -> String {
+        match self.0.iter().find(|(i, _)| i == id) {
+            Some((_, name)) if self.sharing(name) == 1 => name.clone(),
+            _ => id.to_string(),
+        }
+    }
+
+    /// The calendar choice `ids` as `busy_calendars`: null for none, else
+    /// the sorted labels.
+    fn labels(&self, ids: &[String]) -> Option<Vec<String>> {
+        if ids.is_empty() {
+            return None;
+        }
+        let mut names: Vec<String> = ids.iter().map(|id| self.label(id)).collect();
+        names.sort();
+        Some(names)
+    }
+
+    /// Whether a document can name every calendar of `ids`.
+    fn nameable(&self, ids: &[String]) -> bool {
+        ids.iter().all(|id| {
+            self.0
+                .iter()
+                .any(|(i, name)| i == id && self.sharing(name) == 1)
+        })
+    }
+
+    /// The id of the one calendar named `name`, or why there is none.
+    fn named(&self, path: &str, name: &str) -> Result<String, ApplyError> {
+        let found: Vec<&String> = self
+            .0
+            .iter()
+            .filter(|(_, n)| n == name)
+            .map(|(id, _)| id)
+            .collect();
+        match found.as_slice() {
+            [id] => Ok((*id).clone()),
+            [] => {
+                let mut names: Vec<String> = self.0.iter().map(|(_, n)| format!("{n:?}")).collect();
+                names.sort();
+                names.dedup();
+                let known = if names.is_empty() {
+                    "no source of this admin has listed a calendar yet: sync it once first"
+                        .to_string()
+                } else {
+                    format!("the calendars are {}", names.join(", "))
+                };
+                Err(ApplyError::invalid(
+                    path,
+                    format!("no calendar named {name:?}; {known}"),
+                ))
+            }
+            several => Err(ApplyError::invalid(
+                path,
+                format!(
+                    "{} calendars of this admin's sources are named {name:?}: rename one in the \
+                     calendar server, then sync the source",
+                    several.len()
+                ),
+            )),
+        }
+    }
+}
+
+/// Today in the timezone an event type follows (its own, else the
+/// profile's, else the server's): where the managed date overrides start.
+async fn today_for(ctx: &Ctx, timezone: Option<&str>) -> NaiveDate {
+    let tz = match timezone
+        .unwrap_or(&ctx.me.timezone)
+        .parse::<chrono_tz::Tz>()
+    {
+        Ok(tz) => tz,
+        Err(_) => crate::web::availability::get_host_tz(ctx.pool(), "").await,
+    };
+    today_in(tz)
+}
+
+/// A stored override row in the document's shape.
+fn override_item(
+    date: String,
+    start: Option<String>,
+    end: Option<String>,
+    blocked: bool,
+) -> DateOverride {
+    if blocked {
+        DateOverride {
+            date,
+            blocked: Some(true),
+            start: None,
+            end: None,
+        }
+    } else {
+        DateOverride {
+            date,
+            blocked: None,
+            start,
+            end,
+        }
+    }
+}
+
+/// The stored date overrides of `et_id` from `today` on, sorted.
+async fn stored_overrides(
+    ctx: &Ctx,
+    et_id: &str,
+    today: NaiveDate,
+) -> Result<Vec<DateOverride>, ApplyError> {
+    let rows: Vec<(String, Option<String>, Option<String>, i64)> = sqlx::query_as(
+        "SELECT date, start_time, end_time, is_blocked FROM availability_overrides
+         WHERE event_type_id = ? AND date >= ?",
+    )
+    .bind(et_id)
+    .bind(today.format("%Y-%m-%d").to_string())
+    .fetch_all(ctx.pool())
+    .await?;
+    let mut out: Vec<DateOverride> = rows
+        .into_iter()
+        .map(|(date, start, end, blocked)| override_item(date, start, end, blocked != 0))
+        .collect();
+    out.sort();
+    Ok(out)
+}
+
+/// What is stored for one event type beside nothing else: the form state,
+/// the Telegram mode, the price and the date overrides from `today` on (or
+/// the new form's start for a slug that does not exist yet).
+#[derive(Clone)]
+struct Current {
+    state: EditState,
+    mode: GuestMode,
+    price: Option<TonPrice>,
+    overrides: Vec<DateOverride>,
+    today: NaiveDate,
+}
+
+impl Current {
+    async fn load(ctx: &Ctx, et_id: &str) -> Result<Self, ApplyError> {
+        let state = EditState::load(ctx.pool(), et_id)
+            .await
+            .map_err(read_error)?;
+        let today = today_for(ctx, state.timezone.as_deref()).await;
+        Ok(Self {
+            mode: guest_mode(ctx, et_id).await,
+            price: stored_price(ctx, et_id).await?,
+            overrides: stored_overrides(ctx, et_id, today).await?,
+            today,
+            state,
+        })
+    }
+
+    async fn new_type(ctx: &Ctx, slug: &str, profile: &[Rule]) -> Self {
+        let state = new_form(slug, &ctx.me, profile);
+        Self {
+            today: today_for(ctx, state.timezone.as_deref()).await,
+            state,
+            mode: GuestMode::Off,
+            price: None,
+            overrides: Vec::new(),
+        }
+    }
+
+    fn item(&self, calendars: &Calendars) -> EventTypeItem {
+        item_of(
+            &self.state,
+            self.mode,
+            &self.price,
+            &self.overrides,
+            calendars,
+        )
+    }
+}
+
 /// The stored guest Telegram mode (`off` when none is stored).
 async fn guest_mode(ctx: &Ctx, et_id: &str) -> GuestMode {
     GuestMode::from_key(crate::telegram::store::event_type_mode(ctx.pool(), et_id).await)
@@ -279,9 +521,15 @@ fn limits_of(limits: &[(i64, String, bool)]) -> Vec<FrequencyLimit> {
     out
 }
 
-/// A form state, its Telegram mode and its price as a document item, every
-/// key given.
-fn item_of(state: &EditState, mode: GuestMode, price: &Option<TonPrice>) -> EventTypeItem {
+/// A form state, its Telegram mode, its price and its date overrides as a
+/// document item, every key given.
+fn item_of(
+    state: &EditState,
+    mode: GuestMode,
+    price: &Option<TonPrice>,
+    overrides: &[DateOverride],
+    calendars: &Calendars,
+) -> EventTypeItem {
     EventTypeItem {
         slug: state.slug.clone(),
         title: Some(state.title.clone()),
@@ -312,6 +560,8 @@ fn item_of(state: &EditState, mode: GuestMode, price: &Option<TonPrice>) -> Even
         reschedule_notice_min: Some(state.reschedule_notice_min),
         sms_phone_mode: PhoneMode::from_key(&state.sms_phone_mode),
         frequency_limits: Some(limits_of(&state.frequency_limits)),
+        busy_calendars: Some(calendars.labels(&state.calendar_ids)),
+        overrides: Some(overrides.to_vec()),
         ton_price: Some(price.clone()),
         telegram_guest_mode: Some(mode),
         enabled: Some(state.enabled),
@@ -329,7 +579,7 @@ fn as_map(item: &EventTypeItem) -> Result<Map<String, Value>, ApplyError> {
 // --- The desired state ---
 
 /// An item's desired state: the form state with the item applied, the
-/// Telegram mode and the price.
+/// Telegram mode, the price and the date overrides.
 struct Wanted {
     state: EditState,
     mode: GuestMode,
@@ -338,6 +588,128 @@ struct Wanted {
     price: Option<TonPrice>,
     /// What the price section stores, when the item gives `ton_price`.
     price_write: Option<PriceWrite>,
+    /// From `today` on, sorted.
+    overrides: Vec<DateOverride>,
+    /// The item gives `overrides`.
+    overrides_given: bool,
+    today: NaiveDate,
+}
+
+impl Wanted {
+    fn item(&self, calendars: &Calendars) -> EventTypeItem {
+        item_of(
+            &self.state,
+            self.mode,
+            &self.price,
+            &self.overrides,
+            calendars,
+        )
+    }
+}
+
+/// `busy_calendars` as the form's `calendar_ids`, sorted as stored.
+fn calendars_wanted(
+    slug: &str,
+    names: Option<&[String]>,
+    calendars: &Calendars,
+) -> Result<Vec<String>, ApplyError> {
+    let Some(names) = names else {
+        return Ok(Vec::new());
+    };
+    let path = at(slug, "busy_calendars");
+    if names.is_empty() {
+        return Err(ApplyError::invalid(
+            path,
+            format!("use null for every synced calendar ({BUSY_CALENDARS_SHAPE})"),
+        ));
+    }
+    let mut ids = BTreeSet::new();
+    let mut listed = BTreeSet::new();
+    for (i, name) in names.iter().enumerate() {
+        let here = format!("{path}[{i}]");
+        check_text(&here, name, None)?;
+        if !listed.insert(name.as_str()) {
+            return Err(ApplyError::invalid(here, "listed twice"));
+        }
+        ids.insert(calendars.named(&here, name)?);
+    }
+    Ok(ids.into_iter().collect())
+}
+
+/// A date written exactly as `YYYY-MM-DD`.
+fn exact_date(path: &str, date: &str) -> Result<NaiveDate, ApplyError> {
+    NaiveDate::parse_from_str(date, "%Y-%m-%d")
+        .ok()
+        .filter(|d| d.format("%Y-%m-%d").to_string() == date)
+        .ok_or_else(|| ApplyError::invalid(path, "use YYYY-MM-DD"))
+}
+
+/// A time of day written exactly as `HH:MM`.
+fn exact_time(path: &str, time: &str) -> Result<NaiveTime, ApplyError> {
+    NaiveTime::parse_from_str(time, "%H:%M")
+        .ok()
+        .filter(|t| t.format("%H:%M").to_string() == time)
+        .ok_or_else(|| ApplyError::invalid(path, "use HH:MM, 00:00 to 23:59"))
+}
+
+/// One entry of `overrides` checked as the MCP `add_date_override` checks
+/// it (a blocked day or custom hours, start before end, at most
+/// `MAX_DAYS_AHEAD` days ahead), spelled canonically. `None`: dated before
+/// `today`, left out.
+fn override_wanted(
+    path: &str,
+    entry: &DateOverride,
+    today: NaiveDate,
+) -> Result<Option<DateOverride>, ApplyError> {
+    let date = exact_date(&format!("{path}.date"), &entry.date)?;
+    match (entry.blocked, &entry.start, &entry.end) {
+        (Some(true), None, None) => {}
+        (None, Some(start), Some(end)) => {
+            let s = exact_time(&format!("{path}.start"), start)?;
+            let e = exact_time(&format!("{path}.end"), end)?;
+            if s >= e {
+                return Err(ApplyError::invalid(
+                    format!("{path}.end"),
+                    "must be after start",
+                ));
+            }
+        }
+        (Some(false), _, _) => {
+            return Err(ApplyError::invalid(
+                format!("{path}.blocked"),
+                "only true; for custom hours give start and end and leave blocked out",
+            ))
+        }
+        _ => return Err(ApplyError::invalid(path, OVERRIDES_SHAPE)),
+    }
+    let last = today + chrono::Duration::days(MAX_DAYS_AHEAD);
+    if date > last {
+        return Err(ApplyError::invalid(
+            format!("{path}.date"),
+            format!("must be {last} at the latest"),
+        ));
+    }
+    Ok((date >= today).then(|| entry.clone()))
+}
+
+/// `overrides` from `today` on, checked, without repeats, sorted.
+fn overrides_wanted(
+    slug: &str,
+    entries: &[DateOverride],
+    today: NaiveDate,
+) -> Result<Vec<DateOverride>, ApplyError> {
+    let mut seen = BTreeSet::new();
+    let mut out = Vec::with_capacity(entries.len());
+    for (i, entry) in entries.iter().enumerate() {
+        let path = at(slug, &format!("overrides[{i}]"));
+        let wanted = override_wanted(&path, entry, today)?;
+        if !seen.insert(entry.clone()) {
+            return Err(ApplyError::invalid(path, "listed twice"));
+        }
+        out.extend(wanted);
+    }
+    out.sort();
+    Ok(out)
 }
 
 /// `ton_price` as the fields a browser posts for the form's price section,
@@ -461,13 +833,18 @@ fn limit_rows(
 async fn wanted(
     ctx: &Ctx,
     item: &EventTypeItem,
-    base: EditState,
-    base_mode: GuestMode,
-    base_price: Option<TonPrice>,
+    base: Current,
     profile: &[Rule],
+    calendars: &Calendars,
 ) -> Result<Wanted, ApplyError> {
     let slug = item.slug.as_str();
-    let mut state = base;
+    let Current {
+        mut state,
+        mode: base_mode,
+        price: base_price,
+        overrides: base_overrides,
+        today,
+    } = base;
     state
         .apply(ctx.pool(), "", "", patch_of(item)?)
         .await
@@ -488,6 +865,21 @@ async fn wanted(
     if let Some(enabled) = item.enabled {
         state.enabled = enabled;
     }
+    if let Some(names) = &item.busy_calendars {
+        state.calendar_ids = calendars_wanted(slug, names.as_deref(), calendars)?;
+    }
+    // Today in the timezone the type follows once written: the one verify
+    // reads it with, so a run that changes the timezone near midnight
+    // replaces the same days it compares.
+    let today = if item.timezone.is_some() && item.overrides.is_some() {
+        today_for(ctx, state.timezone.as_deref()).await
+    } else {
+        today
+    };
+    let overrides = match &item.overrides {
+        Some(entries) => overrides_wanted(slug, entries, today)?,
+        None => base_overrides,
+    };
     let (price, price_write) = match &item.ton_price {
         Some(price) => (price.clone(), Some(price_wanted(slug, price.as_ref())?)),
         None => (base_price, None),
@@ -498,6 +890,9 @@ async fn wanted(
         mode_given: item.telegram_guest_mode.is_some(),
         price,
         price_write,
+        overrides,
+        overrides_given: item.overrides.is_some(),
+        today,
     })
 }
 
@@ -548,14 +943,13 @@ fn new_form(slug: &str, me: &crate::models::User, profile: &[Rule]) -> EditState
 /// one: key, stored value, desired value, in the document's shape.
 fn differences(
     item: &EventTypeItem,
-    before: &EditState,
-    before_mode: GuestMode,
-    before_price: &Option<TonPrice>,
+    before: &Current,
     want: &Wanted,
+    calendars: &Calendars,
 ) -> Result<Vec<(String, Value, Value)>, ApplyError> {
     let given = as_map(item)?;
-    let stored = as_map(&item_of(before, before_mode, before_price))?;
-    let desired = as_map(&item_of(&want.state, want.mode, &want.price))?;
+    let stored = as_map(&before.item(calendars))?;
+    let desired = as_map(&want.item(calendars))?;
     Ok(KEYS
         .iter()
         .filter(|key| given.contains_key(**key))
@@ -575,11 +969,10 @@ fn differences(
 /// then `required`), and a mode the item gives is written after it.
 fn without_stored(
     item: &EventTypeItem,
-    state: &EditState,
-    mode: GuestMode,
-    price: &Option<TonPrice>,
+    current: &Current,
+    calendars: &Calendars,
 ) -> Result<EventTypeItem, ApplyError> {
-    let stored = as_map(&item_of(state, mode, price))?;
+    let stored = as_map(&current.item(calendars))?;
     let mut given = as_map(item)?;
     given.retain(|key, value| {
         key == "slug" || key == "telegram_guest_mode" || stored.get(key) != Some(value)
@@ -691,6 +1084,7 @@ pub(super) async fn check(ctx: &Ctx, section: &EventTypes) -> Result<(), ApplyEr
     }
 
     let profile = profile_rules(ctx).await?;
+    let calendars = Calendars::load(ctx).await?;
     let has_account: bool =
         sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM accounts WHERE user_id = ?)")
             .bind(&ctx.me.id)
@@ -715,14 +1109,10 @@ pub(super) async fn check(ctx: &Ctx, section: &EventTypes) -> Result<(), ApplyEr
         }
         match personal_id(ctx, slug).await? {
             Some(et_id) => {
-                let base = EditState::load(ctx.pool(), &et_id)
-                    .await
-                    .map_err(read_error)?;
-                let mode = guest_mode(ctx, &et_id).await;
-                let price = stored_price(ctx, &et_id).await?;
-                let item = without_stored(item, &base, mode, &price)?;
+                let base = Current::load(ctx, &et_id).await?;
+                let item = without_stored(item, &base, &calendars)?;
                 check_item(&item)?;
-                wanted(ctx, &item, base, mode, price, &profile).await?;
+                wanted(ctx, &item, base, &profile, &calendars).await?;
             }
             None => {
                 if !has_account {
@@ -738,8 +1128,8 @@ pub(super) async fn check(ctx: &Ctx, section: &EventTypes) -> Result<(), ApplyEr
                     ));
                 }
                 check_item(item)?;
-                let base = new_form(slug, &ctx.me, &profile);
-                wanted(ctx, item, base, GuestMode::Off, None, &profile).await?;
+                let base = Current::new_type(ctx, slug, &profile).await;
+                wanted(ctx, item, base, &profile, &calendars).await?;
             }
         }
     }
@@ -773,10 +1163,11 @@ pub(super) async fn check(ctx: &Ctx, section: &EventTypes) -> Result<(), ApplyEr
 /// Post the forms and record the changes (pipeline step 3).
 pub(super) async fn apply(ctx: &mut Ctx, section: &EventTypes) -> Result<(), ApplyError> {
     let profile = profile_rules(ctx).await?;
+    let calendars = Calendars::load(ctx).await?;
     for item in &section.items {
         match personal_id(ctx, &item.slug).await? {
-            Some(et_id) => update(ctx, item, &et_id, &profile).await?,
-            None => create(ctx, item, &profile).await?,
+            Some(et_id) => update(ctx, item, &et_id, &profile, &calendars).await?,
+            None => create(ctx, item, &profile, &calendars).await?,
         }
     }
 
@@ -821,11 +1212,16 @@ pub(super) async fn apply(ctx: &mut Ctx, section: &EventTypes) -> Result<(), App
 
 /// A new event type: the new form's defaults with the item applied, posted
 /// to `create_event_type`.
-async fn create(ctx: &mut Ctx, item: &EventTypeItem, profile: &[Rule]) -> Result<(), ApplyError> {
+async fn create(
+    ctx: &mut Ctx,
+    item: &EventTypeItem,
+    profile: &[Rule],
+    calendars: &Calendars,
+) -> Result<(), ApplyError> {
     let slug = item.slug.as_str();
     let path = item_path(slug);
-    let base = new_form(slug, &ctx.me, profile);
-    let want = wanted(ctx, item, base, GuestMode::Off, None, profile).await?;
+    let base = Current::new_type(ctx, slug, profile).await;
+    let want = wanted(ctx, item, base, profile, calendars).await?;
     ctx.record(&path, Value::Null, "created");
 
     let fields = want.state.form_fields(&ctx.me.timezone, true, true);
@@ -858,24 +1254,13 @@ async fn update(
     item: &EventTypeItem,
     et_id: &str,
     profile: &[Rule],
+    calendars: &Calendars,
 ) -> Result<(), ApplyError> {
     let slug = item.slug.as_str();
-    let before = EditState::load(ctx.pool(), et_id)
-        .await
-        .map_err(read_error)?;
-    let before_mode = guest_mode(ctx, et_id).await;
-    let before_price = stored_price(ctx, et_id).await?;
-    let item = &without_stored(item, &before, before_mode, &before_price)?;
-    let want = wanted(
-        ctx,
-        item,
-        before.clone(),
-        before_mode,
-        before_price.clone(),
-        profile,
-    )
-    .await?;
-    let changes = differences(item, &before, before_mode, &before_price, &want)?;
+    let before = Current::load(ctx, et_id).await?;
+    let item = &without_stored(item, &before, calendars)?;
+    let want = wanted(ctx, item, before.clone(), profile, calendars).await?;
+    let changes = differences(item, &before, &want, calendars)?;
     if changes.is_empty() {
         return Ok(());
     }
@@ -889,6 +1274,7 @@ async fn update(
         ctx.record(at(slug, key), b, a);
     }
 
+    let before = before.state;
     if by_form {
         if want.state.weekly_hours.is_empty() {
             // The form would give it the profile's default hours.
@@ -951,12 +1337,43 @@ async fn off_form(
     if want.mode_given && guest_mode(ctx, et_id).await != want.mode {
         crate::telegram::store::save_event_type_mode(ctx.pool(), et_id, want.mode.key()).await?;
     }
+    if want.overrides_given && stored_overrides(ctx, et_id, want.today).await? != want.overrides {
+        write_overrides(ctx, et_id, want).await?;
+    }
     if now.timezone != want.state.timezone {
         sqlx::query("UPDATE event_types SET timezone = ? WHERE id = ?")
             .bind(&want.state.timezone)
             .bind(et_id)
             .execute(ctx.pool())
             .await?;
+    }
+    Ok(())
+}
+
+/// The date overrides of `et_id` from `want.today` on replaced by the
+/// desired ones, with the columns `create_override` writes. Earlier rows
+/// stay as they are.
+async fn write_overrides(ctx: &Ctx, et_id: &str, want: &Wanted) -> Result<(), ApplyError> {
+    sqlx::query("DELETE FROM availability_overrides WHERE event_type_id = ? AND date >= ?")
+        .bind(et_id)
+        .bind(want.today.format("%Y-%m-%d").to_string())
+        .execute(ctx.pool())
+        .await?;
+    for entry in &want.overrides {
+        let blocked = entry.blocked == Some(true);
+        sqlx::query(
+            "INSERT INTO availability_overrides
+                 (id, event_type_id, date, start_time, end_time, is_blocked)
+             VALUES (?, ?, ?, ?, ?, ?)",
+        )
+        .bind(uuid::Uuid::new_v4().to_string())
+        .bind(et_id)
+        .bind(&entry.date)
+        .bind(&entry.start)
+        .bind(&entry.end)
+        .bind(i64::from(blocked))
+        .execute(ctx.pool())
+        .await?;
     }
     Ok(())
 }
@@ -979,6 +1396,7 @@ async fn toggle(ctx: &Ctx, slug: &str) -> Result<(), ApplyError> {
 /// Read back and compare with the document (pipeline step 4).
 pub(super) async fn verify(ctx: &Ctx, section: &EventTypes) -> Result<(), ApplyError> {
     let profile = profile_rules(ctx).await?;
+    let calendars = Calendars::load(ctx).await?;
     for item in &section.items {
         let slug = item.slug.as_str();
         let Some(et_id) = personal_id(ctx, slug).await? else {
@@ -988,14 +1406,10 @@ pub(super) async fn verify(ctx: &Ctx, section: &EventTypes) -> Result<(), ApplyE
                 &Value::Null,
             ));
         };
-        let now = EditState::load(ctx.pool(), &et_id)
-            .await
-            .map_err(read_error)?;
-        let mode = guest_mode(ctx, &et_id).await;
-        let price = stored_price(ctx, &et_id).await?;
-        let item = &without_stored(item, &now, mode, &price)?;
-        let want = wanted(ctx, item, now.clone(), mode, price.clone(), &profile).await?;
-        if let Some((key, stored, desired)) = differences(item, &now, mode, &price, &want)?
+        let now = Current::load(ctx, &et_id).await?;
+        let item = &without_stored(item, &now, &calendars)?;
+        let want = wanted(ctx, item, now.clone(), &profile, &calendars).await?;
+        if let Some((key, stored, desired)) = differences(item, &now, &want, &calendars)?
             .into_iter()
             .next()
         {
@@ -1046,9 +1460,13 @@ pub(super) async fn verify(ctx: &Ctx, section: &EventTypes) -> Result<(), ApplyE
 /// The stored state in the document's shape (`--export`), reading only:
 /// every personal event type of the admin, in the order they were made.
 /// `weekly_hours` is null where the hours are the profile's default ones,
-/// and `prune` is left out (`none`).
+/// and `prune` is left out (`none`). A key is left out where the document
+/// cannot say what is stored: `busy_calendars` naming a calendar whose name
+/// another one shares (or one no source lists), `overrides` with a row the
+/// document could not give (a hand edit).
 pub(super) async fn export(ctx: &Ctx) -> Result<Option<EventTypes>, ApplyError> {
     let profile = profile_rules(ctx).await?;
+    let calendars = Calendars::load(ctx).await?;
     let ids: Vec<String> = sqlx::query_scalar(
         "SELECT et.id FROM event_types et
          JOIN accounts a ON a.id = et.account_id
@@ -1060,13 +1478,21 @@ pub(super) async fn export(ctx: &Ctx) -> Result<Option<EventTypes>, ApplyError> 
     .await?;
     let mut items = Vec::with_capacity(ids.len());
     for et_id in ids {
-        let state = EditState::load(ctx.pool(), &et_id)
-            .await
-            .map_err(read_error)?;
-        let price = stored_price(ctx, &et_id).await?;
-        let mut item = item_of(&state, guest_mode(ctx, &et_id).await, &price);
-        if state.weekly_hours == profile {
+        let current = Current::load(ctx, &et_id).await?;
+        let mut item = current.item(&calendars);
+        if current.state.weekly_hours == profile {
             item.weekly_hours = Some(None);
+        }
+        if !calendars.nameable(&current.state.calendar_ids) {
+            item.busy_calendars = None;
+        }
+        let canonical = current.overrides.iter().enumerate().all(|(i, entry)| {
+            override_wanted(&format!("overrides[{i}]"), entry, current.today)
+                .is_ok_and(|kept| kept.is_some())
+        });
+        let unique = current.overrides.windows(2).all(|pair| pair[0] != pair[1]);
+        if !canonical || !unique {
+            item.overrides = None;
         }
         items.push(item);
     }
@@ -1156,7 +1582,14 @@ mod tests {
         };
         let mut state = new_form("x", &me, &[(1, "09:00".into(), "17:00".into())]);
         state.title = "X".into();
-        let map = as_map(&item_of(&state, GuestMode::Off, &None)).unwrap();
+        let map = as_map(&item_of(
+            &state,
+            GuestMode::Off,
+            &None,
+            &[],
+            &Calendars(Vec::new()),
+        ))
+        .unwrap();
         let mut keys: Vec<&str> = map
             .keys()
             .map(String::as_str)

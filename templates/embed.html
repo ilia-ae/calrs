@@ -37,20 +37,15 @@
   .embed-config .field-hint { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem; }
 
   .embed-code-block {
-    position: relative; background: var(--bg); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 0.875rem 1rem; padding-right: 5rem;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 0.875rem 1rem;
+    font-family: var(--mono);
     font-size: 0.78rem; line-height: 1.5; white-space: pre-wrap; word-break: break-word;
     color: var(--text); max-height: 280px; overflow: auto;
   }
-  .embed-copy-btn {
-    position: absolute; top: 0.5rem; right: 0.5rem;
-    padding: 0.375rem 0.625rem; font-size: 0.75rem; font-weight: 600;
-    border: 1px solid var(--border); border-radius: var(--radius);
-    background: var(--surface); color: var(--accent); cursor: pointer;
-  }
-  .embed-copy-btn:hover { border-color: var(--accent); }
-  .embed-copy-btn.copied { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+  .embed-snippet-head { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem; }
+  .embed-snippet-head .embed-section-label { margin: 0; }
+  #copy-btn.copied { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 
   .embed-preview-frame {
     background:
@@ -69,11 +64,9 @@
   .embed-section-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin: 0 0 0.4rem; }
 </style>
 
+<a href="/dashboard/event-types" class="back-link">&larr; {{ t("overrides-back-event-types") }}</a>
 <div class="card">
-  <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-    <h1 style="margin-bottom: 0;">{{ t("embed-heading", title=event_type_title) }}</h1>
-    <a href="/dashboard/event-types" style="color: var(--text-secondary); font-size: 0.85rem; text-decoration: none;">&larr; {{ t("overrides-back-event-types") }}</a>
-  </div>
+  <h1 style="margin-bottom: 0.5rem;">{{ t("embed-heading", title=event_type_title) }}</h1>
   <p class="subtitle" style="margin-bottom: 1rem;">{{ t("embed-subtitle") }}</p>
 
   {% if visibility != "public" %}
@@ -90,7 +83,7 @@
 
   {% if not has_username %}
   <div class="error" style="margin-bottom: 1rem;">
-    {{ t("embed-need-username", path='<code>/u/&lt;' ~ (t("embed-username-placeholder") | escape) ~ '&gt;/' ~ (event_type_slug | escape) ~ '</code>', link='<a href="/dashboard/settings" style="color: var(--accent);">' ~ (t("embed-need-username-link") | escape) ~ '</a>') | safe }}
+    {{ t("embed-need-username", path='<code>/u/&lt;' ~ (t("embed-username-placeholder") | escape) ~ '&gt;/' ~ (event_type_slug | escape) ~ '</code>', link='<a href="/dashboard/settings">' ~ (t("embed-need-username-link") | escape) ~ '</a>') | safe }}
   </div>
   {% else %}
   <div class="embed-tabs" role="tablist">
@@ -152,12 +145,13 @@
         <label>{{ t("embed-button-colors") }}</label>
         <div class="color-row">
           <input type="color" id="cfg-button-bg" value="#2563eb">
-          <input type="text" id="cfg-button-fg-hex" maxlength="7" placeholder="{{ t('embed-button-fg-placeholder') }}" style="flex:1;">
+          <input type="text" id="cfg-button-bg-hex" maxlength="7" placeholder="#2563eb" style="flex:1;">
         </div>
         <div class="color-row" style="margin-top: 0.375rem;">
           <input type="color" id="cfg-button-fg" value="#ffffff">
-          <span class="field-hint" style="margin:0;">{{ t("embed-button-colors-hint") }}</span>
+          <input type="text" id="cfg-button-fg-hex" maxlength="7" placeholder="{{ t('embed-button-fg-placeholder') }}" style="flex:1;">
         </div>
+        <div class="field-hint">{{ t("embed-button-colors-hint") }}</div>
       </div>
 
       <div class="form-row variant-floating">
@@ -177,11 +171,11 @@
 
     <!-- RIGHT: code + preview -->
     <div>
-      <h2 class="embed-section-label">{{ t("embed-snippet") }}</h2>
-      <div style="position: relative; margin-bottom: 1rem;">
-        <pre class="embed-code-block" id="snippet-output">{{ t("embed-loading") }}</pre>
-        <button type="button" class="embed-copy-btn" id="copy-btn">{{ t("settings-copy") }}</button>
+      <div class="embed-snippet-head">
+        <h2 class="embed-section-label">{{ t("embed-snippet") }}</h2>
+        <button type="button" class="btn btn-secondary btn-sm btn-auto" id="copy-btn">{{ t("settings-copy") }}</button>
       </div>
+      <pre class="embed-code-block" id="snippet-output" style="margin-bottom: 1rem;">{{ t("embed-loading") }}</pre>
 
       <h2 class="embed-section-label">{{ t("embed-preview") }}</h2>
       <div class="embed-preview-frame" id="preview-frame"></div>
@@ -445,6 +439,7 @@
   setVal('cfg-button-text', state.buttonText);
   setVal('cfg-button-position', state.buttonPosition);
   setVal('cfg-button-bg', state.buttonBg);
+  setVal('cfg-button-bg-hex', state.buttonBg);
   setVal('cfg-button-fg', state.buttonFg);
   setVal('cfg-button-fg-hex', state.buttonFg);
   $('cfg-show-icon').checked = state.showIcon;
@@ -464,6 +459,7 @@
       setVal('cfg-brand', state.brand);
       setVal('cfg-brand-hex', state.brand);
       setVal('cfg-button-bg', state.buttonBg);
+      setVal('cfg-button-bg-hex', state.buttonBg);
     }
     refresh();
   });
@@ -479,7 +475,11 @@
   $('cfg-button-position').addEventListener('change', function (e) { state.buttonPosition = e.target.value; refresh(); });
   $('cfg-button-bg').addEventListener('input', function (e) {
     var v = hexNorm(e.target.value); if (!v) return;
-    state.buttonBg = v; refresh();
+    state.buttonBg = v; setVal('cfg-button-bg-hex', v); refresh();
+  });
+  $('cfg-button-bg-hex').addEventListener('input', function (e) {
+    var v = hexNorm(e.target.value); if (!v) return;
+    state.buttonBg = v; setVal('cfg-button-bg', v); refresh();
   });
   $('cfg-button-fg').addEventListener('input', function (e) {
     var v = hexNorm(e.target.value); if (!v) return;

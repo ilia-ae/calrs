@@ -9,12 +9,20 @@
 .action-menu-dropdown a:hover, .action-menu-dropdown button:hover { background: var(--surface-hover); }
 .action-menu-dropdown .danger { color: var(--error-text); }
 .et-meta { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.15rem; }
-.copy-link-btn.copied { color: var(--success) !important; border-color: var(--success) !important; }
+.copy-link-btn.copied { color: var(--success); border-color: var(--success); }
+/* ilia fork: on a phone the actions wrap from the left (dashboard_base.html),
+   so the ⋯ can sit near the left edge, where a menu right-aligned to it would
+   open off screen. Open it under the whole actions block, from its left edge. */
+@media (max-width: 480px) {
+  .et-row .et-actions { position: relative; }
+  .et-row .action-menu { position: static; }
+  .et-row .action-menu-dropdown { left: 0; right: auto; }
+}
 </style>
 <div class="card">
-  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+  <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
     <h1 style="margin-bottom: 0;">{{ t("event-types-heading") }}</h1>
-    <a href="/dashboard/event-types/new" class="slot-btn" style="text-decoration: none; font-size: 0.85rem; font-weight: 600; color: var(--accent); border-color: var(--accent);">+ {{ t("event-types-new") }}</a>
+    <a href="/dashboard/event-types/new" class="btn btn-sm btn-auto">+ {{ t("event-types-new") }}</a>
   </div>
   {% if has_any %}
     {% for et in all_event_types %}
@@ -29,7 +37,7 @@
           {% if et.resource_names %}<span class="badge badge-muted" title="{{ et.resource_names }}">{{ t("event-types-badge-resources") }}</span>{% endif %}
           {% if et.date_range %}<span class="badge {% if et.date_range_state == 'expired' %}badge-disabled{% else %}badge-info{% endif %}">{{ et.date_range }}</span>{% if et.date_range_state == "active" %}<span class="badge badge-success">{{ t("event-types-badge-active") }}</span>{% elif et.date_range_state == "expired" %}<span class="badge badge-disabled">{{ t("event-types-badge-expired") }}</span>{% endif %}{% endif %}
           {% if et.visibility == "private" or et.visibility == "internal" %}
-            <a href="/dashboard/invites/{{ et.id }}" style="font-size: 0.75rem; color: var(--accent); text-decoration: none; margin-left: 0.25rem;">{{ t("event-types-send-invites") }} &rarr;</a>
+            <a href="/dashboard/invites/{{ et.id }}" style="font-size: 0.75rem; margin-left: 0.25rem;">{{ t("event-types-send-invites") }} &rarr;</a>
           {% endif %}
         </div>
         <div class="et-meta">
@@ -43,17 +51,17 @@
            reached through a tokenised invite, so copying its path would hand
            out a link that 404s; the row offers "Send invites" instead. #}
         {% if et.view_url %}
-        <button type="button" class="slot-btn copy-link-btn" style="font-size: 0.8rem; cursor: pointer;" title="{{ t('dashboard-event-types-copy-title') }}" data-copy-label="{{ t('dashboard-event-types-copy') }}" data-copied-label="{{ t('dashboard-event-types-copied') }}" data-copy-failed-label="{{ t('dashboard-event-types-copy-failed') }}" data-path="{{ et.view_url }}">{{ t('dashboard-event-types-copy') }}</button>
+        <button type="button" class="btn btn-secondary btn-sm btn-auto copy-link-btn" title="{{ t('dashboard-event-types-copy-title') }}" data-copy-label="{{ t('dashboard-event-types-copy') }}" data-copied-label="{{ t('dashboard-event-types-copied') }}" data-copy-failed-label="{{ t('dashboard-event-types-copy-failed') }}" data-path="{{ et.view_url }}">{{ t('dashboard-event-types-copy') }}</button>
         {% endif %}
         {% if et.can_manage %}
-        <a href="{{ et.edit_url }}" class="slot-btn" style="text-decoration: none; font-size: 0.8rem;">{{ t("event-types-edit") }}</a>
+        <a href="{{ et.edit_url }}" class="btn btn-secondary btn-sm btn-auto">{{ t("event-types-edit") }}</a>
         <form method="post" action="{{ et.toggle_url }}" style="margin: 0;">
-          <button type="submit" class="slot-btn" style="font-size: 0.8rem; cursor: pointer;">{% if et.enabled %}{{ t("event-types-disable") }}{% else %}{{ t("event-types-enable") }}{% endif %}</button>
+          <button type="submit" class="btn btn-secondary btn-sm btn-auto">{% if et.enabled %}{{ t("event-types-disable") }}{% else %}{{ t("event-types-enable") }}{% endif %}</button>
         </form>
-        <a href="{{ et.embed_url }}" class="slot-btn" style="text-decoration: none; font-size: 0.8rem;">{{ t("event-types-embed") }}</a>
+        <a href="{{ et.embed_url }}" class="btn btn-secondary btn-sm btn-auto">{{ t("event-types-embed") }}</a>
         {% endif %}
         <div class="action-menu">
-          <button type="button" class="slot-btn action-menu-toggle" style="font-size: 0.8rem; cursor: pointer; padding: 0.375rem 0.5rem;">&ctdot;</button>
+          <button type="button" class="btn btn-secondary btn-sm btn-auto action-menu-toggle" aria-label="{{ t('event-types-more-actions') }}" aria-expanded="false"><span aria-hidden="true">&ctdot;</span></button>
           <div class="action-menu-dropdown">
             {% if et.can_manage %}
             <a href="{{ et.overrides_url }}">{{ t("event-types-overrides") }}</a>
@@ -81,13 +89,17 @@
     {% endfor %}
   {% else %}
     <div class="empty" style="padding: 2rem 1rem;">
-      <div class="empty-icon">&#128197;</div>
-      <div class="empty-text">{{ t("event-types-empty", link='<a href="/dashboard/event-types/new" style="color: var(--accent); text-decoration: none;">' ~ (t("event-types-empty-link-label") | escape) ~ '</a>') | safe }}</div>
+      <div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="18" height="16.5" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4M8 14h3M8 17.5h6"/></svg></div>
+      <div class="empty-text">{{ t("event-types-empty", link='<a href="/dashboard/event-types/new">' ~ (t("event-types-empty-link-label") | escape) ~ '</a>') | safe }}</div>
     </div>
   {% endif %}
 </div>
 
 <script>
+function closeMenu(m) {
+  m.classList.remove('open');
+  m.previousElementSibling.setAttribute('aria-expanded', 'false');
+}
 document.addEventListener('click', function(e) {
   var copyBtn = e.target.closest('.copy-link-btn');
   if (copyBtn) {
@@ -145,11 +157,11 @@ document.addEventListener('click', function(e) {
   if (btn) {
     e.stopPropagation();
     var menu = btn.nextElementSibling;
-    document.querySelectorAll('.action-menu-dropdown.open').forEach(function(m) { if (m !== menu) m.classList.remove('open'); });
-    menu.classList.toggle('open');
+    document.querySelectorAll('.action-menu-dropdown.open').forEach(function(m) { if (m !== menu) closeMenu(m); });
+    btn.setAttribute('aria-expanded', menu.classList.toggle('open'));
     return;
   }
-  document.querySelectorAll('.action-menu-dropdown.open').forEach(function(m) { m.classList.remove('open'); });
+  document.querySelectorAll('.action-menu-dropdown.open').forEach(closeMenu);
 });
 </script>
 {% endblock %}

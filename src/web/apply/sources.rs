@@ -9,6 +9,10 @@
 //! calendar server, so no login is ever tried.
 //!
 //! The writes are the ones the web and MCP make:
+//! - the name (ilia fork) is the edit form's column (`UPDATE caldav_sources
+//!   SET name`), written directly: the form's handler would log in to the
+//!   server to test the connection (Kerio locks an account after failed
+//!   logins), and the name needs no connection;
 //! - the write calendar is the web's statement (`set_write_calendar`,
 //!   `UPDATE caldav_sources SET write_calendar_href`), with MCP's check that
 //!   the calendar's address stays on the source's server
@@ -32,6 +36,16 @@ use std::collections::BTreeSet;
 /// source's listed calendars (as MCP's audit says it).
 const UNLISTED: &str = "(unlisted)";
 
+/// The most bytes of a source's name (the column has no limit; the role and
+/// the form agree on this one).
+const NAME_MAX: usize = 255;
+
+/// ilia fork: what a source's `name` is. The role greps for this literal in
+/// the binary before it sends the key (an older calrs refuses it as an
+/// unknown key): keep it a literal, and used at runtime (the refusal of a
+/// name that is empty, padded or too long).
+pub(crate) const SOURCE_NAME_SHAPE: &str = "sources[].name: 1..255 bytes, not padded";
+
 fn at(index: usize, key: &str) -> String {
     format!("sources[{index}].{key}")
 }
@@ -39,6 +53,7 @@ fn at(index: usize, key: &str) -> String {
 /// A source as stored.
 struct Stored {
     id: String,
+    name: String,
     url: String,
     provider: String,
     write_href: Option<String>,
@@ -55,13 +70,14 @@ struct Calendar {
 
 impl Stored {
     async fn load(ctx: &Ctx, id: &str) -> Result<Self, ApplyError> {
-        let (url, provider, write_href): (String, String, Option<String>) = sqlx::query_as(
-            "SELECT url, provider_type, NULLIF(write_calendar_href, '')
-             FROM caldav_sources WHERE id = ?",
-        )
-        .bind(id)
-        .fetch_one(ctx.pool())
-        .await?;
+        let (name, url, provider, write_href): (String, String, String, Option<String>) =
+            sqlx::query_as(
+                "SELECT name, url, provider_type, NULLIF(write_calendar_href, '')
+                 FROM caldav_sources WHERE id = ?",
+            )
+            .bind(id)
+            .fetch_one(ctx.pool())
+            .await?;
         let rows: Vec<(String, Option<String>, String, i64)> = sqlx::query_as(
             "SELECT id, display_name, href, sync_enabled FROM calendars
              WHERE source_id = ? ORDER BY id",
@@ -84,6 +100,7 @@ impl Stored {
         calendars.sort_by(|a, b| a.name.cmp(&b.name).then(a.id.cmp(&b.id)));
         Ok(Self {
             id: id.to_string(),
+            name,
             url,
             provider,
             write_href,
@@ -151,6 +168,15 @@ impl Stored {
                 .map_or(Value::from(UNLISTED), |c| Value::from(c.name.clone())),
         }
     }
+}
+
+/// A source's name as the edit form stores it: not empty, not padded, at
+/// most `NAME_MAX` bytes.
+fn check_name(index: usize, name: &str) -> Result<(), ApplyError> {
+    if name.is_empty() || name.trim() != name || name.len() > NAME_MAX {
+        return Err(ApplyError::invalid(at(index, "name"), SOURCE_NAME_SHAPE));
+    }
+    Ok(())
 }
 
 /// The admin's source `url` + `username`.
@@ -239,6 +265,9 @@ pub(super) async fn check(ctx: &Ctx, section: &[Source]) -> Result<(), ApplyErro
                 "listed twice",
             ));
         }
+        if let Some(name) = &source.name {
+            check_name(index, name)?;
+        }
         let stored = Stored::load(ctx, &find(ctx, index, source).await?).await?;
         if let Some(name) = &source.write_calendar {
             if let Some(name) = name {
@@ -271,6 +300,17 @@ pub(super) async fn check(ctx: &Ctx, section: &[Source]) -> Result<(), ApplyErro
 pub(super) async fn apply(ctx: &mut Ctx, section: &[Source]) -> Result<(), ApplyError> {
     for (index, source) in section.iter().enumerate() {
         let stored = Stored::load(ctx, &find(ctx, index, source).await?).await?;
+
+        if let Some(name) = &source.name {
+            if name != &stored.name {
+                ctx.record(at(index, "name"), &stored.name, name);
+                sqlx::query("UPDATE caldav_sources SET name = ? WHERE id = ?")
+                    .bind(name)
+                    .bind(&stored.id)
+                    .execute(ctx.pool())
+                    .await?;
+            }
+        }
 
         if let Some(name) = &source.write_calendar {
             let href = wanted_href(&stored, index, name.as_deref())?;
@@ -329,6 +369,15 @@ pub(super) async fn apply(ctx: &mut Ctx, section: &[Source]) -> Result<(), Apply
 pub(super) async fn verify(ctx: &Ctx, section: &[Source]) -> Result<(), ApplyError> {
     for (index, source) in section.iter().enumerate() {
         let stored = Stored::load(ctx, &find(ctx, index, source).await?).await?;
+        if let Some(name) = &source.name {
+            if name != &stored.name {
+                return Err(ApplyError::stored_differs(
+                    at(index, "name"),
+                    &Value::from(name.clone()),
+                    &Value::from(stored.name.clone()),
+                ));
+            }
+        }
         if let Some(name) = &source.write_calendar {
             if wanted_href(&stored, index, name.as_deref())? != stored.write_href {
                 return Err(ApplyError::stored_differs(
@@ -360,9 +409,10 @@ pub(super) async fn verify(ctx: &Ctx, section: &[Source]) -> Result<(), ApplyErr
 
 /// The stored state in the document's shape (`--export`), reading only:
 /// every source of the admin, oldest first. A key is left out where the
-/// document cannot say what is stored: a write calendar whose address no
-/// listed calendar has, a name two calendars share, or a source that syncs
-/// no calendar.
+/// document cannot say what is stored: a name the edit form would not
+/// store (empty, padded, too long: a hand edit), a write calendar whose
+/// address no listed calendar has, a name two calendars share, or a source
+/// that syncs no calendar.
 pub(super) async fn export(ctx: &Ctx) -> Result<Option<Vec<Source>>, ApplyError> {
     let rows: Vec<(String, String, String)> = sqlx::query_as(
         "SELECT cs.id, cs.url, cs.username FROM caldav_sources cs
@@ -383,9 +433,13 @@ pub(super) async fn export(ctx: &Ctx) -> Result<Option<Vec<Source>>, ApplyError>
         let synced = stored.synced();
         let sync_calendars =
             (!synced.is_empty() && !synced.iter().any(|n| stored.ambiguous(n))).then_some(synced);
+        let name = check_name(0, &stored.name)
+            .is_ok()
+            .then(|| stored.name.clone());
         sources.push(Source {
             url,
             username,
+            name,
             write_calendar,
             sync_calendars,
         });

@@ -62,7 +62,7 @@ async fn login_page_leads_with_the_passkey_button() {
     assert_eq!(status, 200);
     let button = at(
         &html,
-        r#"<button type="button" class="btn btn-passkey" data-webauthn="get" data-form="webauthn-form" hidden>Sign in with passkey</button>"#,
+        r#"<button type="button" class="btn btn-lg btn-passkey" data-webauthn="get" data-form="webauthn-form" hidden>Sign in with passkey</button>"#,
     );
     let totp = at(
         &html,
@@ -194,6 +194,12 @@ async fn settings_page_lists_keys_and_offers_both_add_buttons() {
     assert!(html.contains(&format!(
         "confirm?action=passkey_delete&amp;credential={synced_id}\">Remove</a>"
     )));
+    // The row actions are small buttons of the shared system; Remove is
+    // marked destructive, its confirmation carries the red fill.
+    assert!(html.contains(&format!(
+        r#"<a class="btn btn-ghost btn-sm btn-auto passkey-delete" href="/dashboard/settings/mfa/confirm?action=passkey_delete&amp;credential={synced_id}">"#
+    )));
+    assert!(html.contains(r#"<p class="mfa-back"><a href="/dashboard/settings">"#));
     let key = at(
         &html,
         r#"<a class="btn" href="/dashboard/settings/mfa/confirm?action=passkey_add&amp;kind=security-key">Add a security key</a>"#,
@@ -318,6 +324,30 @@ async fn confirm_page_renders_for_every_action() {
         assert!(html.contains("Confirm with passkey"));
         no_inline_handlers(&html);
     }
+    // Removing a key or the app is destructive: its final button is
+    // `.btn-danger`, with the key and with a code; other changes are not.
+    for (query, danger) in [
+        (delete.as_str(), true),
+        ("action=disable", true),
+        (rename.as_str(), false),
+        ("action=regenerate", false),
+    ] {
+        let (_, _, html) = confirm_page(&app, &session, query).await;
+        assert_eq!(
+            html.contains(r#"class="btn btn-lg btn-passkey btn-danger" data-webauthn="get""#),
+            danger,
+            "{query}"
+        );
+        if !danger {
+            assert!(html.contains(r#"class="btn btn-lg btn-passkey" data-webauthn="get""#));
+        }
+        let (_, _, html) = confirm_page(&app, &session, &format!("{query}&method=recovery")).await;
+        assert_eq!(
+            html.contains(r#"<button class="btn btn-danger" type="submit">"#),
+            danger,
+            "{query}"
+        );
+    }
     let (_, _, html) = confirm_page(&app, &session, &rename).await;
     assert!(html.contains(r#"name="name" id="passkey-name" value="Security key 1""#));
     let (_, _, html) = confirm_page(&app, &session, "action=policy&policy=required").await;
@@ -381,7 +411,9 @@ async fn register_page_leads_with_the_chosen_button() {
         assert!(page_options(&html).is_some());
         let lead = at(
             &html,
-            &format!(r#"class="btn btn-passkey" data-webauthn="create" data-hints="{first}""#),
+            &format!(
+                r#"class="btn btn-lg btn-passkey" data-webauthn="create" data-hints="{first}""#
+            ),
         );
         let next = at(
             &html,

@@ -27,12 +27,45 @@ confirmed-add-to-calendar = Add to calendar
 
 # Slot picker (templates/slots.html)
 
+## ilia-ov-slots
+slots-time-format-24 = 24h
+slots-time-format-12 = 12h
+slots-prev-month = Previous month
+slots-next-month = Next month
+slots-prev-week = Previous week
+slots-next-week = Next week
+book-remove-guest = Remove guest
+ilia-error-back-to-site = Back to the site
+
 slots-location-video = Video call
 slots-location-phone = Phone call
 slots-location-google-meet = Google Meet
 
 slots-tz-label = Your timezone
 slots-time-format-label = Time format
+
+## ilia-ov5-guest
+tz-city-midway = Midway
+tz-city-hawaii = Hawaii
+tz-city-alaska = Alaska
+tz-city-los-angeles = Los Angeles
+tz-city-denver = Denver
+tz-city-chicago = Chicago
+tz-city-new-york = New York
+tz-city-sao-paulo = São Paulo
+tz-city-cape-verde = Cape Verde
+tz-city-london = London
+tz-city-paris = Paris, Brussels
+tz-city-helsinki = Helsinki, Kyiv
+tz-city-moscow = Moscow
+tz-city-dubai = Dubai
+tz-city-india = India
+tz-city-bangkok = Bangkok
+tz-city-shanghai = Shanghai
+tz-city-tokyo = Tokyo
+tz-city-sydney = Sydney
+tz-city-auckland = Auckland
+
 tz-group-common = Common timezones
 tz-region-africa = Africa
 tz-region-america = Americas
@@ -68,6 +101,12 @@ slots-weekday-sat-short = S
 slots-weekday-sun-short = S
 
 slots-select-date = Select a date
+
+## ilia-ov3-guest
+# The deferred slot load failed (slots.html); the booking form's TON price note (partials/ton_price.html).
+slots-load-failed = Failed to load availability. Please refresh the page.
+ton-book-price-note = paid in TON after you book
+
 slots-loading-availability = Loading availability...
 slots-click-highlighted = Click a highlighted date to see available times
 slots-bookable-range-both = Bookable from { $from } to { $until }
@@ -290,6 +329,11 @@ email-confirm-reschedule-notice = Note: rescheduling requires at least { $minute
 # Event type form: Google Meet location + cancel/reschedule minimum notice
 # (templates/event_type_form.html, src/google_meet.rs)
 
+## ilia-ov-eventform
+# The collapsed "Payment in TON" section's summary: no payment, or the price comes from the demand ladder.
+ton-etf-hint-off = Free
+ton-etf-hint-ladder = By demand
+
 event-type-form-location-google-meet = Google Meet (auto-generated link)
 event-type-form-location-google-meet-hint = A unique Google Meet link is created on confirmation, owned by the assigned host. Every host (you, or every eligible team member) must have Google Calendar connected with a write-back calendar selected.
 
@@ -339,12 +383,23 @@ booking-blocked-body = The host requires at least { $minutes } minutes of notice
 
 # Dashboard event types listing (templates/dashboard_event_types.html)
 
+## ilia-ov-dates
+# Booking times on the dashboard lists: the day ("Today", "Tomorrow", a weekday
+# or a date), then the start and end times and the host timezone.
+dashboard-when-today = Today
+dashboard-when-tomorrow = Tomorrow
+dashboard-when-range = { $date } at { $start } — { $end } { $tz }
+
 dashboard-event-types-copy = Copy
 dashboard-event-types-copied = Copied!
 dashboard-event-types-copy-title = Copy booking link
 dashboard-event-types-copy-failed = Copy failed
 
 # Dashboard sidebar and shared chrome (templates/dashboard_base.html)
+
+## ilia-ov-shell
+nav-menu = Menu
+event-types-more-actions = More actions
 
 nav-section-scheduling = Scheduling
 nav-overview = Overview
@@ -416,6 +471,11 @@ overview-action-reason-team-admin = Requires a team — create one first
 overview-action-reason-team-member = Requires a team — ask an admin
 
 # Dashboard bookings (templates/dashboard_bookings.html)
+
+## ilia-ov-lists
+team-form-slug-placeholder = engineering
+troubleshoot-label-past = Already passed
+troubleshoot-legend-beyond-horizon = Beyond horizon or date range
 
 bookings-page-title = Bookings
 bookings-pending-approval = Pending approval
@@ -554,6 +614,13 @@ editor-preview = Preview
 
 # Profile and settings (templates/settings.html)
 
+## ilia-ov-settings
+settings-choose-file = Choose file
+settings-no-file = No file chosen
+admin-provider-local = Password
+admin-provider-oidc = SSO
+admin-theme-vates-desc = Red and space blue
+
 settings-page-title = Settings
 settings-heading = Profile & Settings
 settings-public-page-label = Your public booking page
@@ -605,6 +672,11 @@ settings-theme-light = Light
 settings-theme-dark = Dark
 
 # Sign in (templates/auth/login.html)
+
+## ilia-ov-auth
+ilia-mfa-recovery-copy = Copy the codes
+ilia-mfa-recovery-copied = Codes copied
+ilia-mfa-recovery-copy-manual = Copying did not work. The codes are selected: copy them by hand.
 
 login-page-title = Sign in
 login-heading = Sign in
@@ -693,6 +765,15 @@ team-profile-subtitle = Pick an event type to book a time.
 team-profile-empty = No event types available yet.
 
 # Availability troubleshoot (templates/troubleshoot.html, src/web/mod.rs)
+
+## ilia-ov2-lists
+# The troubleshoot timeline's legend entry for time already gone today.
+troubleshoot-legend-past = Past
+# Accessible names of the troubleshoot page's day arrows.
+troubleshoot-prev-day = Previous day
+troubleshoot-next-day = Next day
+# Accessible name of a member's role select on the team settings page.
+team-settings-role-of = Role of { $name }
 
 troubleshoot-page-title = Troubleshoot
 troubleshoot-empty = No event types found. { $link } to start troubleshooting availability.
@@ -797,6 +878,11 @@ source-form-heading-add = Connect a calendar
 source-form-subtitle-edit = Update the connection. Leave the password blank to keep the existing one. After changing the URL or username, run a sync to refresh the discovered calendar list.
 source-form-subtitle-add = Connect a CalDAV server or Microsoft Exchange (EWS) so calrs can check availability when guests book meetings.
 source-form-backend = Backend
+
+## ilia-ov3-dash
+# The "Other / generic CalDAV" preset on the new-source form; it also becomes the default source name.
+source-form-preset-other = Other CalDAV server
+
 source-form-preset = Preset
 source-form-connect-google = Connect with Google
 source-form-google-unavailable = Google Calendar is not available. Contact your administrator.
@@ -937,6 +1023,10 @@ etf-min-notice-help = How far in advance someone must book.
 etf-section-limits = Booking limits
 etf-first-slot-only = One slot per day
 etf-first-slot-only-help = Only show the earliest available time each day.
+
+## ilia-ov4-dash
+etf-freq-per-member = Per team member
+
 etf-freq-limit = Limit booking frequency
 etf-freq-limit-help = Limit how many times this event can be booked per period.
 etf-add-limit = Add limit
@@ -1230,8 +1320,25 @@ admin-sms-gateway = Gateway:
 admin-sms-account = Account:
 admin-sms-sender = Sender:
 admin-sms-enabled = SMS enabled
+## ilia-ov3-admin
+admin-sms-provider-webhook = Generic webhook
+admin-sms-webhook-secret = HMAC secret
 admin-sms-gateway-label = Gateway
 admin-required-on-switch = Required when switching gateway
+## ilia-ov2-settings
+admin-sms-sender-label = Sender
+admin-sms-api-base-url = API base URL
+admin-sms-region-base-url = Region base URL
+admin-sms-webhook-url = Webhook URL
+admin-sms-twilio-sender-hint = A Twilio number in E.164 format (+15551234567), or an alphanumeric sender ID where the destination country allows one.
+admin-sms-twilio-base-url-hint = Optional. Defaults to https://api.twilio.com. Use https, the credential travels on this connection.
+admin-sms-gatewayapi-sender-hint = Up to 11 alphanumeric characters, or 15 digits.
+admin-sms-gatewayapi-base-url-hint = Optional. Defaults to https://gatewayapi.com; use https://gatewayapi.eu to keep traffic in the EU.
+admin-sms-sevenio-sender-hint = Up to 11 alphanumeric characters, or 16 digits.
+admin-sms-sevenio-base-url-hint = Optional. Defaults to https://gateway.seven.io.
+admin-sms-webhook-sender-hint = Optional. Passed through to your endpoint as "sender".
+admin-sms-webhook-base-url-hint = calrs POSTs {"{"}"to", "text", "sender"{"}"} here and expects 2xx back.
+
 admin-sms-docs = { $provider } API documentation
 admin-sms-country = Default country code
 admin-sms-country-hint = (used when guests enter a local phone number)
@@ -1712,7 +1819,7 @@ ton-pay-qr-alt = QR code with the payment details
 ton-pay-scan = Or scan this code with your wallet app.
 ton-pay-qr-alt-tonkeeper = QR code for Tonkeeper with the payment details
 ton-pay-scan-tonkeeper = Or scan this code with Tonkeeper or your phone's camera.
-ton-pay-qr-other = Another wallet, such as MyTonWallet? Show its QR code
+ton-pay-qr-other = QR code for another wallet (MyTonWallet etc.)
 ton-pay-address = Address
 ton-pay-comment = Comment
 ton-pay-copy = Copy
@@ -1721,7 +1828,7 @@ ton-pay-warn-comment = The comment is required: it is how we recognise your paym
 ton-pay-warn-encrypt = Do not encrypt the comment.
 ton-pay-warn-token = Pay in TON, not in tokens.
 ton-pay-warn-exchange = Paying from an exchange? Put the code above in the memo (comment) field.
-ton-pay-warn-deadline = Send the payment before { $time }. A payment sent later may not be counted.
+ton-pay-warn-deadline = Send the payment before { $time } ({ $zone }). A payment sent later may not be counted.
 ton-pay-check = I have paid, check now
 ton-pay-email = Email me this link
 ton-pay-emailed = We have sent this link to the email address you booked with.
@@ -2175,6 +2282,9 @@ ton-etf-ladder-help = The price is the step for the number of your upcoming book
 # ilia fork: the TON settings page (/dashboard/admin/ton)
 nav-admin-ton = TON payments
 ton-etf-ladder-edit = Edit the ladder
+## ilia-ov-ton
+ton-admin-debug-tg-saved-locked = Nothing changed: the guest Telegram username is locked.
+dbg-err-requote = The price changed twice while booking. Nothing was booked: try again.
 ton-admin-page-title = TON payments
 ton-admin-heading = TON payments
 ton-admin-intro = These settings apply to TON payments on this server. A value set in the server's environment wins, then one saved here or by config apply, then the default.
@@ -2193,6 +2303,13 @@ ton-admin-address-raw = Raw form
 ton-admin-indexer = Indexer
 ton-admin-watcher = Watcher
 ton-admin-watcher-ready = ready
+
+## ilia-ov3-ton
+ton-admin-notready-wallet = the receiving wallet is not active (or not checked yet)
+ton-admin-notready-network = the indexer is on another network (or not checked yet)
+ton-admin-notready-stale = the watcher has not completed a step in the last 2 minutes
+ton-admin-off-unset = CALRS_TON_NETWORK is not set
+
 ton-admin-watcher-not-ready = not ready: { $reason }
 ton-admin-last-step = last step
 ton-admin-open-invoices = Open invoices
@@ -2230,7 +2347,7 @@ ton-admin-f-rate_max_age_min = Oldest accepted rate (minutes)
 ton-admin-f-rate_max_jump_pct = Largest jump from the last rate (%)
 ton-admin-f-alert_email = Alert email (empty: every admin)
 ton-admin-ladder-help = Steps separated by commas: the price at 0, 1, 2… confirmed bookings in the coming days; the last step is the ceiling. "free" only at the start: a free booking waits for the owner's approval.
-ton-admin-ladder-row = From %1 bookings
+ton-admin-ladder-row = Bookings: %1
 ton-admin-ladder-add = Add a step
 ton-admin-ladder-remove = Remove
 ton-admin-free = free
@@ -2266,7 +2383,7 @@ ton-admin-via-apply = config apply
 nav-admin-debug-booking = Debug booking
 dbg-title = Debug booking
 dbg-intro = Book a test meeting as a guest would, without filling in the guest form each time. The booking goes through the same path as the public booking page: the checks, the price and the TON invoice, the hold on the time and the emails. Payment is never skipped or marked as received: pay the invoice from your wallet, or cancel the booking.
-dbg-switch-note = Switch this page off once debugging is done, with the switch at the top of the TON payments page:
+dbg-switch-note = Switch this page off once debugging is done, with the switch at the top of the page:
 dbg-cancelled = Test bookings cancelled: { $count }.
 dbg-no-types = You have no enabled personal event type.
 dbg-event-type = Event type
@@ -2348,7 +2465,7 @@ dbg-telegram-from-chat = Prefilled from your linked Telegram chat.
 dbg-telegram-from-setting = Prefilled from the Debug block of
 dbg-telegram-none = No username to prefill: set one in the Debug block of
 dbg-timing = Timing for this test booking
-dbg-timing-normal = Normal: the site's settings (Admin → TON payments)
+dbg-timing-normal = Normal: the site's settings (the TON payments page)
 dbg-timing-fast = Fast test: { $window } min to pay; renewals: { $renewals }, { $renew } min each (the guest is asked to pay again); then the invoice expires and the booking is cancelled automatically. Grace { $grace } min, margin { $margin } min.
 dbg-timing-custom = Custom, in minutes (an empty field takes the fast value):
 dbg-timing-window = Window to pay, min

@@ -90,6 +90,7 @@ fn dashboard_label_converts_stored_tz_to_host_profile_tz() {
         "America/New_York",
         "Europe/Paris",
         "America/New_York",
+        "en",
     );
     assert!(
         primary.contains("4:00 PM") && primary.contains("4:30 PM"),
@@ -118,6 +119,7 @@ fn dashboard_label_omits_secondary_when_guest_tz_equals_host_tz() {
         "Europe/Paris",
         "Europe/Paris",
         "Europe/Paris",
+        "en",
     );
     assert!(
         secondary.is_none(),
@@ -133,9 +135,64 @@ fn dashboard_label_falls_back_for_unparseable_input() {
         "Europe/Paris",
         "Europe/Paris",
         "America/New_York",
+        "en",
     );
     assert_eq!(primary, "garbage — also-garbage");
     assert!(secondary.is_none());
+}
+
+#[test]
+fn dashboard_label_follows_russian_with_a_24_hour_clock() {
+    // The same booking as above, on a Russian dashboard: the date is
+    // written out in Russian (genitive month) and both lines use 24-hour time.
+    let (primary, secondary) = format_booking_for_dashboard(
+        "2099-01-20T10:00:00",
+        "2099-01-20T10:30:00",
+        "America/New_York",
+        "Europe/Paris",
+        "America/New_York",
+        "ru",
+    );
+    assert_eq!(primary, "20 января 2099, 16:00 — 16:30 CET");
+    assert_eq!(secondary.as_deref(), Some("10:00 — 10:30 EST"));
+}
+
+#[test]
+fn dashboard_range_names_the_day_in_the_dashboard_language() {
+    let today = NaiveDate::from_ymd_opt(2099, 12, 14).unwrap();
+    let at = |d: u32, h: u32, m: u32| {
+        NaiveDate::from_ymd_opt(2099, 12, d)
+            .unwrap()
+            .and_hms_opt(h, m, 0)
+            .unwrap()
+    };
+    let range = |d: u32, lang: &str| {
+        format_dashboard_range(at(d, 14, 0), at(d, 14, 30), today, "UTC", lang)
+    };
+    assert_eq!(range(14, "ru"), "Сегодня, 14:00 — 14:30 UTC");
+    assert_eq!(range(15, "ru"), "Завтра, 14:00 — 14:30 UTC");
+    // 2099-12-17 is a Thursday; the weekday starts the line, capitalised.
+    assert_eq!(range(17, "ru"), "Четверг, 14:00 — 14:30 UTC");
+    assert_eq!(range(17, "fr"), "Jeudi, 14:00 — 14:30 UTC");
+    assert_eq!(range(28, "de"), "28. Dezember 2099, 14:00 — 14:30 UTC");
+    // English stays exactly as upstream writes it.
+    assert_eq!(range(14, "en"), "Today at 2:00 PM — 2:30 PM UTC");
+    assert_eq!(range(17, "en"), "Thursday at 2:00 PM — 2:30 PM UTC");
+    assert_eq!(range(28, "en"), "Mon, Dec 28 at 2:00 PM — 2:30 PM UTC");
+    let next_year = format_dashboard_range(
+        NaiveDate::from_ymd_opt(2100, 1, 4)
+            .unwrap()
+            .and_hms_opt(9, 5, 0)
+            .unwrap(),
+        NaiveDate::from_ymd_opt(2100, 1, 4)
+            .unwrap()
+            .and_hms_opt(9, 35, 0)
+            .unwrap(),
+        today,
+        "UTC",
+        "en",
+    );
+    assert_eq!(next_year, "Mon, Jan 4, 2100 at 9:05 AM — 9:35 AM UTC");
 }
 
 // --- format_date_label tests ---

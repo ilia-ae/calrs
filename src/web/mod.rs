@@ -194,6 +194,20 @@ pub struct AppState {
     pub(crate) debug_booking: debug_booking::Shown,
 }
 
+impl AppState {
+    /// ilia fork: the company link of the logo line, for the pages whose
+    /// templates carry it (the booking action and result pages, the TON
+    /// pages). One helper, usable from sync renderers too: it reads without
+    /// waiting, and only an admin save holding the lock at that instant
+    /// gives `None` (an unlinked logo for that one page).
+    pub(crate) fn company_link_now(&self) -> Option<String> {
+        self.company_link
+            .try_read()
+            .ok()
+            .and_then(|link| link.clone())
+    }
+}
+
 // --- CSRF protection (double-submit cookie pattern) ---
 
 /// Generate a random CSRF token using UUID v4.
@@ -1366,6 +1380,7 @@ fn render_booking_action_error_html_in(
     };
     Html(
         tmpl.render(context! {
+            company_link => state.company_link_now(),
             title => title,
             message => message,
             lang => lang,

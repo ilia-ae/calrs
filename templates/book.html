@@ -20,21 +20,23 @@
 
 <div class="card">
   <h1>{{ event_type.title }}</h1>
+  {#- ilia fork: the guest has picked a time here; the note says payment follows the booking. -#}
+  {% set ton_note_key = "ton-book-price-note" %}
   {% include "partials/ton_price.html" %}
   <div class="meta">
-    <span>{{ event_type.duration_min }} min</span>
-    <span>{{ host_name }}</span>
+    <span><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>{{ t("event-types-duration", minutes=event_type.duration_min) }}</span>
+    <span><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>{{ host_name }}</span>
     {% if event_type.location_value or event_type.location_type == "jitsi_auto" or event_type.location_type == "webhook_auto" or event_type.location_type == "google_meet" %}
       {% if event_type.location_type is defined and event_type.location_type == "in_person" %}
-        <span>{{ event_type.location_value }}</span>
+        <span><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg>{{ event_type.location_value }}</span>
       {% else %}
-        <span>{% if event_type.location_type == "jitsi_auto" %}{% if meeting_jitsi_label %}{{ meeting_jitsi_label }}{% else %}{{ t("slots-location-video") }}{% endif %}{% elif event_type.location_type == "webhook_auto" %}{% if meeting_webhook_label %}{{ meeting_webhook_label }}{% else %}{{ t("slots-location-video") }}{% endif %}{% elif event_type.location_type == "google_meet" %}{{ t("slots-location-google-meet") }}{% elif event_type.location_type == "link" %}{{ t("slots-location-video") }}{% elif event_type.location_type == "phone" %}{{ t("slots-location-phone") }}{% else %}{{ event_type.location_type }}{% endif %}</span>
+        <span><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg>{% if event_type.location_type == "jitsi_auto" %}{% if meeting_jitsi_label %}{{ meeting_jitsi_label }}{% else %}{{ t("slots-location-video") }}{% endif %}{% elif event_type.location_type == "webhook_auto" %}{% if meeting_webhook_label %}{{ meeting_webhook_label }}{% else %}{{ t("slots-location-video") }}{% endif %}{% elif event_type.location_type == "google_meet" %}{{ t("slots-location-google-meet") }}{% elif event_type.location_type == "link" %}{{ t("slots-location-video") }}{% elif event_type.location_type == "phone" %}{{ t("slots-location-phone") }}{% else %}{{ event_type.location_type }}{% endif %}</span>
       {% endif %}
     {% endif %}
   </div>
 
   <div class="selected-summary">
-    <strong>{{ date_label }}</strong> &middot; <span class="book-time" data-time="{{ time_start }}">{{ time_start }}</span> – <span class="book-time" data-time="{{ time_end }}">{{ time_end }}</span>
+    <strong>{{ date_label }}</strong> &middot; <span class="book-time" data-time="{{ time_start }}">{{ time_start }}</span> – <span class="book-time" data-time="{{ time_end }}">{{ time_end }}</span>{% if guest_tz is defined and guest_tz %} ({{ guest_tz }}){% endif %}
   </div>
 
   {% if error %}
@@ -250,14 +252,15 @@
     {% if max_additional_guests is defined and max_additional_guests > 0 %}
     <div class="form-group">
       <label>{{ t("book-additional-guests-label") }} <span class="hint">{{ t("book-additional-guests-hint", max=max_additional_guests) }}</span></label>
-      <div id="guest-list" style="display: flex; flex-direction: column; gap: 0.375rem;"></div>
+      <div id="guest-list" style="display: flex; flex-direction: column; gap: 0.375rem; margin-bottom: 0.375rem;"></div>
       <input type="hidden" name="additional_guests" id="additional-guests-hidden" value="">
-      <button type="button" id="add-guest-btn" style="margin-top: 0.375rem; background: none; border: 1px dashed var(--border); border-radius: var(--radius); padding: 0.5rem; cursor: pointer; color: var(--text-muted); font-size: 0.85rem; font-family: inherit; width: 100%; transition: all 0.15s ease;">{{ t("book-add-guest-btn") }}</button>
+      <button type="button" id="add-guest-btn" class="btn btn-secondary btn-sm">{{ t("book-add-guest-btn") }}</button>
     </div>
     <script>
     (function() {
       var max = {{ max_additional_guests }};
       var guestEmailPlaceholder = {{ t("book-guest-email-placeholder") | tojson }};
+      var removeGuestLabel = {{ t("book-remove-guest") | tojson }};
       var list = document.getElementById('guest-list');
       var hidden = document.getElementById('additional-guests-hidden');
       var addBtn = document.getElementById('add-guest-btn');
@@ -281,23 +284,26 @@
         inp.type = 'email';
         inp.placeholder = guestEmailPlaceholder;
         inp.maxLength = 255;
-        inp.style.cssText = 'flex: 1; padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.9rem; font-family: inherit; background: var(--surface); color: var(--text);';
+        // Padding, font, colours and the focus ring come from .form-group input.
+        inp.style.cssText = 'flex: 1; min-width: 0;';
         inp.addEventListener('input', syncHidden);
         var removeBtn = document.createElement('button');
         removeBtn.type = 'button';
+        removeBtn.className = 'btn btn-ghost btn-sm btn-auto';
+        removeBtn.setAttribute('aria-label', removeGuestLabel);
         removeBtn.textContent = '\u00d7';
-        removeBtn.style.cssText = 'background: none; border: none; color: var(--text-muted); font-size: 1.25rem; cursor: pointer; padding: 0 0.25rem; line-height: 1;';
+        removeBtn.style.fontSize = '1.125rem';
         removeBtn.addEventListener('click', function() {
           row.remove();
           count--;
-          addBtn.style.display = count < max ? '' : 'none';
+          addBtn.hidden = count >= max;
           syncHidden();
         });
         row.appendChild(inp);
         row.appendChild(removeBtn);
         list.appendChild(row);
         inp.focus();
-        if (count >= max) addBtn.style.display = 'none';
+        addBtn.hidden = count >= max;
       }
 
       addBtn.addEventListener('click', addRow);

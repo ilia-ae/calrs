@@ -4,11 +4,14 @@
     to whoever pays), so this offers to email that booking's links to the
     address it was made with: pay there, or cancel it to free the time. -#}
 
-{% block title %}{{ t("action-error-page-title") }}{% endblock %}
+{% block title %}{{ t("ton-bae-title-unavailable") }}{% endblock %}
 
 {% block content %}
+{% from "partials/result_icon.html" import result_icon %}
+<div class="page-narrow">
+<div class="logo">{% if company_link %}<a href="{{ company_link }}" target="_blank" rel="noopener noreferrer">{% endif %}<img src="/logo" alt="" onerror="this.closest('.logo').style.display='none'">{% if company_link %}</a>{% endif %}</div>
 <div class="card" style="text-align: center;">
-  <div class="check" style="background: #d97706;">!</div>
+  {{ result_icon("wait", "alert") }}
   <h1>{{ t("ton-bae-title-unavailable") }}</h1>
   <p class="subtitle">{{ t("ton-bae-body-already-open") }}</p>
   {% if email %}
@@ -17,5 +20,6 @@
     <button type="submit" class="btn">{{ t("ton-resend-submit") }}</button>
   </form>
   {% endif %}
+</div>
 </div>
 {% endblock %}

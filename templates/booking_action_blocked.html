@@ -3,8 +3,11 @@
 {% block title %}{% if action == "reschedule" %}{{ t("booking-blocked-title-reschedule") }}{% else %}{{ t("booking-blocked-title-cancel") }}{% endif %}{% endblock %}
 
 {% block content %}
+{% from "partials/result_icon.html" import result_icon %}
+<div class="page-narrow">
+<div class="logo">{% if company_link %}<a href="{{ company_link }}" target="_blank" rel="noopener noreferrer">{% endif %}<img src="/logo" alt="" onerror="this.closest('.logo').style.display='none'">{% if company_link %}</a>{% endif %}</div>
 <div class="card" style="text-align: center;">
-  <div class="check" style="background: var(--text-muted);">!</div>
+  {{ result_icon("muted", "alert") }}
   <h1>{% if action == "reschedule" %}{{ t("booking-blocked-title-reschedule") }}{% else %}{{ t("booking-blocked-title-cancel") }}{% endif %}</h1>
   {# ilia fork: in relay mode the contact is the system mailbox, never the host. #}
   {% if not relay %}
@@ -14,5 +17,6 @@
   {% else %}
   <p class="subtitle">{{ t("booking-blocked-body-no-reply", minutes=notice_min) }}</p>
   {% endif %}
+</div>
 </div>
 {% endblock %}

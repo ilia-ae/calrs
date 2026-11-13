@@ -27,12 +27,45 @@ confirmed-add-to-calendar = Lisa kalendrisse
 
 # Slot picker (templates/slots.html)
 
+## ilia-ov-slots
+slots-time-format-24 = 24 h
+slots-time-format-12 = 12 h
+slots-prev-month = Eelmine kuu
+slots-next-month = Järgmine kuu
+slots-prev-week = Eelmine nädal
+slots-next-week = Järgmine nädal
+book-remove-guest = Eemalda külaline
+ilia-error-back-to-site = Tagasi veebilehele
+
 slots-location-video = Videokõne
 slots-location-phone = Telefonikõne
 slots-location-google-meet = Google Meet
 
 slots-tz-label = Sinu ajavöönd
 slots-time-format-label = Ajavorming
+
+## ilia-ov5-guest
+tz-city-midway = Midway
+tz-city-hawaii = Hawaii
+tz-city-alaska = Alaska
+tz-city-los-angeles = Los Angeles
+tz-city-denver = Denver
+tz-city-chicago = Chicago
+tz-city-new-york = New York
+tz-city-sao-paulo = São Paulo
+tz-city-cape-verde = Roheneemesaared
+tz-city-london = London
+tz-city-paris = Pariis, Brüssel
+tz-city-helsinki = Helsingi, Kiiev
+tz-city-moscow = Moskva
+tz-city-dubai = Dubai
+tz-city-india = India
+tz-city-bangkok = Bangkok
+tz-city-shanghai = Shanghai
+tz-city-tokyo = Tokyo
+tz-city-sydney = Sydney
+tz-city-auckland = Auckland
+
 tz-group-common = Levinud ajavööndid
 tz-region-africa = Aafrika
 tz-region-america = Ameerika
@@ -68,6 +101,12 @@ slots-weekday-sat-short = L
 slots-weekday-sun-short = P
 
 slots-select-date = Vali kuupäev
+
+## ilia-ov3-guest
+# The deferred slot load failed (slots.html); the booking form's TON price note (partials/ton_price.html).
+slots-load-failed = Saadavust ei õnnestunud laadida. Värskenda lehte.
+ton-book-price-note = makstakse TON-is pärast broneerimist
+
 slots-loading-availability = Vabade aegade laadimine...
 slots-click-highlighted = Vabade aegade nägemiseks klõpsa esile tõstetud kuupäeval
 slots-bookable-range-both = Broneeritav { $from } kuni { $until }
@@ -289,6 +328,11 @@ email-confirm-reschedule-notice = Pane tähele: aja muutmine nõuab vähemalt { 
 
 # Event type form: cancel/reschedule minimum notice (templates/event_type_form.html)
 
+## ilia-ov-eventform
+# The collapsed "Payment in TON" section's summary: no payment, or the price comes from the demand ladder.
+ton-etf-hint-off = Tasuta
+ton-etf-hint-ladder = Nõudluse järgi
+
 # Google Meet (templates/event_type_form.html, src/google_meet.rs)
 event-type-form-location-google-meet = Google Meet (automaatselt loodud link)
 event-type-form-location-google-meet-hint = Kinnitamisel luuakse eraldi Google Meeti link, mille omanik on määratud korraldaja. Igal korraldajal (sinul või igal sobival meeskonnaliikmel) peab olema Google Calendar ühendatud ja kirjutamiskalender valitud.
@@ -338,12 +382,23 @@ booking-blocked-body = Korraldaja nõuab vähemalt { $minutes } minutit etteteat
 
 # Dashboard event types listing (templates/dashboard_event_types.html)
 
+## ilia-ov-dates
+# Booking times on the dashboard lists: the day ("Today", "Tomorrow", a weekday
+# or a date), then the start and end times and the host timezone.
+dashboard-when-today = Täna
+dashboard-when-tomorrow = Homme
+dashboard-when-range = { $date }, { $start } — { $end } { $tz }
+
 dashboard-event-types-copy = Kopeeri
 dashboard-event-types-copied = Kopeeritud!
 dashboard-event-types-copy-title = Kopeeri broneerimislink
 dashboard-event-types-copy-failed = Kopeerimine ebaõnnestus
 
 # Dashboard sidebar and shared chrome (templates/dashboard_base.html)
+
+## ilia-ov-shell
+nav-menu = Menüü
+event-types-more-actions = Rohkem toiminguid
 
 nav-section-scheduling = Ajaplaneerimine
 nav-overview = Ülevaade
@@ -415,6 +470,11 @@ overview-action-reason-team-admin = Nõuab meeskonda — loo esmalt üks
 overview-action-reason-team-member = Nõuab meeskonda — küsi haldajalt
 
 # Dashboard bookings (templates/dashboard_bookings.html)
+
+## ilia-ov-lists
+team-form-slug-placeholder = arendus
+troubleshoot-label-past = Juba möödas
+troubleshoot-legend-beyond-horizon = Väljaspool horisonti või ajavahemikku
 
 bookings-page-title = Broneeringud
 bookings-pending-approval = Ootab kinnitust
@@ -553,6 +613,13 @@ editor-preview = Eelvaade
 
 # Profile and settings (templates/settings.html)
 
+## ilia-ov-settings
+settings-choose-file = Vali fail
+settings-no-file = Faili pole valitud
+admin-provider-local = Parool
+admin-provider-oidc = SSO
+admin-theme-vates-desc = Punane ja kosmosesinine
+
 settings-page-title = Seaded
 settings-heading = Profiil ja seaded
 settings-public-page-label = Sinu avalik broneerimisleht
@@ -604,6 +671,11 @@ settings-theme-light = Hele
 settings-theme-dark = Tume
 
 # Sign in (templates/auth/login.html)
+
+## ilia-ov-auth
+ilia-mfa-recovery-copy = Kopeeri koodid
+ilia-mfa-recovery-copied = Koodid kopeeritud
+ilia-mfa-recovery-copy-manual = Kopeerimine ebaõnnestus. Koodid on valitud: kopeeri need käsitsi.
 
 login-page-title = Logi sisse
 login-heading = Logi sisse
@@ -692,6 +764,15 @@ team-profile-subtitle = Aja broneerimiseks vali sündmuse tüüp.
 team-profile-empty = Sündmuse tüüpe pole veel saadaval.
 
 # Availability troubleshoot (templates/troubleshoot.html, src/web/mod.rs)
+
+## ilia-ov2-lists
+# The troubleshoot timeline's legend entry for time already gone today.
+troubleshoot-legend-past = Möödunud aeg
+# Accessible names of the troubleshoot page's day arrows.
+troubleshoot-prev-day = Eelmine päev
+troubleshoot-next-day = Järgmine päev
+# Accessible name of a member's role select on the team settings page.
+team-settings-role-of = Roll: { $name }
 
 troubleshoot-page-title = Tõrkeotsing
 troubleshoot-empty = Sündmuse tüüpe ei leitud. { $link }, et alustada saadavuse tõrkeotsingut.
@@ -796,6 +877,11 @@ source-form-heading-add = Ühenda kalender
 source-form-subtitle-edit = Uuenda ühendust. Jäta parool tühjaks, et praegune alles jääks. Pärast aadressi või kasutajanime muutmist käivita sünkroonimine, et leitud kalendrite loend värskeneks.
 source-form-subtitle-add = Ühenda CalDAV-server või Microsoft Exchange (EWS), et calrs saaks broneerimisel saadavust kontrollida.
 source-form-backend = Taustsüsteem
+
+## ilia-ov3-dash
+# The "Other / generic CalDAV" preset on the new-source form; it also becomes the default source name.
+source-form-preset-other = Muu CalDAV-server
+
 source-form-preset = Eelseadistus
 source-form-connect-google = Ühenda Google’iga
 source-form-google-unavailable = Google’i kalender ei ole saadaval. Võta ühendust haldajaga.
@@ -936,6 +1022,10 @@ etf-min-notice-help = Kui palju aega ette tuleb broneerida.
 etf-section-limits = Broneerimispiirangud
 etf-first-slot-only = Üks aeg päevas
 etf-first-slot-only-help = Näita iga päeva kohta ainult kõige varasemat vaba aega.
+
+## ilia-ov4-dash
+etf-freq-per-member = Iga meeskonnaliikme kohta
+
 etf-freq-limit = Piira broneerimise sagedust
 etf-freq-limit-help = Piira, mitu korda seda sündmust saab perioodi jooksul broneerida.
 etf-add-limit = Lisa piirang
@@ -1229,8 +1319,25 @@ admin-sms-gateway = Lüüs:
 admin-sms-account = Konto:
 admin-sms-sender = Saatja:
 admin-sms-enabled = SMS sees
+## ilia-ov3-admin
+admin-sms-provider-webhook = Oma veebihaak
+admin-sms-webhook-secret = HMAC-saladus
 admin-sms-gateway-label = Lüüs
 admin-required-on-switch = Nõutav lüüsi vahetamisel
+## ilia-ov2-settings
+admin-sms-sender-label = Saatja
+admin-sms-api-base-url = API baas-URL
+admin-sms-region-base-url = Piirkonna baas-URL
+admin-sms-webhook-url = Veebihaagi URL
+admin-sms-twilio-sender-hint = Twilio number E.164 vormingus (+15551234567) või tähtnumbriline saatja ID, kui sihtriik seda lubab.
+admin-sms-twilio-base-url-hint = Valikuline. Vaikimisi https://api.twilio.com. Kasuta https-i, selle ühenduse kaudu liiguvad volitused.
+admin-sms-gatewayapi-sender-hint = Kuni 11 tähtnumbrilist märki või 15 numbrit.
+admin-sms-gatewayapi-base-url-hint = Valikuline. Vaikimisi https://gatewayapi.com; kasuta https://gatewayapi.eu, et liiklus jääks ELi.
+admin-sms-sevenio-sender-hint = Kuni 11 tähtnumbrilist märki või 16 numbrit.
+admin-sms-sevenio-base-url-hint = Valikuline. Vaikimisi https://gateway.seven.io.
+admin-sms-webhook-sender-hint = Valikuline. Antakse sinu lõpp-punktile edasi kui "sender".
+admin-sms-webhook-base-url-hint = calrs saadab siia POST-päringu {"{"}"to", "text", "sender"{"}"} ja ootab vastuseks 2xx.
+
 admin-sms-docs = { $provider } API dokumentatsioon
 admin-sms-country = Vaikimisi riigi suunakood
 admin-sms-country-hint = (kasutatakse, kui külalised sisestavad kohaliku numbri)
@@ -1710,7 +1817,7 @@ ton-pay-qr-alt = Makseandmetega QR-kood
 ton-pay-scan = Või skanni see kood oma rahakoti rakendusega.
 ton-pay-qr-alt-tonkeeper = Makseandmetega QR-kood Tonkeeperi jaoks
 ton-pay-scan-tonkeeper = Või skanni see kood Tonkeeperi või telefoni kaameraga.
-ton-pay-qr-other = Muu rahakott, näiteks MyTonWallet? Näita selle QR-koodi
+ton-pay-qr-other = QR-kood muu rahakoti jaoks (nt MyTonWallet)
 ton-pay-address = Aadress
 ton-pay-comment = Kommentaar
 ton-pay-copy = Kopeeri
@@ -1719,7 +1826,7 @@ ton-pay-warn-comment = Kommentaar on kohustuslik: selle järgi tunneme sinu maks
 ton-pay-warn-encrypt = Ära krüpteeri kommentaari.
 ton-pay-warn-token = Maksa TON-is, mitte tokenitega.
 ton-pay-warn-exchange = Maksad börsilt? Kirjuta ülal olev kood memo (kommentaari) välja.
-ton-pay-warn-deadline = Saada makse enne { $time }. Hiljem saadetud makset ei pruugita arvesse võtta.
+ton-pay-warn-deadline = Saada makse enne { $time } ({ $zone }). Hiljem saadetud makset ei pruugita arvesse võtta.
 ton-pay-check = Maksin ära, kontrolli
 ton-pay-email = Saada see link mulle e-postiga
 ton-pay-emailed = Saatsime selle lingi broneeringus märgitud e-posti aadressile.
@@ -2173,6 +2280,9 @@ ton-etf-ladder-help = Hind on aste, mis vastab sinu eelseisvate broneeringute ar
 # ilia fork: the TON settings page (/dashboard/admin/ton)
 nav-admin-ton = TON-maksed
 ton-etf-ladder-edit = Muuda redelit
+## ilia-ov-ton
+ton-admin-debug-tg-saved-locked = Midagi ei muutunud: külalise Telegrami kasutajanimi on lukus.
+dbg-err-requote = Hind muutus broneerimise ajal kaks korda. Midagi ei broneeritud: proovi uuesti.
 ton-admin-page-title = TON-maksed
 ton-admin-heading = TON-maksed
 ton-admin-intro = Need seaded kehtivad selle serveri TON-maksetele. Esikohal on serveri keskkonnas määratud väärtus, siis siin või config apply abil salvestatud väärtus, siis vaikeväärtus.
@@ -2191,6 +2301,13 @@ ton-admin-address-raw = Toorkuju
 ton-admin-indexer = Indekseerija
 ton-admin-watcher = Jälgija
 ton-admin-watcher-ready = valmis
+
+## ilia-ov3-ton
+ton-admin-notready-wallet = vastuvõtv rahakott pole aktiivne (või pole veel kontrollitud)
+ton-admin-notready-network = indekseerija on teises võrgus (või pole veel kontrollitud)
+ton-admin-notready-stale = jälgija pole viimase 2 minuti jooksul ühtegi sammu lõpetanud
+ton-admin-off-unset = CALRS_TON_NETWORK pole määratud
+
 ton-admin-watcher-not-ready = pole valmis: { $reason }
 ton-admin-last-step = viimane samm
 ton-admin-open-invoices = Avatud arved
@@ -2228,7 +2345,7 @@ ton-admin-f-rate_max_age_min = Vanim lubatud kurss (minutid)
 ton-admin-f-rate_max_jump_pct = Suurim hüpe võrreldes viimase kursiga (%)
 ton-admin-f-alert_email = Teavituste e-post (tühi: kõik administraatorid)
 ton-admin-ladder-help = Astmed komadega eraldatult: hind 0, 1, 2… kinnitatud broneeringu korral lähipäevadel; viimane aste on lagi. „free“ ainult alguses: tasuta broneering ootab omaniku kinnitust.
-ton-admin-ladder-row = Alates %1 broneeringust
+ton-admin-ladder-row = Broneeringud: %1
 ton-admin-ladder-add = Lisa aste
 ton-admin-ladder-remove = Eemalda
 ton-admin-free = tasuta
@@ -2264,7 +2381,7 @@ ton-admin-via-apply = config apply
 nav-admin-debug-booking = Testbroneering
 dbg-title = Testbroneering
 dbg-intro = Broneeri testkohtumine nii, nagu külaline seda teeks, ilma et peaksid iga kord külalise vormi täitma. Broneering läbib sama tee nagu avalik broneerimisleht: kontrollid, hind ja TON-arve, aja kinnihoidmine ja e-kirjad. Makset ei jäeta kunagi vahele ega märgita laekunuks: maksa arve oma rahakotist või tühista broneering.
-dbg-switch-note = Lülita see leht välja, kui silumine on läbi, TON-maksete lehe ülaosas oleva lülitiga:
+dbg-switch-note = Lülita see leht välja, kui silumine on läbi, lehe ülaosas oleva lülitiga:
 dbg-cancelled = Tühistatud testbroneeringuid: { $count }.
 dbg-no-types = Sul pole ühtegi sisselülitatud isiklikku kohtumise tüüpi.
 dbg-event-type = Kohtumise tüüp
@@ -2346,7 +2463,7 @@ dbg-telegram-from-chat = Võetud sinu seotud Telegrami vestlusest.
 dbg-telegram-from-setting = Võetud lehe Debug-plokist:
 dbg-telegram-none = Pole midagi eeltäita: määra nimi lehe Debug-plokis:
 dbg-timing = Selle testbroneeringu tähtajad
-dbg-timing-normal = Tavalised: saidi seaded (Admin → TON payments)
+dbg-timing-normal = Tavalised: saidi seaded (leht „TON-maksed“)
 dbg-timing-fast = Kiirtest: { $window } min maksmiseks; pikendusi: { $renewals }, igaüks { $renew } min (külaliselt küsitakse uuesti makset); siis arve aegub ja broneering tühistatakse automaatselt. Armuaeg { $grace } min, varu { $margin } min.
 dbg-timing-custom = Oma, minutites (tühi väli võtab kiirtesti väärtuse):
 dbg-timing-window = Makseaken, min

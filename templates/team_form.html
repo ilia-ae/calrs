@@ -19,18 +19,17 @@
 
   <div class="form-group">
     <label for="slug">{{ t("team-form-slug") }} <span class="hint">{{ t("team-form-slug-hint") }}</span></label>
-    <input type="text" id="slug" name="slug" required value="{{ form_slug }}" placeholder="engineering" pattern="[a-z0-9\-]+" title="{{ t('team-form-slug-pattern-title') }}">
+    <input type="text" id="slug" name="slug" required value="{{ form_slug }}" placeholder="{{ t('team-form-slug-placeholder') }}" pattern="[a-z0-9\-]+" title="{{ t('team-form-slug-pattern-title') }}">
   </div>
 
   <div class="form-group">
     <label for="description">{{ t("team-form-description") }} <span class="hint">{{ t("team-form-optional") }}</span></label>
-    <div style="border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;">
-      <div class="md-toolbar" data-target="description" style="display: flex; gap: 0.25rem; padding: 0.375rem 0.5rem; background: var(--surface-hover); border-bottom: 1px solid var(--border);">
-        <button type="button" data-action="bold" title="{{ t('editor-bold-short') }}" style="padding: 0.25rem 0.5rem; background: none; border: 1px solid transparent; border-radius: 3px; cursor: pointer; font-weight: 700; font-size: 0.85rem; color: var(--text); font-family: inherit; line-height: 1;">B</button>
-        <button type="button" data-action="italic" title="{{ t('editor-italic-short') }}" style="padding: 0.25rem 0.5rem; background: none; border: 1px solid transparent; border-radius: 3px; cursor: pointer; font-style: italic; font-size: 0.85rem; color: var(--text); font-family: inherit; line-height: 1;">I</button>
-        <button type="button" data-action="link" title="{{ t('editor-link-short') }}" style="padding: 0.25rem 0.5rem; background: none; border: 1px solid transparent; border-radius: 3px; cursor: pointer; font-size: 0.85rem; color: var(--text); font-family: inherit; line-height: 1;">&#128279;</button>
-        <div style="flex: 1;"></div>
-        <button type="button" class="md-preview-toggle" title="{{ t('editor-toggle-preview') }}" style="padding: 0.25rem 0.5rem; background: none; border: 1px solid transparent; border-radius: 3px; cursor: pointer; font-size: 0.75rem; color: var(--text-muted); font-family: inherit; line-height: 1;">{{ t("editor-preview") }}</button>
+    <div style="border: 1px solid var(--field-border); border-radius: var(--radius); overflow: hidden;">
+      <div class="md-toolbar" data-target="description">
+        <button type="button" data-action="bold" title="{{ t('editor-bold-short') }}" aria-label="{{ t('editor-bold-short') }}">B</button>
+        <button type="button" data-action="italic" title="{{ t('editor-italic-short') }}" aria-label="{{ t('editor-italic-short') }}">I</button>
+        <button type="button" data-action="link" title="{{ t('editor-link-short') }}" aria-label="{{ t('editor-link-short') }}"><svg class="icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></button>
+        <button type="button" class="md-preview-toggle" title="{{ t('editor-toggle-preview') }}">{{ t("editor-preview") }}</button>
       </div>
       <textarea id="description" name="description" rows="3" placeholder="{{ t('team-form-description-placeholder') }}" style="border: none; border-radius: 0; width: 100%; resize: vertical; padding: 0.5rem 0.75rem; font-family: inherit; font-size: 0.9rem; background: var(--surface); color: var(--text); box-sizing: border-box;">{{ form_description }}</textarea>
       <div id="description-preview" style="display: none; padding: 0.5rem 0.75rem; min-height: 4rem; font-size: 0.9rem; color: var(--text); background: var(--surface);"></div>
@@ -68,7 +67,7 @@
 
   <!-- Unified search bar -->
   <div style="position: relative;">
-    <input type="text" id="member-search" autocomplete="off" placeholder="{{ t('team-form-search-placeholder') }}" style="width: 100%; padding: 0.625rem 1rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.9rem; font-family: inherit; background: var(--surface); color: var(--text);">
+    <input type="text" id="member-search" autocomplete="off" placeholder="{{ t('team-form-search-placeholder') }}" style="width: 100%; padding: 0.625rem 1rem; border: 1px solid var(--field-border); border-radius: var(--radius); font-size: 0.9rem; font-family: inherit; background: var(--surface); color: var(--text);">
     <div id="search-results" style="display: none; position: absolute; top: 100%; left: 0; right: 0; background: var(--surface); border: 1px solid var(--border); border-top: none; border-radius: 0 0 var(--radius) var(--radius); max-height: 300px; overflow-y: auto; z-index: 10; box-shadow: var(--shadow);"></div>
   </div>
 </div>
@@ -81,19 +80,17 @@
 </form>
 
 <script>
-var MEMBER_COUNT_ONE = {{ t('teams-member-count', count=1) | tojson }};
-var MEMBER_COUNT_OTHER = {{ t('teams-member-count', count=2) | tojson }};
 (function() {
   var allUsers = [
     {% for u in users %}
-    { id: "{{ u.id }}", name: "{{ u.name }}", email: "{{ u.email }}", isSelf: {{ u.is_self | lower }}, hasAvatar: {{ u.has_avatar | lower }}, initials: "{{ u.initials }}" },
+    { id: {{ u.id | tojson }}, name: {{ u.name | tojson }}, email: {{ u.email | tojson }}, isSelf: {{ u.is_self | lower }}, hasAvatar: {{ u.has_avatar | lower }}, initials: {{ u.initials | tojson }} },
     {% endfor %}
   ];
 
   var allGroups = [
     {% for g in oidc_groups %}
-    { id: "{{ g.id }}", name: "{{ g.name }}", count: {{ g.member_count }}, members: [
-      {% for m in g.members %}{ id: "{{ m.id }}", name: "{{ m.name }}", hasAvatar: {{ m.has_avatar | lower }}, initials: "{{ m.initials }}" },{% endfor %}
+    { id: {{ g.id | tojson }}, name: {{ g.name | tojson }}, count: {{ g.member_count }}, countLabel: {{ t('teams-member-count', count=g.member_count) | tojson }}, members: [
+      {% for m in g.members %}{ id: {{ m.id | tojson }}, name: {{ m.name | tojson }}, hasAvatar: {{ m.has_avatar | lower }}, initials: {{ m.initials | tojson }} },{% endfor %}
     ] },
     {% endfor %}
   ];
@@ -278,11 +275,9 @@ var MEMBER_COUNT_OTHER = {{ t('teams-member-count', count=2) | tojson }};
         } else {
           var countEl = document.createElement('span');
           countEl.style.cssText = 'color:var(--text-muted);font-size:0.8rem;';
-          // Both plural forms are rendered server-side from the same Fluent
-          // key, then the digits are swapped for the live count: a count sent
-          // as a string would never match the `one` variant.
-          var memberForm = g.count === 1 ? MEMBER_COUNT_ONE : MEMBER_COUNT_OTHER;
-          countEl.textContent = ' (' + memberForm.replace(/\d+/, g.count) + ')';
+          // The label is rendered server-side per group, so Fluent picks the
+          // right plural form (one/few/many) for the language.
+          countEl.textContent = ' (' + g.countLabel + ')';
           info.appendChild(countEl);
         }
         row.appendChild(info);
@@ -307,14 +302,22 @@ var MEMBER_COUNT_OTHER = {{ t('teams-member-count', count=2) | tojson }};
   renderPills();
   syncInputs();
 
-  // Auto-generate slug from name
+  // Auto-generate slug from name. Cyrillic is transliterated and Latin
+  // accents are stripped (ilia fork), so "Разработка" gives "razrabotka"
+  // instead of an empty slug that fails the pattern.
+  var TR = {'а':'a','б':'b','в':'v','г':'g','д':'d','е':'e','ё':'e','ж':'zh','з':'z','и':'i','й':'y','к':'k','л':'l','м':'m','н':'n','о':'o','п':'p','р':'r','с':'s','т':'t','у':'u','ф':'f','х':'kh','ц':'ts','ч':'ch','ш':'sh','щ':'shch','ъ':'','ы':'y','ь':'','э':'e','ю':'yu','я':'ya','ß':'ss','ł':'l','ø':'o','æ':'ae','œ':'oe'};
+  function slugify(s) {
+    s = s.toLowerCase().replace(/[а-яёßłøæœ]/g, function(c) { return TR[c]; });
+    if (s.normalize) s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return s.replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  }
   var nameEl = document.getElementById('name');
   var slugEl = document.getElementById('slug');
   var slugManuallyEdited = slugEl.value !== '';
   slugEl.addEventListener('input', function() { slugManuallyEdited = true; });
   nameEl.addEventListener('input', function() {
     if (!slugManuallyEdited) {
-      slugEl.value = nameEl.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      slugEl.value = slugify(nameEl.value);
     }
   });
 })();

@@ -32,11 +32,12 @@ Impersonation uses a separate `calrs_impersonate` cookie (24-hour TTL). The real
 
 ## Availability troubleshoot
 
-For each event type, the dashboard offers a **Troubleshoot** link that opens a visual timeline at `/dashboard/troubleshoot/{event_type_id}`:
+The dashboard sidebar's **Troubleshoot** link opens a visual timeline at `/dashboard/troubleshoot?event_type=<slug>&date=<YYYY-MM-DD>` (pick the event type and the day on the page):
 
-- Shows candidate slots for the next 7 days
+- Shows the candidate slots of one day (today by default), with arrows to the previous and next day
 - Displays why each slot is blocked (calendar event name, existing booking, buffer overlap)
 - Helps debug availability issues when users report incorrect free/busy status
+- Times already gone on the day shown are marked **Already passed** (their own shade and legend entry, **Past**), not blamed on the minimum notice, and the date is shown in your dashboard language (ilia fork)
 
 ![Availability troubleshoot](images/troubleshoot.png)
 

@@ -47,6 +47,39 @@ impl Drop for EnvGuard {
     }
 }
 
+/// Installs `subscriber` as this thread's default for a test that reads the
+/// log, until the guard drops.
+///
+/// tracing-core caches one `Interest` per callsite for the whole process.
+/// While only one dispatcher is alive, it takes that interest from the
+/// default subscriber of whichever thread hits the callsite first. A
+/// parallel test with no subscriber can then cache `never`, and the capture
+/// misses its own events (this made `posted_fields_cannot_forge_log_lines`
+/// and two agent audit tests fail now and then). [`pin_dispatch`] keeps a
+/// second dispatcher alive, so tracing-core combines the interests of all
+/// live dispatchers and each thread's own subscriber decides per event. The
+/// rebuild re-checks callsites already cached before this capture began.
+pub(crate) fn capture_default<S>(subscriber: S) -> tracing::subscriber::DefaultGuard
+where
+    S: tracing::Subscriber + Send + Sync + 'static,
+{
+    pin_dispatch();
+    let guard = tracing::subscriber::set_default(subscriber);
+    tracing::callsite::rebuild_interest_cache();
+    guard
+}
+
+/// Keeps a second dispatcher alive for the whole test run (see
+/// [`capture_default`]). It is nobody's default and answers `never`, so it
+/// receives no events and, combined with a capture's `always`, makes the
+/// callsite `sometimes`: checked per event against the thread's subscriber.
+/// Call it before `with_default` in a capture that does not use
+/// [`capture_default`].
+pub(crate) fn pin_dispatch() {
+    static PIN: std::sync::OnceLock<tracing::Dispatch> = std::sync::OnceLock::new();
+    PIN.get_or_init(|| tracing::Dispatch::new(tracing::subscriber::NoSubscriber::default()));
+}
+
 /// A server that answers every request with a `307` to a second server on
 /// the same loopback address, and that second server's hit counter. A client
 /// that follows redirects re-sends its request (and body) there.

@@ -2,17 +2,17 @@
 {# ilia fork: a booking's messages with its guest (src/web/messages.rs). #}
 {% block title %}{{ t("msg-page-title") }} — calrs{% endblock %}
 {% block dashboard_content %}
+<a href="/dashboard/bookings" class="back-link">&larr; {{ t("msg-back") }}</a>
 <div class="card">
-  <p><a href="/dashboard/bookings">&larr; {{ t("msg-back") }}</a></p>
   <h1>{{ t("msg-page-title") }}</h1>
   <p style="margin: 0.25rem 0;"><strong>{{ event }}</strong> &middot; {{ when }}</p>
   <p style="color: var(--text-muted); font-size: 0.875rem; margin: 0 0 1rem;">{{ t("msg-guest", guest=guest_name) }} &middot; {{ guest_email }}</p>
 
   {% if sent %}
-    <div class="success" style="margin: 0.75rem 0;">{{ t("msg-sent") }}</div>
+    <div class="success" role="status" style="margin: 0.75rem 0;">{{ t("msg-sent") }}</div>
   {% endif %}
   {% if error %}
-    <div class="error" style="margin: 0.75rem 0;">{{ error }}</div>
+    <div class="error" role="alert" style="margin: 0.75rem 0;">{{ error }}</div>
   {% endif %}
 
   {% if messages %}
@@ -20,7 +20,7 @@
     {% for m in messages %}
       <div class="msg-item" style="padding: 0.75rem 0; {% if not loop.last %}border-bottom: 1px solid var(--border);{% endif %}">
         <div style="font-size: 0.8rem; color: var(--text-muted);">
-          <strong class="{% if m.not_guest %}msg-not-guest{% endif %}" style="color: {% if m.from_host %}var(--accent){% elif m.not_guest %}var(--danger, #b45309){% else %}var(--text){% endif %};">{{ m.who }}</strong>
+          <strong class="{% if m.not_guest %}msg-not-guest{% endif %}" style="color: {% if m.from_host %}var(--accent){% elif m.not_guest %}var(--warn){% else %}var(--text){% endif %};">{{ m.who }}</strong>
           &middot; {{ m.at }} &middot; {{ m.via }}{% if m.email %} &middot; {{ m.email }}{% endif %}{% if m.telegram %} &middot; {{ m.telegram }}{% endif %}
         </div>
         <div class="msg-text" style="white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 0.25rem;">{{ m.text }}</div>
@@ -35,14 +35,16 @@
 <div class="card" style="margin-top: 1rem;">
   {% if open and not impersonating %}
   <form method="post" action="/dashboard/bookings/{{ booking_id }}/messages">
-    <label for="msg-text" style="display: block; font-weight: 600; margin-bottom: 0.375rem;">{{ t("msg-label") }}</label>
-    <textarea id="msg-text" name="text" rows="5" maxlength="{{ max_chars }}" required style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius); font-family: inherit; background: var(--surface); color: var(--text);">{{ draft }}</textarea>
+    <div class="form-group" style="margin-bottom: 0.375rem;">
+      <label for="msg-text">{{ t("msg-label") }}</label>
+      <textarea id="msg-text" name="text" rows="5" maxlength="{{ max_chars }}" required>{{ draft }}</textarea>
+    </div>
     <p style="color: var(--text-muted); font-size: 0.8rem; margin: 0.375rem 0;">
       {% if email_on %}{% if inbox_on %}{{ t("msg-help-email") }}{% else %}{{ t("msg-help-email-no-inbox") }}{% endif %}{% else %}{{ t("msg-help-no-email") }}{% endif %}
       {% if telegram_on %}{% if telegram_linked %}{{ t("msg-help-telegram") }}{% else %}{{ t("msg-help-no-telegram") }}{% endif %}{% endif %}
       {{ t("msg-help-limits") }}
     </p>
-    <button type="submit" class="slot-btn" style="cursor: pointer; font-weight: 600; color: var(--accent); border-color: var(--accent);">{{ t("msg-send") }}</button>
+    <button type="submit" class="btn btn-auto">{{ t("msg-send") }}</button>
   </form>
   {% elif not open %}
     <p style="color: var(--text-muted); margin: 0;">{{ t("msg-error-closed") }}</p>

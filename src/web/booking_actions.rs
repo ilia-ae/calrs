@@ -129,7 +129,7 @@ pub(super) async fn approve_booking_form(
         }
     };
 
-    let (start_at, end_at) =
+    let (start_at, end_at, zone) =
         crate::booking_time::guest_wall_strings(&state.pool, &token, &start_at, &end_at).await;
     let date_label = format_date_label(&start_at, lang);
     let start_time = extract_time_24h(&start_at);
@@ -140,10 +140,12 @@ pub(super) async fn approve_booking_form(
         Err(e) => return internal_error_response("internal", &e),
     };
     tmpl.render(context! {
+        company_link => state.company_link_now(),
         event_title,
         date_label,
         start_time,
         end_time,
+        zone,
         guest_name,
         guest_email,
         lang => lang,
@@ -509,11 +511,13 @@ pub(super) async fn approve_booking_by_token(
     };
     let rendered = tmpl
         .render(context! {
+            company_link => state.company_link_now(),
             event_title,
             date_label,
             date,
             start_time,
             end_time,
+            zone => guest_tz_parsed.name(),
             guest_name,
             guest_email,
             lang => lang,
@@ -553,7 +557,7 @@ pub(super) async fn decline_booking_form(
         }
     };
 
-    let (start_at, end_at) =
+    let (start_at, end_at, zone) =
         crate::booking_time::guest_wall_strings(&state.pool, &token, &start_at, &end_at).await;
     let date_label = format_date_label(&start_at, lang);
     let date = start_at.get(..10).unwrap_or(&start_at).to_string();
@@ -566,11 +570,13 @@ pub(super) async fn decline_booking_form(
     };
     let rendered = tmpl
         .render(context! {
+            company_link => state.company_link_now(),
             event_title,
             date_label,
             date,
             start_time,
             end_time,
+            zone,
             guest_name,
             guest_email,
             lang => lang,
@@ -743,11 +749,13 @@ pub(super) async fn decline_booking_by_token(
     };
     let rendered = tmpl
         .render(context! {
+            company_link => state.company_link_now(),
             event_title,
             date_label,
             date,
             start_time,
             end_time,
+            zone => guest_tz_parsed.name(),
             guest_name,
             guest_email,
             reason,
@@ -856,6 +864,7 @@ fn check_notice_window(
     };
     let rendered = tmpl
         .render(context! {
+            company_link => state.company_link_now(),
             notice_min => n,
             host_email => crate::web::ilia::blocked_contact_shown(host_email),
             contact_href => host_email,
@@ -1048,7 +1057,7 @@ pub(super) async fn guest_cancel_form(
         }
     }
 
-    let (start_at, end_at) =
+    let (start_at, end_at, zone) =
         crate::booking_time::guest_wall_strings(&state.pool, &token, &start_at, &end_at).await;
     let date_label = format_date_label(&start_at, lang);
     let date = start_at.get(..10).unwrap_or(&start_at).to_string();
@@ -1061,11 +1070,13 @@ pub(super) async fn guest_cancel_form(
     };
     let rendered = tmpl
         .render(context! {
+            company_link => state.company_link_now(),
             event_title,
             date_label,
             date,
             start_time,
             end_time,
+            zone,
             guest_name,
             host_name,
             lang => lang,
@@ -1365,11 +1376,13 @@ pub(super) async fn guest_cancel_booking(
     };
     let rendered = tmpl
         .render(context! {
+            company_link => state.company_link_now(),
             event_title,
             date_label,
             date,
             start_time,
             end_time,
+            zone => guest_tz_parsed.name(),
             host_name,
             reason,
             lang => lang,
@@ -1532,16 +1545,14 @@ pub(super) async fn guest_reschedule_slots(
     let hosts = reschedule_hosts(&state.pool, &uid, &owner_user_id).await;
     let host = reschedule_host_profile(&state.pool, &hosts, &et_id).await;
 
-    let old_guest_tz: String =
-        sqlx::query_scalar("SELECT guest_timezone FROM bookings WHERE id = ?")
-            .bind(&booking_id)
-            .fetch_one(&state.pool)
-            .await
-            .unwrap_or_else(|_| "UTC".into());
-    let old_tz = old_guest_tz.parse::<Tz>().unwrap_or(Tz::UTC);
+    // ilia fork: the current time in the zone this page shows slots in (the
+    // selector's zone: ?tz=, else UTC, as for the slots below), so the banner,
+    // the slots and the confirm step compare like with like. Upstream used
+    // the zone the booking was made in, unlabelled.
+    let page_tz = parse_guest_tz(query.tz.as_deref());
     let old_stored_tz = get_host_tz(&state.pool, &et_id).await;
     let (old_date, old_start_time, old_end_time) =
-        booking_strings_in_guest_tz(&start_at, &end_at, old_stored_tz, old_tz);
+        booking_strings_in_guest_tz(&start_at, &end_at, old_stored_tz, page_tz);
     let old_date_label = format_date_label(&old_date, lang);
 
     // If date + time + tz are present, show confirmation page
@@ -1736,7 +1747,9 @@ pub(super) async fn guest_reschedule_slots(
             reschedule_base => reschedule_base,
             reschedule_info => context! {
                 event_title => et_title,
-                old_date => old_date,
+                // ilia fork: the long date in the page language, as the
+                // confirm step shows it, not the ISO date.
+                old_date => old_date_label,
                 old_time => old_start_time,
             },
             default_calendar_view => default_calendar_view,
@@ -2831,6 +2844,7 @@ pub(super) async fn claim_booking_form(
             };
             return Html(
                 tmpl.render(context! {
+                    company_link => state.company_link_now(),
                     claimed_by_name => claimed_by_name,
                     lang => lang,
                 })
@@ -2872,7 +2886,7 @@ pub(super) async fn claim_booking_form(
         }
     };
 
-    let (start_at, end_at) =
+    let (start_at, end_at, zone) =
         crate::booking_time::guest_wall_strings(&state.pool, &booking_id, &start_at, &end_at).await;
     let date_label = format_date_label(&start_at, lang);
     let start_time = extract_time_24h(&start_at);
@@ -2885,10 +2899,12 @@ pub(super) async fn claim_booking_form(
 
     Html(
         tmpl.render(context! {
+            company_link => state.company_link_now(),
             event_title => event_title,
             date_label => date_label,
             start_time => start_time,
             end_time => end_time,
+            zone => zone,
             guest_name => guest_name,
             guest_email => guest_email,
             assigned_to => assigned_to.unwrap_or_default(),
@@ -2951,6 +2967,7 @@ pub(super) async fn claim_booking(
                 };
                 return Html(
                     tmpl.render(context! {
+                        company_link => state.company_link_now(),
                         claimed_by_name => claimed_by_name,
                         lang => lang,
                     })
@@ -3001,6 +3018,7 @@ pub(super) async fn claim_booking(
         };
         return Html(
             tmpl.render(context! {
+                company_link => state.company_link_now(),
                 claimed_by_name => claimed_name.map(|(n,)| n).unwrap_or_default(),
                 lang => lang,
             })
@@ -3120,7 +3138,7 @@ pub(super) async fn claim_booking(
     };
 
     let claim_utc_times = crate::booking_time::ics_times(&start_at, &end_at);
-    let (start_at, end_at) =
+    let (start_at, end_at, zone) =
         crate::booking_time::guest_wall_strings(&state.pool, &booking_id, &start_at, &end_at).await;
     let date = start_at.get(..10).unwrap_or(&start_at).to_string();
     let start_time = extract_time_24h(&start_at);
@@ -3211,10 +3229,12 @@ pub(super) async fn claim_booking(
 
     Html(
         tmpl.render(context! {
+            company_link => state.company_link_now(),
             event_title => event_title,
             date_label => date_label,
             start_time => start_time,
             end_time => end_time,
+            zone => zone,
             guest_name => guest_name,
             guest_email => guest_email,
             lang => lang,

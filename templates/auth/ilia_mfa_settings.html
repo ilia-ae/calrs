@@ -25,9 +25,9 @@
         <strong class="passkey-name">{{ key.name }}</strong><span class="passkey-kind{{ ' passkey-kind-synced' if key.synced else '' }}">{{ t("ilia-passkey-kind-synced") if key.synced else t("ilia-passkey-kind-hardware") }}</span>
         <p class="passkey-meta">{{ t("ilia-passkey-added", date=key.added) }} · {% if key.last_used %}{{ t("ilia-passkey-last-used", date=key.last_used) }}{% else %}{{ t("ilia-passkey-never-used") }}{% endif %}</p>
         {% if key.other_site %}<p class="passkey-meta error">{{ t("ilia-passkey-other-site", rp_id=key.other_site) }}</p>{% endif %}
-        <p class="passkey-actions">
-          <a href="/dashboard/settings/mfa/confirm?action=passkey_rename&amp;credential={{ key.id }}">{{ t("ilia-passkey-rename") }}</a>
-          <a href="/dashboard/settings/mfa/confirm?action=passkey_delete&amp;credential={{ key.id }}">{{ t("ilia-passkey-delete") }}</a>
+        <p class="passkey-actions btn-row">
+          <a class="btn btn-secondary btn-sm btn-auto" href="/dashboard/settings/mfa/confirm?action=passkey_rename&amp;credential={{ key.id }}">{{ t("ilia-passkey-rename") }}</a>
+          <a class="btn btn-ghost btn-sm btn-auto passkey-delete" href="/dashboard/settings/mfa/confirm?action=passkey_delete&amp;credential={{ key.id }}">{{ t("ilia-passkey-delete") }}</a>
         </p>
       </li>
       {% endfor %}
@@ -62,5 +62,5 @@
   </section>
   <p style="margin-top: 1.5rem;">{{ t("ilia-mfa-changes-help") }}</p>
   {% endif %}
-  <p><a href="/dashboard/settings">{{ t("mfa-back") }}</a></p>
+  <p class="mfa-back"><a href="/dashboard/settings">{{ t("mfa-back") }}</a></p>
 </div>

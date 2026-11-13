@@ -1,9 +1,13 @@
 {% extends "base.html" %}
 {% block title %}{{ t("already-claimed-page-title") }}{% endblock %}
 {% block content %}
+{% from "partials/result_icon.html" import result_icon %}
+<div class="page-narrow">
+<div class="logo">{% if company_link %}<a href="{{ company_link }}" target="_blank" rel="noopener noreferrer">{% endif %}<img src="/logo" alt="" onerror="this.closest('.logo').style.display='none'">{% if company_link %}</a>{% endif %}</div>
 <div class="card" style="text-align: center;">
-  <div class="check" style="background: var(--text-muted);">!</div>
+  {{ result_icon("muted", "alert") }}
   <h1>{{ t("already-claimed-heading") }}</h1>
   <p class="subtitle">{{ t("already-claimed-subtitle", name=claimed_by_name) }}</p>
+</div>
 </div>
 {% endblock %}

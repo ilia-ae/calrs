@@ -1430,3 +1430,353 @@ async fn event_types_follow_the_profile_set_in_the_same_run() {
     assert!(again.changed.is_empty(), "{:?}", again.changed);
     assert_eq!(env.snapshot().await, before);
 }
+
+// --- Busy calendars, date overrides, source names (ilia fork) ---
+
+// The role greps a release for these literals before it sends the keys
+// (`BUSY_CALENDARS_SHAPE`, `OVERRIDES_SHAPE`, `SOURCE_NAME_SHAPE`): they
+// must stay as they are.
+const BUSY_CALENDARS_SHAPE: &str = "busy_calendars: null or a list of calendar names";
+const OVERRIDES_SHAPE: &str =
+    "overrides: [{date, blocked: true} | {date, start, end}], from today on";
+const SOURCE_NAME_SHAPE: &str = "sources[].name: 1..255 bytes, not padded";
+
+async fn busy_ids(env: &ApplyEnv, slug: &str) -> Vec<String> {
+    sqlx::query_scalar(
+        "SELECT etc.calendar_id FROM event_type_calendars etc
+         JOIN event_types et ON et.id = etc.event_type_id
+         WHERE et.slug = ? AND et.team_id IS NULL ORDER BY etc.calendar_id",
+    )
+    .bind(slug)
+    .fetch_all(&env.pool)
+    .await
+    .unwrap()
+}
+
+#[tokio::test]
+async fn busy_calendars_are_chosen_by_name_cleared_with_null_and_round_trip() {
+    let env = ApplyEnv::new().await;
+    seed_source(&env).await;
+    let mut item = consultation();
+    item["busy_calendars"] = json!(["Work", "/caldav/users/aa/Old/"]);
+    let json = et_doc(json!([item.clone()]), None);
+    env.apply(&json, false).await.unwrap();
+    assert_eq!(busy_ids(&env, "15min").await, ["cal-old", "cal-work"]);
+    let before = env.snapshot().await;
+    assert!(env.apply(&json, false).await.unwrap().changed.is_empty());
+    assert_eq!(env.snapshot().await, before);
+
+    // Another choice: the change is the sorted names, the form writes it,
+    // and nothing else of the type changes.
+    item["busy_calendars"] = json!(["Holidays"]);
+    let report = env
+        .apply(&et_doc(json!([item.clone()]), None), false)
+        .await
+        .unwrap();
+    assert_eq!(
+        report.changed,
+        vec![Change {
+            path: "event_types[15min].busy_calendars".into(),
+            before: json!(["/caldav/users/aa/Old/", "Work"]),
+            after: json!(["Holidays"]),
+        }]
+    );
+    assert_eq!(busy_ids(&env, "15min").await, ["cal-hol"]);
+    assert_eq!(limits(&env, "15min").await, vec![(4, "day".to_string())]);
+
+    // Left out: the stored choice stays.
+    let report = env
+        .apply(&et_doc(json!([consultation()]), None), false)
+        .await
+        .unwrap();
+    assert!(report.changed.is_empty(), "{:?}", report.changed);
+    assert_eq!(busy_ids(&env, "15min").await, ["cal-hol"]);
+
+    // The export names it and applies with no change.
+    let exported = env.export().await.unwrap().event_types.unwrap();
+    assert_eq!(
+        exported.items[0].busy_calendars,
+        Some(Some(vec!["Holidays".to_string()]))
+    );
+    let json = doc(json!({ "event_types": serde_json::to_value(&exported).unwrap() }));
+    assert!(env.apply(&json, false).await.unwrap().changed.is_empty());
+
+    // null: no choice, every synced calendar.
+    item["busy_calendars"] = Value::Null;
+    let report = env
+        .apply(&et_doc(json!([item]), None), false)
+        .await
+        .unwrap();
+    assert_eq!(
+        change(&report, "event_types[15min].busy_calendars").after,
+        Value::Null
+    );
+    assert!(busy_ids(&env, "15min").await.is_empty());
+    let exported = env.export().await.unwrap().event_types.unwrap();
+    assert_eq!(exported.items[0].busy_calendars, Some(None));
+}
+
+#[tokio::test]
+async fn busy_calendars_refuse_names_the_rows_cannot_back() {
+    let env = ApplyEnv::new().await;
+    seed_source(&env).await;
+    let with = |names: Value| {
+        let mut item = consultation();
+        item["busy_calendars"] = names;
+        et_doc(json!([item]), None)
+    };
+    let error = refused(
+        &env,
+        &with(json!(["Kalender"])),
+        "event_types[15min].busy_calendars[0]",
+    )
+    .await;
+    assert!(error.to_string().contains("\"Work\""), "{error}");
+    let error = refused(&env, &with(json!([])), "event_types[15min].busy_calendars").await;
+    assert!(error.to_string().contains(BUSY_CALENDARS_SHAPE), "{error}");
+    refused(
+        &env,
+        &with(json!(["Work", "Work"])),
+        "event_types[15min].busy_calendars[1]",
+    )
+    .await;
+    refused(
+        &env,
+        &with(json!([" Work"])),
+        "event_types[15min].busy_calendars[0]",
+    )
+    .await;
+
+    // A name two calendars share cannot be told apart; the export leaves a
+    // choice of such a calendar out.
+    sqlx::query(
+        "INSERT INTO calendars (id, source_id, href, display_name) VALUES ('cal-work2', 'src', '/w2/', 'Work')",
+    )
+    .execute(&env.pool)
+    .await
+    .unwrap();
+    let error = refused(
+        &env,
+        &with(json!(["Work"])),
+        "event_types[15min].busy_calendars[0]",
+    )
+    .await;
+    assert!(error.to_string().contains("2 calendars"), "{error}");
+    env.apply(&with(json!(["Holidays"])), false).await.unwrap();
+    sqlx::query(
+        "INSERT INTO event_type_calendars (event_type_id, calendar_id)
+         SELECT id, 'cal-work' FROM event_types WHERE slug = '15min'",
+    )
+    .execute(&env.pool)
+    .await
+    .unwrap();
+    let exported = env.export().await.unwrap().event_types.unwrap();
+    assert_eq!(exported.items[0].busy_calendars, None);
+    let json = doc(json!({ "event_types": serde_json::to_value(&exported).unwrap() }));
+    assert!(env.apply(&json, false).await.unwrap().changed.is_empty());
+}
+
+fn day(offset: i64) -> String {
+    (chrono::Utc::now().date_naive() + chrono::Duration::days(offset))
+        .format("%Y-%m-%d")
+        .to_string()
+}
+
+async fn override_rows(
+    env: &ApplyEnv,
+    slug: &str,
+) -> Vec<(String, Option<String>, Option<String>, i64)> {
+    sqlx::query_as(
+        "SELECT o.date, o.start_time, o.end_time, o.is_blocked FROM availability_overrides o
+         JOIN event_types et ON et.id = o.event_type_id
+         WHERE et.slug = ? AND et.team_id IS NULL
+         ORDER BY o.date, o.is_blocked, o.start_time",
+    )
+    .bind(slug)
+    .fetch_all(&env.pool)
+    .await
+    .unwrap()
+}
+
+async fn insert_override(env: &ApplyEnv, slug: &str, date: &str, blocked: bool) {
+    let et = et_id(env, slug).await.unwrap();
+    let (start, end) = if blocked {
+        (None, None)
+    } else {
+        (Some("12:00"), Some("13:00"))
+    };
+    sqlx::query(
+        "INSERT INTO availability_overrides (id, event_type_id, date, start_time, end_time, is_blocked)
+         VALUES (?, ?, ?, ?, ?, ?)",
+    )
+    .bind(uuid::Uuid::new_v4().to_string())
+    .bind(et)
+    .bind(date)
+    .bind(start)
+    .bind(end)
+    .bind(i64::from(blocked))
+    .execute(&env.pool)
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn overrides_are_written_from_today_on_and_past_rows_stay() {
+    let env = ApplyEnv::new().await;
+    let mut item = consultation();
+    item["overrides"] = json!([
+        {"date": day(5), "start": "14:00", "end": "16:00"},
+        {"date": day(3), "blocked": true},
+        {"date": day(-3), "blocked": true}
+    ]);
+    let json = et_doc(json!([item.clone()]), None);
+    env.apply(&json, false).await.unwrap();
+    assert_eq!(
+        override_rows(&env, "15min").await,
+        vec![
+            (day(3), None, None, 1),
+            (day(5), Some("14:00".into()), Some("16:00".into()), 0),
+        ],
+        "an entry before today is left out"
+    );
+    let before = env.snapshot().await;
+    assert!(env.apply(&json, false).await.unwrap().changed.is_empty());
+    assert_eq!(env.snapshot().await, before);
+
+    // A row clicked in the UI: a run without the key leaves it, one with
+    // the key reports and removes it; a past row is never touched.
+    insert_override(&env, "15min", &day(7), false).await;
+    insert_override(&env, "15min", &day(-10), true).await;
+    let report = env
+        .apply(&et_doc(json!([consultation()]), None), false)
+        .await
+        .unwrap();
+    assert!(report.changed.is_empty(), "{:?}", report.changed);
+    assert_eq!(override_rows(&env, "15min").await.len(), 4);
+    let report = env.apply(&json, false).await.unwrap();
+    let changed = change(&report, "event_types[15min].overrides");
+    assert_eq!(changed.before.as_array().unwrap().len(), 3);
+    assert_eq!(changed.after.as_array().unwrap().len(), 2);
+    assert_eq!(paths(&report), ["event_types[15min].overrides"]);
+    let rows = override_rows(&env, "15min").await;
+    assert_eq!(rows.len(), 3);
+    assert_eq!(rows[0], (day(-10), None, None, 1));
+
+    // The export: from today on, in the document's shape, applying back.
+    let exported = env.export().await.unwrap().event_types.unwrap();
+    let got = serde_json::to_value(&exported.items[0].overrides).unwrap();
+    assert_eq!(
+        got,
+        json!([
+            {"date": day(3), "blocked": true},
+            {"date": day(5), "start": "14:00", "end": "16:00"}
+        ])
+    );
+    let json = doc(json!({ "event_types": serde_json::to_value(&exported).unwrap() }));
+    assert!(env.apply(&json, false).await.unwrap().changed.is_empty());
+
+    // []: none from today on; the past row stays.
+    item["overrides"] = json!([]);
+    let report = env
+        .apply(&et_doc(json!([item]), None), false)
+        .await
+        .unwrap();
+    assert_eq!(
+        change(&report, "event_types[15min].overrides").after,
+        json!([])
+    );
+    assert_eq!(
+        override_rows(&env, "15min").await,
+        vec![(day(-10), None, None, 1)]
+    );
+}
+
+#[tokio::test]
+async fn overrides_of_another_shape_are_refused_and_nothing_is_written() {
+    let env = ApplyEnv::new().await;
+    env.apply(&et_doc(json!([consultation()]), None), false)
+        .await
+        .unwrap();
+    let with = |entries: Value| {
+        let mut item = consultation();
+        item["overrides"] = entries;
+        et_doc(json!([item]), None)
+    };
+    let path = "event_types[15min].overrides";
+    let error = refused(
+        &env,
+        &with(json!([{"date": day(2)}])),
+        &format!("{path}[0]"),
+    )
+    .await;
+    assert!(error.to_string().contains(OVERRIDES_SHAPE), "{error}");
+    for (entries, at) in [
+        (
+            json!([{"date": day(2), "start": "16:00", "end": "14:00"}]),
+            "[0].end",
+        ),
+        (
+            json!([{"date": day(2), "start": "9:00", "end": "14:00"}]),
+            "[0].start",
+        ),
+        (json!([{"date": day(2), "blocked": false}]), "[0].blocked"),
+        (
+            json!([{"date": day(2), "blocked": true, "start": "09:00", "end": "10:00"}]),
+            "[0]",
+        ),
+        (json!([{"date": "2026-1-5", "blocked": true}]), "[0].date"),
+        (json!([{"date": day(400), "blocked": true}]), "[0].date"),
+        (
+            json!([{"date": day(2), "blocked": true}, {"date": day(2), "blocked": true}]),
+            "[1]",
+        ),
+    ] {
+        refused(&env, &with(entries), &format!("{path}{at}")).await;
+    }
+    refused(
+        &env,
+        &with(json!([{"date": day(2), "blocked": true, "note": "x"}])),
+        "(document)",
+    )
+    .await;
+    refused(&env, &with(json!(null)), "(document)").await;
+}
+
+#[tokio::test]
+async fn a_source_name_changed_in_the_ui_is_reported_and_restored() {
+    let env = ApplyEnv::new().await;
+    seed_source(&env).await;
+    let json = source(json!({"name": "Kerio"}));
+    assert!(env.apply(&json, false).await.unwrap().changed.is_empty());
+
+    sqlx::query("UPDATE caldav_sources SET name = 'Renamed' WHERE id = 'src'")
+        .execute(&env.pool)
+        .await
+        .unwrap();
+    let report = env.apply(&json, false).await.unwrap();
+    assert_eq!(
+        report.changed,
+        vec![Change {
+            path: "sources[0].name".into(),
+            before: json!("Renamed"),
+            after: json!("Kerio"),
+        }]
+    );
+    let name: String = sqlx::query_scalar("SELECT name FROM caldav_sources WHERE id = 'src'")
+        .fetch_one(&env.pool)
+        .await
+        .unwrap();
+    assert_eq!(name, "Kerio");
+    let before = env.snapshot().await;
+    assert!(env.apply(&json, false).await.unwrap().changed.is_empty());
+    assert_eq!(env.snapshot().await, before);
+
+    let exported = env.export().await.unwrap().sources.unwrap();
+    assert_eq!(exported[0].name.as_deref(), Some("Kerio"));
+
+    for bad in [json!(""), json!(" Kerio"), json!("x".repeat(256))] {
+        let error = refused(&env, &source(json!({ "name": bad })), "sources[0].name").await;
+        assert!(error.to_string().contains(SOURCE_NAME_SHAPE), "{error}");
+    }
+    refused(&env, &source(json!({"name": null})), "(document)").await;
+}

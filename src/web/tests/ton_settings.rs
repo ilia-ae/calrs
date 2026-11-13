@@ -477,3 +477,24 @@ fn a_key_is_from_credentials_only_when_loaded_from_them() {
     let nothing = EnvSnapshot::of(&[]).loaded_from(&report.loaded());
     assert_eq!(nothing.secret_state("CALRS_TON_API_KEY"), "unset");
 }
+
+#[tokio::test]
+async fn the_watchers_last_step_is_shown_in_the_admins_zone() {
+    let e = settings_env(&[]).await;
+    sqlx::query("UPDATE users SET timezone = 'Asia/Dubai' WHERE email = 'test@example.com'")
+        .execute(&e.pool)
+        .await
+        .unwrap();
+    let at = chrono::DateTime::parse_from_rfc3339("2026-11-12T19:36:27Z")
+        .unwrap()
+        .with_timezone(&Utc);
+    e.rt.with_health(|h| h.last_ok = Some(at));
+    let admin = e.session().await;
+    let (status, page) = e.get_authed_page(&admin).await;
+    assert_eq!(status, axum::http::StatusCode::OK);
+    // The stored UTC stamp only in the attribute; the text in Dubai (+4).
+    assert!(
+        page.contains(r#"<time datetime="2026-11-12T19:36:27Z">2026-11-12 23:36:27</time>"#),
+        "{page}"
+    );
+}

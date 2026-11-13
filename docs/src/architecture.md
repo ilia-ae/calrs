@@ -114,7 +114,7 @@ calrs/
 | `/dashboard/teams/{id}/settings` | Team settings (members, OIDC groups, danger zone) |
 | `/dashboard/organization` | Internal event types + invite link generation |
 | `/dashboard/invites/{event_type_id}` | Invite management for private event types |
-| `/dashboard/troubleshoot/{id}` | Availability troubleshoot timeline |
+| `/dashboard/troubleshoot?event_type=<slug>&date=<date>` | Availability troubleshoot timeline |
 | `/booking/approve/{token}` | Token-based booking approval (from email) |
 | `/booking/decline/{token}` | Token-based booking decline (from email) |
 | `/booking/cancel/{token}` | Guest self-cancellation |

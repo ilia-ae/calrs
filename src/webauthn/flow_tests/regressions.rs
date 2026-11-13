@@ -523,10 +523,9 @@ async fn posted_fields_cannot_forge_log_lines() {
         .with_writer(move || writer.clone())
         .with_ansi(false)
         .finish();
-    let _guard = tracing::subscriber::set_default(subscriber);
-    // A callsite first hit with no subscriber caches "never"; see
-    // `capture_tracing` in src/web/tests/security.rs.
-    tracing::callsite::rebuild_interest_cache();
+    // Not a plain `set_default`: a sibling test hitting a callsite first
+    // could cache "never" for it; see `test_support::capture_default`.
+    let _guard = crate::test_support::capture_default(subscriber);
     let forged = enc("x\nFORGED INFO calrs::mfa: MFA completed user_id=other");
     let r = post_settings(
         &app,

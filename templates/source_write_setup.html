@@ -25,9 +25,9 @@
       {% endfor %}
     </div>
 
-    <div style="display: flex; gap: 0.75rem; align-items: center;">
-      <button type="submit" class="slot-btn" style="background: var(--accent); color: var(--on-accent); border: none; padding: 0.5rem 1.5rem; border-radius: var(--radius); font-size: 0.95rem; cursor: pointer;">{{ t("source-write-save") }}</button>
-      <a href="/dashboard" style="color: var(--text-muted); text-decoration: none; font-size: 0.9rem;">{{ t("source-write-skip") }}</a>
+    <div class="btn-row">
+      <button type="submit" class="btn btn-auto">{{ t("source-write-save") }}</button>
+      <a href="/dashboard" class="btn btn-ghost btn-auto">{{ t("source-write-skip") }}</a>
     </div>
   </form>
 </div>

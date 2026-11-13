@@ -453,6 +453,9 @@ pub(crate) async fn pay_page(
             checked => query.checked.is_some(),
             rebook_url => rebook_url,
             telegram_link => telegram_link,
+            // ilia fork: "Add to calendar" once the booking is confirmed (a
+            // waived one is still pending: the host has yet to confirm it).
+            ics_url => (pay_state == PayState::Confirmed).then(|| format!("{base}/ics")),
             renewals => row.renewals,
             renewals_max => row.renewals_max,
             expires_at => row.expires_at,
@@ -461,6 +464,105 @@ pub(crate) async fn pay_page(
         })
         .unwrap_or_else(|e| internal_error_body("template render", &e));
     private(Html(rendered).into_response())
+}
+
+/// `GET …/ics` (ilia fork): the booking's invite, the page's "Add to
+/// calendar", while the booking is confirmed. Scoped to the pay token, so the
+/// page never carries the cancel token behind upstream's `/booking/ics/…`
+/// (whoever holds that can cancel). Without the guest's name, email or
+/// notes, nor the host's address: the pay link may have been passed to
+/// whoever pays. The meeting's place stays, as the page shows the meeting
+/// (`crate::email::generate_ics_payer`).
+pub(crate) async fn pay_ics(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(token): Path<String>,
+) -> Response {
+    if let Some(resp) = limited(&state, &headers).await {
+        return resp;
+    }
+    let row = load(&state.pool, &token).await;
+    let lang = page_lang(row.as_ref(), &headers);
+    let Some(row) = row else {
+        return private(super::flow::not_found(&state, lang));
+    };
+    if current_state(&state, &row, Utc::now()).await != PayState::Confirmed {
+        return private(super::flow::not_found(&state, lang));
+    }
+    let Some(ics) = confirmed_ics(&state.pool, &row.booking_id).await else {
+        return private(super::flow::not_found(&state, lang));
+    };
+    private(
+        (
+            [
+                (header::CONTENT_TYPE, "text/calendar; charset=UTF-8"),
+                (
+                    header::CONTENT_DISPOSITION,
+                    "attachment; filename=\"booking.ics\"",
+                ),
+            ],
+            ics,
+        )
+            .into_response(),
+    )
+}
+
+/// The invite of a confirmed booking, as upstream's `booking_ics` builds it
+/// (same UID and SEQUENCE, so a calendar updates the event the email added),
+/// but with no one's identity: no guest name, email or notes, no ATTENDEE or
+/// ORGANIZER (`generate_ics_payer`). The place stays: the page shows the
+/// meeting, and the invite is no use without it.
+async fn confirmed_ics(pool: &SqlitePool, booking_id: &str) -> Option<String> {
+    #[allow(clippy::type_complexity)]
+    let (uid, guest_timezone, start_at, end_at, title, host_name, location, et_id): (
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+        Option<String>,
+        String,
+    ) = sqlx::query_as(
+        "SELECT b.uid, COALESCE(b.guest_timezone, 'UTC'),
+                CASE b.time_version WHEN 1 THEN b.start_at ELSE rtrim(b.start_at, 'Z') END,
+                CASE b.time_version WHEN 1 THEN b.end_at ELSE rtrim(b.end_at, 'Z') END,
+                et.title, u.name,
+                COALESCE(NULLIF(b.meeting_url, ''), et.location_value), et.id
+         FROM bookings b
+         JOIN event_types et ON et.id = b.event_type_id
+         JOIN accounts a ON a.id = et.account_id
+         JOIN users u ON u.id = COALESCE(b.assigned_user_id, a.user_id)
+         WHERE b.id = ? AND b.status = 'confirmed'",
+    )
+    .bind(booking_id)
+    .fetch_optional(pool)
+    .await
+    .unwrap_or_else(|e| {
+        tracing::error!(target: TARGET, error = %e, "cannot read a booking for its invite");
+        None
+    })?;
+    let stored_tz = crate::web::availability::get_host_tz(pool, &et_id).await;
+    let guest_tz = guest_timezone
+        .parse::<chrono_tz::Tz>()
+        .unwrap_or(chrono_tz::UTC);
+    let (date, start_time, end_time) =
+        crate::web::format::booking_strings_in_guest_tz(&start_at, &end_at, stored_tz, guest_tz);
+    let details = crate::email::BookingDetails {
+        utc_times: crate::booking_time::ics_times(&start_at, &end_at),
+        event_title: title,
+        date,
+        start_time,
+        end_time,
+        guest_timezone,
+        host_name,
+        sequence: crate::web::calendar_push::booking_ics_sequence(pool, &uid).await,
+        uid,
+        location: location.filter(|l| !l.is_empty()),
+        host_timezone: stored_tz.name().to_string(),
+        ..Default::default()
+    };
+    Some(crate::email::generate_ics_payer(&details))
 }
 
 /// `GET …/status`: the state and what is left to pay, nothing else (no

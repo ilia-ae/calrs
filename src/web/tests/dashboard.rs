@@ -93,6 +93,41 @@ async fn settings_page_returns_200() {
     );
 }
 
+/// ilia fork: the settings page uses the shared button system, and the
+/// avatar picker is a label button in the page language rather than the
+/// browser's own "Choose File / No file chosen".
+#[tokio::test]
+async fn settings_page_uses_the_shared_buttons_and_a_translated_file_picker() {
+    let (app, _, session, _) = setup_test_app().await;
+    let body = body_string(
+        app.oneshot(get_authed("/dashboard/settings", &session))
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert!(
+        body.contains("<label class=\"btn btn-secondary btn-sm btn-auto file-pick\">Choose file<input type=\"file\" name=\"avatar\""),
+        "{body}"
+    );
+    assert!(body.contains("class=\"file-pick-input\""), "{body}");
+    assert!(
+        body.contains("data-file-name>No file chosen</span>"),
+        "{body}"
+    );
+    // The page's own content (the dashboard's timezone banner sits above it).
+    let content = body.split_once("<h1>").expect("page heading").1;
+    assert!(
+        !content.contains("class=\"slot-btn\""),
+        "no slot buttons left: {content}"
+    );
+    assert!(body.contains("id=\"copy-url-btn\" class=\"btn btn-secondary btn-sm btn-auto\""));
+    assert!(body.contains("id=\"copy-to-all-btn\" class=\"btn btn-secondary btn-sm btn-auto\""));
+    // The theme picker marks the current choice with aria-pressed, not inline colours.
+    assert!(body.contains("id=\"theme-picker\" class=\"btn-row\" role=\"group\""));
+    assert_eq!(body.matches("aria-pressed=\"false\"").count(), 3, "{body}");
+    assert!(!body.contains("b.style.borderColor = 'var(--accent)'"));
+}
+
 #[tokio::test]
 async fn confirm_pending_booking_via_dashboard() {
     let (app, pool, session, et_id) = setup_test_app().await;
@@ -820,4 +855,27 @@ async fn default_availability_carries_the_profile_timezone() {
     let json: serde_json::Value = serde_json::from_str(&body_string(response).await).unwrap();
     assert_eq!(json["timezone"], "Europe/Bucharest");
     assert!(json["schedule"].is_string());
+}
+
+// ilia fork: the team form's member picker reads user names from a script
+// literal; an apostrophe must not reach it HTML-escaped and a trailing
+// backslash must not end the string early.
+#[tokio::test]
+async fn team_form_writes_user_names_as_json() {
+    let (app, pool, session, _) = setup_test_app().await;
+    let id = insert_role_user(&pool, "ann@example.com", "user").await;
+    sqlx::query("UPDATE users SET name = ? WHERE id = ?")
+        .bind("Ann O'Brien \\")
+        .bind(&id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let response = app
+        .oneshot(get_authed("/dashboard/teams/new", &session))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 200);
+    let body = body_string(response).await;
+    assert!(!body.contains("Ann O&#x27;Brien"), "{body}");
+    assert!(body.contains("Brien \\\\\", email: "), "{body}");
 }

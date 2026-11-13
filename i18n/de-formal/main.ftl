@@ -18,6 +18,9 @@ confirmed-subtitle-pending = Ihre Buchungsanfrage wurde an { $host } gesendet. S
 
 slots-tz-label = Ihre Zeitzone
 
+## ilia-ov3-guest
+slots-load-failed = Verfügbarkeit konnte nicht geladen werden. Bitte laden Sie die Seite neu.
+
 slots-click-highlighted = Klicken Sie auf ein hervorgehobenes Datum, um verfügbare Zeiten zu sehen
 
 # Booking form (templates/book.html)
@@ -155,6 +158,9 @@ settings-lend-resource-help = Wenn eine Buchung eine geteilte Ressource (Demolab
 settings-default-availability-help = Ihre Standardarbeitszeiten. Werden für dynamische Gruppenlinks verwendet, wenn andere Sie zu einem Termin hinzufügen.
 
 # Sign in (templates/auth/login.html)
+
+## ilia-ov-auth
+ilia-mfa-recovery-copy-manual = Kopieren hat nicht geklappt. Die Codes sind markiert: Kopieren Sie sie von Hand.
 
 login-subtitle = Melden Sie sich bei Ihrem calrs-Konto an
 
@@ -433,7 +439,7 @@ ton-pay-warn-comment = Der Kommentar ist Pflicht: Daran erkennen wir Ihre Zahlun
 ton-pay-warn-encrypt = Verschlüsseln Sie den Kommentar nicht.
 ton-pay-warn-token = Zahlen Sie in TON, nicht mit Tokens.
 ton-pay-warn-exchange = Sie zahlen von einer Börse? Tragen Sie den Code oben ins Memo-Feld (Kommentar) ein.
-ton-pay-warn-deadline = Senden Sie die Zahlung vor { $time }. Eine später gesendete Zahlung wird womöglich nicht berücksichtigt.
+ton-pay-warn-deadline = Senden Sie die Zahlung vor { $time } ({ $zone }). Eine später gesendete Zahlung wird womöglich nicht berücksichtigt.
 ton-pay-emailed = Wir haben diesen Link an die E-Mail-Adresse Ihrer Buchung gesendet.
 ton-pay-email-unavailable = Der Link konnte nicht gesendet werden. Lassen Sie diese Seite offen oder speichern Sie ihre Adresse.
 ton-pay-checking-now = Wir prüfen Ihre Zahlung. Diese Seite aktualisiert sich von selbst.
@@ -564,6 +570,8 @@ ton-form-error-mode = Wählen Sie einen festen Preis oder den Preis nach Nachfra
 ton-etf-ladder-help = Der Preis ist die Stufe für die Zahl Ihrer anstehenden Buchungen in den nächsten Tagen (bestätigte oder bezahlte, kostenlose Anfragen, die auf Ihre Bestätigung warten, und Team-Buchungen, die Sie leiten; unbezahlte zählen nicht): zuerst kostenlos (jede kostenlose Buchung bestätigen Sie), dann höher, je voller Ihr Kalender wird. Gäste sehen den aktuellen Preis und zahlen den angezeigten. Die Staffel legt der Administrator fest.
 
 # ilia fork: the TON settings page (/dashboard/admin/ton)
+## ilia-ov-ton
+dbg-err-requote = Der Preis hat sich beim Buchen zweimal geändert. Nichts wurde gebucht: Versuchen Sie es noch einmal.
 ton-admin-errors = Nichts gespeichert: Korrigieren Sie die unten markierten Felder.
 ton-admin-locked-env = Um es hier zu ändern, entfernen Sie { $var } aus der Umgebung des Servers und starten Sie calrs neu.
 ton-admin-locked-apply = Ändern Sie es im Dokument von config apply oder lassen Sie es in dessen ton-Abschnitt weg, um es an diese Seite zu übergeben.
@@ -572,7 +580,7 @@ ton-admin-my-demand = Ihre anstehenden Buchungen jetzt: { $n }. Ihr Staffelpreis
 # ilia fork: the debug booking page (src/web/debug_booking.rs)
 
 dbg-intro = Einen Testtermin so buchen, wie ein Gast es täte, ohne jedes Mal das Gastformular auszufüllen. Die Buchung läuft über denselben Weg wie die öffentliche Buchungsseite: die Prüfungen, der Preis und die TON-Rechnung, das Freihalten der Zeit und die E-Mails. Die Zahlung wird nie übersprungen und nie als erhalten markiert: Bezahlen Sie die Rechnung aus Ihrer Wallet oder stornieren Sie die Buchung.
-dbg-switch-note = Schalten Sie diese Seite nach dem Debuggen wieder aus, mit dem Schalter oben auf der Seite TON-Zahlungen:
+dbg-switch-note = Schalten Sie diese Seite nach dem Debuggen wieder aus, mit dem Schalter oben auf der Seite:
 dbg-price-now-free = jetzt kostenlos (die Anfrage wird von Ihnen bestätigt)
 dbg-impersonating = Die Testbuchung ist nur ohne Identitätswechsel verfügbar. Beenden Sie zuerst den Identitätswechsel.
 ton-admin-debug-intro = Testbuchung: Ihre eigenen Termintypen so buchen, wie ein Gast es tut (der echte Preis, die Rechnung, die Zahlungsseite und Telegram), ohne das Gastformular auszufüllen. Nur für Admins. Solange sie aus ist, antwortet ihre Seite mit 404 und nichts verlinkt sie.

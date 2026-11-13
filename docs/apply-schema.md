@@ -78,6 +78,7 @@ calrs --data-dir D config apply --export [--user E]    # stored state, same sche
     "google_oauth2": "off",
     "captcha": "off",
     "meeting_webhook": "off",
+    "sms": "off",                         // ilia fork; only "off" (see "SMS gateway" below)
     "sms_allow_all_users": false,
     "ton": {                              // ilia fork; left out = no change (see "TON settings" below)
       "window_min": 30, "grace_min": 15,  // whole numbers, or null (the default, still owned)
@@ -91,6 +92,7 @@ calrs --data-dir D config apply --export [--user E]    # stored state, same sche
 
   "sources": [                            // A4; each must already exist, matched on url + username
     {"url": "https://…", "username": "aa@10112.in",
+     "name": "Kerio",                     // ilia fork; 1..255 bytes, not padded (see "Source name")
      "write_calendar": "Calendar",        // nullable (null = no write-back); a calendar display name
      "sync_calendars": ["Calendar"]}      // display names synced, every other one not; NOT nullable
   ],
@@ -124,6 +126,9 @@ calrs --data-dir D config apply --export [--user E]    # stored state, same sche
         "cancel_notice_min": 120, "reschedule_notice_min": 120,   // nullable
         "sms_phone_mode": "off",          // off | optional | required
         "frequency_limits": [{"count": 4, "period": "day"}],      // whole list; [] = none; day|week|month|year
+        "busy_calendars": null,           // ilia fork; nullable (null = every synced calendar); calendar names
+        "overrides": [{"date": "2026-12-31", "blocked": true},    // ilia fork; whole list from today on;
+                      {"date": "2027-01-05", "start": "12:00", "end": "15:00"}],  // [] = none from today on
         "ton_price": null,                // nullable (null = free); or the whole price, see "TON price" below:
                                           // {"usd": "500.00", "window_min": null, "enabled": true}
         "telegram_guest_mode": "optional",// off | optional | required
@@ -136,9 +141,23 @@ calrs --data-dir D config apply --export [--user E]    # stored state, same sche
 
 - **Event type items:**
   - Field names, values and ranges are the MCP `EventTypePatch` ones (`src/web/agent/dto.rs`).
-  - Three things differ: `timezone` is nullable here; `weekly_hours`, `frequency_limits`, `ton_price`, `telegram_guest_mode` and `enabled` are extra keys; and there is no `version`.
+  - Three things differ: `timezone` is nullable here; `weekly_hours`, `frequency_limits`, `busy_calendars`, `overrides`, `ton_price`, `telegram_guest_mode` and `enabled` are extra keys; and there is no `version`.
   - A key that is left out keeps the stored value. On creation, a missing key takes the new event type form's default.
-  - These are not in v1 and are left as they are: busy calendars, resources, watchers, team fields and date overrides.
+  - These are not in v1 and are left as they are: resources, watchers and team fields (not used on a single-owner server).
+- **Busy calendars (`busy_calendars`, ilia fork, added after v1 froze; same format string):** the event type form's calendar choice (`calendar_ids`, stored in `event_type_calendars`): the calendars whose events block this type's slots.
+  - `null` is no choice: every synced calendar blocks (the form's default, nothing checked). `[]` is refused (`use null for every synced calendar`), so there is one spelling.
+  - Otherwise a list of calendar display names (a calendar with none is named by its `href`), as the `sources` section names them, among the calendars of all the admin's sources whatever they sync (the `sources` section may turn one on in the same run). A name listed twice, unknown (the error lists the names there are) or shared by two calendars is refused under `event_types[<slug>].busy_calendars[<i>]`. The order does not matter; the diff and the export give the sorted names.
+  - Written with the form (posted when it differs, like any key the form carries). As in the slot queries, a choice of which no calendar is synced any more counts as no choice.
+  - Export: the sorted names, `null` for no choice; left out when a chosen calendar shares its name with another one (or no source lists it), so an export applies as no change.
+  - Calendars of a source added in the same run are not known until `calrs serve` syncs it: the ilia-booking role leaves the key out of such a run.
+  - An older calrs refuses the key (`deny_unknown_fields`, exit 2, nothing written). The marker of a calrs that knows it is `BUSY_CALENDARS_SHAPE` in `src/web/apply/event_types.rs`, `busy_calendars: null or a list of calendar names` (part of the refusal of `[]`, so it is in the binary).
+- **Date overrides (`overrides`, ilia fork, added after v1 froze; same format string):** the type's overrides page (`/dashboard/event-types/{slug}/overrides`, `availability_overrides`): `{"date": "YYYY-MM-DD", "blocked": true}` is a day off, `{"date", "start": "HH:MM", "end": "HH:MM"}` replaces that day's weekly hours.
+  - Always the whole list **from today on**, today in the type's timezone (its own, else the profile's). `[]` removes every override from today on. Left out, the stored rows stay (those made on the page or by MCP included).
+  - Rows dated before today are never compared, written or exported, and an entry dated before today is left out of the run: an inventory still applies after a day off has passed.
+  - Checks, as MCP's `add_date_override`: the date and the times spelled exactly (`"9:00"` is refused), start before end, at most `MAX_DAYS_AHEAD` (366) days ahead, `blocked` only `true` and never with times, an entry listed twice refused. Paths `event_types[<slug>].overrides[<i>]`.
+  - Written after the form, in the run's transaction: one `DELETE` of the type's rows from today on, then one `INSERT` per entry with the columns the page writes, only when the stored rows differ. The diff gives the whole sorted lists.
+  - Export: the rows from today on, sorted (by date, custom hours before a day off); left out when a row is one the document could not give (a hand edit).
+  - An older calrs refuses the key (exit 2, nothing written). Its marker is `OVERRIDES_SHAPE` in `src/web/apply/event_types.rs`, `overrides: [{date, blocked: true} | {date, start, end}], from today on` (part of the refusal of an entry of another shape).
 - **TON price (`ton_price`, added after v1 froze; same format string):** the price section of the event type form (`ton_prices`).
   - `null` is free: no price, a stored one is removed (the section unchecked and blank).
   - Otherwise an object, always the whole price: exactly one of `ton` (the invoice amount itself, no exchange rate), `usd` (converted at the rate of the moment the guest books, inside the server's corridor `CALRS_TON_RATE_MIN_USD`..`MAX_USD`) and `"ladder": true` (ilia fork: the site's demand ladder, `CALRS_TON_LADDER`, in TON; only `true` is accepted, `null` and `false` are refused); `window_min`, the minutes the guest has to pay (10..240, `null` = the server's `CALRS_TON_WINDOW_MIN`), left out = `null`; `enabled`, left out = `true`, `false` keeps the price switched off (the type books free, the section's unchecked box with an amount).
@@ -156,9 +175,15 @@ calrs --data-dir D config apply --export [--user E]    # stored state, same sche
   - Report: `site.ton.<key>` (before and after in the document's shape; `null` for the default or no row) and `site.ton.<key>.owner` (`"apply"`, `"panel"` or `null`). A value change sets `restart` (`calrs serve` resolves the settings at startup); an owner change alone does not. Each change gets a row in `ton_settings_audit` (source `apply`, the admin of `user`): the durable trail. A `calrs::audit` log event follows each change only once the run has committed (never on `--dry-run` or a rollback); the ilia-booking role runs `config apply` with `RUST_LOG=off`, so its runs log none.
   - An older calrs refuses `ton` as an unknown key of `site` (exit 2, nothing written). The marker of a calrs that knows it is the literal `TON_SETTINGS_SHAPE` in `src/web/apply/ton.rs`, `site.ton: {window_min .. free_per_guest_days}, each a value or null (apply-owned)`, in the source and in the binary.
   - Export: the keys apply owns, `null` for a default it owns; no `ton` key when it owns none, so applying an export is no change. A stored value the document cannot state (a hand edit) is left out.
-  - **`debug_booking`** (ilia fork, added later): the switch of the admin's debug booking page (`/dashboard/admin/debug-booking`), stored in the same table with the key `CALRS_DEBUG_BOOKING` (`crate::ton::settings::DEBUG_BOOKING`). `true` or `false` (stored `1` or `0`); `null` is off, still owned by apply; anything else (`"on"`, `1`) is refused (`must be true, false or null`). Owned by apply, the Debug switch at the top of the TON page is locked with the reason; left out of a present section it goes back to the page like the other keys. `calrs serve` reads it on every request, so a change takes effect at once and sets **no** `restart`. The server's environment `CALRS_DEBUG_BOOKING` still wins. Exported as a boolean (`"debug_booking": true`), which applies back with no change. An older calrs refuses it as an unknown key of `site.ton` (exit 2, nothing written); `TON_SETTINGS_SHAPE` is kept as it was, so a role that sends `debug_booking` must check for this calrs another way (the ilia-booking role does not send it: it sets the environment, or nothing).
+  - **`debug_booking`** (ilia fork, added later): the switch of the admin's debug booking page (`/dashboard/admin/debug-booking`), stored in the same table with the key `CALRS_DEBUG_BOOKING` (`crate::ton::settings::DEBUG_BOOKING`). `true` or `false` (stored `1` or `0`); `null` is off, still owned by apply; anything else (`"on"`, `1`) is refused (`must be true, false or null`). Owned by apply, the Debug switch at the top of the TON page is locked with the reason; left out of a present section it goes back to the page like the other keys. `calrs serve` reads it on every request, so a change takes effect at once and sets **no** `restart`. The server's environment `CALRS_DEBUG_BOOKING` still wins. Exported as a boolean (`"debug_booking": true`), which applies back with no change. An older calrs refuses it as an unknown key of `site.ton` (exit 2, nothing written); `TON_SETTINGS_SHAPE` is kept as it was. The marker of a calrs that knows it is `DEBUG_BOOKING_SHAPE` in `src/web/apply/ton.rs`, `site.ton.debug_booking: true, false or null` (part of the refusal of another value, so in the binary; added after the key, so a calrs with the key but without the marker is taken for an older one). The ilia-booking role sends it only from `calrs_site.ton.debug_booking`, never together with its `calrs_debug_booking` (the environment, which wins).
   - **`debug_booking_telegram`** (ilia fork, added after `debug_booking`): the guest Telegram username the debug booking page prefills when the admin's linked Telegram chat has none (key `CALRS_DEBUG_BOOKING_TELEGRAM`, `crate::ton::settings::DEBUG_BOOKING_TELEGRAM`). A string in the stored spelling, without `@` (`"getmonolith"`; `"@getmonolith"` is refused with the spelling to use), checked like the booking form's Telegram field (a Latin letter, then letters, digits and `_`, 4 to 32 characters, not ending in `_`); `null` is none, still owned by apply. Owned by apply, the field in the Debug block of the TON page is locked with the reason; left out of a present section it goes back to the page with its value. Read on every request: **no** `restart`. The server's environment `CALRS_DEBUG_BOOKING_TELEGRAM` still wins. Exported as the string. An older calrs refuses it as an unknown key of `site.ton` (exit 2, nothing written); the marker of a calrs that knows it is `DEBUG_BOOKING_TELEGRAM_SHAPE` in `src/web/apply/ton.rs` (`site.ton.debug_booking_telegram: a Telegram username without @, or null`, part of the key's error message, so it is in the binary), which the ilia-booking role checks before it sends the key.
-- **Not in the document:** `base_url` and `allow_private_hosts` belong to the environment, so they are unknown keys. There are no secrets in v1.
+- **Source name (`sources[].name`, ilia fork, added after v1 froze; same format string):** the name of Sources → Edit. 1..255 bytes, not padded (the edit form trims, and refuses an empty name); left out keeps it. Written with one `UPDATE caldav_sources SET name` in the run's transaction, never through the edit form, whose handler logs in to the calendar server to test the connection (Kerio locks an account after failed logins). Export: the name, left out when it is one the form would not store (a hand edit). An older calrs refuses the key (exit 2, nothing written); the marker is `SOURCE_NAME_SHAPE` in `src/web/apply/sources.rs`, `sources[].name: 1..255 bytes, not padded` (part of its refusal, so in the binary). The ilia-booking role sends the name of every source only to a release whose binary has the marker.
+- **SMS gateway (`site.sms`, ilia fork, added after v1 froze; same format string):** the SMS gateway card of the admin page (`sms_config`). Only `"off"`, like `captcha`: the stored gateway is deleted with its encrypted secret, as the card's Clear button does (`admin_update_sms_clear`, every row). Left out, a gateway saved on the page stays. `sms_allow_all_users` is a separate key (the policy card).
+  - Report: one path per column the card shows, `site.sms.provider`, `site.sms.api_key`, `site.sms.sender`, `site.sms.base_url` (stored value to `null`) and `site.sms.api_secret` (`"(secret set)"` to `null`). The gateway is read on every send: no `restart`.
+  - Refused (exit 2, nothing written) when the `CALRS_SMS_*` environment block of the `config apply` process sets the gateway: that block wins over the database and the card's handler does not clear while it is set. `config apply` does not see `calrs serve`'s environment, so on a server whose `calrs.env` sets the gateway the stored row is deleted and the environment still governs.
+  - Export: `"off"` when no gateway is stored and the environment sets none; otherwise left out, so applying an export changes nothing.
+  - An older calrs refuses the key (`deny_unknown_fields`, exit 2, nothing written). The marker of a calrs that knows it is `SMS_OFF_SHAPE` in `src/web/apply/site.rs`, `site.sms: "off" deletes the stored SMS gateway` (part of the environment refusal, so in the binary). The ilia-booking role checks it before it sends the key.
+- **Not in the document:** `base_url` and `allow_private_hosts` belong to the environment, so they are unknown keys. There are no secrets in v1. (The ilia-booking role keeps the stored `allow_private_hosts` empty with `calrs config general --allow-private-hosts ""` when its environment sets none.)
 
 ### Canonical values
 
@@ -188,13 +213,13 @@ The checks reuse the existing validators: `check_text`/`check_opt_text`/`check_t
 **Paths:**
 - `profile.<key>` and `site.<key>`;
 - `site.custom.<colour>` and `site.jitsi` (one path for the whole value: `"off"` or the object);
-- a feature switched `off`: one path per column, `site.<feature>.<column>`, for example `site.oidc.enabled`, `site.oidc.client_secret`, `site.captcha.instance_url`, `site.meeting_webhook.secret`;
-- `sources[<index in the document>].write_calendar` (the calendar's name or null) and `sources[<index>].sync_calendars` (the sorted list of names synced, before and after). A calendar with an empty display name is named by its `href`;
+- a feature switched `off`: one path per column, `site.<feature>.<column>`, for example `site.oidc.enabled`, `site.oidc.client_secret`, `site.captcha.instance_url`, `site.meeting_webhook.secret`; the SMS gateway (ilia fork) `site.sms.<column>`;
+- `sources[<index in the document>].name` (ilia fork), `sources[<index>].write_calendar` (the calendar's name or null) and `sources[<index>].sync_calendars` (the sorted list of names synced, before and after). A calendar with an empty display name is named by its `href`;
 - `event_types[<slug>].<key>`;
 - `event_types[<slug>]` with `before: null, after: "created"` for a created event type, or `before: "present", after: null` for a deleted one. Disabling by prune is `event_types[<slug>].enabled`, true to false.
 
 **Values:**
-- `before` and `after` are JSON in the document's own shape. `weekly_hours` and `frequency_limits` appear as whole lists, `ton_price` as the whole object with every key (or `null`).
+- `before` and `after` are JSON in the document's own shape. `weekly_hours`, `frequency_limits`, `busy_calendars` and `overrides` appear as whole lists, `ton_price` as the whole object with every key (or `null`).
 - A cleared secret column shows `"(secret set)"` changing to `null` (`SECRET_SET`).
 - `profile.avatar` shows `"sha256:<hex>"`, or `null`.
 

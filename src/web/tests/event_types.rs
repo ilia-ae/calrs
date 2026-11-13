@@ -143,6 +143,37 @@ async fn overrides_page_returns_200() {
     );
 }
 
+/// The event type pages lay out with the shared classes: the two-column
+/// rows stack on a phone (no inline grid beating `.form-grid-2`), the embed
+/// snippet's copy button is a `.btn` beside its heading rather than over the
+/// code, and the exception-type radios sit next to their labels.
+#[tokio::test]
+async fn event_type_pages_use_the_shared_layout() {
+    let (app, _, session, _) = setup_test_app().await;
+    let get = |uri: &'static str| {
+        let app = app.clone();
+        let session = session.clone();
+        async move {
+            let resp = app.oneshot(get_authed(uri, &session)).await.unwrap();
+            assert_eq!(resp.status(), 200, "{uri}");
+            body_string(resp).await
+        }
+    };
+    let form = get("/dashboard/event-types/test-meeting/edit").await;
+    assert!(form.contains(r#"<div class="form-grid-2" style="align-items: start;">"#));
+    assert!(!form.contains("grid-template-columns: auto 1fr"), "{form}");
+    assert!(!form.contains(
+        r#"style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;" class="form-grid-2""#
+    ));
+    let embed = get("/dashboard/event-types/test-meeting/embed").await;
+    assert!(embed.contains(r#"class="btn btn-secondary btn-sm btn-auto" id="copy-btn""#));
+    assert!(!embed.contains("embed-copy-btn"), "{embed}");
+    assert!(embed.contains(r#"class="back-link""#));
+    let overrides = get("/dashboard/event-types/test-meeting/overrides").await;
+    assert!(overrides.contains(r#"<div class="form-grid-2" style="max-width: 440px;">"#));
+    assert!(overrides.contains(r#"value="blocked" checked style="accent-color: var(--accent);">"#));
+}
+
 #[tokio::test]
 async fn toggle_event_type_disables_and_enables() {
     let (app, pool, session, _) = setup_test_app().await;

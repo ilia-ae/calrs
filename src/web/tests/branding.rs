@@ -866,3 +866,105 @@ fn custom_theme_dark_palette_puts_dark_text_on_a_light_accent() {
     let (light, _) = theme_blocks(&css);
     assert_eq!(css_var(&light, "--on-accent"), "#111111");
 }
+
+/// The main `<style>` block of base.html, with no template code in it.
+fn base_html_css() -> &'static str {
+    let html = include_str!("../../../templates/base.html");
+    let start = html.find("<style>").expect("base.html has a style block") + "<style>".len();
+    let end = start + html[start..].find("</style>").expect("closed style block");
+    &html[start..end]
+}
+
+/// The declarations of the first rule whose selector list is exactly `selector`.
+fn base_html_rule(selector: &str) -> &'static str {
+    let css = base_html_css();
+    let mut from = 0;
+    while let Some(at) = css[from..].find(selector) {
+        let at = from + at;
+        let after = css[at + selector.len()..].trim_start();
+        let line_start = css[..at].rfind(['}', '/', '\n']).map_or(0, |i| i + 1);
+        if after.starts_with('{') && css[line_start..at].trim().is_empty() {
+            let open = at + selector.len() + css[at + selector.len()..].find('{').unwrap();
+            let close = open + css[open..].find('}').expect("closed rule");
+            return &css[open + 1..close];
+        }
+        from = at + selector.len();
+    }
+    panic!("no rule `{selector}` in base.html")
+}
+
+#[test]
+fn base_html_native_controls_follow_the_page_theme() {
+    // ilia fork: with only the meta tag, a dark OS drew unchecked checkboxes
+    // and radios as filled dark marks on the light theme.
+    assert!(base_html_rule(":root").contains("color-scheme: light;"));
+    assert!(base_html_rule("html.dark").contains("color-scheme: dark;"));
+    assert!(base_html_rule("input[type=checkbox], input[type=radio]")
+        .contains("accent-color: var(--accent)"));
+}
+
+#[test]
+fn base_html_links_without_a_class_take_the_accent_at_zero_specificity() {
+    let link = base_html_rule(":where(a:not([class]):not(.btn *))");
+    assert!(link.contains("color: var(--accent);"), "{link}");
+    assert!(link.contains("text-decoration: underline;"), "{link}");
+    let hover = base_html_rule(":where(a:not([class]):not(.btn *):hover)");
+    assert!(hover.contains("color: var(--accent-hover);"), "{hover}");
+    // No bare `a` rule, which would outrank :where() and beat the footer's
+    // and the language menu's own link colours.
+    let css = base_html_css();
+    assert!(!css.contains("\n    a {") && !css.contains("\n    a:hover"));
+    assert!(base_html_rule(".powered a").contains("text-decoration: none"));
+}
+
+#[test]
+fn base_html_checkboxes_and_radios_are_not_stretched_like_text_fields() {
+    let css = base_html_css();
+    let fields = ".form-group input, .form-group textarea, .form-group > select";
+    assert!(base_html_rule(fields).contains("width: 100%"));
+    let focus = css
+        .find(".form-group input:focus, .form-group textarea:focus, .form-group > select:focus")
+        .expect("the focus rule");
+    let checks = ".form-group input[type=checkbox], .form-group input[type=radio]";
+    let rule = base_html_rule(checks);
+    for decl in [
+        "width: auto;",
+        "padding: 0;",
+        "box-shadow: none;",
+        "flex: none;",
+    ] {
+        assert!(rule.contains(decl), "{decl} in {rule}");
+    }
+    // Same specificity as the focus rule, so it must come after it.
+    assert!(css.find(checks).unwrap() > focus);
+    assert!(base_html_rule(".form-group > select").contains("min-height: 2.5rem"));
+}
+
+#[test]
+fn base_html_defines_the_shared_layout_classes() {
+    let narrow = base_html_rule(".page-narrow, .card-narrow");
+    assert!(narrow.contains("max-width: 30rem;"), "{narrow}");
+    assert!(
+        !narrow.contains("margin:"),
+        "only the side margins, so a margin-top on the element stays: {narrow}"
+    );
+    let icon = base_html_rule(".result-icon");
+    assert!(icon.contains("width: 3rem;") && icon.contains("border-radius: 50%;"));
+    for variant in ["ok", "wait", "info", "bad", "muted"] {
+        assert!(
+            base_html_rule(&format!(".result-icon.{variant}")).contains("background:"),
+            "{variant}"
+        );
+    }
+    let inline = base_html_rule("svg.icon");
+    assert!(inline.contains("width: 1em;") && inline.contains("height: 1em;"));
+    assert!(base_html_rule("h3").contains("font-size: 0.95rem;"));
+}
+
+#[test]
+fn base_html_pending_badge_is_readable_in_dark_mode() {
+    let rule = base_html_rule(
+        "html.dark .badge-warning, html.dark .badge-pending, html.dark .badge-requires",
+    );
+    assert!(rule.contains("color: #fbbf24"), "{rule}");
+}

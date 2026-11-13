@@ -2,19 +2,18 @@
 {#- ilia fork: the admin's debug booking page (src/web/debug_booking.rs; served only while the switch on the TON page, or CALRS_DEBUG_BOOKING, is on). -#}
 {% block title %}{{ t("dbg-title") }} — calrs{% endblock %}
 {% block dashboard_content %}
-{% set field_style = "width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); font-size: 0.9rem;" %}
 {% include "ilia/debug_style.html" %}
 <div class="dbg-banner" id="debug-banner" role="note"><span class="dbg-label">{{ t("dbg-banner") }}</span></div>
 <div class="dbg-hazard" id="debug-zone" style="padding: 0.75rem;">
 <div class="card" id="debug-booking-intro">
   <h1>{{ t("dbg-title") }}</h1>
   <p style="color: var(--text-secondary); font-size: 0.9rem;">{{ t("dbg-intro") }}</p>
-  <p style="color: var(--warning-text, #b45309); font-size: 0.85rem; margin-bottom: 0;">{{ t("dbg-switch-note") }} <a href="/dashboard/admin/ton#debug-block">{{ t("nav-admin-ton") }}</a></p>
+  <p style="color: var(--warn); font-size: 0.85rem; margin-bottom: 0;">{{ t("dbg-switch-note") }} <a href="/dashboard/admin/ton#debug-block">{{ t("nav-admin-ton") }}</a></p>
 </div>
 
 {% if own_chat_missing %}
-<div class="card" id="debug-booking-no-chat" role="note" style="border: 2px solid var(--warning-text, #b45309); background: rgba(245, 158, 11, 0.08);">
-  <h2 style="margin: 0 0 0.35rem; font-size: 1.05rem; color: var(--warning-text, #b45309);">{{ t("dbg-no-chat-title") }}</h2>
+<div class="card" id="debug-booking-no-chat" role="note" style="border: 2px solid var(--warn-border); background: var(--warn-bg);">
+  <h2 style="margin: 0 0 0.35rem; font-size: 1.05rem; color: var(--warn);">{{ t("dbg-no-chat-title") }}</h2>
   <p style="font-size: 0.9rem; margin: 0 0 0.6rem;">{{ t("dbg-no-chat-body") }}</p>
   <a class="btn" id="debug-booking-link-chat" href="{{ telegram_settings_path }}">{{ t("dbg-no-chat-link") }}</a>
 </div>
@@ -27,15 +26,13 @@
 {% endif %}
 
 {% if warning %}
-<div class="card" id="debug-booking-warning" style="border-color: var(--warning-text, #b45309); background: rgba(245, 158, 11, 0.06);">
-  <div style="color: var(--warning-text, #b45309); font-size: 0.9rem;">{{ warning }}</div>
+<div class="card" id="debug-booking-warning" style="border-color: var(--warn-border); background: var(--warn-bg);">
+  <div style="color: var(--warn); font-size: 0.9rem;">{{ warning }}</div>
 </div>
 {% endif %}
 
 {% if error %}
-<div class="card" id="debug-booking-error" style="border-color: var(--error-text); background: rgba(239, 68, 68, 0.05);">
-  <div class="error" style="color: var(--error-text); font-size: 0.9rem;">{{ error }}</div>
-</div>
+<div class="error" id="debug-booking-error" role="alert">{{ error }}</div>
 {% endif %}
 
 <div class="card" id="debug-booking-form">
@@ -45,13 +42,13 @@
   <form method="get" action="{{ path }}" style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: flex-end; margin-bottom: 1rem;">
     <div class="form-group" style="flex: 1; min-width: 14rem; margin: 0;">
       <label for="dbg-et">{{ t("dbg-event-type") }}</label>
-      <select id="dbg-et" name="et" style="{{ field_style }}">
+      <select id="dbg-et" name="et">
         {% for et in types %}
         <option value="{{ et.slug }}"{% if et.selected %} selected{% endif %}>{{ et.title }} ({{ et.slug }}){% if et.priced %} · {{ t("dbg-priced") }}{% endif %}{% if et.private %} · {{ t("dbg-private-short") }}{% endif %}</option>
         {% endfor %}
       </select>
     </div>
-    <button type="submit" class="slot-btn" style="cursor: pointer;">{{ t("dbg-choose") }}</button>
+    <button type="submit" class="btn btn-secondary btn-auto" style="min-height: 2.5rem;">{{ t("dbg-choose") }}</button>
   </form>
 
   {% if selected %}
@@ -74,7 +71,7 @@
     <div class="form-group">
       <label for="dbg-slot">{{ t("dbg-slot") }}</label>
       {% if slots %}
-      <select id="dbg-slot" name="slot" required style="{{ field_style }}">
+      <select id="dbg-slot" name="slot" required>
         {% for s in slots %}
         <option value="{{ s.value }}"{% if s.selected %} selected{% endif %}>{{ s.label }}</option>
         {% endfor %}
@@ -86,11 +83,11 @@
     </div>
     <div class="form-group">
       <label for="dbg-name">{{ t("dbg-name") }}</label>
-      <input id="dbg-name" name="name" value="{{ name }}" required maxlength="255" style="{{ field_style }}">
+      <input id="dbg-name" name="name" value="{{ name }}" required maxlength="255">
     </div>
     <div class="form-group">
       <label for="dbg-email">{{ t("dbg-email") }}</label>
-      <select id="dbg-email" name="email" style="{{ field_style }}">
+      <select id="dbg-email" name="email">
         {% for e in emails %}
         <option value="{{ e }}"{% if e == email %} selected{% endif %}>{{ e }}</option>
         {% endfor %}
@@ -100,7 +97,7 @@
     {% if selected.telegram_field %}
     <div class="form-group">
       <label for="dbg-telegram">{{ t("dbg-telegram-username") }}{% if selected.telegram_required %} <span class="hint">{{ t("dbg-telegram-required") }}</span>{% endif %}</label>
-      <input id="dbg-telegram" name="telegram" value="{{ telegram or '' }}" maxlength="64" autocomplete="off" style="{{ field_style }}"{% if selected.telegram_required %} required{% endif %}>
+      <input id="dbg-telegram" name="telegram" value="{{ telegram or '' }}" maxlength="64" autocomplete="off"{% if selected.telegram_required %} required{% endif %}>
       <span id="dbg-telegram-from" data-from="{{ telegram_from or '' }}" style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">
         {% if telegram_from == "chat" %}{{ t("dbg-telegram-from-chat") }}{% elif telegram_from == "setting" %}{{ t("dbg-telegram-from-setting") }}{% elif not telegram %}{{ t("dbg-telegram-none") }}{% endif %}
         {% if telegram_from == "setting" or (not telegram_from and not telegram) %}<a href="/dashboard/admin/ton#debug-block">{{ t("nav-admin-ton") }}</a>{% endif %}
@@ -109,7 +106,7 @@
     {% endif %}
     <div class="form-group">
       <label for="dbg-guest-lang">{{ t("dbg-guest-lang") }}</label>
-      <select id="dbg-guest-lang" name="guest_lang" style="{{ field_style }}">
+      <select id="dbg-guest-lang" name="guest_lang">
         {% for l in guest_langs %}
         <option value="{{ l.code }}" lang="{{ l.code }}"{% if l.selected %} selected{% endif %}>{{ l.label }}</option>
         {% endfor %}
@@ -118,7 +115,7 @@
     </div>
     <div class="form-group">
       <label for="dbg-notes">{{ t("dbg-notes") }}</label>
-      <textarea id="dbg-notes" name="notes" rows="2" maxlength="5000" style="{{ field_style }}">{{ notes }}</textarea>
+      <textarea id="dbg-notes" name="notes" rows="2" maxlength="5000">{{ notes }}</textarea>
     </div>
     <div class="form-group" id="dbg-own-chat-group">
       <label style="display: flex; gap: 0.5rem; align-items: flex-start; font-weight: 600;">
@@ -147,14 +144,14 @@
         <span>{{ t("dbg-timing-custom") }}</span>
       </label>
       <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; margin: 0.25rem 0 0 1.6rem;">
-        <label style="font-size: 0.85rem;">{{ t("dbg-timing-window") }}<br><input type="number" name="t_window" id="dbg-t-window" min="{{ timing_bounds.window_min }}" max="{{ timing_bounds.window_max }}" placeholder="{{ fast.window }}" value="{{ t_window or '' }}" style="width: 6rem; {{ field_style }}"></label>
-        <label style="font-size: 0.85rem;">{{ t("dbg-timing-renew-window") }}<br><input type="number" name="t_renew_window" id="dbg-t-renew-window" min="{{ timing_bounds.window_min }}" max="{{ timing_bounds.renew_max }}" placeholder="{{ fast.renew }}" value="{{ t_renew_window or '' }}" style="width: 6rem; {{ field_style }}"></label>
-        <label style="font-size: 0.85rem;">{{ t("dbg-timing-renewals") }}<br><input type="number" name="t_renewals" id="dbg-t-renewals" min="0" max="{{ timing_bounds.renewals_max }}" placeholder="{{ fast.renewals }}" value="{{ t_renewals or '' }}" style="width: 6rem; {{ field_style }}"></label>
+        <label style="font-size: 0.85rem;">{{ t("dbg-timing-window") }}<br><input type="number" name="t_window" id="dbg-t-window" min="{{ timing_bounds.window_min }}" max="{{ timing_bounds.window_max }}" placeholder="{{ fast.window }}" value="{{ t_window or '' }}" style="width: 6rem;"></label>
+        <label style="font-size: 0.85rem;">{{ t("dbg-timing-renew-window") }}<br><input type="number" name="t_renew_window" id="dbg-t-renew-window" min="{{ timing_bounds.window_min }}" max="{{ timing_bounds.renew_max }}" placeholder="{{ fast.renew }}" value="{{ t_renew_window or '' }}" style="width: 6rem;"></label>
+        <label style="font-size: 0.85rem;">{{ t("dbg-timing-renewals") }}<br><input type="number" name="t_renewals" id="dbg-t-renewals" min="0" max="{{ timing_bounds.renewals_max }}" placeholder="{{ fast.renewals }}" value="{{ t_renewals or '' }}" style="width: 6rem;"></label>
       </div>
       <span style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-top: 0.4rem;">{{ t("dbg-timing-help", min=timing_bounds.window_min) }}</span>
     </fieldset>
     {% endif %}
-    <p style="font-size: 0.85rem; color: var(--text-muted);">{{ t("dbg-test-note") }}</p>
+    <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0 0 1rem;">{{ t("dbg-test-note") }}</p>
     <button type="submit" class="btn"{% if not slots or not has_username %} disabled{% endif %}>{{ t("dbg-submit") }}</button>
   </form>
   {% endif %}
@@ -184,7 +181,7 @@
   <p style="font-size: 0.85rem; color: var(--text-muted);">{{ t("dbg-list-none") }}</p>
   {% endif %}
   <form method="post" action="{{ cancel_path }}" style="margin-top: 1rem;">
-    <button type="submit" class="slot-btn" style="cursor: pointer; color: var(--error-text);"{% if not standing %} disabled{% endif %}>{{ t("dbg-cancel-all", count=standing) }}</button>
+    <button type="submit" class="btn btn-danger btn-sm btn-auto"{% if not standing %} disabled{% endif %}>{{ t("dbg-cancel-all", count=standing) }}</button>
   </form>
   <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0.5rem 0 0;">{{ t("dbg-cancel-all-help") }}</p>
   <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0.5rem 0 0;">{{ t("dbg-list-live") }}</p>

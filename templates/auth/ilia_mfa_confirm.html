@@ -6,8 +6,9 @@
   {% if last_factor and mandatory %}
   <p class="error" role="alert">{{ t("ilia-mfa-last-factor") }}</p>
   {% else %}
-  {% if turns_off %}<p class="error">{{ t("ilia-mfa-last-factor-off") }}</p>{% endif %}
+  {% if turns_off %}<p class="warn" role="note">{{ t("ilia-mfa-last-factor-off") }}</p>{% endif %}
   <p>{{ t("ilia-mfa-confirm-help") }}</p>
+  {% set danger = action in ["passkey_delete", "disable"] %}
   <form method="post" action="{{ post_to }}" id="webauthn-form">
     <input type="hidden" name="_csrf" value="{{ csrf_token }}">
     {% if action == "policy" %}<input type="hidden" name="policy" value="{{ policy }}">{% else %}<input type="hidden" name="action" value="{{ action }}">{% endif %}
@@ -25,13 +26,13 @@
     </div>
     {% if method == "passkey" %}
     {% with create = false %}{% include "auth/ilia_webauthn_fields.html" %}{% endwith %}
-    <button type="button" class="btn btn-passkey" data-webauthn="get" data-form="webauthn-form" hidden>{{ t("ilia-passkey-confirm") }}</button>
+    <button type="button" class="btn btn-lg btn-passkey{{ ' btn-danger' if danger else '' }}" data-webauthn="get" data-form="webauthn-form" hidden>{{ t("ilia-passkey-confirm") }}</button>
     {% else %}
     <div class="form-group">
       <label for="code">{{ t("ilia-mfa-recovery-code") if method == "recovery" else t("mfa-totp-code") }}</label>
       <input type="text" name="code" id="code" required autocomplete="one-time-code" maxlength="32" spellcheck="false">
     </div>
-    <button class="btn" type="submit">{{ t("ilia-mfa-confirm-code") }}</button>
+    <button class="btn{{ ' btn-danger' if danger else '' }}" type="submit">{{ t("ilia-mfa-confirm-code") }}</button>
     {% endif %}
   </form>
   {% if method == "passkey" %}{% include "auth/ilia_webauthn_notices.html" %}{% endif %}
@@ -40,5 +41,5 @@
   {% if has_totp and method != "totp" %}<a class="btn btn-secondary" href="{{ base }}&amp;method=totp">{{ t("ilia-mfa-use-totp") }}</a>{% endif %}
   {% if method != "recovery" %}<a class="btn btn-secondary" href="{{ base }}&amp;method=recovery">{{ t("ilia-mfa-use-recovery") }}</a>{% endif %}
   {% endif %}
-  <p style="margin-top: 1rem;"><a href="{{ '/dashboard/admin' if action == 'policy' else '/dashboard/settings/mfa' }}">{{ t("mfa-back") }}</a></p>
+  <p class="mfa-back"><a href="{{ '/dashboard/admin' if action == 'policy' else '/dashboard/settings/mfa' }}">{{ t("mfa-back") }}</a></p>
 </div>

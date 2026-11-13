@@ -88,6 +88,18 @@ async fn seed_kerio(env: &ApplyEnv) {
 /// book.ilia.ae's document (settings design §5, with the lead's choices:
 /// MFA `optional` for now), every key of every section given.
 fn production(avatar_file: &str, avatar_sha: &str) -> Value {
+    let mut doc = production_v1(avatar_file, avatar_sha);
+    // ilia fork keys added after v1 (outside the literal: `json!` would hit
+    // the recursion limit).
+    doc["sources"][0]["name"] = json!("Kerio");
+    for item in doc["event_types"]["items"].as_array_mut().unwrap() {
+        item["busy_calendars"] = Value::Null;
+        item["overrides"] = json!([]);
+    }
+    doc
+}
+
+fn production_v1(avatar_file: &str, avatar_sha: &str) -> Value {
     let weekday = |day: &str| json!({"day": day, "windows": [{"start": "10:00", "end": "19:00"}]});
     json!({
         "profile": {
@@ -123,6 +135,7 @@ fn production(avatar_file: &str, avatar_sha: &str) -> Value {
             "google_oauth2": "off",
             "captcha": "off",
             "meeting_webhook": "off",
+            "sms": "off",
             "sms_allow_all_users": false
         },
         "sources": [{
@@ -436,6 +449,23 @@ async fn the_export_of_a_hand_edited_database_applies_as_no_change() {
     .execute(&env.pool)
     .await
     .unwrap();
+    // ilia fork: a padded source name, a busy calendar of a shared name and
+    // a date override the overrides page let through ("9:00").
+    exec("UPDATE caldav_sources SET name = ' Kerio ' WHERE id = 'kerio'").await;
+    exec("INSERT INTO event_type_calendars (event_type_id, calendar_id) VALUES ('et-old', 'cal-hol')")
+        .await;
+    sqlx::query(
+        "INSERT INTO availability_overrides (id, event_type_id, date, start_time, end_time, \
+         is_blocked) VALUES ('ov-old', 'et-old', ?, '9:00', '10:00', 0)",
+    )
+    .bind(
+        (chrono::Utc::now().date_naive() + chrono::Duration::days(3))
+            .format("%Y-%m-%d")
+            .to_string(),
+    )
+    .execute(&env.pool)
+    .await
+    .unwrap();
 
     let exported = env.export().await.unwrap();
     let profile = exported.profile.clone().unwrap();
@@ -454,9 +484,12 @@ async fn the_export_of_a_hand_edited_database_applies_as_no_change() {
         source.sync_calendars, None,
         "two synced calendars are named Calendar"
     );
+    assert_eq!(source.name, None, "a padded name");
     let items = &exported.event_types.as_ref().unwrap().items;
     assert_eq!(items.len(), 1);
     assert_eq!(items[0].slug, "old-call");
+    assert_eq!(items[0].busy_calendars, None, "a calendar of a shared name");
+    assert_eq!(items[0].overrides, None, "an override spelled \"9:00\"");
 
     let before = env.snapshot().await;
     for dry_run in [true, false] {

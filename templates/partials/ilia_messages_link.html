@@ -1,4 +1,4 @@
 {# ilia fork: the booking's messages (src/web/messages.rs): the count, and
    the guest messages after the host's last one, highlighted. #}
 {% set msg = ilia_messages[b.id] if ilia_messages is defined and ilia_messages[b.id] else none %}
-<a href="/dashboard/bookings/{{ b.id }}/messages" class="slot-btn booking-action-btn" style="font-size: 0.8rem; text-decoration: none; color: var(--accent); cursor: pointer;{% if msg and msg.new %} font-weight: 600; border-color: var(--accent);{% endif %}">{% if msg and msg.new %}{{ t("msg-link-new", count=msg.new) }}{% elif msg %}{{ t("msg-link-count", count=msg.total) }}{% else %}{{ t("msg-link") }}{% endif %}</a>
+<a href="/dashboard/bookings/{{ b.id }}/messages" class="btn {% if msg and msg.new %}btn-secondary{% else %}btn-ghost{% endif %} btn-sm btn-auto booking-action-btn">{% if msg and msg.new %}{{ t("msg-link-new", count=msg.new) }}{% elif msg %}{{ t("msg-link-count", count=msg.total) }}{% else %}{{ t("msg-link") }}{% endif %}</a>

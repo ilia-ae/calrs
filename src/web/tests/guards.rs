@@ -135,6 +135,8 @@ fn booking_action_error_call_sites_pass_no_english() {
         "render_booking_action_error_in(",
         "render_booking_action_error_html_in(",
         "render_booking_action_error_keys_in(",
+        // ilia fork: the error page with a button back (flow.rs).
+        "render_booking_action_error_keys_with_action_in(",
     ];
 
     let src: String = web_source_files()
@@ -510,10 +512,9 @@ fn dashboard_sources_remove_button_no_onclick_interpolation() {
         })
         .expect("renders");
 
-    // The Remove button is the one containing "Remove" text AND the
-    // error-text style. It's distinguishable from "Test" by the
-    // var(--error-text) inline style.
-    let onclick = extract_onclick_for_button(&rendered, "var(--error-text)")
+    // The Remove button is the one with the `source-remove-btn` class
+    // (ilia fork: the row actions use the shared .btn classes).
+    let onclick = extract_onclick_for_button(&rendered, "source-remove-btn")
         .expect("remove button onclick present");
     assert_eq!(
         onclick,
@@ -556,7 +557,7 @@ fn team_settings_delete_button_no_onclick_interpolation() {
         })
         .expect("renders");
 
-    let onclick = extract_onclick_for_button(&rendered, "border-color: var(--error-text)")
+    let onclick = extract_onclick_for_button(&rendered, "class=\"btn btn-danger btn-auto\"")
         .expect("delete team button onclick present");
     assert_eq!(
         onclick, "if(confirm(this.dataset.confirm)) this.nextElementSibling.submit();",

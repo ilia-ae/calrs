@@ -1,0 +1,16 @@
+{#- ilia fork: the icon of a guest result or action page, on the shared
+    `.result-icon` of base.html, drawn like the payment page's finished state
+    (stroke paths, no emoji or font glyphs). `tone` is one of the modifier
+    classes (ok, wait, info, bad, muted); `shape` is check, clock, cross,
+    rotate, minus or alert. Use it at the top of a centred card:
+    {% from "partials/result_icon.html" import result_icon %}{{ result_icon("ok", "check") }} -#}
+{% macro result_icon(tone, shape) -%}
+<span class="result-icon {{ tone }}" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+{%- if shape == "check" %}<path d="M5 12.5l4.5 4.5L19 7.5"/>
+{%- elif shape == "clock" %}<circle cx="12" cy="12" r="8"/><path d="M12 8v4l2.5 2.5"/>
+{%- elif shape == "cross" %}<path d="M7 7l10 10M17 7L7 17"/>
+{%- elif shape == "minus" %}<path d="M6 12h12"/>
+{%- elif shape == "rotate" %}<path d="M20 11a8 8 0 0 0-14.5-4.5L4 8"/><path d="M4 4v4h4"/><path d="M4 13a8 8 0 0 0 14.5 4.5L20 16"/><path d="M20 20v-4h-4"/>
+{%- else %}<path d="M12 7v6M12 16.5v.5"/>
+{%- endif %}</svg></span>
+{%- endmacro %}

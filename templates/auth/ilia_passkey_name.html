@@ -6,9 +6,9 @@
 </div>
 <p>{{ t("ilia-passkey-register-help") }}</p>
 {% if kind == "device" %}
-<button type="button" class="btn btn-passkey" data-webauthn="create" data-hints="client-device,hybrid" data-form="webauthn-form" hidden>{{ t("ilia-passkey-add-device") }}</button>
+<button type="button" class="btn btn-lg btn-passkey" data-webauthn="create" data-hints="client-device,hybrid" data-form="webauthn-form" hidden>{{ t("ilia-passkey-add-device") }}</button>
 <button type="button" class="btn btn-secondary" data-webauthn="create" data-hints="security-key" data-form="webauthn-form" hidden>{{ t("ilia-passkey-add-security-key") }}</button>
 {% else %}
-<button type="button" class="btn btn-passkey" data-webauthn="create" data-hints="security-key" data-form="webauthn-form" hidden>{{ t("ilia-passkey-add-security-key") }}</button>
+<button type="button" class="btn btn-lg btn-passkey" data-webauthn="create" data-hints="security-key" data-form="webauthn-form" hidden>{{ t("ilia-passkey-add-security-key") }}</button>
 <button type="button" class="btn btn-secondary" data-webauthn="create" data-hints="client-device,hybrid" data-form="webauthn-form" hidden>{{ t("ilia-passkey-add-device") }}</button>
 {% endif %}

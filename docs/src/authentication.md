@@ -45,7 +45,10 @@ an authenticator app (or enter the displayed key manually), then enter its
 six-digit code. Setup expires after 10 minutes. The authenticator uses SHA-1,
 six digits, and a 30-second interval; keep the server and phone clocks in sync.
 
-Save the ten recovery codes displayed after setup. Each code can replace an
+Save the ten recovery codes displayed after setup. **Copy the codes** (ilia
+fork) copies all ten, one per line, and says "Codes copied" for two seconds; if
+the browser refuses the clipboard, the codes are selected so you can copy them
+by hand, and the page says so. **Continue to dashboard** leaves the page. Each code can replace an
 authenticator code once, and the codes are not displayed again. You can generate
 a replacement set in the same settings page using your password and a valid
 authenticator or recovery code. This invalidates all previous recovery codes.
@@ -169,7 +172,8 @@ With no second step yet, **Set up two-factor authentication** asks for your
 password, then offers **Add a security key** and **Add a passkey on this device
 or phone**, or **Use an authenticator app instead**. The key's name is
 optional ("Security key 1" or "Passkey 1" is used when it is empty, up to 64
-characters). The ten recovery codes are shown once, after this first step; a
+characters). The ten recovery codes are shown once, after this first step (**Copy the
+codes** copies them all); a
 recovery code replaces a passkey or an authenticator code for one sign-in. When
 MFA is required, the same choice appears at the next login.
 

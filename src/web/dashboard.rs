@@ -108,7 +108,14 @@ pub(super) async fn dashboard(
                 sms_phone_mode,
             )| {
                 let (primary, secondary) =
-                    format_booking_for_dashboard(start, end, stored_tz, host_tz, guest_tz);
+                    format_booking_for_dashboard(
+                        start,
+                        end,
+                        stored_tz,
+                        host_tz,
+                        guest_tz,
+                        auth_user.lang,
+                    );
                 context! {
                     id => id,
                     guest_name => name,
@@ -144,6 +151,9 @@ pub(super) async fn dashboard(
             team_count => team_count,
             is_admin => user.role == "admin",
             pending_bookings => pending_ctx,
+            // ilia fork: an unpaid TON booking gets the bookings page's
+            // actions here too (waive or decline), never a plain Confirm.
+            ton => ton_pay::dashboard_badges(&state.pool, &user.id, &user.timezone, auth_user.lang).await,
             favorites => favorites,
             impersonating => impersonating,
             impersonating_name => impersonating_name,
@@ -504,8 +514,14 @@ pub(super) async fn dashboard_bookings(
         .iter()
         .map(
             |(id, name, email, start, end, title, team_name, token, stored_tz, guest_tz, notes)| {
-                let (primary, secondary) =
-                    format_booking_for_dashboard(start, end, stored_tz, host_tz, guest_tz);
+                let (primary, secondary) = format_booking_for_dashboard(
+                    start,
+                    end,
+                    stored_tz,
+                    host_tz,
+                    guest_tz,
+                    auth_user.lang,
+                );
                 context! {
                     id => id,
                     guest_name => name,
@@ -539,7 +555,14 @@ pub(super) async fn dashboard_bookings(
                 sms_phone_mode,
             )| {
                 let (primary, secondary) =
-                    format_booking_for_dashboard(start, end, stored_tz, host_tz, guest_tz);
+                    format_booking_for_dashboard(
+                        start,
+                        end,
+                        stored_tz,
+                        host_tz,
+                        guest_tz,
+                        auth_user.lang,
+                    );
                 context! {
                     id => id,
                     guest_name => name,
@@ -577,7 +600,14 @@ pub(super) async fn dashboard_bookings(
                 writeback_error,
             )| {
                 let (primary, secondary) =
-                    format_booking_for_dashboard(start, end, stored_tz, host_tz, guest_tz);
+                    format_booking_for_dashboard(
+                        start,
+                        end,
+                        stored_tz,
+                        host_tz,
+                        guest_tz,
+                        auth_user.lang,
+                    );
                 context! {
                     id => id,
                     // The booking is confirmed but not on the host's

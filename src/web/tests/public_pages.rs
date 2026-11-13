@@ -838,3 +838,139 @@ fn build_month_params_survives_an_absurdly_large_horizon() {
         "an unrepresentable horizon must not bound the month nav"
     );
 }
+
+/// ilia fork: the guest result and action pages share the payment page's
+/// shape: one 30rem column (`.page-narrow`) and a stroke-SVG `.result-icon`
+/// in place of upstream's `.check` disc with an emoji or a text glyph.
+#[test]
+fn guest_result_pages_use_the_narrow_column_and_the_svg_icon() {
+    let mut env = minijinja::Environment::new();
+    env.set_undefined_behavior(minijinja::UndefinedBehavior::Lenient);
+    env.set_loader(minijinja::path_loader("templates"));
+    crate::i18n::register(&mut env);
+
+    let cases: &[(&str, minijinja::Value, Option<&str>)] = &[
+        (
+            "confirmed.html",
+            context! { lang => "ru" },
+            Some("result-icon ok"),
+        ),
+        (
+            "confirmed.html",
+            context! { lang => "ru", pending => true },
+            Some("result-icon wait"),
+        ),
+        (
+            "confirmed.html",
+            context! { lang => "ru", rescheduled => true },
+            Some("result-icon ok"),
+        ),
+        (
+            "confirmed.html",
+            context! { lang => "ru", rescheduled => true, pending => true },
+            Some("result-icon wait"),
+        ),
+        (
+            "booking_cancelled_guest.html",
+            context! { lang => "ru" },
+            Some("result-icon bad"),
+        ),
+        (
+            "booking_declined.html",
+            context! { lang => "ru" },
+            Some("result-icon bad"),
+        ),
+        (
+            "booking_approved.html",
+            context! { lang => "ru" },
+            Some("result-icon ok"),
+        ),
+        (
+            "booking_claimed.html",
+            context! { lang => "ru" },
+            Some("result-icon ok"),
+        ),
+        (
+            "booking_already_claimed.html",
+            context! { lang => "ru" },
+            Some("result-icon muted"),
+        ),
+        (
+            "booking_action_error.html",
+            context! { lang => "ru", title => "T", message => "M" },
+            Some("result-icon muted"),
+        ),
+        (
+            "booking_action_blocked.html",
+            context! { lang => "ru", notice_min => 60 },
+            Some("result-icon muted"),
+        ),
+        (
+            "ton_quote.html",
+            context! { lang => "ru", why_key => "ton-quote-why", fields => Vec::<minijinja::Value>::new() },
+            Some("result-icon wait"),
+        ),
+        (
+            "ton_pay_exit.html",
+            context! { lang => "ru" },
+            Some("result-icon wait"),
+        ),
+        (
+            "ton_already_open.html",
+            context! { lang => "ru" },
+            Some("result-icon wait"),
+        ),
+        (
+            "booking_reschedule_confirm.html",
+            context! { lang => "ru" },
+            Some("result-icon info"),
+        ),
+        ("booking_cancel_form.html", context! { lang => "ru" }, None),
+        ("booking_decline_form.html", context! { lang => "ru" }, None),
+        ("booking_approve_form.html", context! { lang => "ru" }, None),
+        ("booking_claim_form.html", context! { lang => "ru" }, None),
+    ];
+    for (name, ctx, icon) in cases {
+        let html = env
+            .get_template(name)
+            .unwrap_or_else(|e| panic!("{name}: {e}"))
+            .render(ctx)
+            .unwrap_or_else(|e| panic!("{name}: {e}"));
+        assert!(html.contains("<div class=\"page-narrow\">"), "{name}");
+        assert!(!html.contains("class=\"check\""), "{name}");
+        for glyph in ["&#128260;", "&#8987;", "&#10003;", "&#10007;"] {
+            assert!(!html.contains(glyph), "{name}: {glyph}");
+        }
+        if let Some(icon) = icon {
+            assert!(
+                html.contains(&format!("<span class=\"{icon}\" aria-hidden=\"true\"")),
+                "{name}: {icon}"
+            );
+            assert!(html.contains("<svg viewBox=\"0 0 24 24\""), "{name}");
+        }
+    }
+
+    // The follow-up actions of the confirmation are buttons, and the meeting
+    // link is a plain link (base.html colours it).
+    let html = env
+        .get_template("confirmed.html")
+        .unwrap()
+        .render(context! {
+            lang => "en",
+            ics_url => "/booking/ics/t",
+            username => "alice",
+            event_type => context! { slug => "intro" },
+            location_type => "link",
+            location_value => "https://meet.example.com/x",
+        })
+        .unwrap();
+    assert!(html.contains("download class=\"btn btn-secondary\""));
+    assert!(
+        html.contains("<a class=\"btn btn-ghost\" href=\"/u/alice/intro\">"),
+        "{html}"
+    );
+    assert!(!html.contains("&larr;"));
+    assert!(html.contains(
+        "target=\"_blank\" rel=\"noopener noreferrer\" style=\"overflow-wrap: anywhere;\">https:"
+    ));
+}

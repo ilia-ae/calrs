@@ -3,23 +3,26 @@
 {% block title %}{{ t("decline-page-title") }}{% endblock %}
 
 {% block content %}
+<div class="page-narrow">
+<div class="logo">{% if company_link %}<a href="{{ company_link }}" target="_blank" rel="noopener noreferrer">{% endif %}<img src="/logo" alt="" onerror="this.closest('.logo').style.display='none'">{% if company_link %}</a>{% endif %}</div>
 <div class="card">
-  <h1>{{ t("decline-heading") }}</h1>
-  <p class="subtitle">{{ t("decline-subtitle") }}</p>
+  <div style="text-align: center;">
+    <h1>{{ t("decline-heading") }}</h1>
+    <p class="subtitle">{{ t("decline-subtitle") }}</p>
+  </div>
 
   <div class="detail"><strong>{{ t("confirmed-detail-event") }}</strong> {{ event_title }}</div>
   <div class="detail"><strong>{{ t("confirmed-detail-date") }}</strong> {{ date_label }}</div>
-  <div class="detail"><strong>{{ t("confirmed-detail-time") }}</strong> {{ start_time }} – {{ end_time }}</div>
+  <div class="detail"><strong>{{ t("confirmed-detail-time") }}</strong> {{ start_time }} – {{ end_time }}{% if zone %} ({{ zone }}){% endif %}</div>
   <div class="detail"><strong>{{ t("common-detail-guest") }}</strong> {{ guest_name }} &lt;{{ guest_email }}&gt;</div>
-</div>
 
-<div class="card">
-  <form method="post">
+  <form method="post" style="margin-top: 1.25rem;">
     <div class="form-group">
       <label for="reason">{{ t("cancel-reason-label") }} <span class="hint">{{ t("common-reason-optional") }}</span></label>
       <textarea id="reason" name="reason" placeholder="{{ t('decline-reason-placeholder-guest') }}"></textarea>
     </div>
     <button type="submit" class="btn btn-danger">{{ t("decline-button") }}</button>
   </form>
+</div>
 </div>
 {% endblock %}

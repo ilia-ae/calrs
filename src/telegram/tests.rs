@@ -33,8 +33,7 @@ impl Log {
         use tracing_subscriber::layer::SubscriberExt;
         let log = Self::default();
         let guard =
-            tracing::subscriber::set_default(tracing_subscriber::registry().with(log.clone()));
-        tracing::callsite::rebuild_interest_cache();
+            crate::test_support::capture_default(tracing_subscriber::registry().with(log.clone()));
         (log, guard)
     }
 

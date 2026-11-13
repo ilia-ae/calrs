@@ -1651,6 +1651,8 @@ async fn the_last_factor_rule_and_removal() {
     let delete = format!("action=passkey_delete&credential={id}");
     let (_, _, html) = confirm_page(&app, &session, &delete).await;
     assert!(html.contains("This is your last method"));
+    // A consequence to confirm, not a refusal: the amber note, not the red alert.
+    assert!(html.contains(r#"<p class="warn" role="note">This is your last method"#));
     let r = confirm_with_key(
         &app,
         &session,

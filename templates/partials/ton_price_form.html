@@ -2,15 +2,15 @@
 <details class="card collapsible-section" id="ton-price-section" style="margin-top: 1rem;"{% if ton_price.enabled %} open{% endif %}>
   <summary class="collapsible-header">
     <h2>{{ t("ton-etf-section") }}</h2>
-    <span class="collapsible-hint"></span>
+    <span class="collapsible-hint" id="ton-price-hint">{% if not ton_price.enabled %}{{ t("ton-etf-hint-off") }}{% elif ton_price.mode == "ladder" %}{{ t("ton-etf-hint-ladder") }}{% elif ton_price.currency == "USD" %}${{ ton_price.amount or ton_price.placeholder }}{% else %}{{ ton_price.amount or ton_price.placeholder }} TON{% endif %}</span>
     <span class="collapsible-chevron"></span>
   </summary>
   <div class="collapsible-body">
     {% if not ton_price.payments_on %}
     <p style="color: var(--error-text); font-size: 0.85rem; margin-bottom: 0.75rem;">{{ t("ton-etf-off-note") }}</p>
     {% endif %}
-    <label style="display: flex; align-items: center; gap: 0.625rem; cursor: pointer; padding: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius);">
-      <input type="checkbox" name="ton_price_enabled" {% if ton_price.enabled %}checked{% endif %} style="accent-color: var(--accent); width: 1.125rem; height: 1.125rem;">
+    <label style="display: flex; align-items: flex-start; gap: 0.625rem; cursor: pointer; padding: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius);">
+      <input type="checkbox" name="ton_price_enabled" {% if ton_price.enabled %}checked{% endif %} style="accent-color: var(--accent); width: 1.125rem; height: 1.125rem; margin-top: 0.18rem; flex-shrink: 0;">
       <div>
         <strong style="font-size: 0.925rem;">{{ t("ton-etf-enabled") }}</strong>
         <div style="color: var(--text-muted); font-size: 0.825rem;">{{ t("ton-etf-enabled-help") }}</div>
@@ -18,7 +18,7 @@
     </label>
     <div class="form-group" style="margin-top: 0.75rem; margin-bottom: 0;">
       <label for="ton_price_mode">{{ t("ton-etf-mode") }}</label>
-      <select id="ton_price_mode" name="ton_price_mode" style="padding: 0.625rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.925rem; font-family: inherit; background: var(--surface); color: var(--text); width: 100%;">
+      <select id="ton_price_mode" name="ton_price_mode" style="padding: 0.625rem 0.75rem; border: 1px solid var(--field-border); border-radius: var(--radius); font-size: 0.925rem; font-family: inherit; background: var(--surface); color: var(--text); width: 100%;">
         <option value="fixed"{% if ton_price.mode != "ladder" %} selected{% endif %}>{{ t("ton-etf-mode-fixed") }}</option>
         <option value="ladder"{% if ton_price.mode == "ladder" %} selected{% endif %}>{{ t("ton-etf-mode-ladder") }}</option>
       </select>
@@ -34,11 +34,11 @@
     <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.75rem;">
       <div class="form-group" style="flex: 2 1 10rem; margin-bottom: 0;">
         <label for="ton_price_amount">{{ t("ton-etf-price") }}</label>
-        <input type="text" id="ton_price_amount" name="ton_price_amount" value="{{ ton_price.amount }}" inputmode="decimal" placeholder="{{ ton_price.placeholder }}" style="padding: 0.625rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.925rem; font-family: inherit; background: var(--surface); color: var(--text); width: 100%;">
+        <input type="text" id="ton_price_amount" name="ton_price_amount" value="{{ ton_price.amount }}" inputmode="decimal" placeholder="{{ ton_price.placeholder }}" style="padding: 0.625rem 0.75rem; border: 1px solid var(--field-border); border-radius: var(--radius); font-size: 0.925rem; font-family: inherit; background: var(--surface); color: var(--text); width: 100%;">
       </div>
-      <div class="form-group" style="flex: 1 1 7rem; margin-bottom: 0;">
+      <div class="form-group" style="flex: 1 1 12rem; margin-bottom: 0;">
         <label for="ton_price_currency">{{ t("ton-etf-currency") }}</label>
-        <select id="ton_price_currency" name="ton_price_currency" style="padding: 0.625rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.925rem; font-family: inherit; background: var(--surface); color: var(--text); width: 100%;">
+        <select id="ton_price_currency" name="ton_price_currency" style="padding: 0.625rem 0.75rem; border: 1px solid var(--field-border); border-radius: var(--radius); font-size: 0.925rem; font-family: inherit; background: var(--surface); color: var(--text); width: 100%;">
           <option value="TON"{% if ton_price.currency != "USD" %} selected{% endif %}>{{ t("ton-etf-currency-ton") }}</option>
           <option value="USD"{% if ton_price.currency == "USD" %} selected{% endif %}>{{ t("ton-etf-currency-usd") }}</option>
         </select>
@@ -55,16 +55,35 @@
       if (!mode) return;
       var fixed = document.getElementById('ton-price-fixed');
       var ladder = document.getElementById('ton-price-ladder');
+      var hint = document.getElementById('ton-price-hint');
+      var on = document.querySelector('#ton-price-section input[name="ton_price_enabled"]');
+      var amount = document.getElementById('ton_price_amount');
+      var currency = document.getElementById('ton_price_currency');
+      var OFF = {{ t("ton-etf-hint-off") | tojson }};
+      var LADDER = {{ t("ton-etf-hint-ladder") | tojson }};
+      // The section's summary, the same text the server renders.
+      function upd() {
+        if (!hint) return;
+        if (on && !on.checked) { hint.textContent = OFF; return; }
+        if (mode.value === 'ladder') { hint.textContent = LADDER; return; }
+        var v = amount ? (amount.value.trim() || amount.placeholder) : '';
+        hint.textContent = currency && currency.value === 'USD' ? '$' + v : v + ' TON';
+      }
       mode.addEventListener('change', function() {
-        fixed.hidden = mode.value === 'ladder';
-        ladder.hidden = mode.value !== 'ladder';
+        if (fixed) fixed.hidden = mode.value === 'ladder';
+        if (ladder) ladder.hidden = mode.value !== 'ladder';
+        upd();
       });
+      if (on) on.addEventListener('change', upd);
+      if (currency) currency.addEventListener('change', upd);
+      if (amount) amount.addEventListener('input', upd);
+      upd();
     })();
     </script>
     {% if ton_price.telegram_on %}
     <div class="form-group" style="margin-top: 0.75rem;">
       <label for="ton_guest_telegram">{{ t("ton-etf-telegram") }}</label>
-      <select id="ton_guest_telegram" name="ton_guest_telegram" style="padding: 0.625rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.925rem; font-family: inherit; background: var(--surface); color: var(--text); width: 100%;">
+      <select id="ton_guest_telegram" name="ton_guest_telegram" style="padding: 0.625rem 0.75rem; border: 1px solid var(--field-border); border-radius: var(--radius); font-size: 0.925rem; font-family: inherit; background: var(--surface); color: var(--text); width: 100%;">
         <option value="required"{% if ton_price.guest_telegram == "required" %} selected{% endif %}>{{ t("tg-settings-mode-required") }}</option>
         <option value="optional"{% if ton_price.guest_telegram == "optional" %} selected{% endif %}>{{ t("tg-settings-mode-optional") }}</option>
         <option value="off"{% if ton_price.guest_telegram == "off" %} selected{% endif %}>{{ t("tg-settings-mode-off") }}</option>
@@ -74,7 +93,7 @@
     {% endif %}
     <div class="form-group" style="margin-top: 0.75rem; margin-bottom: 0;">
       <label for="ton_window_min">{{ t("ton-etf-window") }}</label>
-      <input type="number" id="ton_window_min" name="ton_window_min" value="{{ ton_price.window }}" min="10" max="240" placeholder="{{ ton_price.default_window }}" style="padding: 0.625rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.925rem; font-family: inherit; background: var(--surface); color: var(--text); width: 100%;">
+      <input type="number" id="ton_window_min" name="ton_window_min" value="{{ ton_price.window }}" min="10" max="240" placeholder="{{ ton_price.default_window }}" style="padding: 0.625rem 0.75rem; border: 1px solid var(--field-border); border-radius: var(--radius); font-size: 0.925rem; font-family: inherit; background: var(--surface); color: var(--text); width: 100%;">
       <span class="hint" style="font-size: 0.825rem; color: var(--text-muted); display: block; margin-top: 0.375rem;">{{ t("ton-etf-window-help", minutes=ton_price.default_window) }}</span>
     </div>
   </div>
