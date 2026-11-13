@@ -36,6 +36,8 @@ mod error_page;
 mod embed_origins;
 mod event_types;
 mod fail_closed;
+// ilia fork: the theme button in the footer, next to the language menu.
+mod footer_theme;
 mod format;
 mod guards;
 mod hosts;

@@ -2,10 +2,12 @@
 //!
 //! Every public page (profiles, slots, booking forms, guest and host token
 //! pages, TON pay pages, login and MFA) shows a small menu of the bundled
-//! languages in its top corner. Each entry is a plain link to the same page
-//! with `?lang=<code>` added, so the menu works without JavaScript (a small
-//! script only closes it on Escape or a click elsewhere, and points the links
-//! at the URL a page changed in place, like the slots page's month arrows):
+//! languages in the footer under the page (the `.footer-controls` row of
+//! templates/base.html, before the theme button). Each entry is a plain link
+//! to the same page with `?lang=<code>` added, so the menu works without
+//! JavaScript (a small script only closes it on Escape or a click elsewhere,
+//! and points the links at the URL a page changed in place, like the slots
+//! page's month arrows):
 //!
 //! 1. [`middleware`] sees `lang` on a GET, stores a supported code in the
 //!    `calrs_lang` cookie ([`crate::i18n::LANG_COOKIE`]) and answers with a

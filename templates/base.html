@@ -527,6 +527,10 @@
     .powered a:hover { color: var(--text-secondary); }
     /* ilia fork: the dashboard has no made-by part, and without a source URL nothing is left. */
     .powered:empty { display: none; }
+    /* ilia fork: the footer's row of quiet controls, the language menu and the theme button, centred
+       under the source line; empty on the dashboard, which has its own theme setting. */
+    .footer-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.25rem; margin-top: 0.75rem; font-size: 0.8125rem; }
+    .footer-controls:empty { display: none; }
 
     .error {
       color: var(--error-text);
@@ -701,7 +705,7 @@
        content. */
     body { padding: 1rem 0.75rem; background: transparent; display: block; min-height: 0; }
     .container { max-width: none; }
-    .logo, .made-by, .theme-pill, #theme-toggle, .lang-switch { display: none !important; }
+    .logo, .made-by, .footer-controls, .lang-switch, #theme-toggle { display: none !important; }
     {% if embed_brand %}
     /* Apply the brand accent in both light and dark mode. The `html.dark`
        selector is needed to out-specify base.html's `html.dark` accent rule;
@@ -751,32 +755,29 @@
         maker "based on calrs · Source code". The made-by part is the footer block, hidden when
         embedded and left out by the dashboard; the AGPL source link stays on every page. #}
     <div class="powered">{% block footer %}<span class="made-by">{% if made_by_name %}Made by {% if made_by_url %}<a href="{{ made_by_url }}" target="_blank" rel="noopener noreferrer">{{ made_by_name }}</a>{% else %}{{ made_by_name }}{% endif %} · based on {% if not source_url %}<a href="https://cal.rs" target="_blank" rel="noopener noreferrer">calrs</a>{% endif %}{% else %}based on <a href="https://cal.rs" target="_blank" rel="noopener noreferrer">calrs</a>{% if source_url %} · {% endif %}{% endif %}</span>{% endblock %}{% if source_url %}<a class="source-link" href="{{ source_url }}" target="_blank" rel="noopener noreferrer">{% if made_by_name %}source code{% else %}Source code{% endif %}</a>{% endif %}</div>
-    {% block theme_toggle %}
-    <button id="theme-toggle" type="button" title="{{ t('base-theme-toggle') }}" aria-label="{{ t('base-theme-toggle') }}" class="theme-pill">
-      <span class="theme-pill-track">
-        <svg class="theme-pill-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-        <svg class="theme-pill-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-        <span class="theme-pill-knob"></span>
-      </span>
-    </button>
-    <style>
-      .theme-pill { position: fixed; top: 0.75rem; right: 0.75rem; background: none; border: none; cursor: pointer; padding: 0; z-index: 10; }
-      .theme-pill-track { display: flex; align-items: center; justify-content: space-between; width: 52px; height: 28px; background: var(--border); border-radius: 999px; padding: 0 5px; position: relative; transition: background 0.3s ease; }
-      .theme-pill:hover .theme-pill-track { background: var(--text-muted); }
-      .theme-pill-sun, .theme-pill-moon { width: 14px; height: 14px; flex-shrink: 0; transition: opacity 0.3s ease; }
-      .theme-pill-sun { color: #f59e0b; }
-      .theme-pill-moon { color: var(--text-muted); }
-      .theme-pill-knob { position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; background: var(--surface, #fff); border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.2); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-      html.dark .theme-pill-knob { transform: translateX(24px); }
-      html.dark .theme-pill-track { background: var(--border-hover); }
-      html.dark .theme-pill:hover .theme-pill-track { background: var(--text-muted); }
-      html.dark .theme-pill-sun { opacity: 0.4; }
-      html:not(.dark) .theme-pill-moon { opacity: 0.4; }
-      @media (prefers-reduced-motion: reduce) { .theme-pill-knob, .theme-pill-track { transition: none; } }
-    </style>
-    {% endblock %}
-    {#- ilia fork: the language menu (partials/lang_switcher.html), centred in the footer under the source line; the dashboard leaves it out. #}
-    {% block lang_switcher %}{% include "partials/lang_switcher.html" %}{% endblock %}
+    {#- ilia fork: one centred row of quiet controls in the footer, under the source line: the
+        language menu (partials/lang_switcher.html; absent on pages answering a form POST and on
+        the error page) and the theme button (sun in light, moon in dark), as product and docs
+        footers have them. Not rendered when embedded (the parent sets ?theme=); the dashboard
+        empties both blocks and has its own theme setting, and the row then hides (:empty). #}
+    {% if not embed %}<div class="footer-controls">
+      {%- block lang_switcher %}{% include "partials/lang_switcher.html" %}{% endblock -%}
+      {%- block theme_toggle %}
+      <button id="theme-toggle" type="button" class="theme-btn" title="{{ t('base-theme-toggle') }}" aria-label="{{ t('base-theme-toggle') }}">
+        <svg class="theme-btn-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+        <svg class="theme-btn-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+      <style>
+        .theme-btn { display: inline-flex; align-items: center; justify-content: center; width: 1.75rem; height: 1.75rem; padding: 0; border: none; border-radius: 8px; background: none; color: var(--text-muted); cursor: pointer; transition: color 0.15s ease, background-color 0.15s ease; }
+        .theme-btn:hover { color: var(--text); background: var(--surface-hover); }
+        .theme-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+        .theme-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
+        .theme-btn-moon, html.dark .theme-btn-sun { display: none; }
+        html.dark .theme-btn-moon { display: block; }
+        @media (prefers-reduced-motion: reduce) { .theme-btn { transition: none; } }
+      </style>
+      {%- endblock -%}
+    </div>{% endif %}
   </div>
 <script>
 // CSRF protection: inject _csrf hidden field into all POST forms

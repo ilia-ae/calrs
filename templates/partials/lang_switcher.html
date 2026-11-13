@@ -1,9 +1,10 @@
 {#- ilia fork (src/web/lang_switch.rs): the language menu of public pages, in the footer under
-    the page as BTCPay Server's checkout has it: the current language by name, plain muted text,
-    the list opening upwards. Plain links (`?lang=xx` on this page, then a redirect back) that work without a
-    script; the script below only closes the menu on Escape or a click elsewhere, and points the
-    links at the URL shown now, for pages that change it in place (the slots page's month arrows
-    use history.pushState). Absent when embedded, on the dashboard and on pages answering a form
+    the page as BTCPay Server's checkout has it, left of the theme button (the .footer-controls
+    row of base.html): the current language by name, plain muted text, the list opening upwards.
+    Plain links (`?lang=xx` on this page, then a redirect back) that work without a script; the
+    script below only closes the menu on Escape or a click elsewhere, and points the links at the
+    URL shown now, for pages that change it in place (the slots page's month arrows use
+    history.pushState). Absent when embedded, on the dashboard and on pages answering a form
     POST (lang_switcher() is empty). -#}
 {% if not embed and lang_switcher is defined %}{% set _langs = lang_switcher() %}{% if _langs %}
 <details class="lang-switch">
@@ -19,7 +20,7 @@
   </ul>
 </details>
 <style>
-  .lang-switch { position: relative; width: fit-content; margin: 0.75rem auto 0; font-size: 0.8125rem; }
+  .lang-switch { position: relative; font-size: 0.8125rem; }
   .lang-switch summary { list-style: none; display: flex; align-items: center; gap: 0.375rem; padding: 0.25rem 0.5rem; border-radius: 8px; color: var(--text-muted); cursor: pointer; user-select: none; transition: color 0.15s ease, background-color 0.15s ease; }
   .lang-switch summary::-webkit-details-marker { display: none; }
   .lang-switch summary:hover { color: var(--text); background: var(--surface-hover); }
