@@ -19,11 +19,58 @@
  * the element's content, so a fallback link inside it shows only without
  * JavaScript. A host page whose CSP has no 'unsafe-inline' can then embed
  * with one <script src> alone. Links that are not http(s) are not loaded.
+ *
+ * ilia fork: the widget speaks the host page's language. `config.lang` (a
+ * calrs language code such as "ru" or "de-formal"; "" for the visitor's
+ * browser language) wins; otherwise the primary subtag of the page's
+ * <html lang> ("ru-RU" -> "ru") is sent as `lang`. calrs uses it only when
+ * it ships that language.
+ *
+ * ilia fork: the inline widget takes the host page's theme. Without
+ * `config.theme`, the background behind the widget decides ("light" or
+ * "dark" by its luminance; a page with none is light unless its root's
+ * color-scheme is only dark), it is sent as `theme`, and a later change (a
+ * site's own dark-mode switch, the system theme) is passed to the widget with
+ * a `calrs:theme` message, so it switches in place. `config.theme` "light" or
+ * "dark" fixes it; "auto" follows the visitor's system, as upstream does. The
+ * iframe takes the same color-scheme (inline, `important`), since a scheme
+ * different from the page inside makes the browser paint the frame opaque.
  */
 (function () {
   if (window.Calrs) return;
 
-  function buildSrc(link, config) {
+  // ilia fork: the language to ask calrs for (see the header comment).
+  function pageLang() {
+    var l = (document.documentElement.getAttribute('lang') || '').toLowerCase().split(/[-_]/)[0];
+    return /^[a-z]{2,3}$/.test(l) ? l : '';
+  }
+  function langFor(config) {
+    var l = config && typeof config.lang === 'string' ? config.lang.toLowerCase() : pageLang();
+    return /^[a-z]{2,3}(-[a-z]{2,8})?$/.test(l) ? l : '';
+  }
+
+  // ilia fork: the host page's theme behind `el` (see the header comment).
+  function hostTheme(el) {
+    for (var n = el; n && n.nodeType === 1; n = n.parentElement) {
+      var m = /rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:[,\s\/]+([\d.]+%?))?/.exec(getComputedStyle(n).backgroundColor || '');
+      if (!m) continue;
+      var a = m[4] === undefined ? 1 : (m[4].slice(-1) === '%' ? parseFloat(m[4]) / 100 : parseFloat(m[4]));
+      if (a < 0.5) continue;
+      var y = (0.299 * m[1] + 0.587 * m[2] + 0.114 * m[3]) / 255;
+      return y < 0.5 ? 'dark' : 'light';
+    }
+    var cs = getComputedStyle(document.documentElement).colorScheme || '';
+    return /dark/.test(cs) && !/light/.test(cs) ? 'dark' : 'light';
+  }
+  function fixedTheme(config) {
+    var t = config && config.theme;
+    return t === 'light' || t === 'dark' || t === 'auto' ? t : '';
+  }
+  function schemeFor(theme) {
+    return theme === 'light' || theme === 'dark' ? theme : 'light dark';
+  }
+
+  function buildSrc(link, config, theme) {
     if (!link) return 'about:blank';
     // ilia fork: an iframe with a javascript: or data: src would run in (or
     // look like) the host page; only http(s) booking links are loaded.
@@ -35,14 +82,17 @@
     var hashIdx = link.indexOf('#');
     if (hashIdx >= 0) link = link.slice(0, hashIdx);
     var url = link + (link.indexOf('?') >= 0 ? '&' : '?') + 'embed=1';
+    theme = theme || (config && config.theme);
+    if (theme) url += '&theme=' + encodeURIComponent(theme);
     if (config) {
       if (config.layout) url += '&layout=' + encodeURIComponent(config.layout);
-      if (config.theme) url += '&theme=' + encodeURIComponent(config.theme);
       if (config.brand) {
         var b = String(config.brand).replace(/^#/, '');
         url += '&brand=' + encodeURIComponent(b);
       }
     }
+    var lang = langFor(config);
+    if (lang) url += '&lang=' + encodeURIComponent(lang);
     return url;
   }
 
@@ -70,6 +120,36 @@
       var h = Math.max(60, Math.floor(ev.data.height || 0)) + 8;
       iframe.style.height = h + 'px';
     });
+  }
+
+  // ilia fork: pass a change of the host page's theme to the widget, which
+  // switches in place (templates/base.html, embed mode). Sent again on every
+  // load of the frame, since a page inside only hears it once it listens.
+  function followTheme(target, iframe, theme) {
+    var origin = originOf(iframe.src);
+    if (!origin) return;
+    function tell() {
+      try { iframe.contentWindow.postMessage({ type: 'calrs:theme', theme: theme }, origin); } catch (e) {}
+    }
+    function check() {
+      var now = hostTheme(target);
+      if (now === theme) return;
+      theme = now;
+      iframe.style.setProperty('color-scheme', schemeFor(theme), 'important');
+      tell();
+    }
+    iframe.addEventListener('load', tell);
+    if (window.MutationObserver) {
+      var mo = new MutationObserver(check);
+      mo.observe(document.documentElement, { attributes: true });
+      if (document.body) mo.observe(document.body, { attributes: true });
+    }
+    if (window.matchMedia) {
+      var mq = matchMedia('(prefers-color-scheme: dark)');
+      var later = function () { setTimeout(check, 50); };
+      if (mq.addEventListener) mq.addEventListener('change', later);
+      else if (mq.addListener) mq.addListener(later);
+    }
   }
 
   // Single shared modal — reused by floatingButton and elementClick.
@@ -150,13 +230,18 @@
       var target = typeof opts.selector === 'string' ? document.querySelector(opts.selector) : opts.selector;
       if (!target) return;
       var iframe = document.createElement('iframe');
-      iframe.src = buildSrc(opts.link, opts.config);
+      // ilia fork: the host page's theme unless the config fixes one.
+      var fixed = fixedTheme(opts.config);
+      var theme = fixed || hostTheme(target);
+      iframe.src = buildSrc(opts.link, opts.config, theme);
       iframe.style.cssText = 'width:100%;min-height:560px;border:0;display:block;';
+      iframe.style.setProperty('color-scheme', schemeFor(theme), 'important');
       iframe.setAttribute('loading', 'lazy');
       iframe.setAttribute('title', 'Booking');
       target.innerHTML = '';
       target.appendChild(iframe);
       attachResize(iframe);
+      if (!fixed) followTheme(target, iframe, theme);
     },
 
     floatingButton: function (opts) {

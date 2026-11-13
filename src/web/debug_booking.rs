@@ -792,21 +792,7 @@ fn posted_guest_lang(value: Option<&str>) -> Result<Option<&'static str>, ()> {
 /// exactly the one chosen (`de-formal` is chosen as itself).
 pub(crate) fn guest_headers(headers: &HeaderMap, lang: &'static str) -> HeaderMap {
     let mut out = headers.clone();
-    let prefix = format!("{}=", crate::i18n::LANG_COOKIE);
-    let mut parts: Vec<String> = headers
-        .get_all(axum::http::header::COOKIE)
-        .iter()
-        .filter_map(|v| v.to_str().ok())
-        .flat_map(|s| s.split(';'))
-        .map(str::trim)
-        .filter(|p| !p.is_empty() && !p.starts_with(prefix.as_str()))
-        .map(str::to_string)
-        .collect();
-    parts.push(format!("{prefix}{lang}"));
-    out.remove(axum::http::header::COOKIE);
-    if let Ok(v) = axum::http::HeaderValue::from_str(&parts.join("; ")) {
-        out.insert(axum::http::header::COOKIE, v);
-    }
+    super::lang_switch::with_pick(&mut out, lang);
     out.remove(crate::i18n::GERMAN_FORMAL_HEADER);
     out
 }

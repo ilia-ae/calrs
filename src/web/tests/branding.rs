@@ -843,6 +843,76 @@ fn custom_theme_keeps_a_saturated_accent_in_dark_mode() {
     assert_eq!(css_var(&dark, "--on-accent"), "#ffffff");
 }
 
+/// ilia fork: the host page's language is carried through the embedded flow
+/// only when calrs ships it.
+#[test]
+fn query_suffix_carries_only_a_bundled_language() {
+    let with = |lang: &str| {
+        EmbedParams {
+            embed: Some("1".to_string()),
+            lang: Some(lang.to_string()),
+            ..Default::default()
+        }
+        .query_suffix(true)
+    };
+    assert_eq!(with("ru"), "&embed=1&lang=ru");
+    assert_eq!(with("de-formal"), "&embed=1&lang=de-formal");
+    assert_eq!(with("xx"), "&embed=1");
+    assert_eq!(with("ru\"><b>"), "&embed=1");
+    assert_eq!(with(""), "&embed=1");
+    let not_embedded = EmbedParams {
+        lang: Some("ru".to_string()),
+        ..Default::default()
+    };
+    assert_eq!(not_embedded.query_suffix(false), "");
+}
+
+/// ilia fork: `embed.js` asks for the host page's language and keeps the
+/// frame transparent (see its header comment).
+#[test]
+fn embed_js_sends_the_page_language_and_a_matching_color_scheme() {
+    let js = include_str!("../../../assets/embed.js");
+    assert!(js.contains("document.documentElement.getAttribute('lang')"));
+    assert!(js.contains("url += '&lang=' + encodeURIComponent(lang)"));
+    assert!(js.contains("typeof config.lang === 'string'"));
+    assert!(js.contains("iframe.style.setProperty('color-scheme', schemeFor(theme), 'important')"));
+    // Without a fixed theme the host page's background decides, and a later
+    // change reaches the frame as a message.
+    assert!(js.contains("var theme = fixed || hostTheme(target);"));
+    assert!(js.contains("type: 'calrs:theme'"));
+    assert!(js.contains("new MutationObserver(check)"));
+}
+
+/// ilia fork: the embedded page switches theme only on the framing page's
+/// `calrs:theme` message, and only to light or dark.
+#[test]
+fn embedded_pages_take_the_theme_message_from_their_parent_only() {
+    let base = include_str!("../../../templates/base.html");
+    let at = base
+        .find("ev.data.type !== 'calrs:theme'")
+        .expect("listener");
+    let listener = &base[base[..at]
+        .rfind("window.addEventListener('message'")
+        .unwrap()..];
+    let listener = &listener[..listener.find("});").unwrap()];
+    assert!(
+        listener.contains("ev.source !== window.parent"),
+        "{listener}"
+    );
+    assert!(
+        listener.contains("t !== 'light' && t !== 'dark'"),
+        "{listener}"
+    );
+    assert!(
+        listener.contains("classList.toggle('dark', t === 'dark')"),
+        "{listener}"
+    );
+    // Inside the embed-only script, after the not-framed early return.
+    let embed_script = &base[base.rfind("{% if embed %}").unwrap()..];
+    assert!(embed_script.contains("if (window.parent === window) return;"));
+    assert!(embed_script.contains("'calrs:theme'"));
+}
+
 #[test]
 fn brand_css_picks_text_for_its_own_fill() {
     // ilia fork: the embed brand replaces the accent, so it carries its own

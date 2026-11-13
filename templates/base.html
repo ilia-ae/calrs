@@ -913,6 +913,15 @@ window.calrsFormat12h = function(time24) {
   ['click', 'change', 'input', 'transitionend', 'animationend'].forEach(function(evt) {
     document.addEventListener(evt, function() { setTimeout(send, 50); }, true);
   });
+  // ilia fork: embed.js passes the host page's theme when it changes (a
+  // site's own dark-mode switch), so the widget switches in place. Only the
+  // framing page is heard, and only "light" or "dark".
+  window.addEventListener('message', function (ev) {
+    if (ev.source !== window.parent || !ev.data || ev.data.type !== 'calrs:theme') return;
+    var t = ev.data.theme;
+    if (t !== 'light' && t !== 'dark') return;
+    document.documentElement.classList.toggle('dark', t === 'dark');
+  });
 })();
 </script>
 {% endif %}

@@ -131,6 +131,8 @@ A value that does not parse, an empty one included, turns embedding off and logs
 
 `embed.js` fills every element with `data-calrs-inline="<booking link>"` (optionally `data-calrs-config='{"theme":"auto"}'`) when it loads, so a host page can embed with one `<script src=".../embed.js" defer></script>` and no inline script, and its own CSP only needs this origin in `script-src` and `frame-src`. It loads only `http(s)` links.
 
+The widget speaks the host page's language and takes its theme (ilia fork). `embed.js` sends the primary subtag of the page's `<html lang>` as `lang` (`config.lang` overrides it, `""` leaves the visitor's browser language); for an embedded booking request a `lang` naming a shipped language is that request's language pick, carried through the flow's links and the form's POST, so the booking stores it and the guest's emails follow it. Nothing is stored in a cookie, and any other value is ignored, never echoed. Without `config.theme`, the background behind the widget decides between `light` and `dark`, and a later change (a site's own dark-mode switch) reaches the widget as a `calrs:theme` message, which the embedded page accepts only from its parent and only as `light` or `dark`. The iframe gets the same `color-scheme`, so it stays transparent.
+
 ## CSRF protection
 
 All POST forms are protected against cross-site request forgery using the **double-submit cookie** pattern:
