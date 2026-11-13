@@ -694,9 +694,19 @@ input[name=theme]:focus-visible + .theme-card { outline: 2px solid var(--accent)
       </div>
     </div>
     <div class="form-group">
+      {% if threecx_key_from_env %}
+      <label for="threecx_api_key">{{ t("admin-threecx-api-key") }}</label>
+      <input type="password" id="threecx_api_key" value="" placeholder="{{ t('admin-threecx-api-key-env-placeholder') }}" disabled aria-describedby="threecx_api_key_env">
+      {% if threecx_key_env_bad %}
+      <span class="hint" id="threecx_api_key_env" style="color: var(--error-text);">{{ t("admin-threecx-api-key-env-bad") }}</span>
+      {% else %}
+      <span class="hint" id="threecx_api_key_env">{{ t("admin-threecx-api-key-env") }}</span>
+      {% endif %}
+      {% else %}
       <label for="threecx_api_key">{{ t("admin-threecx-api-key") }} <span class="hint">{% if threecx_key_set %}{{ t("admin-keep-current-set-hint") }}{% else %}{{ t("admin-keep-current-hint") }}{% endif %}</span></label>
       <input type="password" id="threecx_api_key" name="threecx_api_key" value="" placeholder="{{ t('admin-keep-unchanged') }}" autocomplete="new-password">
       <span class="hint">{{ t("admin-threecx-api-key-help") }}</span>
+      {% endif %}
     </div>
     <div class="form-group">
       <label for="threecx_display_name">{{ t("admin-display-name") }} <span class="hint">{{ t("team-form-optional") }}</span></label>

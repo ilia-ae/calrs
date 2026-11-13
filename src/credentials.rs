@@ -29,6 +29,7 @@ pub(crate) const NAMES: &[&str] = &[
     "CALRS_TON_API_KEY",
     "CALRS_TON_API_URL",
     "CALRS_TON_COINGECKO_KEY",
+    "CALRS_THREECX_API_KEY",
     "CALRS_SECRET_KEY",
 ];
 
@@ -312,6 +313,7 @@ mod tests {
             include_str!("telegram/config.rs"),
             include_str!("inbox/config.rs"),
             include_str!("ton/config.rs"),
+            include_str!("web/threecx.rs"),
             include_str!("crypto.rs"),
         ]
         .concat();

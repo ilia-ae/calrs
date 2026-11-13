@@ -7,6 +7,9 @@
 //! change (owner's request 2026-11-13: "changing it in the web must work
 //! too"). The key is never exported and is reported as `"(secret set)"`.
 //! `calrs serve` caches the settings, so a change asks for a restart.
+//! While the deployment sets the key (`CALRS_THREECX_API_KEY`, the
+//! ilia-booking role's vault) an `api_key` is refused: the key is changed
+//! there, and `site.threecx` carries none.
 
 use super::{ApplyError, Ctx, SECRET_SET};
 use crate::web::threecx;
@@ -49,11 +52,13 @@ fn invalid(field: &str, reason: impl std::fmt::Display) -> ApplyError {
     )
 }
 
-/// The stored settings in the document's shape (the key as whether one is
-/// stored, and whether it equals `wanted_key`).
+/// The stored settings in the document's shape (the key as whether there is
+/// one, and the stored one to compare with a given `api_key`).
 struct Stored {
     shown: threecx::Shown,
     key: Option<String>,
+    /// A key is stored in the database (whatever the deployment sets).
+    db_key_set: bool,
 }
 
 async fn stored(ctx: &Ctx) -> Result<Stored, ApplyError> {
@@ -63,8 +68,13 @@ async fn stored(ctx: &Ctx) -> Result<Stored, ApplyError> {
             .fetch_optional(ctx.pool())
             .await?
             .flatten();
+    let db_key_set = enc.as_deref().is_some_and(|e| !e.is_empty());
     let key = enc.and_then(|e| crate::crypto::decrypt_value(&ctx.state.secret_key, &e).ok());
-    Ok(Stored { shown, key })
+    Ok(Stored {
+        shown,
+        key,
+        db_key_set,
+    })
 }
 
 /// Reading only: each value as the card would store it.
@@ -93,6 +103,9 @@ pub(super) async fn check(_ctx: &Ctx, section: &ThreeCx) -> Result<(), ApplyErro
         }
     }
     if let Some(key) = &s.api_key {
+        if threecx::env_key().is_set() {
+            return Err(invalid("api_key", threecx::KEY_FROM_ENV));
+        }
         let checked = threecx::check_api_key(key).map_err(|r| invalid("api_key", r))?;
         if &checked != key {
             return Err(invalid("api_key", "must not be padded"));
@@ -102,7 +115,7 @@ pub(super) async fn check(_ctx: &Ctx, section: &ThreeCx) -> Result<(), ApplyErro
 }
 
 fn doc_of(stored: &Stored) -> Value {
-    if stored.shown.base_url.is_empty() && !stored.shown.key_set {
+    if stored.shown.base_url.is_empty() && !stored.db_key_set {
         return Value::String("off".to_string());
     }
     serde_json::json!({
@@ -115,7 +128,7 @@ fn doc_of(stored: &Stored) -> Value {
 
 fn differs(section: &ThreeCx, stored: &Stored) -> bool {
     match section {
-        ThreeCx::Off(_) => !stored.shown.base_url.is_empty() || stored.shown.key_set,
+        ThreeCx::Off(_) => !stored.shown.base_url.is_empty() || stored.db_key_set,
         ThreeCx::On(s) => {
             stored.shown.base_url != s.base_url
                 || stored.shown.extension != s.extension
@@ -190,7 +203,7 @@ pub(super) async fn verify(ctx: &Ctx, section: &ThreeCx) -> Result<(), ApplyErro
 /// `"off"`; nothing when what is stored is not something the checks accept.
 pub(super) async fn export(ctx: &Ctx) -> Result<Option<ThreeCx>, ApplyError> {
     let s = stored(ctx).await?;
-    if s.shown.base_url.is_empty() && s.shown.extension.is_empty() && !s.shown.key_set {
+    if s.shown.base_url.is_empty() && s.shown.extension.is_empty() && !s.db_key_set {
         return Ok(Some(ThreeCx::Off(super::Off::Off)));
     }
     let section = ThreeCx::On(ThreeCxSettings {

@@ -7,6 +7,8 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 
 const KEY: &str = "test-video-conference-key-0123456789";
+/// The key the deployment sets (`CALRS_THREECX_API_KEY`), another one.
+const ENV_KEY: &str = "deployment-video-conference-key-9876543210";
 const KEY32: [u8; 32] = [0u8; 32];
 
 #[derive(Default)]
@@ -21,6 +23,8 @@ struct Pbx {
     foreign_link: bool,
     /// Answer every call with a 502 and an HTML page.
     down: bool,
+    /// The key it accepts, when not [`KEY`].
+    accept: Option<String>,
 }
 
 type SharedPbx = Arc<std::sync::Mutex<Pbx>>;
@@ -82,7 +86,7 @@ fn answer(
         )
             .into_response();
     }
-    if p.refuse_key || key.as_deref() != Some(KEY) {
+    if p.refuse_key || key.as_deref() != Some(p.accept.as_deref().unwrap_or(KEY)) {
         return error(401, "API Authentication Failed");
     }
     let path = uri.path().trim_start_matches("/webmeeting/api/v1");
@@ -218,6 +222,30 @@ fn settings_are_checked_and_canonical() {
     assert_eq!(threecx::check_display_name("  ").unwrap(), None);
     assert!(threecx::check_display_name(&"x".repeat(101)).is_err());
     assert!(threecx::check_display_name("a\u{7}b").is_err());
+}
+
+#[test]
+fn the_deployment_key_is_read_as_a_key() {
+    use threecx::{parse_env_key, EnvKey};
+    assert_eq!(parse_env_key(None), EnvKey::Unset);
+    assert_eq!(parse_env_key(Some("")), EnvKey::Unset);
+    assert_eq!(parse_env_key(Some("  \n")), EnvKey::Unset, "empty is unset");
+    assert_eq!(
+        parse_env_key(Some(&format!("{ENV_KEY}\n"))),
+        EnvKey::Set(ENV_KEY.to_string())
+    );
+    assert_eq!(parse_env_key(Some("short")), EnvKey::Malformed);
+    assert_eq!(
+        parse_env_key(Some("has a space in it 0123")),
+        EnvKey::Malformed
+    );
+    assert!(parse_env_key(Some("short")).is_set());
+    let shown = format!("{:?}", parse_env_key(Some(ENV_KEY)));
+    assert!(!shown.contains(ENV_KEY), "{shown}");
+    assert!(
+        !threecx::env_key().is_set(),
+        "tests never read the process environment"
+    );
 }
 
 #[test]
@@ -773,6 +801,115 @@ async fn the_admin_card_saves_tests_and_removes_without_showing_the_key() {
     assert!(!page.contains("<script>alert"));
 }
 
+async fn stored_enc(pool: &SqlitePool) -> Option<String> {
+    sqlx::query_scalar("SELECT threecx_api_key_enc FROM auth_config WHERE id = 'singleton'")
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
+#[tokio::test]
+async fn the_deployment_key_wins_and_locks_the_card() {
+    let (app, pool, session, _et_id, base, pbx) = threecx_app().await;
+    let _env = threecx::test_env_key(Some(ENV_KEY));
+    // The deployment's key is the key, the stored one is never used.
+    assert_eq!(threecx::load(&pool, &KEY32).await.unwrap().api_key, ENV_KEY);
+    let shown = threecx::shown(&pool).await;
+    assert!(shown.key_set && shown.key_from_env && !shown.key_env_bad);
+
+    let page = body_string(
+        app.clone()
+            .oneshot(get_authed("/dashboard/admin", &session))
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert!(page.contains("Set by the deployment (CALRS_THREECX_API_KEY)"));
+    assert!(
+        !page.contains("name=\"threecx_api_key\""),
+        "the key field posts nothing"
+    );
+    assert!(page.contains(
+        "id=\"threecx_api_key\" value=\"\" placeholder=\"Set by the deployment\" disabled"
+    ));
+    assert!(!page.contains(KEY) && !page.contains(ENV_KEY));
+
+    let post = |body: String| {
+        let app = app.clone();
+        let session = session.clone();
+        async move {
+            let r = app
+                .oneshot(post_form(
+                    "/dashboard/admin/threecx",
+                    &session,
+                    "c",
+                    &format!("_csrf=c&{body}"),
+                ))
+                .await
+                .unwrap();
+            r.headers()
+                .get("location")
+                .map(|v| v.to_str().unwrap().to_string())
+                .unwrap_or_default()
+        }
+    };
+    let enc = format!("threecx_base_url={}", urlencoding::encode(&base));
+    pbx.lock().unwrap().accept = Some(ENV_KEY.to_string());
+    // The test call carries the deployment's key, even with one typed.
+    assert!(post(format!(
+        "action=test&{enc}&threecx_extension=100&threecx_api_key={KEY}"
+    ))
+    .await
+    .ends_with("threecx=ok#threecx"));
+    let sent = pbx.lock().unwrap().calls.last().unwrap().2.clone();
+    assert_eq!(sent.as_deref(), Some(ENV_KEY));
+    // A typed key is refused, nothing written.
+    let before = stored_enc(&pool).await;
+    assert!(before.is_some());
+    assert!(post(format!(
+        "action=save&{enc}&threecx_extension=100&threecx_api_key={KEY}"
+    ))
+    .await
+    .ends_with("threecx=key-env#threecx"));
+    assert_eq!(stored_enc(&pool).await, before);
+    let page = body_string(
+        app.clone()
+            .oneshot(get_authed("/dashboard/admin?threecx=key-env", &session))
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert!(page.contains("Not saved: the key is set by the deployment"));
+    // A save without a key removes the stored one, unused from now on.
+    assert!(post(format!("action=save&{enc}&threecx_extension=100"))
+        .await
+        .ends_with("threecx=saved#threecx"));
+    assert_eq!(stored_enc(&pool).await, None);
+    assert_eq!(threecx::load(&pool, &KEY32).await.unwrap().api_key, ENV_KEY);
+
+    // A malformed variable keeps 3CX off and says so, without a fallback.
+    drop(_env);
+    let _bad = threecx::test_env_key(Some("short"));
+    assert!(threecx::load(&pool, &KEY32).await.is_none());
+    let shown = threecx::shown(&pool).await;
+    assert!(!shown.key_set && shown.key_from_env && shown.key_env_bad);
+    let page = body_string(
+        app.clone()
+            .oneshot(get_authed("/dashboard/admin", &session))
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert!(page.contains("CALRS_THREECX_API_KEY is set but is not a key"));
+    assert!(post("action=test".to_string())
+        .await
+        .ends_with("threecx=not-set#threecx"));
+    drop(_bad);
+    // Without the variable there is no key left: the stored one went.
+    assert!(threecx::load(&pool, &KEY32).await.is_none());
+    assert!(!threecx::shown(&pool).await.key_set);
+}
+
 #[tokio::test]
 async fn the_admin_card_needs_an_admin_and_csrf() {
     let (app, pool, _session, _et_id) = setup_test_app().await;
@@ -901,6 +1038,62 @@ mod apply_section {
         assert_eq!(report.changed[0].after, json!("off"));
         assert_eq!(stored_key(&env).await, None);
         assert_eq!(threecx::shown(&env.pool).await, threecx::Shown::default());
+    }
+
+    #[tokio::test]
+    async fn the_deployment_key_is_not_the_documents() {
+        let env = ApplyEnv::new().await;
+        let _env = threecx::test_env_key(Some(ENV_KEY));
+        let on = r#"{"base_url":"https://sip.ilia.ae","extension":"100","display_name":"3CX"}"#;
+        let report = env.apply(&doc(on), false).await.unwrap();
+        assert_eq!(report.changed.len(), 1);
+        assert_eq!(
+            report.changed[0].after,
+            json!({"base_url": "https://sip.ilia.ae", "extension": "100", "display_name": "3CX",
+                   "api_key": apply::SECRET_SET})
+        );
+        assert_eq!(
+            stored_key(&env).await,
+            None,
+            "nothing stored: the key is the deployment's"
+        );
+        assert!(env.apply(&doc(on), false).await.unwrap().changed.is_empty());
+
+        // A key in the document is refused, in a dry run too, nothing written.
+        let before = env.snapshot().await;
+        let with_key = format!(
+            r#"{{"base_url":"https://sip.ilia.ae","extension":"100","display_name":"3CX","api_key":"{KEY}"}}"#
+        );
+        for dry_run in [true, false] {
+            match env.apply(&doc(&with_key), dry_run).await {
+                Err(ApplyError::Invalid { path, message }) => {
+                    assert_eq!(path, "site.threecx.api_key");
+                    assert!(message.contains("CALRS_THREECX_API_KEY"), "{message}");
+                    assert!(!message.contains(KEY));
+                }
+                other => panic!("{other:?}"),
+            }
+        }
+        assert_eq!(env.snapshot().await, before);
+
+        // The export names no key; off and off again change nothing twice.
+        let text = serde_json::to_string(&env.export().await.unwrap()).unwrap();
+        assert!(!text.contains(ENV_KEY));
+        assert!(text.contains(r#""threecx":{"base_url":"https://sip.ilia.ae","extension":"100","display_name":"3CX"}"#), "{text}");
+        assert_eq!(
+            env.apply(&doc(r#""off""#), false)
+                .await
+                .unwrap()
+                .changed
+                .len(),
+            1
+        );
+        assert!(env
+            .apply(&doc(r#""off""#), false)
+            .await
+            .unwrap()
+            .changed
+            .is_empty());
     }
 
     #[tokio::test]

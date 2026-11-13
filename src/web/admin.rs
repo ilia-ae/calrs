@@ -583,6 +583,8 @@ pub(super) async fn admin_dashboard(
             threecx_extension => threecx_shown.extension,
             threecx_display_name => threecx_shown.display_name,
             threecx_key_set => threecx_shown.key_set,
+            threecx_key_from_env => threecx_shown.key_from_env,
+            threecx_key_env_bad => threecx_shown.key_env_bad,
             threecx_notice => threecx_notice,
             threecx_notice_text => threecx_notice_text,
             threecx_notice_ok => threecx_notice_ok,
