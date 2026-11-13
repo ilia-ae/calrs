@@ -396,13 +396,23 @@ pub(super) fn first_name(full_name: &str) -> &str {
 /// The guest-facing invite (email attachments, the ICS download). ilia
 /// fork: in relay mode its ORGANIZER is the system (`crate::inbox`).
 pub fn generate_ics(details: &BookingDetails, method: &str) -> String {
-    generate_ics_impl(details, method, false, false)
+    generate_ics_impl(details, method, false, false, false)
+}
+
+/// ilia fork: the invite reached by a bearer link that may have been passed
+/// on to someone else (the TON payment page's "Add to calendar"). A PUBLISH
+/// calendar with the meeting, its time and its place only: no ATTENDEE or
+/// ORGANIZER line (no guest's or host's address), no notes or phone, and a
+/// SUMMARY without the guest's name. Same UID and SEQUENCE as the guest's
+/// invite, so a calendar updates the event the email added.
+pub fn generate_ics_payer(details: &BookingDetails) -> String {
+    generate_ics_impl(details, "PUBLISH", false, false, true)
 }
 
 /// ilia fork: the host's own copy (host emails), which names the host as
 /// ORGANIZER like the calendar write-back.
 pub(super) fn generate_host_ics(details: &BookingDetails, method: &str) -> String {
-    generate_ics_impl(details, method, false, true)
+    generate_ics_impl(details, method, false, true, false)
 }
 
 /// ilia fork: the ORGANIZER address of an invite. The host's own copies
@@ -425,7 +435,7 @@ fn organizer_email(host_copy: bool, uid: &str, host_email: &str) -> Option<Strin
 /// (in UTC) for every written booking. Email .ics attachments keep plain
 /// ATTENDEE;RSVP=TRUE so mail clients still offer "Add to calendar".
 pub fn generate_ics_caldav(details: &BookingDetails) -> String {
-    generate_ics_impl(details, "", true, true)
+    generate_ics_impl(details, "", true, true, false)
 }
 
 fn generate_ics_impl(
@@ -433,17 +443,25 @@ fn generate_ics_impl(
     method: &str,
     schedule_agent_client: bool,
     host_copy: bool,
+    // ilia fork: `generate_ics_payer`, no one's identity in the file.
+    payer_copy: bool,
 ) -> String {
     let guest_first = first_name(&details.guest_name);
     let host_first = first_name(&details.host_name);
-    let summary = sanitize_ics(&format!(
-        "{} \u{2014} {} & {}",
-        details.event_title, guest_first, host_first
-    ));
+    let summary = if payer_copy {
+        sanitize_ics(&format!("{} \u{2014} {}", details.event_title, host_first))
+    } else {
+        sanitize_ics(&format!(
+            "{} \u{2014} {} & {}",
+            details.event_title, guest_first, host_first
+        ))
+    };
     // CN= is a parameter, not a TEXT value: it needs quoting, not backslashes.
     let host_name = sanitize_ics_param(&details.host_name);
     let guest_name = sanitize_ics_param(&details.guest_name);
-    let organizer_line = organizer_email(host_copy, &details.uid, &details.host_email)
+    let organizer_line = (!payer_copy)
+        .then(|| organizer_email(host_copy, &details.uid, &details.host_email))
+        .flatten()
         .map(|email| {
             format!(
                 "ORGANIZER;CN={host_name}:mailto:{}\r\n",
@@ -473,7 +491,7 @@ fn generate_ics_impl(
     let notes = details
         .notes
         .as_ref()
-        .filter(|n| !n.trim().is_empty())
+        .filter(|n| !payer_copy && !n.trim().is_empty())
         .map(|n| sanitize_ics(n));
     let description: Vec<String> = phone.into_iter().chain(notes).collect();
     let description_line = if description.is_empty() {
@@ -503,8 +521,14 @@ fn generate_ics_impl(
     let additional_attendee_lines: String = details
         .additional_attendees
         .iter()
+        .filter(|_| !payer_copy)
         .map(|email| format!("ATTENDEE{sa};RSVP=TRUE:mailto:{}\r\n", sanitize_ics(email)))
         .collect();
+    let guest_attendee_line = if payer_copy {
+        String::new()
+    } else {
+        format!("ATTENDEE{sa};CN={guest_name};RSVP=TRUE:mailto:{guest_email}\r\n")
+    };
     let dtstamp = chrono::Utc::now().format("%Y%m%dT%H%M%SZ").to_string();
     // Convert guest-timezone times to UTC for the ICS
     let (dtstart, dtend) = details.utc_times.clone().unwrap_or_else(|| {
@@ -530,7 +554,7 @@ fn generate_ics_impl(
          {description_line}\
          {location_line}\
          {organizer_line}\
-         ATTENDEE{sa};CN={guest_name};RSVP=TRUE:mailto:{guest_email}\r\n\
+         {guest_attendee_line}\
          {additional_attendee_lines}\
          STATUS:CONFIRMED\r\n\
          {valarm}\
@@ -550,8 +574,7 @@ fn generate_ics_impl(
         description_line = description_line,
         location_line = location_line,
         organizer_line = organizer_line,
-        guest_name = guest_name,
-        guest_email = guest_email,
+        guest_attendee_line = guest_attendee_line,
         additional_attendee_lines = additional_attendee_lines,
     ))
 }

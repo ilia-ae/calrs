@@ -2,10 +2,10 @@
 {% block title %}{{ t("teams-page-title") }} — calrs{% endblock %}
 {% block dashboard_content %}
 <div class="card">
-  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+  <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.5rem 0.75rem; margin-bottom: 1rem;">
     <h1 style="margin-bottom: 0;">{{ t("teams-heading") }}</h1>
     {% if is_admin %}
-    <a href="/dashboard/teams/new" class="slot-btn" style="text-decoration: none; font-size: 0.85rem; font-weight: 600; color: var(--accent); border-color: var(--accent);">+ {{ t("teams-new") }}</a>
+    <a href="/dashboard/teams/new" class="btn btn-sm btn-auto">+ {{ t("teams-new") }}</a>
     {% endif %}
   </div>
   {% if teams %}
@@ -33,13 +33,13 @@
       </div>
       <div class="et-actions">
         {% if is_admin or team.is_team_admin %}
-        <a href="/dashboard/teams/{{ team.id }}/settings" class="slot-btn" style="text-decoration: none; font-size: 0.8rem;">{{ t("teams-settings") }}</a>
+        <a href="/dashboard/teams/{{ team.id }}/settings" class="btn btn-secondary btn-sm btn-auto">{{ t("teams-settings") }}</a>
         {% endif %}
         {% if team.slug %}
           {% if team.visibility == "public" %}
-            <a href="/team/{{ team.slug }}" class="slot-btn" style="text-decoration: none; font-size: 0.8rem;">{{ t("teams-view") }}</a>
+            <a href="/team/{{ team.slug }}" class="btn btn-secondary btn-sm btn-auto">{{ t("teams-view") }}</a>
           {% elif team.invite_token %}
-            <a href="/team/{{ team.slug }}?invite={{ team.invite_token }}" class="slot-btn" style="text-decoration: none; font-size: 0.8rem;">{{ t("teams-view") }}</a>
+            <a href="/team/{{ team.slug }}?invite={{ team.invite_token }}" class="btn btn-secondary btn-sm btn-auto">{{ t("teams-view") }}</a>
           {% endif %}
         {% endif %}
       </div>
@@ -47,8 +47,8 @@
     {% endfor %}
   {% else %}
     <div class="empty" style="padding: 2rem 1rem;">
-      <div class="empty-icon">&#128101;</div>
-      <div class="empty-text">{{ t("teams-empty") }}{% if is_admin %} {{ t("teams-empty-admin", link='<a href="/dashboard/teams/new" style="color: var(--accent); text-decoration: none;">' ~ (t("teams-empty-admin-link-label") | escape) ~ '</a>') | safe }}{% endif %}</div>
+      <div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20.5a6.5 6.5 0 0 1 13 0M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 14.3a6.5 6.5 0 0 1 3 6.2"/></svg></div>
+      <div class="empty-text">{{ t("teams-empty") }}{% if is_admin %} {{ t("teams-empty-admin", link='<a href="/dashboard/teams/new">' ~ (t("teams-empty-admin-link-label") | escape) ~ '</a>') | safe }}{% endif %}</div>
       {% if not is_admin %}
       <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.5rem;">{{ t("teams-empty-member") }}</p>
       {% endif %}

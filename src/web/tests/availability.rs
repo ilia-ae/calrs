@@ -2523,6 +2523,41 @@ async fn troubleshoot_shows_blocked_override() {
     );
 }
 
+// ilia fork: a past day is reported as passed, not as blocked by a
+// minimum notice of 0 minutes, and the day heading is in the user's language.
+#[tokio::test]
+async fn troubleshoot_reports_a_past_day_as_passed() {
+    let (app, pool, session, _) = setup_test_app().await;
+    let mut day = host_today() - Duration::days(7);
+    while day.weekday() != chrono::Weekday::Mon {
+        day -= Duration::days(1);
+    }
+    let url = format!(
+        "/dashboard/troubleshoot?date={}&event_type=test-meeting",
+        day.format("%Y-%m-%d")
+    );
+    let response = app
+        .clone()
+        .oneshot(get_authed(&url, &session))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 200);
+    let body = body_string(response).await;
+    assert!(body.contains("Already passed"), "{body}");
+    assert!(!body.contains("Min. notice ("), "{body}");
+    assert!(body.contains("Monday"), "{body}");
+
+    sqlx::query("UPDATE users SET language = 'ru' WHERE email = 'test@example.com'")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let response = app.oneshot(get_authed(&url, &session)).await.unwrap();
+    let body = body_string(response).await;
+    assert!(body.contains("Время уже прошло"), "{body}");
+    assert!(body.contains("понедельник"), "{body}");
+    assert!(!body.contains("Monday"), "{body}");
+}
+
 #[test]
 fn parse_guest_tz_europe() {
     let tz = parse_guest_tz(Some("Europe/London"));

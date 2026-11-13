@@ -45,6 +45,31 @@ mod lang_switch;
 // ilia fork: host <-> guest messages.
 mod messages;
 mod organizer;
+// ilia fork: the dashboard shell (sidebar icons, overview, event types).
+mod ov_shell;
+// ilia fork: the second overnight review round, one file per group.
+mod ov2_apply;
+mod ov2_auth;
+mod ov2_base;
+mod ov2_dashcore;
+mod ov2_flaky;
+mod ov2_guest;
+mod ov2_lists;
+mod ov2_public;
+mod ov2_settings;
+// ilia fork: the third overnight review round, one file per group.
+mod ov3_admin;
+mod ov3_dash;
+mod ov3_guest;
+mod ov3_ton;
+// ilia fork: the fourth overnight review round, one file per group.
+mod ov4_admin;
+mod ov4_dash;
+mod ov4_guest;
+// ilia fork: the fifth overnight review round, one file per group.
+mod ov5_admin;
+mod ov5_dash;
+mod ov5_guest;
 mod page_language;
 mod pending_hold;
 mod public_pages;

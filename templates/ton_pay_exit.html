@@ -5,10 +5,14 @@
 {% block title %}{{ t("ton-exit-title") }}{% endblock %}
 
 {% block content %}
+{% from "partials/result_icon.html" import result_icon %}
+<div class="page-narrow">
+<div class="logo">{% if company_link %}<a href="{{ company_link }}" target="_blank" rel="noopener noreferrer">{% endif %}<img src="/logo" alt="" onerror="this.closest('.logo').style.display='none'">{% if company_link %}</a>{% endif %}</div>
 <div class="card" style="text-align: center;">
-  <div class="check" style="background: #d97706;">&#8987;</div>
+  {{ result_icon("wait", "clock") }}
   <h1>{{ t("ton-exit-title") }}</h1>
   <p class="subtitle">{{ t("ton-exit-body", time=held_until, zone=zone) }}</p>
   <p style="margin-top: 1.25rem;"><a class="btn" href="{{ pay_url }}" target="_top" rel="noopener">{{ t("ton-exit-go") }}</a></p>
+</div>
 </div>
 {% endblock %}

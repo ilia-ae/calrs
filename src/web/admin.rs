@@ -535,7 +535,9 @@ pub(super) async fn admin_dashboard(
             sms_providers => crate::sms::PROVIDER_SPECS,
             sms_country_codes => crate::sms::phone::COUNTRY_CODES
                 .iter()
-                .map(|(code, label)| context! { code => code, label => label })
+                .map(|(code, regions, label)| {
+                    context! { code => code, regions => regions, label => label }
+                })
                 .collect::<Vec<_>>(),
             captcha_configured => captcha_configured,
             captcha_instance_url => captcha_instance_url,

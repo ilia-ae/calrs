@@ -583,20 +583,23 @@ fn own_emails(user: &crate::models::User) -> Vec<String> {
     out
 }
 
-/// The admin's zone, which the times are shown and booked in.
-fn admin_tz(user: &crate::models::User) -> Tz {
+/// The admin's zone, which the times are shown and booked in (the TON
+/// page shows its times in it too).
+pub(crate) fn admin_tz(user: &crate::models::User) -> Tz {
     user.timezone.parse().unwrap_or(Tz::UTC)
 }
 
 /// The next free times of `et_id`, as `(value, label)`: `value` is
-/// `YYYY-MM-DDTHH:MM` in `guest_tz`, what the booking form posts. Computed
-/// like the slot page (on-demand sync, busy times, the TON notice, the
-/// booking window and the horizon).
+/// `YYYY-MM-DDTHH:MM` in `guest_tz`, what the booking form posts; the
+/// label writes the date out in `lang` (the admin's dashboard language), as
+/// the booking pages do. Computed like the slot page (on-demand sync, busy
+/// times, the TON notice, the booking window and the horizon).
 async fn next_slots(
     state: &AppState,
     user_id: &str,
     et_id: &str,
     guest_tz: Tz,
+    lang: &str,
 ) -> Vec<(String, String)> {
     let row: Option<(i32, i32, i32, i32)> = sqlx::query_as(
         "SELECT duration_min, buffer_before, buffer_after, min_notice_min FROM event_types WHERE id = ?",
@@ -646,9 +649,14 @@ async fn next_slots(
     days.iter()
         .flat_map(|d| {
             d.slots.iter().map(move |s| {
+                // Upstream's `SlotDay.label` is chrono's English; the date
+                // is written out in the page's language instead.
+                let day = chrono::NaiveDate::parse_from_str(&s.guest_date, "%Y-%m-%d")
+                    .map(|g| crate::i18n::format_long_date(g, lang))
+                    .unwrap_or_else(|_| d.label.clone());
                 (
                     format!("{}T{}", s.guest_date, s.start),
-                    format!("{} · {}–{}", d.label, s.start, s.end),
+                    format!("{day} · {}–{}", s.start, s.end),
                 )
             })
         })
@@ -1057,7 +1065,7 @@ async fn render(
     let fast = crate::ton::deadlines::DebugTiming::FAST;
     let (selected_ctx, slots) = match selected {
         Some(t) => {
-            let slots = next_slots(state, &user.id, &t.id, tz).await;
+            let slots = next_slots(state, &user.id, &t.id, tz, lang).await;
             let tg_mode = super::telegram::form_mode(&state.pool, &t.id).await;
             // The price for this guest: a free step this address already
             // used is the first price (the booking is quoted the same way).
@@ -1399,26 +1407,37 @@ pub(super) async fn book(
         invite.as_ref().map(|(_, token)| token.clone()),
     );
     put("quoted_nano", quoted);
-    let guest_form: BookForm = match serde_json::from_value(serde_json::Value::Object(fields)) {
-        Ok(f) => f,
-        Err(e) => return internal_error_response("debug booking: form", &e),
-    };
 
     let since = (Utc::now() - Duration::seconds(1))
         .format("%Y-%m-%d %H:%M:%S")
         .to_string();
-    let call = handle_booking_for_user(
-        State(state.clone()),
-        guest_headers(&headers, guest_lang),
-        Path((username, et.slug.clone())),
-        Query(EmbedParams::default()),
-        Form(guest_form),
-    );
-    // The timing reaches the invoice through a task-local around this call
-    // only: nothing a guest posts can set it.
-    let resp = match timing {
-        Some(t) => ton_pay::invoice::with_debug_timing(t, call).await,
-        None => call.await,
+    // A booking that commits between this quote and the transaction (or
+    // a cancellation, or a ladder change) makes the booking path answer
+    // with "the price changed". Its form would repost outside this page
+    // (no mark, no own chat, no debug timing, the browser's language, and
+    // a private type's invite deleted below), so the price now is booked
+    // once more here, as the page's button would; the admin never saw a
+    // price to confirm. A second change is refused on this page.
+    let book = |guest_form: BookForm| {
+        let call = handle_booking_for_user(
+            State(state.clone()),
+            guest_headers(&headers, guest_lang),
+            Path((username.clone(), et.slug.clone())),
+            Query(EmbedParams::default()),
+            Form(guest_form),
+        );
+        // The timing reaches the invoice through a task-local around this
+        // call only: nothing a guest posts can set it.
+        async move {
+            match timing {
+                Some(t) => ton_pay::invoice::with_debug_timing(t, call).await,
+                None => call.await,
+            }
+        }
+    };
+    let (resp, requoted) = match book_with_one_requote(fields, book).await {
+        Ok(done) => done,
+        Err(e) => return internal_error_response("debug booking: form", &e),
     };
 
     // Only the status and the redirect are read: a `&Response` held across
@@ -1453,8 +1472,13 @@ pub(super) async fn book(
             status = status.as_u16(),
             guest_lang,
             timing = timing.map(|t| t.text()).as_deref().unwrap_or("site"),
+            requoted,
             "debug booking refused by the booking path"
         );
+        if requoted {
+            let kept = refuse("dbg-err-requote");
+            return render(&state, &admin, kept, None, StatusCode::CONFLICT, &client_ip).await;
+        }
         return resp;
     };
 
@@ -1536,6 +1560,45 @@ async fn one_time_invite(
     .execute(pool)
     .await?;
     Ok((id, token))
+}
+
+/// Book with the form `fields`, and when the booking path answers "the
+/// price changed" ([`requote`]), once more with `quoted_nano` set to the
+/// price now; every other field stays as it was. Returns the last answer
+/// and whether the price changed a second time (the page then refuses
+/// with `dbg-err-requote`). Never more than two calls.
+async fn book_with_one_requote<T, F, Fut>(
+    mut fields: serde_json::Map<String, serde_json::Value>,
+    mut book: F,
+) -> Result<(Response, bool), serde_json::Error>
+where
+    T: serde::de::DeserializeOwned,
+    F: FnMut(T) -> Fut,
+    Fut: std::future::Future<Output = Response>,
+{
+    let mut requoted = false;
+    loop {
+        let form: T = serde_json::from_value(serde_json::Value::Object(fields.clone()))?;
+        let resp = book(form).await;
+        match requote(&resp) {
+            Some(now) if !requoted => {
+                requoted = true;
+                fields.insert(
+                    "quoted_nano".to_string(),
+                    serde_json::Value::String(now.quote_value()),
+                );
+            }
+            again => return Ok((resp, again.is_some())),
+        }
+    }
+}
+
+/// The price now when `resp` is the booking path's "the price changed"
+/// page ([`ton_pay::flow::Requoted`]), else `None`.
+fn requote(resp: &Response) -> Option<crate::ton::ladder::Step> {
+    resp.extensions()
+        .get::<ton_pay::flow::Requoted>()
+        .map(|r| r.0)
 }
 
 /// The booking the public path just made, if it made one: a priced booking
@@ -1664,8 +1727,15 @@ pub(super) async fn cancel_all(
         return impersonating(admin.lang);
     }
     let ids = standing(&state.pool, &admin.user.id).await;
-    let reason = crate::i18n::translate(admin.lang, "dbg-cancel-reason", None);
     for id in &ids {
+        // The reason lands in the guest's messages: in the language the
+        // test guest booked in, else the admin's.
+        let lang = crate::email::stored_booking_language(&state.pool, id).await;
+        let reason = crate::i18n::translate(
+            lang.as_deref().unwrap_or(admin.lang),
+            "dbg-cancel-reason",
+            None,
+        );
         let host = crate::auth::AuthUser {
             user: admin.user.clone(),
             impersonation: None,
@@ -1678,7 +1748,7 @@ pub(super) async fn cancel_all(
             Path(id.clone()),
             Form(CancelForm {
                 _csrf: form._csrf.clone(),
-                reason: Some(reason.clone()),
+                reason: Some(reason),
             }),
         )
         .await;
@@ -1698,6 +1768,90 @@ pub(super) async fn cancel_all(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_the_price_changed_page_is_a_requote() {
+        use crate::ton::ladder::Step;
+        let plain = axum::response::Html("x").into_response();
+        assert_eq!(requote(&plain), None);
+        let mut marked = axum::response::Html("x").into_response();
+        marked
+            .extensions_mut()
+            .insert(ton_pay::flow::Requoted(Step::Ton(7)));
+        assert_eq!(requote(&marked), Some(Step::Ton(7)));
+    }
+
+    type Fields = serde_json::Map<String, serde_json::Value>;
+
+    fn posted() -> Fields {
+        let mut f = Fields::new();
+        for (k, v) in [
+            ("date", "2026-11-16"),
+            ("time", "10:00"),
+            ("email", "admin@example.test"),
+            ("telegram", "getmonolith"),
+            ("invite_token", "inv-1"),
+            ("quoted_nano", "20000000000"),
+        ] {
+            f.insert(k.into(), serde_json::Value::String(v.into()));
+        }
+        f
+    }
+
+    fn requoted(step: crate::ton::ladder::Step) -> Response {
+        let mut r = axum::response::Html("changed").into_response();
+        r.extensions_mut().insert(ton_pay::flow::Requoted(step));
+        r
+    }
+
+    /// Runs the helper against a fake booking path that gives `answers`
+    /// in turn, and returns what it posted each time.
+    async fn run(answers: Vec<Response>) -> (Vec<Fields>, Response, bool) {
+        let calls = std::sync::Mutex::new(Vec::new());
+        let mut answers = answers.into_iter();
+        let (resp, again) = book_with_one_requote(posted(), |f: Fields| {
+            calls.lock().unwrap().push(f);
+            let next = answers.next().expect("called more often than answered");
+            async move { next }
+        })
+        .await
+        .unwrap();
+        (calls.into_inner().unwrap(), resp, again)
+    }
+
+    #[tokio::test]
+    async fn a_changed_price_is_booked_once_more_at_the_price_now() {
+        use crate::ton::ladder::Step;
+        let done = axum::response::Redirect::to("/booking/pay/x").into_response();
+        let (calls, resp, again) = run(vec![requoted(Step::Ton(40 * 1_000_000_000)), done]).await;
+        assert_eq!(calls.len(), 2);
+        assert_eq!(calls[1]["quoted_nano"], "40000000000");
+        // Everything else (invite, Telegram, the slot) is posted unchanged.
+        let mut same = calls[1].clone();
+        same.insert("quoted_nano".into(), calls[0]["quoted_nano"].clone());
+        assert_eq!(same, calls[0]);
+        assert_eq!(resp.status(), StatusCode::SEE_OTHER);
+        assert!(!again);
+    }
+
+    #[tokio::test]
+    async fn a_second_change_ends_the_retries() {
+        use crate::ton::ladder::Step;
+        let (calls, resp, again) = run(vec![requoted(Step::Ton(40)), requoted(Step::Free)]).await;
+        assert_eq!(calls.len(), 2, "never a third call");
+        assert_eq!(calls[1]["quoted_nano"], Step::Ton(40).quote_value());
+        assert_eq!(requote(&resp), Some(Step::Free));
+        assert!(again);
+    }
+
+    #[tokio::test]
+    async fn a_plain_refusal_is_not_retried() {
+        let refused = (StatusCode::CONFLICT, "taken").into_response();
+        let (calls, resp, again) = run(vec![refused]).await;
+        assert_eq!(calls.len(), 1);
+        assert_eq!(resp.status(), StatusCode::CONFLICT);
+        assert!(!again);
+    }
 
     #[test]
     fn a_slot_is_a_date_and_a_time() {

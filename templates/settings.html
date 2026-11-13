@@ -9,7 +9,7 @@
   {% if telegram_enabled is defined and telegram_enabled() %}<p><a href="/dashboard/settings/telegram">{{ t("tg-settings-nav") }}</a></p>{% endif %}
 
   {% if success %}
-    <div class="success" style="margin-top: 1rem; padding: 0.75rem 1rem; border-radius: var(--radius); background: var(--success-bg, #e6f9e6); color: var(--success, #2d7a2d); border: 1px solid var(--success, #2d7a2d);">{{ success }}</div>
+    <div class="success" role="status">{{ success }}</div>
   {% endif %}
 
   {% if error %}
@@ -19,10 +19,10 @@
   {% if username %}
   <div style="margin-top: 1.25rem; margin-bottom: 1.5rem; padding: 1rem; border-radius: var(--radius); background: var(--accent-subtle, rgba(99,102,241,0.06)); border: 1px solid var(--accent-border, rgba(99,102,241,0.2));">
     <label style="display: block; font-weight: 500; margin-bottom: 0.5rem; font-size: 0.875rem;">{{ t("settings-public-page-label") }}</label>
-    <div style="display: flex; gap: 0.5rem; align-items: center;">
-      <input type="text" id="public-url" readonly value="" style="flex: 1; font-size: 0.85rem; padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); font-family: monospace;">
-      <button type="button" id="copy-url-btn" class="slot-btn" style="cursor: pointer; font-weight: 600; color: var(--accent); border-color: var(--accent); white-space: nowrap;">{{ t("settings-copy") }}</button>
-      <a id="open-url-link" href="" target="_blank" rel="noopener noreferrer" class="slot-btn" style="text-decoration: none; font-size: 0.85rem; white-space: nowrap;">{{ t("settings-open") }} &#8599;</a>
+    <div class="btn-row" style="gap: 0.5rem;">
+      <input type="text" id="public-url" readonly value="" style="flex: 1 1 12rem; min-width: 0; font-size: 0.85rem; padding: 0.5rem 0.75rem; border: 1px solid var(--field-border); border-radius: var(--radius); background: var(--surface); color: var(--text); font-family: var(--mono);">
+      <button type="button" id="copy-url-btn" class="btn btn-secondary btn-sm btn-auto" style="white-space: nowrap;">{{ t("settings-copy") }}</button>
+      <a id="open-url-link" href="" target="_blank" rel="noopener noreferrer" class="btn btn-ghost btn-sm btn-auto" style="white-space: nowrap;">{{ t("settings-open") }} &#8599;</a>
     </div>
   </div>
   <script>
@@ -36,7 +36,7 @@
         btn.textContent = {{ t('settings-copied') | tojson }};
         btn.style.color = 'var(--success)';
         btn.style.borderColor = 'var(--success)';
-        setTimeout(function() { btn.textContent = {{ t('settings-copy') | tojson }}; btn.style.color = 'var(--accent)'; btn.style.borderColor = 'var(--accent)'; }, 1500);
+        setTimeout(function() { btn.textContent = {{ t('settings-copy') | tojson }}; btn.style.color = ''; btn.style.borderColor = ''; }, 1500);
       });
     });
   })();
@@ -54,14 +54,17 @@
           {{ form_initials }}
         {% endif %}
       </div>
-      <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
-        <form method="post" action="/dashboard/settings/avatar" enctype="multipart/form-data" style="margin: 0; display: flex; gap: 0.5rem; align-items: center;">
-          <input type="file" name="avatar" accept="image/png,image/jpeg,image/gif,image/webp" data-max-bytes="{{ avatar_max_bytes }}" data-too-big="{{ t('avatar-upload-refused') }}" required style="font-size: 0.85rem;">
-          <button type="submit" class="slot-btn" style="cursor: pointer; font-weight: 600; color: var(--accent); border-color: var(--accent);">{{ t("settings-upload") }}</button>
+      <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; flex: 1 1 auto; min-width: 0;">
+        <form method="post" action="/dashboard/settings/avatar" enctype="multipart/form-data" style="margin: 0; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; min-width: 0;">
+          {# ilia fork: the browser's own file control speaks the browser's
+             language, not the page's; a label button opens the hidden input. #}
+          <label class="btn btn-secondary btn-sm btn-auto file-pick">{{ t("settings-choose-file") }}<input type="file" name="avatar" accept="image/png,image/jpeg,image/gif,image/webp" data-max-bytes="{{ avatar_max_bytes }}" data-too-big="{{ t('avatar-upload-refused') }}" required class="file-pick-input"></label>
+          <span class="file-pick-name" data-file-name>{{ t("settings-no-file") }}</span>
+          <button type="submit" class="btn btn-sm btn-auto">{{ t("settings-upload") }}</button>
         </form>
         {% if has_avatar %}
         <form method="post" action="/dashboard/settings/avatar/delete" style="margin: 0;">
-          <button type="submit" class="slot-btn" style="cursor: pointer; font-size: 0.85rem; color: var(--error-text);">{{ t("settings-remove") }}</button>
+          <button type="submit" class="btn btn-danger btn-sm btn-auto">{{ t("settings-remove") }}</button>
         </form>
         {% endif %}
       </div>
@@ -82,44 +85,43 @@
     <div class="form-group">
       <label for="username">{{ t("settings-username") }} <span class="hint">{{ t("settings-username-hint") }}</span></label>
       <input type="text" id="username" name="username" required maxlength="100" value="{{ username }}" placeholder="alice-martin" pattern="[a-z0-9\-]+" title="{{ t('settings-username-pattern-title') }}">
-      <span class="hint" style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">{{ t("settings-username-help") }} /u/{{ username }}</span>
+      <span class="hint">{{ t("settings-username-help") }} /u/{{ username }}</span>
     </div>
 
     <div class="form-group">
       <label for="title">{{ t("settings-title") }}</label>
       <input type="text" id="title" name="title" value="{{ form_title }}" placeholder="{{ t('settings-title-placeholder') }}">
-      <span class="hint" style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">{{ t("settings-title-help") }}</span>
+      <span class="hint">{{ t("settings-title-help") }}</span>
     </div>
 
     <div class="form-group">
       <label for="bio">{{ t("settings-bio") }}</label>
-      <div style="border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;">
-        <div class="md-toolbar" data-target="bio" style="display: flex; gap: 0.25rem; padding: 0.375rem 0.5rem; background: var(--surface-hover); border-bottom: 1px solid var(--border);">
-          <button type="button" data-action="bold" title="{{ t('editor-bold') }}" style="padding: 0.25rem 0.5rem; background: none; border: 1px solid transparent; border-radius: 3px; cursor: pointer; font-weight: 700; font-size: 0.85rem; color: var(--text); font-family: inherit; line-height: 1;">B</button>
-          <button type="button" data-action="italic" title="{{ t('editor-italic') }}" style="padding: 0.25rem 0.5rem; background: none; border: 1px solid transparent; border-radius: 3px; cursor: pointer; font-style: italic; font-size: 0.85rem; color: var(--text); font-family: inherit; line-height: 1;">I</button>
-          <button type="button" data-action="strikethrough" title="{{ t('editor-strikethrough') }}" style="padding: 0.25rem 0.5rem; background: none; border: 1px solid transparent; border-radius: 3px; cursor: pointer; text-decoration: line-through; font-size: 0.85rem; color: var(--text); font-family: inherit; line-height: 1;">S</button>
-          <button type="button" data-action="code" title="{{ t('editor-code') }}" style="padding: 0.25rem 0.5rem; background: none; border: 1px solid transparent; border-radius: 3px; cursor: pointer; font-family: monospace; font-size: 0.85rem; color: var(--text); line-height: 1;">&lt;/&gt;</button>
+      <div style="border: 1px solid var(--field-border); border-radius: var(--radius); overflow: hidden;">
+        <div class="md-toolbar" data-target="bio">
+          <button type="button" data-action="bold" title="{{ t('editor-bold') }}">B</button>
+          <button type="button" data-action="italic" title="{{ t('editor-italic') }}">I</button>
+          <button type="button" data-action="strikethrough" title="{{ t('editor-strikethrough') }}" style="text-decoration: line-through;">S</button>
+          <button type="button" data-action="code" title="{{ t('editor-code') }}" style="font-family: monospace;">&lt;/&gt;</button>
           <div style="width: 1px; background: var(--border); margin: 0.125rem 0.25rem;"></div>
-          <button type="button" data-action="link" title="{{ t('editor-link') }}" style="padding: 0.25rem 0.5rem; background: none; border: 1px solid transparent; border-radius: 3px; cursor: pointer; font-size: 0.85rem; color: var(--text); font-family: inherit; line-height: 1;">&#128279;</button>
-          <div style="flex: 1;"></div>
-          <button type="button" class="md-preview-toggle" title="{{ t('editor-toggle-preview') }}" style="padding: 0.25rem 0.5rem; background: none; border: 1px solid transparent; border-radius: 3px; cursor: pointer; font-size: 0.75rem; color: var(--text-muted); font-family: inherit; line-height: 1;">{{ t("editor-preview") }}</button>
+          <button type="button" data-action="link" title="{{ t('editor-link') }}" aria-label="{{ t('editor-link') }}"><svg class="icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></button>
+          <button type="button" class="md-preview-toggle" title="{{ t('editor-toggle-preview') }}">{{ t("editor-preview") }}</button>
         </div>
         <textarea id="bio" name="bio" rows="3" placeholder="{{ t('settings-bio-placeholder') }}" style="border: none; border-radius: 0; width: 100%; resize: vertical; padding: 0.5rem 0.75rem; font-family: inherit; font-size: 0.9rem; background: var(--surface); color: var(--text); box-sizing: border-box;">{{ form_bio }}</textarea>
         <div id="bio-preview" style="display: none; padding: 0.5rem 0.75rem; min-height: 4rem; font-size: 0.9rem; color: var(--text); background: var(--surface);"></div>
       </div>
-      <span class="hint" style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">{{ t("settings-bio-help") }}</span>
+      <span class="hint">{{ t("settings-bio-help") }}</span>
     </div>
 
     <div class="form-group">
       <label for="booking_email">{{ t("settings-booking-email") }}</label>
       <input type="email" id="booking_email" name="booking_email" maxlength="255" value="{{ form_booking_email }}" placeholder="{{ user_email }}">
-      <span class="hint" style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">{{ t("settings-booking-email-help") }}</span>
-      <span style="font-size: 0.8rem; color: var(--warning, #b08800); display: block; margin-top: 0.25rem;">{{ t("settings-booking-email-warning") }}</span>
+      <span class="hint">{{ t("settings-booking-email-help") }}</span>
+      <span style="font-size: 0.8rem; color: var(--warn); display: block; margin-top: 0.25rem;">{{ t("settings-booking-email-warning") }}</span>
     </div>
 
     <div class="form-group">
       <label for="timezone">{{ t("settings-timezone") }}</label>
-      <select id="timezone" name="timezone" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); font-size: 0.9rem;">
+      <select id="timezone" name="timezone">
         {% for group in tz_options %}
           <optgroup label="{{ group.label }}">
           {% for tz in group.options %}
@@ -128,49 +130,49 @@
           </optgroup>
         {% endfor %}
       </select>
-      <span class="hint" style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">{{ t("settings-timezone-help") }}</span>
+      <span class="hint">{{ t("settings-timezone-help") }}</span>
     </div>
 
     <div class="form-group">
       <label for="language">{{ t("settings-language") }}</label>
-      <select id="language" name="language" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); font-size: 0.9rem;">
+      <select id="language" name="language">
         <option value="auto" {% if not form_language %}selected{% endif %}>{{ t("settings-language-auto") }}</option>
         {% for lang in lang_options %}
           <option value="{{ lang.value }}" {% if lang.value == form_language %}selected{% endif %}>{{ lang.label }}</option>
         {% endfor %}
       </select>
-      <span class="hint" style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">{{ t("settings-language-help") }}</span>
+      <span class="hint">{{ t("settings-language-help") }}</span>
     </div>
 
     <div class="form-group">
       <label for="public_page_language">{{ t("settings-public-page-language") }}</label>
-      <select id="public_page_language" name="public_page_language" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); font-size: 0.9rem;">
+      <select id="public_page_language" name="public_page_language">
         <option value="visitor" {% if form_public_page_language != "host" %}selected{% endif %}>{{ t("settings-public-page-language-visitor") }}</option>
         <option value="host" {% if form_public_page_language == "host" %}selected{% endif %}>{{ t("settings-public-page-language-host") }}</option>
       </select>
-      <span class="hint" style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">{{ t("settings-public-page-language-help") }}</span>
+      <span class="hint">{{ t("settings-public-page-language-help") }}</span>
     </div>
 
     <div class="form-group" style="margin-top: 1rem;">
-      <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-        <input type="checkbox" name="allow_dynamic_group" {% if allow_dynamic_group %}checked{% endif %} style="width: auto;">
+      <label style="display: flex; align-items: flex-start; gap: 0.5rem; cursor: pointer;">
+        <input type="checkbox" name="allow_dynamic_group" {% if allow_dynamic_group %}checked{% endif %} style="width: auto; margin-top: 0.18rem; flex-shrink: 0;">
         {{ t("settings-dynamic-group") }}
       </label>
-      <span class="hint" style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">{{ t("settings-dynamic-group-help", example='<code>/u/you+them/meeting</code>') | safe }}</span>
+      <span class="hint">{{ t("settings-dynamic-group-help", example='<code>/u/you+them/meeting</code>') | safe }}</span>
     </div>
 
     <div class="form-group" style="margin-top: 1rem;">
-      <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-        <input type="checkbox" name="lend_resource_write" {% if lend_resource_write %}checked{% endif %} style="width: auto;">
+      <label style="display: flex; align-items: flex-start; gap: 0.5rem; cursor: pointer;">
+        <input type="checkbox" name="lend_resource_write" {% if lend_resource_write %}checked{% endif %} style="width: auto; margin-top: 0.18rem; flex-shrink: 0;">
         {{ t("settings-lend-resource") }}
       </label>
-      <span class="hint" style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">{{ t("settings-lend-resource-help") }}</span>
+      <span class="hint">{{ t("settings-lend-resource-help") }}</span>
     </div>
 
     <div id="availability" style="border-top: 1px solid var(--border); padding-top: 1.25rem; margin-top: 1.25rem;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
         <h3 style="font-size: 0.95rem; margin-bottom: 0;">{{ t("settings-default-availability") }}</h3>
-        <button type="button" id="copy-to-all-btn" style="padding: 0.25rem 0.625rem; border: 1px solid var(--border); border-radius: var(--radius); background: transparent; color: var(--text-muted); cursor: pointer; font-size: 0.75rem; transition: all 0.15s ease;" title="{{ t('settings-copy-to-all-title') }}">{{ t("settings-copy-to-all") }}</button>
+        <button type="button" id="copy-to-all-btn" class="btn btn-secondary btn-sm btn-auto" title="{{ t('settings-copy-to-all-title') }}">{{ t("settings-copy-to-all") }}</button>
       </div>
       <span class="hint" style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 0.75rem;">{{ t("settings-default-availability-help") }}</span>
       {% set week_start_inherit = "site" %}
@@ -185,15 +187,21 @@
 
 <div class="card" style="margin-top: 1.25rem;">
   <h2 style="font-size: 1rem; margin-bottom: 0.75rem;">{{ t("settings-appearance") }}</h2>
-  <div id="theme-picker" style="display: flex; gap: 0.5rem;">
-    <button type="button" data-theme="system" class="slot-btn" style="cursor: pointer; font-size: 0.85rem; padding: 0.5rem 1rem; display: flex; align-items: center; gap: 0.375rem;">
-      <span style="font-size: 0.9rem;">&#128187;</span> {{ t("settings-theme-system") }}
+  <style>
+    #theme-picker [aria-pressed="true"] { border-color: var(--text); color: var(--text); background: var(--surface-hover); font-weight: 600; }
+  </style>
+  <div id="theme-picker" class="btn-row" role="group" aria-label="{{ t('settings-appearance') }}" style="gap: 0.5rem;">
+    <button type="button" data-theme="system" class="btn btn-secondary btn-sm btn-auto" aria-pressed="false">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+      {{ t("settings-theme-system") }}
     </button>
-    <button type="button" data-theme="light" class="slot-btn" style="cursor: pointer; font-size: 0.85rem; padding: 0.5rem 1rem; display: flex; align-items: center; gap: 0.375rem;">
-      <span style="font-size: 0.9rem;">&#9728;&#65039;</span> {{ t("settings-theme-light") }}
+    <button type="button" data-theme="light" class="btn btn-secondary btn-sm btn-auto" aria-pressed="false">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+      {{ t("settings-theme-light") }}
     </button>
-    <button type="button" data-theme="dark" class="slot-btn" style="cursor: pointer; font-size: 0.85rem; padding: 0.5rem 1rem; display: flex; align-items: center; gap: 0.375rem;">
-      <span style="font-size: 0.9rem;">&#127769;</span> {{ t("settings-theme-dark") }}
+    <button type="button" data-theme="dark" class="btn btn-secondary btn-sm btn-auto" aria-pressed="false">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      {{ t("settings-theme-dark") }}
     </button>
   </div>
   <script>
@@ -202,15 +210,7 @@
     var btns = document.querySelectorAll('#theme-picker button');
     function applyActive() {
       btns.forEach(function(b) {
-        if (b.dataset.theme === current) {
-          b.style.borderColor = 'var(--accent)';
-          b.style.color = 'var(--accent)';
-          b.style.fontWeight = '600';
-        } else {
-          b.style.borderColor = '';
-          b.style.color = '';
-          b.style.fontWeight = '';
-        }
+        b.setAttribute('aria-pressed', b.dataset.theme === current ? 'true' : 'false');
       });
     }
     btns.forEach(function(b) {
@@ -229,9 +229,6 @@
         } else {
           document.documentElement.classList.remove('dark');
         }
-        // Update footer toggle icon if present
-        var icon = document.getElementById('theme-icon');
-        if (icon) icon.textContent = isDark ? '\u2600\uFE0F' : '\uD83C\uDF19';
       });
     });
     applyActive();
@@ -287,7 +284,7 @@
         opts += '<option value="' + t + '"' + (t === val ? ' selected' : '') + '>' + t + '</option>';
       }
     }
-    return '<select class="' + cls + '" style="padding:0.4rem 0.5rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text);font-family:inherit;font-size:0.85rem;min-width:90px;">' + opts + '</select>';
+    return '<select class="' + cls + '" style="padding:0.4rem 0.5rem;border:1px solid var(--field-border);border-radius:var(--radius);background:var(--surface);color:var(--text);font-family:inherit;font-size:0.85rem;min-width:90px;">' + opts + '</select>';
   }
 
   var weekStartSelect = document.getElementById('week_start');
@@ -310,7 +307,7 @@
       var toggle = document.createElement('input');
       toggle.type = 'checkbox';
       toggle.checked = enabled;
-      toggle.style.cssText = 'accent-color:var(--accent);width:1rem;height:1rem;margin-top:0.3rem;cursor:pointer;flex-shrink:0;';
+      toggle.style.cssText = 'accent-color:var(--accent);width:1rem;height:1rem;margin-top:0.5rem;cursor:pointer;flex-shrink:0;';
       toggle.addEventListener('change', (function(day) {
         return function() {
           if (this.checked) { schedule[day] = [{ start: '09:00', end: '17:00' }]; }
@@ -321,7 +318,7 @@
       dayRow.appendChild(toggle);
 
       var label = document.createElement('div');
-      label.style.cssText = 'width:80px;font-size:0.875rem;font-weight:500;padding-top:0.25rem;flex-shrink:0;' + (!enabled ? 'color:var(--text-muted);' : '');
+      label.style.cssText = 'width:2.5rem;font-size:0.875rem;font-weight:500;padding-top:0.3rem;flex-shrink:0;' + (!enabled ? 'color:var(--text-muted);' : '');
       label.textContent = dayShort[d];
       dayRow.appendChild(label);
 
@@ -342,7 +339,9 @@
           if (wi === schedule[d].length - 1) {
             var addBtn = document.createElement('button');
             addBtn.type = 'button'; addBtn.textContent = '+'; addBtn.title = {{ t('settings-add-window') | tojson }};
-            addBtn.style.cssText = 'padding:0.2rem 0.5rem;border:1px solid var(--border);border-radius:var(--radius);background:transparent;color:var(--text-muted);cursor:pointer;font-size:0.85rem;line-height:1;';
+            addBtn.className = 'btn btn-secondary btn-sm btn-auto';
+            addBtn.setAttribute('aria-label', addBtn.title);
+            addBtn.style.minWidth = '2rem';
             addBtn.addEventListener('click', (function(day) {
               return function() { schedule[day].push({ start: '09:00', end: '17:00' }); renderSchedule(); serializeSchedule(); };
             })(d));
@@ -351,7 +350,10 @@
           if (schedule[d].length > 1) {
             var rmBtn = document.createElement('button');
             rmBtn.type = 'button'; rmBtn.innerHTML = '&times;'; rmBtn.title = {{ t('settings-remove-window') | tojson }};
-            rmBtn.style.cssText = 'padding:0.2rem 0.4rem;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:1rem;line-height:1;';
+            rmBtn.className = 'btn btn-ghost btn-sm btn-auto';
+            rmBtn.setAttribute('aria-label', rmBtn.title);
+            rmBtn.style.minWidth = '2rem';
+            rmBtn.style.fontSize = '1rem';
             rmBtn.addEventListener('click', (function(day, idx) {
               return function() { schedule[day].splice(idx, 1); renderSchedule(); serializeSchedule(); };
             })(d, wi));

@@ -392,8 +392,10 @@ async fn troubleshoot_label(lang: Option<&str>) -> String {
 async fn troubleshoot_shows_busy_for_an_event_without_title() {
     let body = troubleshoot_label(None).await;
     assert!(body.contains("Calendar event: Busy"), "{body}");
+    assert!(body.contains("Monday"), "{body}");
     let body = troubleshoot_label(Some("ru")).await;
     assert!(body.contains("Занято"), "{body}");
+    assert!(body.contains("понедельник"), "{body}");
 }
 
 /// The provider path (Google, Microsoft, …) keeps the same busy times and

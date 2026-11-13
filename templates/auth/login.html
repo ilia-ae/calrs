@@ -1,20 +1,17 @@
 {% extends "base.html" %}
 {% block title %}{{ t("login-page-title") }} — calrs{% endblock %}
 {% block content %}
-<style>
-.btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
-.btn-secondary:hover { background: var(--surface-hover); }
-</style>
+<div class="page-narrow">
 <div class="card" style="margin-top: 3rem;">
   <h1>{{ t("login-heading") }}</h1>
   <p class="subtitle">{% if brand_name %}{{ t("ilia-login-subtitle", brand=brand_name) }}{% else %}{{ t("login-subtitle") }}{% endif %}</p>
 
   {% if error %}
-  <div class="error">{{ error }}</div>
+  <div class="error" role="alert">{{ error }}</div>
   {% endif %}
 
   {% if oidc_enabled %}
-  <a href="/auth/oidc/login" class="btn" style="display: block; text-align: center; text-decoration: none; margin-bottom: 1.5rem;">{{ t("login-sso") }}</a>
+  <a href="/auth/oidc/login" class="btn" style="margin-bottom: 1.5rem;">{{ t("login-sso") }}</a>
   <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem;">
     <hr style="flex: 1; border: none; border-top: 1px solid var(--border);">
     <span style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em;">{{ t("login-or") }}</span>
@@ -36,8 +33,9 @@
 
   {% if registration_enabled %}
   <p style="text-align: center; margin-top: 1.25rem; font-size: 0.875rem; color: var(--text-muted);">
-    {{ t("login-no-account", link='<a href="/auth/register" style="color: var(--accent); text-decoration: none;">' ~ (t("login-register-link") | escape) ~ '</a>') | safe }}
+    {{ t("login-no-account", link='<a href="/auth/register">' ~ (t("login-register-link") | escape) ~ '</a>') | safe }}
   </p>
   {% endif %}
+</div>
 </div>
 {% endblock %}

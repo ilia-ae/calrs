@@ -27,12 +27,45 @@ confirmed-add-to-calendar = Adicionar à agenda
 
 # Slot picker (templates/slots.html)
 
+## ilia-ov-slots
+slots-time-format-24 = 24 h
+slots-time-format-12 = 12 h
+slots-prev-month = Mês anterior
+slots-next-month = Próximo mês
+slots-prev-week = Semana anterior
+slots-next-week = Próxima semana
+book-remove-guest = Remover convidado
+ilia-error-back-to-site = Voltar ao site
+
 slots-location-video = Chamada de vídeo
 slots-location-phone = Ligação
 slots-location-google-meet = Google Meet
 
 slots-tz-label = Seu fuso horário
 slots-time-format-label = Formato de horário
+
+## ilia-ov5-guest
+tz-city-midway = Midway
+tz-city-hawaii = Havaí
+tz-city-alaska = Alasca
+tz-city-los-angeles = Los Angeles
+tz-city-denver = Denver
+tz-city-chicago = Chicago
+tz-city-new-york = Nova York
+tz-city-sao-paulo = São Paulo
+tz-city-cape-verde = Cabo Verde
+tz-city-london = Londres
+tz-city-paris = Paris, Bruxelas
+tz-city-helsinki = Helsinque, Kyiv
+tz-city-moscow = Moscou
+tz-city-dubai = Dubai
+tz-city-india = Índia
+tz-city-bangkok = Bangkok
+tz-city-shanghai = Xangai
+tz-city-tokyo = Tóquio
+tz-city-sydney = Sydney
+tz-city-auckland = Auckland
+
 tz-group-common = Fusos horários comuns
 tz-region-africa = África
 tz-region-america = Américas
@@ -68,6 +101,12 @@ slots-weekday-sat-short = S
 slots-weekday-sun-short = D
 
 slots-select-date = Selecione uma data
+
+## ilia-ov3-guest
+# The deferred slot load failed (slots.html); the booking form's TON price note (partials/ton_price.html).
+slots-load-failed = Não foi possível carregar a disponibilidade. Atualize a página.
+ton-book-price-note = pago em TON depois de agendar
+
 slots-loading-availability = Carregando disponibilidade...
 slots-click-highlighted = Selecione uma data destacada para ver horários disponíveis
 slots-bookable-range-both = Agendável de { $from } até { $until }
@@ -289,6 +328,11 @@ email-confirm-reschedule-notice = Observação: o reagendamento exige pelo menos
 
 # Event type form: cancel/reschedule minimum notice (templates/event_type_form.html)
 
+## ilia-ov-eventform
+# The collapsed "Payment in TON" section's summary: no payment, or the price comes from the demand ladder.
+ton-etf-hint-off = Grátis
+ton-etf-hint-ladder = Pela demanda
+
 # Google Meet (templates/event_type_form.html, src/google_meet.rs)
 event-type-form-location-google-meet = Google Meet (link gerado automaticamente)
 event-type-form-location-google-meet-hint = Na confirmação é criado um link exclusivo do Google Meet, em nome do anfitrião designado. Todo anfitrião (você ou cada membro elegível da equipe) precisa ter o Google Agenda conectado com uma agenda de gravação selecionada.
@@ -338,12 +382,23 @@ booking-blocked-body = O anfitrião exige pelo menos { $minutes } minutos de ant
 
 # Dashboard event types listing (templates/dashboard_event_types.html)
 
+## ilia-ov-dates
+# Booking times on the dashboard lists: the day ("Today", "Tomorrow", a weekday
+# or a date), then the start and end times and the host timezone.
+dashboard-when-today = Hoje
+dashboard-when-tomorrow = Amanhã
+dashboard-when-range = { $date }, { $start } — { $end } { $tz }
+
 dashboard-event-types-copy = Copiar
 dashboard-event-types-copied = Copiado!
 dashboard-event-types-copy-title = Copiar link de agendamento
 dashboard-event-types-copy-failed = Falha ao copiar
 
 # Dashboard sidebar and shared chrome (templates/dashboard_base.html)
+
+## ilia-ov-shell
+nav-menu = Menu
+event-types-more-actions = Mais ações
 
 nav-section-scheduling = Agendamento
 nav-overview = Visão geral
@@ -415,6 +470,11 @@ overview-action-reason-team-admin = Requer uma equipe: crie uma primeiro
 overview-action-reason-team-member = Requer uma equipe: peça a um administrador
 
 # Dashboard bookings (templates/dashboard_bookings.html)
+
+## ilia-ov-lists
+team-form-slug-placeholder = engenharia
+troubleshoot-label-past = Já passou
+troubleshoot-legend-beyond-horizon = Além do horizonte ou do período
 
 bookings-page-title = Agendamentos
 bookings-pending-approval = Aguardando aprovação
@@ -553,6 +613,13 @@ editor-preview = Pré-visualização
 
 # Profile and settings (templates/settings.html)
 
+## ilia-ov-settings
+settings-choose-file = Escolher arquivo
+settings-no-file = Nenhum arquivo escolhido
+admin-provider-local = Senha
+admin-provider-oidc = SSO
+admin-theme-vates-desc = Vermelho e azul espacial
+
 settings-page-title = Configurações
 settings-heading = Perfil e configurações
 settings-public-page-label = Sua página de agendamento pública
@@ -604,6 +671,11 @@ settings-theme-light = Claro
 settings-theme-dark = Escuro
 
 # Sign in (templates/auth/login.html)
+
+## ilia-ov-auth
+ilia-mfa-recovery-copy = Copiar os códigos
+ilia-mfa-recovery-copied = Códigos copiados
+ilia-mfa-recovery-copy-manual = Não foi possível copiar. Os códigos estão selecionados: copie-os manualmente.
 
 login-page-title = Entrar
 login-heading = Entrar
@@ -692,6 +764,15 @@ team-profile-subtitle = Escolha um tipo de evento para agendar um horário.
 team-profile-empty = Ainda não há tipos de evento disponíveis.
 
 # Availability troubleshoot (templates/troubleshoot.html, src/web/mod.rs)
+
+## ilia-ov2-lists
+# The troubleshoot timeline's legend entry for time already gone today.
+troubleshoot-legend-past = Tempo passado
+# Accessible names of the troubleshoot page's day arrows.
+troubleshoot-prev-day = Dia anterior
+troubleshoot-next-day = Dia seguinte
+# Accessible name of a member's role select on the team settings page.
+team-settings-role-of = Função de { $name }
 
 troubleshoot-page-title = Diagnóstico
 troubleshoot-empty = Nenhum tipo de evento encontrado. { $link } para começar a diagnosticar a disponibilidade.
@@ -796,6 +877,11 @@ source-form-heading-add = Conectar uma agenda
 source-form-subtitle-edit = Atualize a conexão. Deixe a senha em branco para manter a atual. Depois de alterar a URL ou o usuário, execute uma sincronização para atualizar a lista de agendas detectadas.
 source-form-subtitle-add = Conecte um servidor CalDAV ou o Microsoft Exchange (EWS) para que o calrs possa verificar a disponibilidade quando alguém agendar.
 source-form-backend = Backend
+
+## ilia-ov3-dash
+# The "Other / generic CalDAV" preset on the new-source form; it also becomes the default source name.
+source-form-preset-other = Outro servidor CalDAV
+
 source-form-preset = Predefinição
 source-form-connect-google = Conectar com o Google
 source-form-google-unavailable = O Google Agenda não está disponível. Fale com a administração.
@@ -936,6 +1022,10 @@ etf-min-notice-help = Com quanta antecedência é preciso agendar.
 etf-section-limits = Limites de agendamento
 etf-first-slot-only = Um horário por dia
 etf-first-slot-only-help = Mostrar apenas o primeiro horário disponível de cada dia.
+
+## ilia-ov4-dash
+etf-freq-per-member = Por membro da equipe
+
 etf-freq-limit = Limitar a frequência de agendamentos
 etf-freq-limit-help = Limitar quantas vezes este evento pode ser agendado por período.
 etf-add-limit = Adicionar um limite
@@ -1229,8 +1319,25 @@ admin-sms-gateway = Gateway:
 admin-sms-account = Conta:
 admin-sms-sender = Remetente:
 admin-sms-enabled = SMS ativados
+## ilia-ov3-admin
+admin-sms-provider-webhook = Webhook próprio
+admin-sms-webhook-secret = Segredo HMAC
 admin-sms-gateway-label = Gateway
 admin-required-on-switch = Obrigatório ao trocar de gateway
+## ilia-ov2-settings
+admin-sms-sender-label = Remetente
+admin-sms-api-base-url = URL base da API
+admin-sms-region-base-url = URL base da região
+admin-sms-webhook-url = URL do webhook
+admin-sms-twilio-sender-hint = Um número Twilio no formato E.164 (+15551234567), ou um ID de remetente alfanumérico onde o país de destino permitir.
+admin-sms-twilio-base-url-hint = Opcional. Padrão: https://api.twilio.com. Use https: a credencial trafega por esta conexão.
+admin-sms-gatewayapi-sender-hint = Até 11 caracteres alfanuméricos, ou 15 dígitos.
+admin-sms-gatewayapi-base-url-hint = Opcional. Padrão: https://gatewayapi.com; use https://gatewayapi.eu para manter o tráfego na UE.
+admin-sms-sevenio-sender-hint = Até 11 caracteres alfanuméricos, ou 16 dígitos.
+admin-sms-sevenio-base-url-hint = Opcional. Padrão: https://gateway.seven.io.
+admin-sms-webhook-sender-hint = Opcional. Repassado ao seu endpoint como "sender".
+admin-sms-webhook-base-url-hint = O calrs envia aqui um POST {"{"}"to", "text", "sender"{"}"} e espera uma resposta 2xx.
+
 admin-sms-docs = Documentação da API do { $provider }
 admin-sms-country = Código de país padrão
 admin-sms-country-hint = (usado quando os convidados informam um número local)
@@ -1710,7 +1817,7 @@ ton-pay-qr-alt = Código QR com os dados do pagamento
 ton-pay-scan = Ou escaneie este código com o app da sua carteira.
 ton-pay-qr-alt-tonkeeper = Código QR para o Tonkeeper com os dados do pagamento
 ton-pay-scan-tonkeeper = Ou escaneie este código com o Tonkeeper ou com a câmera do celular.
-ton-pay-qr-other = Outra carteira, como a MyTonWallet? Mostrar o código QR dela
+ton-pay-qr-other = Código QR para outra carteira (MyTonWallet, etc.)
 ton-pay-address = Endereço
 ton-pay-comment = Comentário
 ton-pay-copy = Copiar
@@ -1719,7 +1826,7 @@ ton-pay-warn-comment = O comentário é obrigatório: é por ele que reconhecemo
 ton-pay-warn-encrypt = Não criptografe o comentário.
 ton-pay-warn-token = Pague em TON, não com tokens.
 ton-pay-warn-exchange = Pagando a partir de uma corretora? Coloque o código acima no campo memo (comentário).
-ton-pay-warn-deadline = Envie o pagamento antes de { $time }. Um pagamento enviado depois pode não ser considerado.
+ton-pay-warn-deadline = Envie o pagamento antes de { $time } ({ $zone }). Um pagamento enviado depois pode não ser considerado.
 ton-pay-check = Já paguei, verificar
 ton-pay-email = Enviar este link por e-mail
 ton-pay-emailed = Enviamos este link para o e-mail usado no agendamento.
@@ -2173,6 +2280,9 @@ ton-etf-ladder-help = O preço é o degrau do número de suas próximas reservas
 # ilia fork: the TON settings page (/dashboard/admin/ton)
 nav-admin-ton = Pagamentos TON
 ton-etf-ladder-edit = Editar a escada
+## ilia-ov-ton
+ton-admin-debug-tg-saved-locked = Nada mudou: o usuário do Telegram do convidado está bloqueado.
+dbg-err-requote = O preço mudou duas vezes durante a reserva. Nada foi reservado: tente de novo.
 ton-admin-page-title = Pagamentos TON
 ton-admin-heading = Pagamentos TON
 ton-admin-intro = Estas configurações valem para os pagamentos TON deste servidor. Vence um valor definido no ambiente do servidor, depois um salvo aqui ou pelo config apply, depois o padrão.
@@ -2191,6 +2301,13 @@ ton-admin-address-raw = Forma bruta
 ton-admin-indexer = Indexador
 ton-admin-watcher = Monitor
 ton-admin-watcher-ready = pronto
+
+## ilia-ov3-ton
+ton-admin-notready-wallet = a carteira de recebimento não está ativa (ou ainda não foi verificada)
+ton-admin-notready-network = o indexador está noutra rede (ou ainda não foi verificado)
+ton-admin-notready-stale = o monitor não concluiu nenhum passo nos últimos 2 minutos
+ton-admin-off-unset = CALRS_TON_NETWORK não está definida
+
 ton-admin-watcher-not-ready = não está pronto: { $reason }
 ton-admin-last-step = último passo
 ton-admin-open-invoices = Faturas abertas
@@ -2228,7 +2345,7 @@ ton-admin-f-rate_max_age_min = Cotação mais antiga aceita (minutos)
 ton-admin-f-rate_max_jump_pct = Maior salto em relação à última cotação (%)
 ton-admin-f-alert_email = E-mail dos alertas (vazio: todos os administradores)
 ton-admin-ladder-help = Degraus separados por vírgulas: o preço com 0, 1, 2… reservas confirmadas nos próximos dias; o último degrau é o teto. "free" só no começo: uma reserva grátis espera a aprovação do dono.
-ton-admin-ladder-row = A partir de %1 reservas
+ton-admin-ladder-row = Reservas: %1
 ton-admin-ladder-add = Adicionar um degrau
 ton-admin-ladder-remove = Remover
 ton-admin-free = grátis
@@ -2264,7 +2381,7 @@ ton-admin-via-apply = config apply
 nav-admin-debug-booking = Reserva de teste
 dbg-title = Reserva de teste
 dbg-intro = Agende uma reunião de teste como um convidado faria, sem preencher o formulário do convidado toda vez. A reserva passa pelo mesmo caminho da página pública de agendamento: as verificações, o preço e a fatura em TON, a retenção do horário e os e-mails. O pagamento nunca é pulado nem marcado como recebido: pague a fatura pela sua carteira ou cancele a reserva.
-dbg-switch-note = Desative esta página quando terminar a depuração, com o interruptor no topo da página Pagamentos TON:
+dbg-switch-note = Desative esta página quando terminar a depuração, com o interruptor no topo da página:
 dbg-cancelled = Reservas de teste canceladas: { $count }.
 dbg-no-types = Você não tem nenhum tipo de evento pessoal ativado.
 dbg-event-type = Tipo de evento
@@ -2346,7 +2463,7 @@ dbg-telegram-from-chat = Preenchido a partir do seu chat do Telegram vinculado.
 dbg-telegram-from-setting = Preenchido a partir do bloco Debug de
 dbg-telegram-none = Nada para preencher: defina um nome no bloco Debug de
 dbg-timing = Prazos desta reserva de teste
-dbg-timing-normal = Normais: as configurações do site (Admin → TON payments)
+dbg-timing-normal = Normais: as configurações do site (página “Pagamentos TON”)
 dbg-timing-fast = Teste rápido: { $window } min para pagar; renovações: { $renewals }, de { $renew } min cada (o convidado é chamado a pagar de novo); depois a fatura expira e a reserva é cancelada automaticamente. Tolerância { $grace } min, margem { $margin } min.
 dbg-timing-custom = Personalizados, em minutos (um campo vazio usa o valor rápido):
 dbg-timing-window = Janela de pagamento, min

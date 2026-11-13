@@ -62,6 +62,45 @@ async fn admin_page_returns_200_for_admin() {
     }
 }
 
+/// ilia fork: the admin page uses the shared button system, shows the sign-in
+/// method and the Vates description in the page language, puts "(you)" in the
+/// user's own row, and picks files with a translated label button.
+#[tokio::test]
+async fn admin_page_uses_the_shared_buttons_and_translated_labels() {
+    let (app, _, session, _) = setup_test_app().await;
+    let body = body_string(
+        app.oneshot(get_authed("/dashboard/admin", &session))
+            .await
+            .unwrap(),
+    )
+    .await;
+    // The page's own content (the dashboard's timezone banner sits above it).
+    let content = body.split_once("<h1>").expect("page heading").1;
+    assert!(
+        !content.contains("slot-btn"),
+        "no slot buttons left: {content}"
+    );
+    assert!(!content.contains("#d97706"), "{content}");
+    // The test user signs in with a password; the raw column value is not shown.
+    assert!(body.contains(">Password</span>"), "{body}");
+    assert!(!body.contains(">local</span>"), "{body}");
+    // "(you)" sits in the badge row, not on a line of its own.
+    assert!(body.contains(">Password</span>\n            <span style=\"font-size: 0.75rem; color: var(--text-muted);\">(you)</span>"), "{body}");
+    assert!(!body.contains("text-align: right;\">\n        <span style=\"font-size: 0.8rem; color: var(--text-muted);\">(you)"));
+    assert!(body.contains("Red and space blue"), "{body}");
+    assert!(!body.contains("Rouge"), "{body}");
+    for field in ["logo", "favicon"] {
+        assert!(
+            body.contains(&format!("<label class=\"btn btn-secondary btn-sm btn-auto file-pick\">Choose file<input type=\"file\" name=\"{field}\"")),
+            "{field}: {body}"
+        );
+    }
+    assert_eq!(
+        body.matches("data-file-name>No file chosen</span>").count(),
+        2
+    );
+}
+
 /// The TLS mode `<select>` marks exactly one option `selected`. Two would
 /// be worse than none: a browser honours the last one, so an operator on
 /// STARTTLS would be shown "None, unencrypted" and silently downgrade the

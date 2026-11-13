@@ -2,7 +2,8 @@
 //! gateway well enough that the admin panel can render its form generically.
 //!
 //! Adding a gateway is: one adapter file, one [`ProviderSpec`] entry, one arm
-//! in [`build_provider`] and [`validate_config`]. No template changes.
+//! in [`build_provider`] and [`validate_config`], and its hint keys in every
+//! `i18n/*/main.ftl`. No template changes.
 
 use super::{SmsConfig, SmsError, SmsProvider};
 
@@ -24,15 +25,27 @@ pub mod kinds {
 pub struct ProviderSpec {
     pub kind: &'static str,
     pub label: &'static str,
+    /// ilia fork: Fluent id of the admin-page label, when the name is not a
+    /// brand ("Generic webhook"); `None` shows `label` as it is.
+    pub label_key: Option<&'static str>,
     pub docs_url: &'static str,
     /// Label for the non-secret identifier, or `None` when unused.
     pub api_key_label: Option<&'static str>,
     pub api_secret_label: &'static str,
+    /// ilia fork: Fluent id of the secret's admin-page label, when it is not
+    /// the vendor's own term ("HMAC secret"); `None` shows `api_secret_label`.
+    pub api_secret_label_key: Option<&'static str>,
+    /// English label, for [`validate_config`]'s messages.
     pub sender_label: &'static str,
+    /// ilia fork: the admin page shows translated labels and hints, so the
+    /// `*_key` fields and both hints are Fluent message ids, rendered with
+    /// `t()`; the English labels stay for the validation messages.
+    pub sender_label_key: &'static str,
     pub sender_hint: &'static str,
     /// Label for the endpoint override, or `None` when the gateway has a
     /// single fixed endpoint.
     pub base_url_label: Option<&'static str>,
+    pub base_url_label_key: Option<&'static str>,
     pub base_url_hint: &'static str,
     pub base_url_required: bool,
     pub sender_required: bool,
@@ -44,13 +57,17 @@ pub const PROVIDER_SPECS: &[ProviderSpec] = &[
     ProviderSpec {
         kind: kinds::TWILIO,
         label: "Twilio",
+        label_key: None,
         docs_url: "https://www.twilio.com/docs/sms/api",
         api_key_label: Some("Account SID"),
         api_secret_label: "Auth token",
+        api_secret_label_key: None,
         sender_label: "Sender",
-        sender_hint: "A Twilio number in E.164 format (+15551234567), or an alphanumeric sender ID where the destination country allows one.",
+        sender_label_key: "admin-sms-sender-label",
+        sender_hint: "admin-sms-twilio-sender-hint",
         base_url_label: Some("API base URL"),
-        base_url_hint: "Optional. Defaults to https://api.twilio.com. Use https, the credential travels on this connection.",
+        base_url_label_key: Some("admin-sms-api-base-url"),
+        base_url_hint: "admin-sms-twilio-base-url-hint",
         base_url_required: false,
         sender_required: true,
         supports_check: true,
@@ -58,13 +75,17 @@ pub const PROVIDER_SPECS: &[ProviderSpec] = &[
     ProviderSpec {
         kind: kinds::GATEWAYAPI,
         label: "GatewayAPI",
+        label_key: None,
         docs_url: "https://gatewayapi.com/docs/apis/rest/",
         api_key_label: None,
         api_secret_label: "API token",
+        api_secret_label_key: None,
         sender_label: "Sender",
-        sender_hint: "Up to 11 alphanumeric characters, or 15 digits.",
+        sender_label_key: "admin-sms-sender-label",
+        sender_hint: "admin-sms-gatewayapi-sender-hint",
         base_url_label: Some("Region base URL"),
-        base_url_hint: "Optional. Defaults to https://gatewayapi.com; use https://gatewayapi.eu to keep traffic in the EU.",
+        base_url_label_key: Some("admin-sms-region-base-url"),
+        base_url_hint: "admin-sms-gatewayapi-base-url-hint",
         base_url_required: false,
         sender_required: true,
         supports_check: false,
@@ -72,13 +93,17 @@ pub const PROVIDER_SPECS: &[ProviderSpec] = &[
     ProviderSpec {
         kind: kinds::SEVENIO,
         label: "seven.io",
+        label_key: None,
         docs_url: "https://docs.seven.io/en/rest-api/endpoints/sms",
         api_key_label: None,
         api_secret_label: "API key",
+        api_secret_label_key: None,
         sender_label: "Sender",
-        sender_hint: "Up to 11 alphanumeric characters, or 16 digits.",
+        sender_label_key: "admin-sms-sender-label",
+        sender_hint: "admin-sms-sevenio-sender-hint",
         base_url_label: Some("API base URL"),
-        base_url_hint: "Optional. Defaults to https://gateway.seven.io.",
+        base_url_label_key: Some("admin-sms-api-base-url"),
+        base_url_hint: "admin-sms-sevenio-base-url-hint",
         base_url_required: false,
         sender_required: true,
         supports_check: true,
@@ -86,13 +111,17 @@ pub const PROVIDER_SPECS: &[ProviderSpec] = &[
     ProviderSpec {
         kind: kinds::WEBHOOK,
         label: "Generic webhook",
+        label_key: Some("admin-sms-provider-webhook"),
         docs_url: "",
         api_key_label: None,
         api_secret_label: "HMAC secret",
+        api_secret_label_key: Some("admin-sms-webhook-secret"),
         sender_label: "Sender",
-        sender_hint: "Optional. Passed through to your endpoint as \"sender\".",
+        sender_label_key: "admin-sms-sender-label",
+        sender_hint: "admin-sms-webhook-sender-hint",
         base_url_label: Some("Webhook URL"),
-        base_url_hint: "calrs POSTs {\"to\", \"text\", \"sender\"} here and expects 2xx back.",
+        base_url_label_key: Some("admin-sms-webhook-url"),
+        base_url_hint: "admin-sms-webhook-base-url-hint",
         base_url_required: true,
         sender_required: false,
         supports_check: false,
@@ -214,6 +243,41 @@ mod tests {
             let provider = build_provider(&cfg).expect("adapter should build");
             assert_eq!(provider.kind(), spec.kind);
         }
+    }
+
+    /// The admin page renders these with `t(p.sender_hint)`, which the
+    /// template key scanner cannot see: an id missing from the English
+    /// bundle would show as the raw id.
+    #[test]
+    fn every_spec_label_and_hint_is_an_english_message() {
+        for spec in PROVIDER_SPECS {
+            assert_eq!(
+                spec.base_url_label.is_some(),
+                spec.base_url_label_key.is_some(),
+                "{}",
+                spec.kind
+            );
+            let keys = [
+                Some(spec.sender_label_key),
+                Some(spec.sender_hint),
+                spec.base_url_label_key,
+                spec.base_url_label.map(|_| spec.base_url_hint),
+            ];
+            for key in keys.into_iter().flatten() {
+                let en = crate::i18n::translate("en", key, None);
+                assert_ne!(en, key, "{}: {key} is not in i18n/en/main.ftl", spec.kind);
+                assert_ne!(
+                    crate::i18n::translate("ru", key, None),
+                    en,
+                    "{}: {key} is English in ru",
+                    spec.kind
+                );
+            }
+        }
+        assert_eq!(
+            crate::i18n::translate("en", "admin-sms-webhook-base-url-hint", None),
+            r#"calrs POSTs {"to", "text", "sender"} here and expects 2xx back."#
+        );
     }
 
     #[test]

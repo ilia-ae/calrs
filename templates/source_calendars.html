@@ -24,8 +24,8 @@
   {% if calendars %}
   <form method="post" action="/dashboard/sources/{{ source_id }}/calendars">
     <div class="source-cal-toolbar">
-      <button type="button" class="slot-btn" style="font-size: 0.8rem; cursor: pointer;" onclick="this.form.querySelectorAll('input[name=sync]').forEach(function (c) { c.checked = true; })">{{ t("source-calendars-select-all") }}</button>
-      <button type="button" class="slot-btn" style="font-size: 0.8rem; cursor: pointer;" onclick="this.form.querySelectorAll('input[name=sync]').forEach(function (c) { c.checked = false; })">{{ t("source-calendars-select-none") }}</button>
+      <button type="button" class="btn btn-secondary btn-sm btn-auto" onclick="this.form.querySelectorAll('input[name=sync]').forEach(function (c) { c.checked = true; })">{{ t("source-calendars-select-all") }}</button>
+      <button type="button" class="btn btn-secondary btn-sm btn-auto" onclick="this.form.querySelectorAll('input[name=sync]').forEach(function (c) { c.checked = false; })">{{ t("source-calendars-select-none") }}</button>
     </div>
     <div class="source-cal-list">
       {% for cal in calendars %}
@@ -38,7 +38,7 @@
       </label>
       {% endfor %}
     </div>
-    <button type="submit" class="slot-btn" style="background: var(--accent); color: var(--on-accent); border: none; padding: 0.5rem 1.5rem; border-radius: var(--radius); font-size: 0.95rem; cursor: pointer;">{{ t("source-calendars-save") }}</button>
+    <button type="submit" class="btn btn-auto">{{ t("source-calendars-save") }}</button>
   </form>
   {% else %}
   <p class="empty" style="padding: 1rem;">{{ t("source-calendars-empty") }}</p>

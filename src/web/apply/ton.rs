@@ -34,7 +34,9 @@
 //!   booking page) is a JSON boolean (`null`: off, still owned). `calrs
 //!   serve` reads it on every request, so its change sets no `restart`.
 //!   It came after the marker below, which is kept as it was: an older
-//!   calrs refuses the key as unknown (exit 2, nothing written).
+//!   calrs refuses the key as unknown (exit 2, nothing written). Its own
+//!   marker, [`DEBUG_BOOKING_SHAPE`], came later still; the role checks it
+//!   before it sends the key.
 //! - **`debug_booking_telegram`** (`settings::DEBUG_BOOKING_TELEGRAM`) is
 //!   the guest Telegram username the test booking page prefills when the
 //!   admin's linked chat has none: a string, bare (`"getmonolith"`, not
@@ -62,6 +64,12 @@ pub(crate) const TON_SETTINGS_SHAPE: &str =
 /// Keep it a literal.
 pub(crate) const DEBUG_BOOKING_TELEGRAM_SHAPE: &str =
     "site.ton.debug_booking_telegram: a Telegram username without @, or null";
+
+/// ilia fork: the marker of a calrs that knows `site.ton.debug_booking`
+/// (added after [`TON_SETTINGS_SHAPE`], which stays as it was): the role
+/// greps for this literal before it sends the key. It is part of the key's
+/// error message, so it is in the binary. Keep it a literal.
+pub(crate) const DEBUG_BOOKING_SHAPE: &str = "site.ton.debug_booking: true, false or null";
 
 fn path(field: &str) -> String {
     format!("site.ton.{field}")
@@ -96,7 +104,12 @@ fn from_doc(key: &Key, value: &Value) -> Result<String, ApplyError> {
     let human = match (key.kind, value) {
         (_, Value::Null) => return Ok(String::new()),
         (Kind::Bool, Value::Bool(b)) => return Ok(if *b { "1" } else { "0" }.to_string()),
-        (Kind::Bool, _) => return Err(ApplyError::invalid(path, "must be true, false or null")),
+        (Kind::Bool, _) => {
+            return Err(ApplyError::invalid(
+                path,
+                format!("must be true, false or null ({DEBUG_BOOKING_SHAPE})"),
+            ))
+        }
         (Kind::Telegram, Value::String(s)) if settings::canonical(key, s).is_err() => {
             return Err(ApplyError::invalid(
                 path,

@@ -789,6 +789,16 @@ async fn hosts_link_their_own_chat_from_settings() {
     assert_eq!(response.status(), 200);
     let page = body_string(response).await;
     assert!(page.contains(&en("tg-settings-not-linked")), "{page}");
+    // The shared button system: Link is the primary fill, no slot buttons.
+    assert!(
+        page.contains(&format!(
+            "<button type=\"submit\" class=\"btn btn-auto\">{}</button>",
+            en("tg-settings-link")
+        )),
+        "{page}"
+    );
+    let content = page.split_once("<h1>").expect("page heading").1;
+    assert!(!content.contains("class=\"slot-btn\""), "{content}");
     let settings = body_string(
         app.clone()
             .oneshot(get_authed("/dashboard/settings", &session))
@@ -831,6 +841,15 @@ async fn hosts_link_their_own_chat_from_settings() {
     let page = link(app.clone()).await;
     let token = token_in(&page, "u_");
     assert!(page.contains(&en("tg-settings-link-expires")));
+    // The deep link is Telegram's blue on the shared shape, no inline colours.
+    assert!(
+        page.contains("<a class=\"btn btn-auto btn-telegram\" href=\""),
+        "{page}"
+    );
+    assert!(
+        !page.contains("background: #229ED9; color: #fff; text-decoration"),
+        "{page}"
+    );
     start(&tg, &pool, HOST_CHAT, Some("host_tg"), &token).await;
     assert_eq!(
         last_to(&tg, HOST_CHAT).text,
@@ -871,6 +890,14 @@ async fn hosts_link_their_own_chat_from_settings() {
         "{page}"
     );
     assert!(!page.contains(&HOST_CHAT.to_string()), "{page}");
+    // Unlink is destructive, so it is the danger button.
+    assert!(
+        page.contains(&format!(
+            "<button type=\"submit\" class=\"btn btn-danger btn-auto\">{}</button>",
+            en("tg-settings-unlink")
+        )),
+        "{page}"
+    );
 
     // Unlink.
     let response = app
@@ -956,6 +983,11 @@ async fn modes_are_saved_only_for_manageable_event_types() {
     )
     .await;
     assert!(page.contains(&en("tg-settings-saved")), "{page}");
+    // The shared `.success` box (base.html), no inline copy of its look.
+    assert!(
+        page.contains("<div class=\"success\" role=\"status\">"),
+        "{page}"
+    );
     assert!(page.contains(&format!("name=\"mode_{et_id}\"")), "{page}");
     drop(tg);
 }

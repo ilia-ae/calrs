@@ -27,12 +27,45 @@ confirmed-add-to-calendar = Toevoegen aan agenda
 
 # Slot picker (templates/slots.html)
 
+## ilia-ov-slots
+slots-time-format-24 = 24 u
+slots-time-format-12 = 12 u
+slots-prev-month = Vorige maand
+slots-next-month = Volgende maand
+slots-prev-week = Vorige week
+slots-next-week = Volgende week
+book-remove-guest = Gast verwijderen
+ilia-error-back-to-site = Terug naar de website
+
 slots-location-video = Videogesprek
 slots-location-phone = Telefoongesprek
 slots-location-google-meet = Google Meet
 
 slots-tz-label = Jouw tijdzone
 slots-time-format-label = Tijdnotatie
+
+## ilia-ov5-guest
+tz-city-midway = Midway
+tz-city-hawaii = Hawaï
+tz-city-alaska = Alaska
+tz-city-los-angeles = Los Angeles
+tz-city-denver = Denver
+tz-city-chicago = Chicago
+tz-city-new-york = New York
+tz-city-sao-paulo = São Paulo
+tz-city-cape-verde = Kaapverdië
+tz-city-london = Londen
+tz-city-paris = Parijs, Brussel
+tz-city-helsinki = Helsinki, Kyiv
+tz-city-moscow = Moskou
+tz-city-dubai = Dubai
+tz-city-india = India
+tz-city-bangkok = Bangkok
+tz-city-shanghai = Shanghai
+tz-city-tokyo = Tokio
+tz-city-sydney = Sydney
+tz-city-auckland = Auckland
+
 tz-group-common = Veelgebruikte tijdzones
 tz-region-africa = Afrika
 tz-region-america = Amerika
@@ -68,6 +101,12 @@ slots-weekday-sat-short = Z
 slots-weekday-sun-short = Z
 
 slots-select-date = Kies een datum
+
+## ilia-ov3-guest
+# The deferred slot load failed (slots.html); the booking form's TON price note (partials/ton_price.html).
+slots-load-failed = Beschikbaarheid kon niet worden geladen. Vernieuw de pagina.
+ton-book-price-note = betalen in TON na het boeken
+
 slots-loading-availability = Beschikbaarheid laden...
 slots-click-highlighted = Klik op een gemarkeerde datum om de beschikbare tijden te zien
 slots-bookable-range-both = Boekbaar van { $from } tot en met { $until }
@@ -290,6 +329,11 @@ email-confirm-reschedule-notice = Let op: verzetten kan tot uiterlijk { $minutes
 # Event type form: Google Meet location + cancel/reschedule minimum notice
 # (templates/event_type_form.html, src/google_meet.rs)
 
+## ilia-ov-eventform
+# The collapsed "Payment in TON" section's summary: no payment, or the price comes from the demand ladder.
+ton-etf-hint-off = Gratis
+ton-etf-hint-ladder = Naar vraag
+
 event-type-form-location-google-meet = Google Meet (automatisch gegenereerde link)
 event-type-form-location-google-meet-hint = Bij bevestiging wordt een unieke Google Meet-link aangemaakt, op naam van de toegewezen organisator. Elke organisator (jij, of elk geschikt teamlid) moet Google Calendar gekoppeld hebben met een agenda geselecteerd om naar terug te schrijven.
 
@@ -339,12 +383,23 @@ booking-blocked-body = De organisator vraagt minstens { $minutes } minuten van t
 
 # Dashboard event types listing (templates/dashboard_event_types.html)
 
+## ilia-ov-dates
+# Booking times on the dashboard lists: the day ("Today", "Tomorrow", a weekday
+# or a date), then the start and end times and the host timezone.
+dashboard-when-today = Vandaag
+dashboard-when-tomorrow = Morgen
+dashboard-when-range = { $date }, { $start } — { $end } { $tz }
+
 dashboard-event-types-copy = Kopiëren
 dashboard-event-types-copied = Gekopieerd!
 dashboard-event-types-copy-title = Boekingslink kopiëren
 dashboard-event-types-copy-failed = Kopiëren mislukt
 
 # Dashboard sidebar and shared chrome (templates/dashboard_base.html)
+
+## ilia-ov-shell
+nav-menu = Menu
+event-types-more-actions = Meer acties
 
 nav-section-scheduling = Planning
 nav-overview = Overzicht
@@ -416,6 +471,11 @@ overview-action-reason-team-admin = Vereist een team — maak er eerst een aan
 overview-action-reason-team-member = Vereist een team — vraag een beheerder
 
 # Dashboard bookings (templates/dashboard_bookings.html)
+
+## ilia-ov-lists
+team-form-slug-placeholder = engineering
+troubleshoot-label-past = Al voorbij
+troubleshoot-legend-beyond-horizon = Buiten horizon of periode
 
 bookings-page-title = Boekingen
 bookings-pending-approval = In afwachting van goedkeuring
@@ -554,6 +614,13 @@ editor-preview = Voorbeeld
 
 # Profile and settings (templates/settings.html)
 
+## ilia-ov-settings
+settings-choose-file = Bestand kiezen
+settings-no-file = Geen bestand gekozen
+admin-provider-local = Wachtwoord
+admin-provider-oidc = SSO
+admin-theme-vates-desc = Rood en ruimteblauw
+
 settings-page-title = Instellingen
 settings-heading = Profiel en instellingen
 settings-public-page-label = Je openbare boekingspagina
@@ -605,6 +672,11 @@ settings-theme-light = Licht
 settings-theme-dark = Donker
 
 # Sign in (templates/auth/login.html)
+
+## ilia-ov-auth
+ilia-mfa-recovery-copy = Codes kopiëren
+ilia-mfa-recovery-copied = Codes gekopieerd
+ilia-mfa-recovery-copy-manual = Kopiëren lukte niet. De codes zijn geselecteerd: kopieer ze met de hand.
 
 login-page-title = Inloggen
 login-heading = Inloggen
@@ -693,6 +765,15 @@ team-profile-subtitle = Kies een afspraaktype om een tijd te boeken.
 team-profile-empty = Nog geen afspraaktypes beschikbaar.
 
 # Availability troubleshoot (templates/troubleshoot.html, src/web/mod.rs)
+
+## ilia-ov2-lists
+# The troubleshoot timeline's legend entry for time already gone today.
+troubleshoot-legend-past = Verstreken tijd
+# Accessible names of the troubleshoot page's day arrows.
+troubleshoot-prev-day = Vorige dag
+troubleshoot-next-day = Volgende dag
+# Accessible name of a member's role select on the team settings page.
+team-settings-role-of = Rol van { $name }
 
 troubleshoot-page-title = Beschikbaarheid controleren
 troubleshoot-empty = Geen afspraaktypes gevonden. { $link } om je beschikbaarheid te controleren.
@@ -797,6 +878,11 @@ source-form-heading-add = Een agenda koppelen
 source-form-subtitle-edit = Werk de verbinding bij. Laat het wachtwoord leeg om het huidige te behouden. Synchroniseer na het wijzigen van de URL of gebruikersnaam om de lijst met gevonden agenda's te vernieuwen.
 source-form-subtitle-add = Koppel een CalDAV-server of Microsoft Exchange (EWS) zodat calrs je beschikbaarheid kan controleren wanneer gasten een afspraak boeken.
 source-form-backend = Backend
+
+## ilia-ov3-dash
+# The "Other / generic CalDAV" preset on the new-source form; it also becomes the default source name.
+source-form-preset-other = Andere CalDAV-server
+
 source-form-preset = Voorinstelling
 source-form-connect-google = Koppelen met Google
 source-form-google-unavailable = Google Agenda is niet beschikbaar. Neem contact op met je beheerder.
@@ -937,6 +1023,10 @@ etf-min-notice-help = Hoe ver van tevoren iemand moet boeken.
 etf-section-limits = Boekingslimieten
 etf-first-slot-only = Eén tijdslot per dag
 etf-first-slot-only-help = Toon alleen de vroegst beschikbare tijd per dag.
+
+## ilia-ov4-dash
+etf-freq-per-member = Per teamlid
+
 etf-freq-limit = Boekingsfrequentie beperken
 etf-freq-limit-help = Beperk hoe vaak deze afspraak per periode geboekt kan worden.
 etf-add-limit = Limiet toevoegen
@@ -1231,8 +1321,25 @@ admin-sms-gateway = Gateway:
 admin-sms-account = Account:
 admin-sms-sender = Afzender:
 admin-sms-enabled = SMS ingeschakeld
+## ilia-ov3-admin
+admin-sms-provider-webhook = Eigen webhook
+admin-sms-webhook-secret = HMAC-geheim
 admin-sms-gateway-label = Gateway
 admin-required-on-switch = Verplicht bij het wisselen van gateway
+## ilia-ov2-settings
+admin-sms-sender-label = Afzender
+admin-sms-api-base-url = API-basis-URL
+admin-sms-region-base-url = Regio-basis-URL
+admin-sms-webhook-url = Webhook-URL
+admin-sms-twilio-sender-hint = Een Twilio-nummer in E.164-formaat (+15551234567), of een alfanumerieke afzender-ID waar het bestemmingsland dat toestaat.
+admin-sms-twilio-base-url-hint = Optioneel. Standaard https://api.twilio.com. Gebruik https, de inloggegevens gaan over deze verbinding.
+admin-sms-gatewayapi-sender-hint = Tot 11 alfanumerieke tekens, of 15 cijfers.
+admin-sms-gatewayapi-base-url-hint = Optioneel. Standaard https://gatewayapi.com; gebruik https://gatewayapi.eu om het verkeer in de EU te houden.
+admin-sms-sevenio-sender-hint = Tot 11 alfanumerieke tekens, of 16 cijfers.
+admin-sms-sevenio-base-url-hint = Optioneel. Standaard https://gateway.seven.io.
+admin-sms-webhook-sender-hint = Optioneel. Wordt als "sender" aan je endpoint doorgegeven.
+admin-sms-webhook-base-url-hint = calrs stuurt hier een POST {"{"}"to", "text", "sender"{"}"} naartoe en verwacht een 2xx-antwoord.
+
 admin-sms-docs = API-documentatie van { $provider }
 admin-sms-country = Standaard landcode
 admin-sms-country-hint = (gebruikt als gasten een lokaal telefoonnummer invoeren)
@@ -1712,7 +1819,7 @@ ton-pay-qr-alt = QR-code met de betaalgegevens
 ton-pay-scan = Of scan deze code met de app van je wallet.
 ton-pay-qr-alt-tonkeeper = QR-code voor Tonkeeper met de betaalgegevens
 ton-pay-scan-tonkeeper = Of scan deze code met Tonkeeper of de camera van je telefoon.
-ton-pay-qr-other = Een andere wallet, zoals MyTonWallet? Toon de QR-code daarvoor
+ton-pay-qr-other = QR-code voor een andere wallet (bijv. MyTonWallet)
 ton-pay-address = Adres
 ton-pay-comment = Opmerking
 ton-pay-copy = Kopiëren
@@ -1721,7 +1828,7 @@ ton-pay-warn-comment = De opmerking is verplicht: daaraan herkennen we je betali
 ton-pay-warn-encrypt = Versleutel de opmerking niet.
 ton-pay-warn-token = Betaal in TON, niet met tokens.
 ton-pay-warn-exchange = Betaal je vanaf een exchange? Zet de code hierboven in het memoveld (opmerking).
-ton-pay-warn-deadline = Verstuur de betaling vóór { $time }. Een later verstuurde betaling telt misschien niet mee.
+ton-pay-warn-deadline = Verstuur de betaling vóór { $time } ({ $zone }). Een later verstuurde betaling telt misschien niet mee.
 ton-pay-check = Ik heb betaald, nu controleren
 ton-pay-email = Stuur me deze link per e-mail
 ton-pay-emailed = We hebben deze link naar het e-mailadres van je boeking gestuurd.
@@ -2175,6 +2282,9 @@ ton-etf-ladder-help = De prijs is de trede voor het aantal komende boekingen in 
 # ilia fork: the TON settings page (/dashboard/admin/ton)
 nav-admin-ton = TON-betalingen
 ton-etf-ladder-edit = Ladder bewerken
+## ilia-ov-ton
+ton-admin-debug-tg-saved-locked = Niets gewijzigd: de Telegram-gebruikersnaam van de gast is vergrendeld.
+dbg-err-requote = De prijs is tijdens het boeken twee keer veranderd. Er is niets geboekt: probeer het opnieuw.
 ton-admin-page-title = TON-betalingen
 ton-admin-heading = TON-betalingen
 ton-admin-intro = Deze instellingen gelden voor TON-betalingen op deze server. Een waarde uit de omgeving van de server gaat voor, dan een die hier of met config apply is opgeslagen, dan de standaardwaarde.
@@ -2193,6 +2303,13 @@ ton-admin-address-raw = Ruwe vorm
 ton-admin-indexer = Indexer
 ton-admin-watcher = Watcher
 ton-admin-watcher-ready = klaar
+
+## ilia-ov3-ton
+ton-admin-notready-wallet = de ontvangende wallet is niet actief (of nog niet gecontroleerd)
+ton-admin-notready-network = de indexer zit op een ander netwerk (of nog niet gecontroleerd)
+ton-admin-notready-stale = de watcher heeft de laatste 2 minuten geen stap voltooid
+ton-admin-off-unset = CALRS_TON_NETWORK is niet ingesteld
+
 ton-admin-watcher-not-ready = niet klaar: { $reason }
 ton-admin-last-step = laatste stap
 ton-admin-open-invoices = Openstaande facturen
@@ -2230,7 +2347,7 @@ ton-admin-f-rate_max_age_min = Oudste toegestane koers (minuten)
 ton-admin-f-rate_max_jump_pct = Grootste sprong ten opzichte van de vorige koers (%)
 ton-admin-f-alert_email = E-mail voor meldingen (leeg: alle beheerders)
 ton-admin-ladder-help = Treden gescheiden door komma's: de prijs bij 0, 1, 2… bevestigde boekingen in de komende dagen; de laatste trede is het plafond. "free" alleen aan het begin: een gratis boeking wacht op de goedkeuring van de eigenaar.
-ton-admin-ladder-row = Vanaf %1 boekingen
+ton-admin-ladder-row = Boekingen: %1
 ton-admin-ladder-add = Trede toevoegen
 ton-admin-ladder-remove = Verwijderen
 ton-admin-free = gratis
@@ -2266,7 +2383,7 @@ ton-admin-via-apply = config apply
 nav-admin-debug-booking = Testboeking
 dbg-title = Testboeking
 dbg-intro = Boek een testafspraak zoals een gast dat zou doen, zonder elke keer het gastformulier in te vullen. De boeking volgt hetzelfde pad als de openbare boekingspagina: de controles, de prijs en de TON-factuur, het vasthouden van de tijd en de e-mails. De betaling wordt nooit overgeslagen of als ontvangen gemarkeerd: betaal de factuur vanuit je wallet of annuleer de boeking.
-dbg-switch-note = Zet deze pagina uit zodra het debuggen klaar is, met de schakelaar bovenaan de pagina TON-betalingen:
+dbg-switch-note = Zet deze pagina uit zodra het debuggen klaar is, met de schakelaar bovenaan de pagina:
 dbg-cancelled = Geannuleerde testboekingen: { $count }.
 dbg-no-types = Je hebt geen ingeschakeld persoonlijk afspraaktype.
 dbg-event-type = Afspraaktype
@@ -2348,7 +2465,7 @@ dbg-telegram-from-chat = Ingevuld vanuit je gekoppelde Telegram-chat.
 dbg-telegram-from-setting = Ingevuld vanuit het Debug-blok van
 dbg-telegram-none = Niets om in te vullen: stel een naam in het Debug-blok in van
 dbg-timing = Termijnen voor deze testboeking
-dbg-timing-normal = Normaal: de instellingen van de site (Admin → TON payments)
+dbg-timing-normal = Normaal: de instellingen van de site (pagina ‘TON-betalingen’)
 dbg-timing-fast = Snelle test: { $window } min om te betalen; verlengingen: { $renewals }, elk { $renew } min (de gast wordt opnieuw om betaling gevraagd); daarna verloopt de factuur en wordt de boeking automatisch geannuleerd. Respijt { $grace } min, marge { $margin } min.
 dbg-timing-custom = Eigen, in minuten (een leeg veld neemt de snelle waarde):
 dbg-timing-window = Betaalvenster, min

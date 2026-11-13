@@ -78,7 +78,7 @@ Every user-facing string goes through Fluent (`i18n/`).
 | `src/email/` | Every email calrs sends (see below) |
 | `src/web/` | The web server (see below) |
 | `src/commands/` | One file per CLI subcommand; `src/commands/sync.rs` is also used by the web server; `sync_window.rs` (ilia fork) is its windowed full fetch (etags first), etag delta, prune and `synced_until` |
-| `src/test_support.rs` | `ENV_LOCK` / `EnvGuard` for tests touching `CALRS_*` variables |
+| `src/test_support.rs` | `ENV_LOCK` / `EnvGuard` for tests touching `CALRS_*` variables; `capture_default` / `pin_dispatch` (ilia fork) for tests that capture `tracing` output, see CLAUDE.md "Tests that capture logs" |
 
 ### `src/web/`
 
@@ -319,4 +319,6 @@ Call sites use `crate::email::name` whatever file `name` lives in.
 Tests sit next to their area: `#[cfg(test)] mod tests` at the bottom of most
 files, `src/web/tests/` and `src/email/tests/` for the two large modules.
 Tests that set `CALRS_*` environment variables take
-`crate::test_support::ENV_LOCK`.
+`crate::test_support::ENV_LOCK`. Tests that capture logs install their
+subscriber with `crate::test_support::capture_default` (or call
+`pin_dispatch` before `with_default`).

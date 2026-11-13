@@ -32,6 +32,14 @@ pub(in crate::web) struct Repost<'a> {
     pub(in crate::web) embed: &'a EmbedParams,
 }
 
+/// ilia fork (debug booking): marks the "the price changed" page with the
+/// price now, as a response extension (neither the body nor the status
+/// changes). The debug booking handler, which posts its own quote and
+/// cannot let the page's form repost outside its context, books once more
+/// at that price instead of returning the page.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Requoted(pub(crate) Step);
+
 /// The error page a refused priced booking shows, in the page language.
 /// Nothing was created. `guest_email` is what the form carried: the "you
 /// already have an unpaid booking" page offers to email that address the
@@ -111,6 +119,7 @@ async fn quote_page(
     let embed = repost.embed;
     let rendered = tmpl
         .render(context! {
+            company_link => state.company_link_now(),
             lang => lang,
             action => &repost.action,
             fields => fields,
@@ -128,7 +137,9 @@ async fn quote_page(
             embed_theme => embed.theme.as_deref().unwrap_or(""),
         })
         .unwrap_or_else(|e| internal_error_body("template render", &e));
-    html_response(rendered, embed)
+    let mut resp = html_response(rendered, embed);
+    resp.extensions_mut().insert(Requoted(now));
+    resp
 }
 
 /// The quote page's explanation: the guest's free step is used, the price
@@ -149,6 +160,7 @@ fn already_open_page(state: &AppState, lang: &str, guest_email: Option<&str>) ->
     };
     let rendered = tmpl
         .render(context! {
+            company_link => state.company_link_now(),
             lang => lang,
             email => guest_email.map(str::trim).filter(|e| !e.is_empty()),
         })
@@ -265,6 +277,7 @@ pub(in crate::web) async fn after_booking(
     };
     let rendered = tmpl
         .render(context! {
+            company_link => state.company_link_now(),
             pay_url => pay_url,
             held_until => held_until,
             zone => tz.name(),
@@ -303,11 +316,15 @@ pub(crate) async fn approval_refused_page(
         Err(e) => return Some(internal_error_response("booking payment check", &e)),
     }
     tracing::warn!(target: TARGET, booking_id, "approval refused: the booking is not paid");
-    Some(render_booking_action_error_keys_in(
+    // The page sends the host to the bookings list, where "Confirm without
+    // payment" is: a link to it, so the page is no dead end.
+    Some(render_booking_action_error_keys_with_action_in(
         state,
         lang,
         "ton-bae-title-unpaid",
         "ton-bae-body-unpaid",
+        "/dashboard/bookings",
+        "nav-bookings",
     ))
 }
 
@@ -338,12 +355,66 @@ pub(crate) async fn guest_reschedule_refused(
     if !invoice::unpaid(&state.pool, booking_id).await {
         return None;
     }
-    Some(render_booking_action_error_keys_in(
-        state,
-        lang,
-        "ton-bae-title-unpaid",
-        "ton-bae-body-reschedule-unpaid",
-    ))
+    // While the invoice is still open, the page links to the payment page
+    // (the guest reached it with the reschedule token, which the same email
+    // as the pay link carries). An expired or closed invoice can no longer
+    // be paid: no link then.
+    let pay_token: Option<String> = sqlx::query_scalar(
+        "SELECT pay_token FROM ton_invoices WHERE booking_id = ? AND status = 'open'",
+    )
+    .bind(booking_id)
+    .fetch_optional(&state.pool)
+    .await
+    .ok()
+    .flatten();
+    Some(match pay_token {
+        Some(pay_token) => render_booking_action_error_keys_with_action_in(
+            state,
+            lang,
+            "ton-bae-title-unpaid",
+            "ton-bae-body-reschedule-unpaid",
+            &format!("/booking/pay/{pay_token}"),
+            "ton-exit-go",
+        ),
+        None => render_booking_action_error_keys_in(
+            state,
+            lang,
+            "ton-bae-title-unpaid",
+            "ton-bae-body-reschedule-unpaid",
+        ),
+    })
+}
+
+/// ilia fork: upstream's booking error page (`booking_action_error.html`)
+/// with one button under the message, for the unpaid-booking refusals whose
+/// next step is known. The title, message and button label are i18n keys.
+fn render_booking_action_error_keys_with_action_in(
+    state: &AppState,
+    lang: &str,
+    title_key: &str,
+    message_key: &str,
+    href: &str,
+    label_key: &str,
+) -> Response {
+    let title = crate::i18n::translate(lang, title_key, None);
+    // The status this title means, as upstream's helper sets it.
+    crate::web::error_page::booking_error(lang, &title);
+    let tmpl = match state.templates.get_template("booking_action_error.html") {
+        Ok(t) => t,
+        Err(e) => return internal_error_response("internal", &e),
+    };
+    axum::response::Html(
+        tmpl.render(context! {
+            company_link => state.company_link_now(),
+            title => title,
+            message => crate::i18n::translate(lang, message_key, None),
+            action_href => href,
+            action_label => crate::i18n::translate(lang, label_key, None),
+            lang => lang,
+        })
+        .unwrap_or_else(|e| internal_error_body("template render", &e)),
+    )
+    .into_response()
 }
 
 /// A booking was cancelled or declined: its open invoice closes now, a paid

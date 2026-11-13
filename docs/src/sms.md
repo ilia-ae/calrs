@@ -39,7 +39,7 @@ Go to **Dashboard > Admin > SMS settings**. Pick a gateway and the form relabels
 
 Two settings apply whichever gateway you pick:
 
-- **Default country code** normalises phone numbers guests type in local form. A French guest typing `06 12 34 56 78` on an instance set to `+33` is stored as `+33612345678`. Numbers starting with `+` or `00` are taken as written, whatever this is set to.
+- **Default country code** normalises phone numbers guests type in local form. A French guest typing `06 12 34 56 78` on an instance set to `+33` is stored as `+33612345678`. Numbers starting with `+` or `00` are taken as written, whatever this is set to. In the ilia fork the admin page names the countries of this list in the page's language and sorts them for it, through the browser (`Intl.DisplayNames`); without JavaScript the list stays in English.
 - **Daily limit** caps messages per day across the whole instance. `0` means no limit. See [Keeping the bill bounded](#keeping-the-bill-bounded).
 
 The secret is encrypted at rest (AES-256-GCM), like every other stored credential. It is never displayed again: leaving the field empty when saving keeps the current value. Switching to a different gateway does require entering that gateway's own credential, since the stored one belongs to the previous vendor.

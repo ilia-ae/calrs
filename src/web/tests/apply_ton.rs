@@ -361,6 +361,13 @@ async fn the_debug_switch_is_a_live_boolean() {
             e.to_string().contains("site.ton.debug_booking"),
             "{bad}: {e}"
         );
+        // The role greps a release for this literal (`DEBUG_BOOKING_SHAPE`)
+        // before it sends the key.
+        assert!(
+            e.to_string()
+                .contains("site.ton.debug_booking: true, false or null"),
+            "{bad}: {e}"
+        );
     }
     assert_eq!(env.snapshot().await, before);
 

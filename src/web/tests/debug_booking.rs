@@ -740,6 +740,18 @@ async fn the_switch_on_the_ton_page_is_live_and_audited() {
         !block.contains("dbg-hazard") && !block.contains("dbg-banner"),
         "{block}"
     );
+    // No hazard styling at all here (owner, 2026-11-12): a switch built
+    // from the theme tokens, the shared buttons.
+    assert!(!block.contains("dbg-"), "{block}");
+    assert!(
+        !page.contains("#facc15"),
+        "no hazard colour on the TON page"
+    );
+    assert!(
+        block.contains(r#"class="switch" role="switch" aria-checked="false""#),
+        "{block}"
+    );
+    assert!(!block.contains("slot-btn"), "{block}");
     assert!(!block.contains("disabled"), "not locked");
     assert!(!block.contains(r#"id="debug-open""#));
 
@@ -753,7 +765,7 @@ async fn the_switch_on_the_ton_page_is_live_and_audited() {
     assert!(block.contains(r#"data-debug="on" data-source="panel""#));
     assert!(block.contains(r#"data-notice="on""#));
     assert!(block.contains(&format!(
-        r#"href="{PATH}" class="dbg-open" id="debug-open""#
+        r#"href="{PATH}" class="btn btn-secondary btn-auto" id="debug-open""#
     )));
     assert!(block.contains(&crate::i18n::translate("en", "ton-admin-debug-open", None)));
     assert!(block.contains(r#"name="on" value="0""#));
@@ -1183,6 +1195,19 @@ async fn the_guest_telegram_username_is_the_chats_then_the_settings() {
         telegram_row(&e).await,
         Some(("getmonolith".into(), "apply".into()))
     );
+    // The notice names the username, not the on/off switch.
+    let (_, ton) = e.get_as(&location(&resp), &admin).await;
+    let block = debug_block(&ton);
+    assert!(block.contains(r#"data-notice="tg-locked""#), "{block}");
+    assert!(
+        block.contains(&crate::i18n::translate(
+            "en",
+            "ton-admin-debug-tg-saved-locked",
+            None
+        )),
+        "{block}"
+    );
+    assert!(!block.contains("the switch is locked"), "{block}");
     let (_, ton) = e.get_as(TON_PAGE, &admin).await;
     let block = debug_block(&ton);
     assert!(block.contains(r#"id="debug-telegram-locked""#), "{block}");
@@ -1902,4 +1927,264 @@ async fn without_a_linked_chat_the_page_says_so_at_the_top() {
     .unwrap();
     let (_, page) = e.get_as(PATH, &admin).await;
     assert!(!page.contains(r#"id="debug-booking-no-chat""#));
+}
+
+// --- the admin's language, the cancel reason, a changed price -------------
+
+#[tokio::test]
+async fn the_page_is_in_the_admins_language_dates_included() {
+    let e = env_on().await;
+    set_user_language(&e.pool, "test@example.com", "ru").await;
+    let admin = e.session().await;
+    let (status, page) = e.get_as(PATH, &admin).await;
+    assert_eq!(status, axum::http::StatusCode::OK);
+    // The first time: its date written out in Russian (the genitive
+    // month), not chrono's English.
+    let select = page
+        .split(r#"<select id="dbg-slot""#)
+        .nth(1)
+        .expect("the slot select")
+        .split("</select>")
+        .next()
+        .unwrap();
+    let option = select.split("<option value=\"").nth(1).expect("a slot");
+    let (value, rest) = option.split_once('"').unwrap();
+    let date = chrono::NaiveDate::parse_from_str(&value[..10], "%Y-%m-%d").unwrap();
+    let label = rest
+        .split_once('>')
+        .unwrap()
+        .1
+        .split("</option>")
+        .next()
+        .unwrap();
+    let day = crate::i18n::format_long_date(date, "ru");
+    assert!(
+        label.starts_with(&format!("{day} · {}–", &value[11..])),
+        "{label}"
+    );
+    let english = date.format("%B").to_string();
+    assert!(!label.contains(&english), "{label}");
+    assert!(!page.contains("Admin → TON payments"), "the timing option");
+    assert!(page.contains("Эл. почта"), "the e-mail label");
+}
+
+#[tokio::test]
+async fn cancel_all_gives_the_reason_in_the_guests_language() {
+    let e = free_env_on().await;
+    let (port, mails) = spawn_capturing_mta().await;
+    use_capturing_mta(&e.pool, port).await;
+    // The admin reads Russian; the test guest books in German.
+    set_user_language(&e.pool, "test@example.com", "ru").await;
+    let admin = e.session().await;
+    let resp = e.post_as(PATH, &admin, &form("&guest_lang=de")).await;
+    assert_eq!(resp.status(), axum::http::StatusCode::OK);
+    let bid = newest_booking(&e).await;
+    assert_eq!(e.booking_col(&bid, "language").await.as_deref(), Some("de"));
+    let resp = e
+        .post_as(CANCEL_PATH, &admin, &format!("_csrf={CSRF}"))
+        .await;
+    assert_eq!(location(&resp), format!("{PATH}?cancelled=1"));
+    let all = settled_mails_to(&mails, "test@example.com").await;
+    let german = crate::i18n::translate("de", "dbg-cancel-reason", None);
+    let russian = crate::i18n::translate("ru", "dbg-cancel-reason", None);
+    assert!(all.iter().any(|m| m.contains(&german)), "{all:#?}");
+    assert!(!all.iter().any(|m| m.contains(&russian)), "{all:#?}");
+}
+
+#[tokio::test]
+async fn the_price_changed_page_is_marked_for_the_debug_handler() {
+    // A stale quote on the public path: the quote page, unchanged for the
+    // guest, carries the price now for the debug handler, which books once
+    // more at it instead of returning a form that reposts past this page.
+    let e = ladder_env_on("20,40").await;
+    let body = format!(
+        "_csrf={CSRF}&date={}&time=10:00&name=Guest+Name&email=guest%40x.io&tz=UTC&quoted_nano=0",
+        far_future_monday()
+    );
+    let resp = e
+        .app()
+        .oneshot(post_form_unauthed(
+            "/u/testuser/test-meeting/book",
+            CSRF,
+            &body,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), axum::http::StatusCode::OK);
+    let marked = resp
+        .extensions()
+        .get::<crate::web::ton_pay::flow::Requoted>()
+        .map(|r| r.0);
+    assert_eq!(marked, Some(crate::ton::ladder::Step::Ton(20 * NANO)));
+    let page = body_string(resp).await;
+    assert!(
+        page.contains(r#"name="quoted_nano" value="20000000000""#),
+        "{page}"
+    );
+
+    // An ordinary refusal is not marked.
+    let resp = e
+        .app()
+        .oneshot(post_form_unauthed(
+            "/u/testuser/test-meeting/book",
+            CSRF,
+            &body.replace("date=", "date=1999-01-0"),
+        ))
+        .await
+        .unwrap();
+    assert!(resp
+        .extensions()
+        .get::<crate::web::ton_pay::flow::Requoted>()
+        .is_none());
+}
+
+/// Another booking of the admin's commits inside every booking transaction
+/// of the debug guest (`test@example.com`): an AFTER INSERT trigger adds a
+/// confirmed one three hours later, so the transaction's recount sees one
+/// more than the quote did. Rolled back with a refused attempt, kept with
+/// a booked one. The trigger's own insert does not fire it again
+/// (recursive triggers are off).
+async fn booked_meanwhile(e: &Env) {
+    sqlx::query(
+        "CREATE TRIGGER booked_meanwhile AFTER INSERT ON bookings
+         WHEN NEW.guest_email = 'test@example.com'
+         BEGIN
+           INSERT INTO bookings (time_version, id, event_type_id, uid, guest_name, guest_email,
+               guest_timezone, start_at, end_at, status, cancel_token, reschedule_token, confirm_token)
+           VALUES (1, lower(hex(randomblob(16))), NEW.event_type_id, 'uid-' || lower(hex(randomblob(16))),
+               'Meanwhile', 'meanwhile@example.com', 'UTC',
+               strftime('%Y-%m-%dT%H:%M:%SZ', NEW.start_at, '+3 hours'),
+               strftime('%Y-%m-%dT%H:%M:%SZ', NEW.start_at, '+3 hours', '+30 minutes'),
+               'confirmed', lower(hex(randomblob(16))), lower(hex(randomblob(16))),
+               'confirm-' || lower(hex(randomblob(16))));
+         END",
+    )
+    .execute(&e.pool)
+    .await
+    .unwrap();
+}
+
+async fn admins_bookings(e: &Env) -> Vec<String> {
+    sqlx::query_scalar("SELECT id FROM bookings WHERE guest_email = 'test@example.com'")
+        .fetch_all(&e.pool)
+        .await
+        .unwrap()
+}
+
+#[tokio::test]
+async fn a_price_raised_meanwhile_is_booked_once_more_at_the_price_now() {
+    // Quoted 20; in the transaction the demand is one higher, 40: the
+    // booking path asks again. The page books once more at 40, which the
+    // second transaction (one higher again) accepts.
+    let e = ladder_env_on("20,40").await;
+    booked_meanwhile(&e).await;
+    let admin = e.session().await;
+    let resp = e.post_as(PATH, &admin, &form("")).await;
+    assert_eq!(
+        resp.status(),
+        axum::http::StatusCode::SEE_OTHER,
+        "{}",
+        body_string(resp).await
+    );
+    assert!(
+        location(&resp).starts_with("/booking/pay/"),
+        "{}",
+        location(&resp)
+    );
+    let rows = e.debug_rows().await;
+    assert_eq!(rows.len(), 1, "the rebooked one is marked as a test");
+    assert_eq!(admins_bookings(&e).await, vec![rows[0].0.clone()]);
+    let (amount, mode): (i64, String) =
+        sqlx::query_as("SELECT amount_nano, pricing_mode FROM ton_invoices WHERE booking_id = ?")
+            .bind(&rows[0].0)
+            .fetch_one(&e.pool)
+            .await
+            .unwrap();
+    assert_eq!((amount as u128, mode.as_str()), (40 * NANO, "ladder"));
+    assert_eq!(booking_status(&e.pool, &rows[0].0).await, "pending");
+}
+
+#[tokio::test]
+async fn a_price_changed_twice_is_refused_on_the_debug_page() {
+    // Quoted free; in the transaction it is 20 (asked again). Rebooked at
+    // 20, the quote is free again: a second change, refused here with
+    // nothing booked rather than a form that reposts past this page.
+    let e = ladder_env_on("free,20,40").await;
+    booked_meanwhile(&e).await;
+    let admin = e.session().await;
+    let resp = e.post_as(PATH, &admin, &form("")).await;
+    assert_eq!(resp.status(), axum::http::StatusCode::CONFLICT);
+    let page = unescape(&body_string(resp).await);
+    assert!(
+        page.contains(&crate::i18n::translate("en", "dbg-err-requote", None)),
+        "{page}"
+    );
+    assert!(e.debug_rows().await.is_empty());
+    assert!(admins_bookings(&e).await.is_empty());
+}
+
+/// ilia fork (second overnight round, group `settings`): the TON page's
+/// tables share one look and show a dash where a fixed price has no "now"
+/// price, its status and error box use the shared tokens and `.error`,
+/// and the debug page's fields and boxes are the shared ones.
+#[tokio::test]
+async fn the_ton_and_debug_pages_use_the_shared_pieces() {
+    let e = env_priced(&[], Some(100 * NANO)).await;
+    on(&e).await;
+    let admin = e.session().await;
+    let (status, page) = e.get_as(TON_PAGE, &admin).await;
+    assert_eq!(status, axum::http::StatusCode::OK);
+    assert!(page.contains(r#"<table id="ton-ladder-preview" class="ton-table">"#));
+    assert!(page.contains(r#"<table id="ton-types" class="ton-table" style="width: 100%;">"#));
+    let types = &page[page.find(r#"id="ton-types""#).unwrap()..];
+    let types = &types[..types.find("</table>").unwrap()];
+    assert!(!types.contains("<th style="), "{types}");
+    assert!(
+        types.contains(r#"<td><span style="color: var(--text-muted);">—</span></td>"#),
+        "a fixed price has no price now: {types}"
+    );
+    // base.html defines `--success-text` as #15803d; the page uses the token, not the literal.
+    assert_eq!(page.matches("#15803d").count(), 1, "{page}");
+    assert!(!page.contains("rgba(239, 68, 68, 0.05)"), "{page}");
+
+    let resp = e
+        .post_as(
+            TON_PAGE,
+            &admin,
+            &format!("_csrf={CSRF}&window_min=45&ladder=20%2Cfree&action=save"),
+        )
+        .await;
+    assert_eq!(resp.status(), axum::http::StatusCode::BAD_REQUEST);
+    let page = unescape(&body_string(resp).await);
+    assert!(
+        page.contains(&format!(
+            "<div class=\"error\" role=\"alert\"><strong>{}</strong>",
+            crate::i18n::translate("en", "ton-admin-errors", None)
+        )),
+        "{page}"
+    );
+
+    let (status, page) = e.get_as(PATH, &admin).await;
+    assert_eq!(status, axum::http::StatusCode::OK);
+    assert!(
+        !page.contains("padding: 0.5rem; border: 1px solid var(--border)"),
+        "{page}"
+    );
+    assert!(page.contains(r#"<select id="dbg-et" name="et">"#), "{page}");
+    assert!(page.contains(r#"<textarea id="dbg-notes" name="notes" rows="2" maxlength="5000">"#));
+    assert!(
+        page.contains(r#"class="btn btn-danger btn-sm btn-auto" disabled>"#),
+        "{page}"
+    );
+    let body = form("").replace("test%40example.com", "victim%40example.org");
+    let resp = e.post_as(PATH, &admin, &body).await;
+    assert_eq!(resp.status(), axum::http::StatusCode::BAD_REQUEST);
+    let page = unescape(&body_string(resp).await);
+    assert!(
+        page.contains(&format!(
+            "<div class=\"error\" id=\"debug-booking-error\" role=\"alert\">{}</div>",
+            crate::i18n::translate("en", "dbg-err-email", None)
+        )),
+        "{page}"
+    );
 }

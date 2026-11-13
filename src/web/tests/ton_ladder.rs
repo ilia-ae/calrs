@@ -933,6 +933,10 @@ async fn the_event_type_form_sets_the_ladder_mode() {
         .unwrap();
     let ru = body_string(e.app().oneshot(get_authed(edit, &session)).await.unwrap()).await;
     assert!(ru.contains("бесплатно → 20 → 40 TON"), "{ru}");
+    assert!(
+        ru.contains(r#"id="ton-price-hint">100.00 TON</span>"#),
+        "{ru}"
+    );
     assert!(!ru.contains("free → 20"), "{ru}");
     sqlx::query("UPDATE users SET language = 'en' WHERE username = 'testuser'")
         .execute(&e.pool)
@@ -951,6 +955,10 @@ async fn the_event_type_form_sets_the_ladder_mode() {
     let page = body_string(e.app().oneshot(get_authed(edit, &session)).await.unwrap()).await;
     assert!(
         page.contains(r#"<option value="ladder" selected>"#),
+        "{page}"
+    );
+    assert!(
+        page.contains(r#"id="ton-price-hint">By demand</span>"#),
         "{page}"
     );
     let page = body_string(

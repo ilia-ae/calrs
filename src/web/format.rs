@@ -126,6 +126,7 @@ pub(super) fn format_booking_for_dashboard(
     stored_tz: &str,
     host_tz: &str,
     guest_tz: &str,
+    lang: &str,
 ) -> (String, Option<String>) {
     let stored = stored_tz.parse::<Tz>().unwrap_or(Tz::UTC);
     let host = host_tz.parse::<Tz>().unwrap_or(Tz::UTC);
@@ -147,13 +148,14 @@ pub(super) fn format_booking_for_dashboard(
         host_end,
         today_host,
         &tz_short_label(host, host_start),
+        lang,
     );
 
     let secondary = if guest != host {
         let g_start = crate::booking_time::local(start_str, stored, guest).unwrap();
         let g_end = crate::booking_time::local(end_str, stored, guest).unwrap();
-        let g_time_start = g_start.time().format("%-I:%M %p").to_string();
-        let g_time_end = g_end.time().format("%-I:%M %p").to_string();
+        let g_time_start = dashboard_time(g_start, lang);
+        let g_time_end = dashboard_time(g_end, lang);
         Some(format!(
             "{} — {} {}",
             g_time_start,
@@ -167,31 +169,71 @@ pub(super) fn format_booking_for_dashboard(
     (primary, secondary)
 }
 
-fn format_dashboard_range(
-    start: NaiveDateTime,
-    end: NaiveDateTime,
-    today: NaiveDate,
-    tz_label: &str,
-) -> String {
-    let date = start.date();
-    let time_start = start.time().format("%-I:%M %p").to_string();
-    let time_end = end.time().format("%-I:%M %p").to_string();
+/// A dashboard clock time: 12-hour in English, as upstream shows it, and
+/// 24-hour in every other language, as their guest pages default to.
+fn dashboard_time(t: NaiveDateTime, lang: &str) -> String {
+    let format = if lang == "en" { "%-I:%M %p" } else { "%H:%M" };
+    t.time().format(format).to_string()
+}
+
+/// The day of a dashboard booking line in the dashboard language: "Today",
+/// "Tomorrow", the weekday within the week ahead, else the date. English keeps
+/// upstream's short "Mon, Dec 14"; the other languages write the date out
+/// with `i18n::format_date` ("14 декабря 2099"), which already has every
+/// locale's word order and the Polish and Russian genitive month.
+fn dashboard_day(date: NaiveDate, today: NaiveDate, lang: &str) -> String {
     let day_diff = (date - today).num_days();
-    let date_part = if day_diff == 0 {
-        "Today".to_string()
+    if day_diff == 0 {
+        crate::i18n::translate(lang, "dashboard-when-today", None)
     } else if day_diff == 1 {
-        "Tomorrow".to_string()
+        crate::i18n::translate(lang, "dashboard-when-tomorrow", None)
     } else if (1..7).contains(&day_diff) {
-        date.format("%A").to_string()
+        let key = match date.weekday() {
+            chrono::Weekday::Mon => "common-weekday-long-mon",
+            chrono::Weekday::Tue => "common-weekday-long-tue",
+            chrono::Weekday::Wed => "common-weekday-long-wed",
+            chrono::Weekday::Thu => "common-weekday-long-thu",
+            chrono::Weekday::Fri => "common-weekday-long-fri",
+            chrono::Weekday::Sat => "common-weekday-long-sat",
+            chrono::Weekday::Sun => "common-weekday-long-sun",
+        };
+        // The day starts the line, and most locales write weekdays in
+        // lower case ("понедельник", "lundi").
+        let weekday = crate::i18n::translate(lang, key, None);
+        let mut chars = weekday.chars();
+        match chars.next() {
+            Some(first) => first.to_uppercase().chain(chars).collect(),
+            None => weekday,
+        }
+    } else if lang != "en" {
+        crate::i18n::format_date(date, lang)
     } else if date.year() == today.year() {
         date.format("%a, %b %-d").to_string()
     } else {
         date.format("%a, %b %-d, %Y").to_string()
-    };
-    format!(
-        "{} at {} — {} {}",
-        date_part, time_start, time_end, tz_label
-    )
+    }
+}
+
+pub(super) fn format_dashboard_range(
+    start: NaiveDateTime,
+    end: NaiveDateTime,
+    today: NaiveDate,
+    tz_label: &str,
+    lang: &str,
+) -> String {
+    let date = dashboard_day(start.date(), today, lang);
+    let time_start = dashboard_time(start, lang);
+    let time_end = dashboard_time(end, lang);
+    // Every value as a string, so Fluent adds no number formatting.
+    let mut args = fluent_bundle::FluentArgs::new();
+    args.set("date", fluent_bundle::FluentValue::from(date.as_str()));
+    args.set(
+        "start",
+        fluent_bundle::FluentValue::from(time_start.as_str()),
+    );
+    args.set("end", fluent_bundle::FluentValue::from(time_end.as_str()));
+    args.set("tz", fluent_bundle::FluentValue::from(tz_label));
+    crate::i18n::translate(lang, "dashboard-when-range", Some(&args))
 }
 
 /// Format a raw date string (YYYY-MM-DD or from datetime) into a human-friendly

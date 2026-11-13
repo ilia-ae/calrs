@@ -3,8 +3,11 @@
 {% block title %}{{ t("cancelled-heading") }}{% endblock %}
 
 {% block content %}
+{% from "partials/result_icon.html" import result_icon %}
+<div class="page-narrow">
+<div class="logo">{% if company_link %}<a href="{{ company_link }}" target="_blank" rel="noopener noreferrer">{% endif %}<img src="/logo" alt="" onerror="this.closest('.logo').style.display='none'">{% if company_link %}</a>{% endif %}</div>
 <div class="card" style="text-align: center;">
-  <div class="check" style="background: var(--error-text);">&#10007;</div>
+  {{ result_icon("bad", "cross") }}
   <h1>{{ t("cancelled-heading") }}</h1>
   <p class="subtitle">{{ t("cancelled-subtitle") }}</p>
 </div>
@@ -12,11 +15,12 @@
 <div class="card">
   <div class="detail"><strong>{{ t("confirmed-detail-event") }}</strong> {{ event_title }}</div>
   <div class="detail"><strong>{{ t("confirmed-detail-date") }}</strong> {{ date_label }}</div>
-  <div class="detail"><strong>{{ t("confirmed-detail-time") }}</strong> {{ start_time }} – {{ end_time }}</div>
+  <div class="detail"><strong>{{ t("confirmed-detail-time") }}</strong> {{ start_time }} – {{ end_time }}{% if zone %} ({{ zone }}){% endif %}</div>
   <div class="detail"><strong>{{ t("confirmed-detail-with") }}</strong> {{ host_name }}</div>
   {% if reason %}
     <div class="detail"><strong>{{ t("common-detail-reason") }}</strong> {{ reason }}</div>
   {% endif %}
 </div>
 <p style="text-align: center; margin-top: 1.5rem; color: var(--text-muted); font-size: 0.9rem;">{{ t("common-close-page") }}</p>
+</div>
 {% endblock %}

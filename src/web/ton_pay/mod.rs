@@ -52,6 +52,7 @@ pub(crate) fn router() -> axum::Router<Arc<AppState>> {
     axum::Router::new()
         .route("/booking/pay/{token}", get(page::pay_page))
         .route("/booking/pay/{token}/status", get(page::pay_status))
+        .route("/booking/pay/{token}/ics", get(page::pay_ics))
         .route("/booking/pay/{token}/check", post(page::pay_check))
         .route("/booking/pay/{token}/email", post(page::pay_email))
         .route("/booking/pay/resend", post(page::resend_links))

@@ -474,6 +474,16 @@ pub(crate) struct Site {
         skip_serializing_if = "Option::is_none"
     )]
     pub(crate) meeting_webhook: Option<Off>,
+    /// ilia fork: the SMS gateway card (`sms_config`), only `"off"`: the
+    /// stored gateway deleted, as the card's Clear button does
+    /// (`site::SMS_OFF_SHAPE`). A gateway in the `CALRS_SMS_*` environment
+    /// is not the document's.
+    #[serde(
+        default,
+        deserialize_with = "present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub(crate) sms: Option<Off>,
     #[serde(
         default,
         deserialize_with = "present",
@@ -532,6 +542,14 @@ pub(crate) struct JitsiSettings {
 pub(crate) struct Source {
     pub(crate) url: String,
     pub(crate) username: String,
+    /// ilia fork: the source's name (Sources → Edit), 1..255 bytes, not
+    /// padded. Written without connecting to the calendar server.
+    #[serde(
+        default,
+        deserialize_with = "present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub(crate) name: Option<String>,
     /// Display name of the calendar bookings are written to; null writes none.
     #[serde(
         default,
@@ -748,6 +766,24 @@ pub(crate) struct EventTypeItem {
         skip_serializing_if = "Option::is_none"
     )]
     pub(crate) frequency_limits: Option<Vec<FrequencyLimit>>,
+    /// ilia fork: the calendars whose events block this type's slots, by
+    /// display name; null: every synced calendar (the form's default, no
+    /// calendar chosen).
+    #[serde(
+        default,
+        deserialize_with = "nullable",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub(crate) busy_calendars: Option<Option<Vec<String>>>,
+    /// ilia fork: the date overrides (days off, custom hours) from today on,
+    /// the whole list; `[]` removes every one from today on. Past rows are
+    /// never touched.
+    #[serde(
+        default,
+        deserialize_with = "present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub(crate) overrides: Option<Vec<DateOverride>>,
     /// The price section of the event type form; null: free (no price).
     #[serde(
         default,
@@ -776,6 +812,33 @@ pub(crate) struct EventTypeItem {
 pub(crate) struct FrequencyLimit {
     pub(crate) count: i64,
     pub(crate) period: Period,
+}
+
+/// ilia fork: one date override of an event type (`availability_overrides`):
+/// `{date, blocked: true}` (the day off) or `{date, start, end}` (custom
+/// hours that day, `HH:MM`).
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DateOverride {
+    pub(crate) date: String,
+    #[serde(
+        default,
+        deserialize_with = "present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub(crate) blocked: Option<bool>,
+    #[serde(
+        default,
+        deserialize_with = "present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub(crate) start: Option<String>,
+    #[serde(
+        default,
+        deserialize_with = "present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub(crate) end: Option<String>,
 }
 
 /// The TON price of an event type (`ton_prices`), the event type form's

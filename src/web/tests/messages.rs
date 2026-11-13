@@ -923,10 +923,7 @@ pub(super) struct LogCapture(Arc<std::sync::Mutex<Vec<String>>>);
 impl LogCapture {
     pub(super) fn install(&self) -> tracing::subscriber::DefaultGuard {
         use tracing_subscriber::layer::SubscriberExt;
-        let guard =
-            tracing::subscriber::set_default(tracing_subscriber::registry().with(self.clone()));
-        tracing::callsite::rebuild_interest_cache();
-        guard
+        crate::test_support::capture_default(tracing_subscriber::registry().with(self.clone()))
     }
 
     pub(super) fn all(&self) -> String {

@@ -11,9 +11,9 @@
     {% if ton_price.from_ton %}{{ t("ton-slots-ladder-fee") }}{% endif %}
   </div>
   {% elif ton_price.ton_exact %}<strong>{{ t("ton-slots-price-ton", ton=ton_price.ton_exact) }}</strong>
-  <span style="color: var(--text-muted);">· {{ t("ton-slots-price-note") }}</span>
-  {% else %}<strong>{{ t("ton-slots-price", usd=ton_price.usd) }}</strong>{% if ton_price.ton %} {{ t("ton-slots-price-approx", ton=ton_price.ton) }}{% endif %}
-  <span style="color: var(--text-muted);">· {{ t("ton-slots-price-note") }}</span>
+  <span style="color: var(--text-muted);">· {{ t(ton_note_key | default("ton-slots-price-note")) }}</span>
+  {% else %}<strong>{{ t("ton-slots-price", usd=ton_price.usd) }}</strong>{% if ton_price.ton %} <span style="white-space: nowrap;">{{ t("ton-slots-price-approx", ton=ton_price.ton) }}</span>{% endif %}
+  <span style="color: var(--text-muted);">· {{ t(ton_note_key | default("ton-slots-price-note")) }}</span>
   {% endif %}
 </div>
 {% endif %}

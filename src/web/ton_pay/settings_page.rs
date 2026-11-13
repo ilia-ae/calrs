@@ -93,6 +93,16 @@ fn tr(lang: &str, key: &str) -> String {
     crate::i18n::translate(lang, key, None)
 }
 
+/// The admin page's text of why the watcher is not ready (the `Display`
+/// of [`NotReady`] is the English one of the log).
+fn not_ready_key(e: &super::NotReady) -> &'static str {
+    match e {
+        super::NotReady::WalletNotActive => "ton-admin-notready-wallet",
+        super::NotReady::WrongNetwork => "ton-admin-notready-network",
+        super::NotReady::WatcherStale => "ton-admin-notready-stale",
+    }
+}
+
 /// The rows the save would leave: `before` with every posted field that is
 /// not locked (owned by the environment or by `config apply`) on top. A
 /// field the form did not carry is left as it is; a blank one goes back to
@@ -447,15 +457,34 @@ async fn render(state: &AppState, admin: &AdminUser, view: View) -> Response {
 
     // The payments' status: read-only, from the running runtime.
     let rt = state.ton.get();
+    // The watcher's last step: `stamp` (UTC) for the `datetime` attribute,
+    // the admin's own zone for the text, as the debug list shows times.
+    let last_ok = rt.as_ref().and_then(|r| r.health().last_ok);
+    let tz = crate::web::debug_booking::admin_tz(&admin.user);
+    let network = env("CALRS_TON_NETWORK")
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty());
+    // Payments off: the unset network in the admin's language; a
+    // configuration error stays verbatim (it names the bad variable). The
+    // English `disabled_reason()` and `NotReady` texts stay for the log
+    // and the agent API.
+    let disabled_reason = if rt.is_some() {
+        None
+    } else if network.is_none() {
+        Some(tr(lang, "ton-admin-off-unset"))
+    } else {
+        state.ton.disabled_reason()
+    };
     let status = context! {
         on => rt.is_some(),
-        network => env("CALRS_TON_NETWORK").map(|v| v.trim().to_string()).filter(|v| !v.is_empty()),
-        disabled_reason => rt.is_none().then(|| state.ton.disabled_reason()).flatten(),
+        network => network,
+        disabled_reason => disabled_reason,
         address => rt.as_ref().map(|r| r.cfg.address_friendly.clone()),
         address_raw => rt.as_ref().map(|r| r.cfg.address_raw.clone()),
         indexer_host => rt.as_ref().map(|r| r.cfg.indexer_host()),
-        ready => rt.as_ref().map(|r| r.ready_on_demand(now).err().map(|e| e.to_string())),
-        last_ok => rt.as_ref().and_then(|r| r.health().last_ok).map(super::stamp),
+        ready => rt.as_ref().map(|r| r.ready_on_demand(now).err().map(|e| tr(lang, not_ready_key(&e)))),
+        last_ok => last_ok.map(super::stamp),
+        last_ok_local => last_ok.map(|t| t.with_timezone(&tz).format("%Y-%m-%d %H:%M:%S").to_string()),
         api_key => env_snapshot.secret_state("CALRS_TON_API_KEY"),
         coingecko_key => env_snapshot.secret_state("CALRS_TON_COINGECKO_KEY"),
         open_invoices => open_invoices,

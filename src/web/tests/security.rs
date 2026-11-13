@@ -661,6 +661,10 @@ pub(super) fn capture_tracing<F: FnOnce()>(f: F) -> String {
 
     let buf = Buf(Arc::new(Mutex::new(String::new())));
     let subscriber = Recorder { buf: buf.0.clone() };
+    // Keeps tracing-core from answering a sibling test's first hit of a
+    // callsite with that thread's (absent) subscriber; see
+    // `test_support::capture_default`.
+    crate::test_support::pin_dispatch();
     tracing::subscriber::with_default(subscriber, || {
         // tracing caches per-callsite Interest the first time the
         // callsite fires. If a sibling test (e.g. one that just

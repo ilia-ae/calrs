@@ -155,22 +155,24 @@ pub fn wall_strings(start: &str, end: &str, target: Tz) -> (String, String) {
     (render(start), render(end))
 }
 
+/// The booking's times in the guest's zone, plus the name of the zone they were
+/// converted into (ilia fork: the pages print it, so a reader knows whose 14:00
+/// it is). Unmarked legacy values pass through unchanged with no zone, since
+/// their zone is not known here.
 pub async fn guest_wall_strings(
     pool: &SqlitePool,
     key: &str,
     start: &str,
     end: &str,
-) -> (String, String) {
+) -> (String, String, Option<String>) {
     if !start.ends_with('Z') {
-        return (start.to_owned(), end.to_owned());
+        return (start.to_owned(), end.to_owned(), None);
     }
     let zone: Option<String> = sqlx::query_scalar("SELECT guest_timezone FROM bookings WHERE id = ?1 OR uid = ?1 OR cancel_token = ?1 OR confirm_token = ?1 OR reschedule_token = ?1")
         .bind(key).fetch_optional(pool).await.ok().flatten();
-    wall_strings(
-        start,
-        end,
-        zone.and_then(|z| z.parse().ok()).unwrap_or(Tz::UTC),
-    )
+    let tz = zone.and_then(|z| z.parse().ok()).unwrap_or(Tz::UTC);
+    let (start, end) = wall_strings(start, end, tz);
+    (start, end, Some(tz.name().to_string()))
 }
 
 /// Preserve both absolute endpoints in calendar attachments, including meetings

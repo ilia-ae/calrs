@@ -2281,12 +2281,12 @@ pub(super) async fn overrides_page(
     .await
     .unwrap_or_default();
 
-    // Dashboard handler: stays English until the dashboard surface is translated.
+    // ilia fork: the date label follows the dashboard language.
     let overrides_ctx: Vec<minijinja::Value> = overrides
         .iter()
         .map(|(id, date, start_time, end_time, is_blocked)| {
             let date_label = NaiveDate::parse_from_str(date, "%Y-%m-%d")
-                .map(|d| crate::i18n::format_long_date(d, "en"))
+                .map(|d| crate::i18n::format_long_date(d, auth_user.lang))
                 .unwrap_or_else(|_| date.clone());
             context! {
                 id => id,

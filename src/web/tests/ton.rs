@@ -37,6 +37,9 @@ mod settings_page;
 #[path = "debug_booking.rs"]
 mod debug_booking;
 
+#[path = "ui_snapshot.rs"]
+mod ui_snapshot;
+
 const OUR: &str = "0:83DFD552E63729B472FCBCC8C45EBCC6691702558B68EC7527E1BA403A0F31A8";
 const OTHER: &str = "0:077F69B02858C4A6BC33E5F052E64E5BAD13AB95DB61442CFE0958B97959BDE4";
 const OTHER_UQ: &str = "UQAHf2mwKFjEprwz5fBS5k5brROrldthRCz-CVi5eVm95EuN";
@@ -1866,6 +1869,9 @@ async fn a_paid_booking_goes_to_its_payment_page_and_holds_the_slot() {
     // A QR code per link, the plain one behind a toggle.
     assert_eq!(page.matches("class=\"ton-qr\"").count(), 2);
     assert!(page.contains("<details class=\"ton-other\">"));
+    // Its toggle draws an svg chevron, no font glyph.
+    assert!(page.contains("<summary><svg class=\"icon\""), "{page}");
+    assert!(!page.contains("\\25B8"));
     assert!(page.contains("$40.00"));
     assert!(page.contains("CoinGecko + Binance"));
     // Never the guest's details.
@@ -1899,6 +1905,130 @@ async fn a_paid_booking_goes_to_its_payment_page_and_holds_the_slot() {
     )));
     assert!(!page.contains("ton://"), "no payment details once paid");
     assert_eq!(settled_mails_to(&mails, "guest@test.com").await.len(), 1);
+}
+
+/// ilia fork: "Add to calendar" on the payment page of a confirmed booking,
+/// served over the pay token (`page::pay_ics`), never the cancel token.
+#[tokio::test]
+async fn a_confirmed_payment_page_offers_the_invite_over_the_pay_token() {
+    let e = env().await;
+    let (bid, token) = e.book_http("guest@test.com", "10:00", "198.51.100.1").await;
+    let ics = format!("/booking/pay/{token}/ics");
+    let cancel_token = e.booking_col(&bid, "cancel_token").await.unwrap();
+    // What the pay-token invite must leave out (the pay link may have been
+    // passed to whoever pays), and the place it keeps.
+    sqlx::query(
+        "UPDATE bookings SET notes = 'PRIVATE-NOTE-7f3', meeting_url = 'https://meet.example/r7f3' WHERE id = ?",
+    )
+    .bind(&bid)
+    .execute(&e.pool)
+    .await
+    .unwrap();
+    let guest_name = e.booking_col(&bid, "guest_name").await.unwrap();
+
+    // Unpaid: no link, and the route names nothing.
+    let (_, _, page) = e.get_page(&format!("/booking/pay/{token}")).await;
+    assert!(!page.contains(&ics));
+    let (status, headers, _) = e.get_page(&ics).await;
+    assert_eq!(status, axum::http::StatusCode::NOT_FOUND);
+    assert_eq!(headers["cache-control"], "no-store");
+
+    // Waived but not yet confirmed by the host: still pending, no invite.
+    sqlx::query("UPDATE ton_invoices SET status = 'waived' WHERE booking_id = ?")
+        .bind(&bid)
+        .execute(&e.pool)
+        .await
+        .unwrap();
+    let (_, _, page) = e.get_page(&format!("/booking/pay/{token}")).await;
+    assert!(page.contains("data-state=\"waived\""), "{page}");
+    assert!(!page.contains(&ics));
+    assert_eq!(e.get_page(&ics).await.0, axum::http::StatusCode::NOT_FOUND);
+    sqlx::query("UPDATE ton_invoices SET status = 'open' WHERE booking_id = ?")
+        .bind(&bid)
+        .execute(&e.pool)
+        .await
+        .unwrap();
+
+    // Paid and confirmed: the button, and the invite of this booking.
+    let inv = e.inv(&bid).await;
+    e.pay(AMOUNT, &code(&inv.reference));
+    e.step(e.now).await;
+    assert_eq!(booking_status(&e.pool, &bid).await, "confirmed");
+    let (_, _, page) = e.get_page(&format!("/booking/pay/{token}")).await;
+    assert!(page.contains(&format!("href=\"{ics}\" download")), "{page}");
+    // The finished state on the shared result disc.
+    assert!(page.contains("<span class=\"result-icon ok\""), "{page}");
+    assert!(!page.contains("class=\"ton-result-icon"));
+    assert!(page.contains(&crate::i18n::translate(
+        "en",
+        "confirmed-add-to-calendar",
+        None
+    )));
+    assert!(
+        !page.contains(&cancel_token),
+        "the cancel token never reaches the page"
+    );
+    let (status, headers, body) = e.get_page(&ics).await;
+    assert_eq!(status, axum::http::StatusCode::OK);
+    assert!(headers["content-type"]
+        .to_str()
+        .unwrap()
+        .starts_with("text/calendar"));
+    assert_eq!(headers["cache-control"], "no-store");
+    assert_eq!(headers["referrer-policy"], "no-referrer");
+    let uid = e.booking_col(&bid, "uid").await.unwrap();
+    assert!(body.contains("BEGIN:VCALENDAR"));
+    assert!(body.contains(&format!("UID:{uid}")), "{body}");
+    assert!(body.contains("METHOD:PUBLISH"), "{body}");
+    assert!(
+        body.contains("LOCATION:https://meet.example/r7f3"),
+        "{body}"
+    );
+    let host_email: String = sqlx::query_scalar(
+        "SELECT COALESCE(booking_email, email) FROM users WHERE username = 'testuser'",
+    )
+    .fetch_one(&e.pool)
+    .await
+    .unwrap();
+    for private in [
+        "PRIVATE-NOTE-7f3",
+        "guest@test.com",
+        guest_name.as_str(),
+        host_email.as_str(),
+        "ATTENDEE",
+        "ORGANIZER",
+    ] {
+        assert!(
+            !body.contains(private),
+            "the pay-token invite leaves out {private:?}: {body}"
+        );
+    }
+    // Upstream's cancel-token invite of the same booking carries the notes
+    // and the guest (so the checks above are not vacuous) and the same
+    // SEQUENCE, so a calendar updates one event.
+    let (status, _, full) = e.get_page(&format!("/booking/ics/{cancel_token}")).await;
+    assert_eq!(status, axum::http::StatusCode::OK);
+    assert!(full.contains("PRIVATE-NOTE-7f3"), "{full}");
+    assert!(full.contains("guest@test.com"), "{full}");
+    let seq = |s: &str| {
+        s.lines()
+            .find(|l| l.starts_with("SEQUENCE:"))
+            .map(str::to_owned)
+    };
+    assert!(seq(&body).is_some(), "{body}");
+    assert_eq!(seq(&body), seq(&full));
+
+    // Cancelled: gone again.
+    sqlx::query("UPDATE bookings SET status = 'cancelled' WHERE id = ?")
+        .bind(&bid)
+        .execute(&e.pool)
+        .await
+        .unwrap();
+    assert_eq!(e.get_page(&ics).await.0, axum::http::StatusCode::NOT_FOUND);
+    let (status, _, _) = e
+        .get_page("/booking/pay/00000000000000000000000000000000/ics")
+        .await;
+    assert_eq!(status, axum::http::StatusCode::NOT_FOUND);
 }
 
 #[tokio::test]
@@ -2071,6 +2201,7 @@ async fn no_approval_path_confirms_an_unpaid_booking() {
     let (bid, _) = e.book_http("guest@test.com", "10:00", "198.51.100.1").await;
     let confirm: String = e.booking_col(&bid, "confirm_token").await.unwrap();
     let unpaid = crate::i18n::translate("en", "ton-bae-body-unpaid", None);
+    let to_bookings = "<a class=\"btn btn-secondary btn-auto\" href=\"/dashboard/bookings\">";
     for status in ["open", "expired", "closed"] {
         sqlx::query("UPDATE ton_invoices SET status = ? WHERE booking_id = ?")
             .bind(status)
@@ -2079,15 +2210,17 @@ async fn no_approval_path_confirms_an_unpaid_booking() {
             .await
             .unwrap();
         // The emailed Approve link, GET and POST.
+        // Both name the way out: the bookings page, where the host can
+        // confirm it without payment.
         let (_, _, page) = e.get_page(&format!("/booking/approve/{confirm}")).await;
         assert!(page.contains(&unpaid), "{status}");
+        assert!(page.contains(to_bookings), "{status}: {page}");
         let resp = e
             .post_guest(&format!("/booking/approve/{confirm}"), "")
             .await;
-        assert!(
-            unescape(&body_string(resp).await).contains(&unpaid),
-            "{status}"
-        );
+        let page = unescape(&body_string(resp).await);
+        assert!(page.contains(&unpaid), "{status}");
+        assert!(page.contains(to_bookings), "{status}: {page}");
         // The dashboard (and the MCP approval, which goes through it).
         let resp = e
             .post_authed(&format!("/dashboard/bookings/{bid}/confirm"), &session)
@@ -2142,16 +2275,38 @@ async fn a_stale_host_reschedule_flag_does_not_let_the_guest_confirm_an_unpaid_b
         .unwrap();
     let token = e.booking_col(&bid, "reschedule_token").await.unwrap();
     let refused = crate::i18n::translate("en", "ton-bae-body-reschedule-unpaid", None);
+    let pay_token: String =
+        sqlx::query_scalar("SELECT pay_token FROM ton_invoices WHERE booking_id = ?")
+            .bind(&bid)
+            .fetch_one(&e.pool)
+            .await
+            .unwrap();
+    let to_pay = format!("href=\"/booking/pay/{pay_token}\"");
+    let go = crate::i18n::translate("en", "ton-exit-go", None);
     let (_, _, page) = e.get_page(&format!("/booking/reschedule/{token}")).await;
     assert!(page.contains(&refused));
+    // While the invoice is open, the page links to the payment page.
+    assert!(page.contains(&to_pay), "{page}");
+    assert!(page.contains(&go), "{page}");
     let resp = e
         .post_guest(
             &format!("/booking/reschedule/{token}"),
             &format!("&date={}&time=11:00&tz=UTC", far_future_monday()),
         )
         .await;
-    assert!(unescape(&body_string(resp).await).contains(&refused));
+    let page = unescape(&body_string(resp).await);
+    assert!(page.contains(&refused));
+    assert!(page.contains(&to_pay), "{page}");
     assert_eq!(booking_status(&e.pool, &bid).await, "pending");
+    // An expired invoice can no longer be paid: the refusal, no link.
+    sqlx::query("UPDATE ton_invoices SET status = 'expired' WHERE booking_id = ?")
+        .bind(&bid)
+        .execute(&e.pool)
+        .await
+        .unwrap();
+    let (_, _, page) = e.get_page(&format!("/booking/reschedule/{token}")).await;
+    assert!(page.contains(&refused));
+    assert!(!page.contains("/booking/pay/"), "{page}");
 }
 
 #[tokio::test]
@@ -2384,6 +2539,11 @@ async fn the_price_is_set_on_the_event_type_form() {
         page.contains("<option value=\"TON\" selected>"),
         "TON is the default"
     );
+    // The collapsed section says what it holds, like the other sections.
+    assert!(
+        page.contains(r#"<span class="collapsible-hint" id="ton-price-hint">Free</span>"#),
+        "no price: the hint says the booking is free"
+    );
     let post = |extra: &str| {
         format!("_csrf={CSRF}&title=Test+Meeting&slug=test-meeting&duration_min=30&location_value=https%3A%2F%2Fmeet.example.com&avail_days=1,2,3,4,5&avail_start=09:00&avail_end=17:00{extra}")
     };
@@ -2436,7 +2596,12 @@ async fn the_price_is_set_on_the_event_type_form() {
     .unwrap();
     assert_eq!(row, (4050, Some(20), 1));
     let resp = e.app().oneshot(get_authed(edit, &session)).await.unwrap();
-    assert!(body_string(resp).await.contains("value=\"40.50\""));
+    let page = body_string(resp).await;
+    assert!(page.contains("value=\"40.50\""));
+    assert!(
+        page.contains(r#"id="ton-price-hint">$40.50</span>"#),
+        "{page}"
+    );
     // Unchecked: kept, off. Then cleared: removed.
     e.app()
         .oneshot(post_form(

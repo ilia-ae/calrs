@@ -2291,29 +2291,30 @@ pub(super) fn server_tz() -> Tz {
 }
 
 /// Common IANA timezones, shown first in every timezone picker with a
-/// friendly label.
-const COMMON_TIMEZONES: &[(&str, &str)] = &[
-    ("Pacific/Midway", "Midway"),
-    ("Pacific/Honolulu", "Hawaii"),
-    ("America/Anchorage", "Alaska"),
-    ("America/Los_Angeles", "Los Angeles"),
-    ("America/Denver", "Denver"),
-    ("America/Chicago", "Chicago"),
-    ("America/New_York", "New York"),
-    ("America/Sao_Paulo", "São Paulo"),
-    ("Atlantic/Cape_Verde", "Cape Verde"),
-    ("UTC", "UTC"),
-    ("Europe/London", "London"),
-    ("Europe/Paris", "Paris, Brussels"),
-    ("Europe/Helsinki", "Helsinki, Kyiv"),
-    ("Europe/Moscow", "Moscow"),
-    ("Asia/Dubai", "Dubai"),
-    ("Asia/Kolkata", "India"),
-    ("Asia/Bangkok", "Bangkok"),
-    ("Asia/Shanghai", "Shanghai"),
-    ("Asia/Tokyo", "Tokyo"),
-    ("Australia/Sydney", "Sydney"),
-    ("Pacific/Auckland", "Auckland"),
+/// friendly label. The Fluent key translates the city in
+/// `timezone_options`; UTC has none.
+const COMMON_TIMEZONES: &[(&str, &str, &str)] = &[
+    ("Pacific/Midway", "Midway", "tz-city-midway"),
+    ("Pacific/Honolulu", "Hawaii", "tz-city-hawaii"),
+    ("America/Anchorage", "Alaska", "tz-city-alaska"),
+    ("America/Los_Angeles", "Los Angeles", "tz-city-los-angeles"),
+    ("America/Denver", "Denver", "tz-city-denver"),
+    ("America/Chicago", "Chicago", "tz-city-chicago"),
+    ("America/New_York", "New York", "tz-city-new-york"),
+    ("America/Sao_Paulo", "São Paulo", "tz-city-sao-paulo"),
+    ("Atlantic/Cape_Verde", "Cape Verde", "tz-city-cape-verde"),
+    ("UTC", "UTC", ""),
+    ("Europe/London", "London", "tz-city-london"),
+    ("Europe/Paris", "Paris, Brussels", "tz-city-paris"),
+    ("Europe/Helsinki", "Helsinki, Kyiv", "tz-city-helsinki"),
+    ("Europe/Moscow", "Moscow", "tz-city-moscow"),
+    ("Asia/Dubai", "Dubai", "tz-city-dubai"),
+    ("Asia/Kolkata", "India", "tz-city-india"),
+    ("Asia/Bangkok", "Bangkok", "tz-city-bangkok"),
+    ("Asia/Shanghai", "Shanghai", "tz-city-shanghai"),
+    ("Asia/Tokyo", "Tokyo", "tz-city-tokyo"),
+    ("Australia/Sydney", "Sydney", "tz-city-sydney"),
+    ("Pacific/Auckland", "Auckland", "tz-city-auckland"),
 ];
 
 /// IANA areas listed in the full picker, one `<optgroup>` each. Ids outside
@@ -2439,10 +2440,10 @@ pub(super) fn timezone_location_label(name: &str) -> String {
 /// so the form posts the saved value back as it is, and the save handlers
 /// keep a value posted back unchanged (`resolve_saved_timezone`).
 pub(super) fn timezone_groups(selected: &str, now: chrono::DateTime<chrono::Utc>) -> Vec<TzGroup> {
-    let is_common = |name: &str| COMMON_TIMEZONES.iter().any(|(iana, _)| *iana == name);
+    let is_common = |name: &str| COMMON_TIMEZONES.iter().any(|(iana, _, _)| *iana == name);
     let mut common: Vec<TzOption> = COMMON_TIMEZONES
         .iter()
-        .map(|(iana, city)| TzOption {
+        .map(|(iana, city, _)| TzOption {
             value: iana.to_string(),
             label: match iana.parse::<Tz>() {
                 Ok(tz) if *iana != "UTC" => format!("{} ({})", city, utc_offset_label(tz, now)),
@@ -2543,6 +2544,31 @@ fn timezone_group_label(lang: &str, area: Option<&str>) -> String {
     }
 }
 
+/// The label of a popular zone with its city in the page language
+/// (`Москва (UTC+3)`); any other label is returned unchanged. The English
+/// label from `timezone_groups` starts with the city, so the offset suffix
+/// is kept as it is.
+pub(super) fn common_timezone_label(lang: &str, value: &str, label: &str) -> String {
+    COMMON_TIMEZONES
+        .iter()
+        .find(|(iana, _, key)| *iana == value && !key.is_empty())
+        .and_then(|(_, city, key)| {
+            label
+                .strip_prefix(city)
+                .map(|rest| format!("{}{}", crate::i18n::translate(lang, key, None), rest))
+        })
+        .unwrap_or_else(|| label.to_string())
+}
+
+/// Fluent keys of the popular zones' city names, for the i18n tests.
+#[cfg(test)]
+pub(super) fn common_timezone_keys() -> impl Iterator<Item = &'static str> {
+    COMMON_TIMEZONES
+        .iter()
+        .map(|(_, _, key)| *key)
+        .filter(|k| !k.is_empty())
+}
+
 /// Template context for a timezone `<select>`: one entry per `<optgroup>`,
 /// each with a translated `label` and its `options` (`value`, `label`,
 /// `selected`). Used by every timezone picker (#265).
@@ -2553,7 +2579,10 @@ pub(super) fn timezone_options(selected: &str, lang: &str) -> Vec<minijinja::Val
             let options: Vec<minijinja::Value> = g
                 .options
                 .iter()
-                .map(|o| context! { value => o.value, label => o.label, selected => o.selected })
+                .map(|o| {
+                    let label = common_timezone_label(lang, &o.value, &o.label);
+                    context! { value => o.value, label => label, selected => o.selected }
+                })
                 .collect();
             context! { label => timezone_group_label(lang, g.area), options => options }
         })
@@ -2943,7 +2972,7 @@ pub(super) async fn troubleshoot(
     // Scan in 15-min increments and classify each tick
     struct Tick {
         time: NaiveTime,
-        status: String, // "available", "outside", "busy_event", "booking", "buffer", "min_notice", "beyond_horizon", "outside_date_range"
+        status: String, // "available", "outside", "busy_event", "booking", "buffer", "past", "min_notice", "beyond_horizon", "outside_date_range"
         label: String,
         detail: String,
     }
@@ -2966,6 +2995,19 @@ pub(super) async fn troubleshoot(
                 time: cursor,
                 status: "outside".to_string(),
                 label: crate::i18n::translate(lang, "troubleshoot-label-outside", None),
+                detail: String::new(),
+            });
+            cursor = (tick_dt + tick_size).time();
+            continue;
+        }
+
+        // ilia fork: a time that has already passed is reported as such; a
+        // minimum notice (possibly 0 minutes) is not what blocks it.
+        if tick_dt < now_host {
+            ticks.push(Tick {
+                time: cursor,
+                status: "past".to_string(),
+                label: crate::i18n::translate(lang, "troubleshoot-label-past", None),
                 detail: String::new(),
             });
             cursor = (tick_dt + tick_size).time();
@@ -3213,7 +3255,7 @@ pub(super) async fn troubleshoot(
                 ),
                 "booking" => tr1(lang, "troubleshoot-reason-booking", "label", &b.label),
                 "buffer" => b.label.clone(),
-                "min_notice" => b.label.clone(),
+                "past" | "min_notice" => b.label.clone(),
                 "beyond_horizon" | "outside_date_range" => b.label.clone(),
                 "resource_busy" => b.label.clone(),
                 _ => b.status.clone(),
@@ -3245,8 +3287,7 @@ pub(super) async fn troubleshoot(
     let next_date = (target_date + Duration::days(1))
         .format("%Y-%m-%d")
         .to_string();
-    // Troubleshoot is a dashboard page; keep English until dashboard is translated.
-    let date_label = crate::i18n::format_long_date(target_date, "en");
+    let date_label = crate::i18n::format_long_date(target_date, lang);
 
     let tmpl = match state.templates.get_template("troubleshoot.html") {
         Ok(t) => t,

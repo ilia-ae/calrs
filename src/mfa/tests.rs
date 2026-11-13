@@ -566,7 +566,14 @@ async fn http_registration_enforces_enrollment() {
     .await;
     assert_eq!(r.status(), 200);
     assert!(response_cookie(&r, SESSION_COOKIE).is_some());
-    assert_eq!(body(r).await.matches("class=\"recovery-code\"").count(), 10);
+    let html = body(r).await;
+    assert_eq!(html.matches("class=\"recovery-code\"").count(), 10);
+    // ilia fork: the codes sit in a grid with one button that copies them all.
+    assert!(html.contains(r#"<ul class="recovery-codes" id="recovery-codes">"#));
+    assert!(html.contains(
+        r#"id="recovery-copy" data-copied="Codes copied" hidden>Copy the codes</button>"#
+    ));
+    assert!(html.contains(r#"<a class="btn" href="/dashboard">"#));
 }
 
 #[tokio::test]

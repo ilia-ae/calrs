@@ -231,11 +231,10 @@ impl AuditLog {
     fn capture() -> (Self, tracing::subscriber::DefaultGuard) {
         use tracing_subscriber::layer::SubscriberExt;
         let log = Self::default();
+        // Not a plain `set_default`: a sibling test hitting a callsite first
+        // could cache "never" for it; see `test_support::capture_default`.
         let guard =
-            tracing::subscriber::set_default(tracing_subscriber::registry().with(log.clone()));
-        // A callsite first hit with no subscriber caches "never"; see
-        // `capture_tracing` in security.rs.
-        tracing::callsite::rebuild_interest_cache();
+            crate::test_support::capture_default(tracing_subscriber::registry().with(log.clone()));
         (log, guard)
     }
 

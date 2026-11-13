@@ -5,7 +5,7 @@
   .directory-info { flex: 1; min-width: 0; overflow-wrap: anywhere; }
   .directory-owner { color: var(--text-muted); font-size: 0.85rem; margin-top: 0.25rem; }
   .directory-actions { display: flex; align-items: center; gap: 0.5rem; }
-  .directory-star { font-size: 1.25rem; padding: 0.35rem 0.7rem; }
+  .directory-star { font-size: 1.125rem; line-height: 1; padding: 0 0.6rem; border-color: var(--field-border); }
   .directory-star[aria-pressed="true"] { color: var(--accent); background: var(--accent-subtle); }
   .directory-notice { color: var(--text-muted); font-size: 0.85rem; margin-top: 0.5rem; }
   .directory-list [hidden] { display: none; }
@@ -25,8 +25,8 @@
         {% if et.matched_hosts %}<div class="directory-owner directory-hosts">{{ t("directory-with-hosts", names=et.matched_hosts | join(", ")) }}</div>{% endif %}
       </div>
       <div class="directory-actions">
-        <button type="button" class="slot-btn directory-share" data-url="{{ et.url }}" data-internal="{{ 'true' if et.visibility == 'internal' else 'false' }}">{{ t("directory-generate") if et.visibility == 'internal' else t("invites-copy-link") }}</button>
-        <button type="button" class="slot-btn directory-star" aria-pressed="{{ 'true' if et.favorite else 'false' }}" aria-label="{{ t('directory-remove', title=et.title) if et.favorite else t('directory-add', title=et.title) }}" data-add-label="{{ t('directory-add', title=et.title) }}" data-remove-label="{{ t('directory-remove', title=et.title) }}"><span aria-hidden="true">{{ '★' if et.favorite else '☆' }}</span></button>
+        <button type="button" class="btn btn-secondary btn-sm btn-auto directory-share" data-url="{{ et.url }}" data-internal="{{ 'true' if et.visibility == 'internal' else 'false' }}">{{ t("directory-generate") if et.visibility == 'internal' else t("invites-copy-link") }}</button>
+        <button type="button" class="btn btn-ghost btn-sm btn-auto directory-star" aria-pressed="{{ 'true' if et.favorite else 'false' }}" aria-label="{{ t('directory-remove', title=et.title) if et.favorite else t('directory-add', title=et.title) }}" data-add-label="{{ t('directory-add', title=et.title) }}" data-remove-label="{{ t('directory-remove', title=et.title) }}"><span aria-hidden="true">{{ '★' if et.favorite else '☆' }}</span></button>
       </div>
     </div>
     {% if et.visibility == 'internal' %}<div class="directory-notice">{{ t("directory-invite-help") }}</div>{% endif %}

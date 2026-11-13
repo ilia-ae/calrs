@@ -151,11 +151,14 @@ cal.example.com {
 | `CALRS_ALLOW_PRIVATE_HOSTS` | Comma-separated hostnames or IP addresses allowed to resolve to private IPs for CalDAV/EWS (SSRF opt-out) | _(none)_ |
 | `CALRS_TRUSTED_PROXIES` | Addresses and CIDR ranges whose `X-Forwarded-For` is believed for rate limiting, or `none` (see [Security](security.md#trusted-proxies)) | loopback, private, ULA and link-local ranges |
 | `CALRS_EMBED_ORIGINS` | Sites that may frame the embedded booking pages (`?embed=1`): a comma or space separated list of origins (`https://example.org`), `none`, or `*` (ilia fork; see [Security](security.md#embedding)) | `*` (any site) |
+| `CALRS_BRAND_NAME` | The instance's own name in place of "calrs" where a visitor sees the product name: tab titles, the sign-in and registration subtitles, the email signature and "Sent by" line, and the issuer of new TOTP set-ups. Trimmed, 1-64 characters, no control characters; anything else is ignored (ilia fork) | _(unset: calrs)_ |
+| `CALRS_SOURCE_URL` | Footer "Source code" link to the source of the running version (AGPL-3.0 §13). `https://` only; anything else is ignored (ilia fork) | _(none: no link)_ |
+| `CALRS_MADE_BY_NAME`, `CALRS_MADE_BY_URL` | Footer credit "Made by <name> · based on source code". The name is 1-64 characters; the URL must be `https://` and is used only when a name is set (ilia fork) | _(unset: "based on calrs")_ |
 | `CALRS_SYNC_MIN_AGE` | Minimum time in seconds between two background syncs of the same calendar source, e.g. `900` for every 15 minutes. Booking pages still refresh a host's calendars on demand once they are 5 minutes old. Capped at `86400` (one day). A failing source is retried at this interval too, so the email warning its owner (sent after three failures) comes later: after about 30 minutes at `900` | `0` (the stalest source every minute) |
 | `RUST_LOG` | Log level filter | `calrs=info,tower_http=info` |
 | `CALRS_SMS_*` | SMS gateway configuration, overriding the admin panel; see [SMS Notifications](./sms.md#environment-variables) | _(none)_ |
 
-`CALRS_BASE_URL` and `CALRS_ALLOW_PRIVATE_HOSTS` can also be set without environment variables — from the admin panel (**System settings**) or the CLI (`calrs config general`). The stored value is persisted in the database; when the matching environment variable is set it takes precedence at runtime. The other variables (`CALRS_DATA_DIR`, `RUST_LOG`, and `CALRS_SECRET_KEY`) are bootstrap settings and remain environment-only.
+`CALRS_BASE_URL` and `CALRS_ALLOW_PRIVATE_HOSTS` can also be set without environment variables — from the admin panel (**System settings**) or the CLI (`calrs config general`). The stored value is persisted in the database; when the matching environment variable is set it takes precedence at runtime. The other variables (`CALRS_DATA_DIR`, `RUST_LOG`, and `CALRS_SECRET_KEY`) are bootstrap settings and remain environment-only. So are the ilia fork's deployment facts (`CALRS_EMBED_ORIGINS`, `CALRS_BRAND_NAME`, `CALRS_SOURCE_URL`, `CALRS_MADE_BY_NAME`, `CALRS_MADE_BY_URL`): read once at startup, with no admin or CLI setting.
 
 ## Observability
 

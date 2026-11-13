@@ -1585,3 +1585,55 @@ async fn guest_cancel_reports_the_status_it_actually_left() {
     assert_eq!(cancel_from_status(&pool, &moved, "pending").await, None);
     assert_eq!(booking_status(&pool, &moved).await, "declined");
 }
+
+/// ilia fork: a Russian guest's reschedule pages, with a booking stored in
+/// that language (`token_page_lang`).
+async fn insert_ru_booking(pool: &SqlitePool, et_id: &str, resched_tok: &str) {
+    sqlx::query("INSERT INTO bookings (id, event_type_id, uid, guest_name, guest_email, guest_timezone, start_at, end_at, status, cancel_token, reschedule_token, language) VALUES (?, ?, 'uid-ru', 'Гость', 'ru@test.com', 'UTC', '2030-06-17T10:00:00', '2030-06-17T10:30:00', 'confirmed', ?, ?, 'ru')")
+        .bind(uuid::Uuid::new_v4().to_string())
+        .bind(et_id)
+        .bind(uuid::Uuid::new_v4().to_string())
+        .bind(resched_tok)
+        .execute(pool)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn reschedule_banner_writes_the_old_date_out_in_the_page_language() {
+    let (app, pool, _, et_id) = setup_test_app().await;
+    let resched_tok = uuid::Uuid::new_v4().to_string();
+    insert_ru_booking(&pool, &et_id, &resched_tok).await;
+    let response = app
+        .oneshot(get(&format!("/booking/reschedule/{resched_tok}")))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 200);
+    let body = body_string(response).await;
+    let long = crate::i18n::format_long_date(NaiveDate::from_ymd_opt(2030, 6, 17).unwrap(), "ru");
+    assert!(body.contains(&format!("сейчас: {long} в 10:00")), "{body}");
+    assert!(!body.contains("2030-06-17 в"), "no ISO date in the banner");
+}
+
+#[tokio::test]
+async fn reschedule_confirm_says_at_in_the_page_language_and_strikes_only_the_old_time() {
+    let (app, pool, _, et_id) = setup_test_app().await;
+    let resched_tok = uuid::Uuid::new_v4().to_string();
+    insert_ru_booking(&pool, &et_id, &resched_tok).await;
+    let response = app
+        .oneshot(get(&format!(
+            "/booking/reschedule/{resched_tok}?date=2030-06-18&time=11:00&tz=UTC"
+        )))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 200);
+    let body = body_string(response).await;
+    assert!(body.contains("<strong>Было:</strong> <del"), "{body}");
+    assert!(body.contains(" в <span class=\"resched-time\" data-time=\"10:00\">10:00</span>"));
+    assert!(body.contains(" в <span class=\"resched-time\" data-time=\"11:00\">11:00</span>"));
+    assert!(!body.contains(" at <span"), "no English 'at'");
+    assert!(!body.contains("line-through"));
+    // The emoji disc became the shared SVG icon.
+    assert!(body.contains("class=\"result-icon info\""));
+    assert!(!body.contains("&#128260;"));
+}

@@ -12,8 +12,10 @@
   </div>
 
   <form method="post" style="margin-top: 1.25rem;">
-    <button type="submit" class="btn">{{ t("host-resched-button") }}</button>
-    <a href="/dashboard/bookings" style="display: inline-block; margin-left: 0.75rem; color: var(--text-muted); text-decoration: none; font-size: 0.9rem;">{{ t("host-resched-cancel-link") }}</a>
+    <div class="btn-row">
+      <button type="submit" class="btn">{{ t("host-resched-button") }}</button>
+      <a class="btn btn-ghost" href="/dashboard/bookings">{{ t("host-resched-cancel-link") }}</a>
+    </div>
   </form>
 </div>
 {% endblock %}

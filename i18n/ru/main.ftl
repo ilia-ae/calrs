@@ -27,12 +27,45 @@ confirmed-add-to-calendar = Добавить в календарь
 
 # Slot picker (templates/slots.html)
 
+## ilia-ov-slots
+slots-time-format-24 = 24 ч
+slots-time-format-12 = 12 ч
+slots-prev-month = Предыдущий месяц
+slots-next-month = Следующий месяц
+slots-prev-week = Предыдущая неделя
+slots-next-week = Следующая неделя
+book-remove-guest = Убрать гостя
+ilia-error-back-to-site = На сайт
+
 slots-location-video = Видеозвонок
 slots-location-phone = Телефонный звонок
 slots-location-google-meet = Google Meet
 
 slots-tz-label = Ваш часовой пояс
 slots-time-format-label = Формат времени
+
+## ilia-ov5-guest
+tz-city-midway = Мидуэй
+tz-city-hawaii = Гавайи
+tz-city-alaska = Аляска
+tz-city-los-angeles = Лос-Анджелес
+tz-city-denver = Денвер
+tz-city-chicago = Чикаго
+tz-city-new-york = Нью-Йорк
+tz-city-sao-paulo = Сан-Паулу
+tz-city-cape-verde = Кабо-Верде
+tz-city-london = Лондон
+tz-city-paris = Париж, Брюссель
+tz-city-helsinki = Хельсинки, Киев
+tz-city-moscow = Москва
+tz-city-dubai = Дубай
+tz-city-india = Индия
+tz-city-bangkok = Бангкок
+tz-city-shanghai = Шанхай
+tz-city-tokyo = Токио
+tz-city-sydney = Сидней
+tz-city-auckland = Окленд
+
 tz-group-common = Популярные часовые пояса
 tz-region-africa = Африка
 tz-region-america = Америка
@@ -68,6 +101,12 @@ slots-weekday-sat-short = Сб
 slots-weekday-sun-short = Вс
 
 slots-select-date = Выберите дату
+
+## ilia-ov3-guest
+# The deferred slot load failed (slots.html); the booking form's TON price note (partials/ton_price.html).
+slots-load-failed = Не удалось загрузить свободное время. Обновите страницу.
+ton-book-price-note = оплата в TON после записи
+
 slots-loading-availability = Загружаем свободное время…
 slots-click-highlighted = Выберите отмеченную дату, чтобы увидеть свободное время
 slots-bookable-range-both = Запись открыта с { $from } по { $until }
@@ -317,6 +356,11 @@ email-confirm-reschedule-notice = Важно: перенести запись м
 # Event type form: Google Meet location + cancel/reschedule minimum notice
 # (templates/event_type_form.html, src/google_meet.rs)
 
+## ilia-ov-eventform
+# The collapsed "Payment in TON" section's summary: no payment, or the price comes from the demand ladder.
+ton-etf-hint-off = Бесплатно
+ton-etf-hint-ladder = По спросу
+
 event-type-form-location-google-meet = Google Meet (ссылка создаётся автоматически)
 event-type-form-location-google-meet-hint = Уникальная ссылка Google Meet создаётся при подтверждении записи, её владелец — назначенный организатор. У каждого организатора (у вас или у каждого подходящего участника команды) должен быть подключён Google Calendar и выбран календарь для новых записей.
 
@@ -368,12 +412,23 @@ booking-blocked-body = Отменить или перенести запись �
 
 # Dashboard event types listing (templates/dashboard_event_types.html)
 
+## ilia-ov-dates
+# Booking times on the dashboard lists: the day ("Today", "Tomorrow", a weekday
+# or a date), then the start and end times and the host timezone.
+dashboard-when-today = Сегодня
+dashboard-when-tomorrow = Завтра
+dashboard-when-range = { $date }, { $start } — { $end } { $tz }
+
 dashboard-event-types-copy = Скопировать
 dashboard-event-types-copied = Скопировано
 dashboard-event-types-copy-title = Скопировать ссылку для записи
 dashboard-event-types-copy-failed = Не удалось скопировать
 
 # Dashboard sidebar and shared chrome (templates/dashboard_base.html)
+
+## ilia-ov-shell
+nav-menu = Меню
+event-types-more-actions = Другие действия
 
 nav-section-scheduling = Планирование
 nav-overview = Обзор
@@ -445,6 +500,11 @@ overview-action-reason-team-admin = Нужна команда — сначала
 overview-action-reason-team-member = Нужна команда — обратитесь к администратору
 
 # Dashboard bookings (templates/dashboard_bookings.html)
+
+## ilia-ov-lists
+team-form-slug-placeholder = razrabotka
+troubleshoot-label-past = Время уже прошло
+troubleshoot-legend-beyond-horizon = Вне глубины или периода записи
 
 bookings-page-title = Записи
 bookings-pending-approval = Ожидают подтверждения
@@ -585,6 +645,13 @@ editor-preview = Предпросмотр
 
 # Profile and settings (templates/settings.html)
 
+## ilia-ov-settings
+settings-choose-file = Выбрать файл
+settings-no-file = Файл не выбран
+admin-provider-local = Пароль
+admin-provider-oidc = SSO
+admin-theme-vates-desc = Красный и космический синий
+
 settings-page-title = Настройки
 settings-heading = Профиль и настройки
 settings-public-page-label = Ваша публичная страница записи
@@ -636,6 +703,11 @@ settings-theme-light = Светлая
 settings-theme-dark = Тёмная
 
 # Sign in (templates/auth/login.html)
+
+## ilia-ov-auth
+ilia-mfa-recovery-copy = Скопировать коды
+ilia-mfa-recovery-copied = Коды скопированы
+ilia-mfa-recovery-copy-manual = Скопировать не удалось. Коды выделены — скопируйте их вручную.
 
 login-page-title = Вход
 login-heading = Вход
@@ -726,6 +798,15 @@ team-profile-subtitle = Выберите тип встречи, чтобы за�
 team-profile-empty = Доступных типов встреч пока нет.
 
 # Availability troubleshoot (templates/troubleshoot.html, src/web/mod.rs)
+
+## ilia-ov2-lists
+# The troubleshoot timeline's legend entry for time already gone today.
+troubleshoot-legend-past = Прошедшее время
+# Accessible names of the troubleshoot page's day arrows.
+troubleshoot-prev-day = Предыдущий день
+troubleshoot-next-day = Следующий день
+# Accessible name of a member's role select on the team settings page.
+team-settings-role-of = Роль: { $name }
 
 troubleshoot-page-title = Диагностика
 troubleshoot-empty = Типы встреч не найдены. { $link }, чтобы начать диагностику доступности.
@@ -838,6 +919,11 @@ source-form-heading-add = Подключение календаря
 source-form-subtitle-edit = Измените параметры подключения. Чтобы оставить текущий пароль, не заполняйте это поле. Если вы изменили адрес или имя пользователя, запустите синхронизацию, чтобы обновить список календарей.
 source-form-subtitle-add = Подключите сервер CalDAV или Microsoft Exchange (EWS), чтобы calrs учитывал вашу занятость, когда гости записываются на встречи.
 source-form-backend = Протокол
+
+## ilia-ov3-dash
+# The "Other / generic CalDAV" preset on the new-source form; it also becomes the default source name.
+source-form-preset-other = Другой сервер CalDAV
+
 source-form-preset = Шаблон
 source-form-connect-google = Подключить через Google
 source-form-google-unavailable = Google Calendar недоступен. Обратитесь к администратору.
@@ -978,6 +1064,10 @@ etf-min-notice-help = За сколько времени до начала мо�
 etf-section-limits = Ограничения записи
 etf-first-slot-only = Одно время в день
 etf-first-slot-only-help = Показывать только самое раннее свободное время каждого дня.
+
+## ilia-ov4-dash
+etf-freq-per-member = Для каждого участника
+
 etf-freq-limit = Ограничить частоту записи
 etf-freq-limit-help = Сколько раз можно записаться на этот тип встречи за период.
 etf-add-limit = Добавить ограничение
@@ -1277,8 +1367,25 @@ admin-sms-gateway = Шлюз:
 admin-sms-account = Аккаунт:
 admin-sms-sender = Отправитель:
 admin-sms-enabled = SMS включены
+## ilia-ov3-admin
+admin-sms-provider-webhook = Свой вебхук
+admin-sms-webhook-secret = Секрет HMAC
 admin-sms-gateway-label = Шлюз
 admin-required-on-switch = Обязательно при смене шлюза
+## ilia-ov2-settings
+admin-sms-sender-label = Отправитель
+admin-sms-api-base-url = Базовый URL API
+admin-sms-region-base-url = Базовый URL региона
+admin-sms-webhook-url = URL вебхука
+admin-sms-twilio-sender-hint = Номер Twilio в формате E.164 (+15551234567) или буквенно-цифровое имя отправителя, если страна получателя его допускает.
+admin-sms-twilio-base-url-hint = Необязательно. По умолчанию https://api.twilio.com. Используйте https: по этому соединению передаются учётные данные.
+admin-sms-gatewayapi-sender-hint = До 11 букв и цифр или до 15 цифр.
+admin-sms-gatewayapi-base-url-hint = Необязательно. По умолчанию https://gatewayapi.com; укажите https://gatewayapi.eu, чтобы трафик оставался в ЕС.
+admin-sms-sevenio-sender-hint = До 11 букв и цифр или до 16 цифр.
+admin-sms-sevenio-base-url-hint = Необязательно. По умолчанию https://gateway.seven.io.
+admin-sms-webhook-sender-hint = Необязательно. Передаётся вашему адресу как «sender».
+admin-sms-webhook-base-url-hint = calrs отправляет сюда POST с {"{"}"to", "text", "sender"{"}"} и ждёт ответа 2xx.
+
 admin-sms-docs = Документация API { $provider }
 admin-sms-country = Код страны по умолчанию
 admin-sms-country-hint = (используется, когда гость вводит местный номер телефона)
@@ -1765,7 +1872,7 @@ ton-pay-qr-alt = QR-код с данными для оплаты
 ton-pay-scan = Или отсканируйте этот код в приложении кошелька.
 ton-pay-qr-alt-tonkeeper = QR-код для Tonkeeper с данными для оплаты
 ton-pay-scan-tonkeeper = Или отсканируйте этот код в Tonkeeper или камерой телефона.
-ton-pay-qr-other = Другой кошелёк, например MyTonWallet? Показать его QR-код
+ton-pay-qr-other = QR‑код для другого кошелька (MyTonWallet и др.)
 ton-pay-address = Адрес
 ton-pay-comment = Комментарий
 ton-pay-copy = Скопировать
@@ -1774,7 +1881,7 @@ ton-pay-warn-comment = Комментарий к переводу обязате
 ton-pay-warn-encrypt = Не шифруйте комментарий.
 ton-pay-warn-token = Платите в TON, а не токенами.
 ton-pay-warn-exchange = Платите с биржи? Укажите код выше в поле «Memo» (комментарий).
-ton-pay-warn-deadline = Отправьте платёж до { $time }. Платёж, отправленный позже, может не засчитаться.
+ton-pay-warn-deadline = Отправьте платёж до { $time } ({ $zone }). Платёж, отправленный позже, может не засчитаться.
 ton-pay-check = Платёж отправлен, проверить
 ton-pay-email = Прислать ссылку на эл. почту
 ton-pay-emailed = Мы отправили эту ссылку на адрес эл. почты, указанный при записи.
@@ -2238,6 +2345,9 @@ ton-etf-ladder-help = Цена — ступень, соответствующа�
 # ilia fork: the TON settings page (/dashboard/admin/ton)
 nav-admin-ton = Оплата TON
 ton-etf-ladder-edit = Изменить лестницу
+## ilia-ov-ton
+ton-admin-debug-tg-saved-locked = Ничего не изменено: имя гостя в Telegram заблокировано.
+dbg-err-requote = Цена дважды изменилась во время бронирования. Ничего не забронировано: попробуйте ещё раз.
 ton-admin-page-title = Оплата TON
 ton-admin-heading = Оплата TON
 ton-admin-intro = Эти настройки относятся к оплате в TON на этом сервере. Сначала действует значение из окружения сервера, затем сохранённое здесь или через config apply, затем значение по умолчанию.
@@ -2256,6 +2366,13 @@ ton-admin-address-raw = Сырая форма
 ton-admin-indexer = Индексатор
 ton-admin-watcher = Наблюдатель
 ton-admin-watcher-ready = готов
+
+## ilia-ov3-ton
+ton-admin-notready-wallet = кошелёк-получатель не активен (или ещё не проверен)
+ton-admin-notready-network = индексатор в другой сети (или ещё не проверен)
+ton-admin-notready-stale = наблюдатель не делал шагов последние 2 минуты
+ton-admin-off-unset = не задана переменная CALRS_TON_NETWORK
+
 ton-admin-watcher-not-ready = не готов: { $reason }
 ton-admin-last-step = последний шаг
 ton-admin-open-invoices = Открытые счета
@@ -2293,7 +2410,7 @@ ton-admin-f-rate_max_age_min = Наибольший возраст курса (�
 ton-admin-f-rate_max_jump_pct = Наибольший скачок от прошлого курса (%)
 ton-admin-f-alert_email = Почта для оповещений (пусто: все администраторы)
 ton-admin-ladder-help = Ступени через запятую: цена при 0, 1, 2… подтверждённых бронированиях в ближайшие дни; последняя ступень — потолок. «free» только в начале: бесплатное бронирование ждёт подтверждения владельца.
-ton-admin-ladder-row = От %1 бронирований
+ton-admin-ladder-row = Бронирований: %1
 ton-admin-ladder-add = Добавить ступень
 ton-admin-ladder-remove = Убрать
 ton-admin-free = бесплатно
@@ -2329,7 +2446,7 @@ ton-admin-via-apply = config apply
 nav-admin-debug-booking = Отладочная бронь
 dbg-title = Отладочная бронь
 dbg-intro = Тестовая запись так, как её сделал бы гость, без заполнения гостевой формы каждый раз. Бронь проходит тот же путь, что и на публичной странице записи: проверки, цена и счёт в TON, удержание времени и письма. Оплата никогда не пропускается и не отмечается как полученная: оплатите счёт из своего кошелька или отмените бронь.
-dbg-switch-note = Когда отладка закончится, выключите эту страницу переключателем вверху страницы «Оплата TON»:
+dbg-switch-note = Когда отладка закончится, выключите эту страницу переключателем вверху страницы:
 dbg-cancelled = Отменено тестовых броней: { $count }.
 dbg-no-types = У вас нет включённых личных типов встреч.
 dbg-event-type = Тип встречи
@@ -2350,8 +2467,8 @@ dbg-slot = Время
 dbg-tz = Время указано по { $tz } — часовому поясу вашего профиля.
 dbg-no-slots = В ближайший 31 день нет свободного времени.
 dbg-name = Имя
-dbg-email = Email
-dbg-email-help = Только ваши собственные адреса: email для входа и email для записей.
+dbg-email = Эл. почта
+dbg-email-help = Только ваши собственные адреса: адрес для входа и адрес для записей.
 dbg-telegram-username = Имя пользователя в Telegram
 dbg-telegram-required = обязательно для этого типа встречи
 dbg-notes = Заметки
@@ -2411,7 +2528,7 @@ dbg-telegram-from-chat = Подставлено из вашего привяза
 dbg-telegram-from-setting = Подставлено из блока Debug на странице
 dbg-telegram-none = Подставить нечего: задайте имя в блоке Debug на странице
 dbg-timing = Сроки для этой тестовой брони
-dbg-timing-normal = Обычные: настройки сайта (Admin → TON payments)
+dbg-timing-normal = Обычные: настройки сайта (страница «Оплата TON»)
 dbg-timing-fast = Быстрый тест: { $window } мин на оплату; продлений: { $renewals }, по { $renew } мин (гостя просят оплатить ещё раз); потом счёт истекает и бронь отменяется автоматически. Запас { $grace } мин, отступ { $margin } мин.
 dbg-timing-custom = Свои, в минутах (пустое поле — значение быстрого теста):
 dbg-timing-window = Окно оплаты, мин

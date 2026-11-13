@@ -129,6 +129,7 @@ pub(super) async fn dynamic_group_google_meet_error_page(
     };
     Some(Html(
         tmpl.render(context! {
+            company_link => state.company_link_now(),
             title => title,
             message => message,
             lang => lang,

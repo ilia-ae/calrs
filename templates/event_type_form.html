@@ -8,22 +8,22 @@
   <div class="error" style="margin-bottom: 1rem;">{{ error }}</div>
 {% endif %}
 {% if saved is defined and saved %}
-  <div style="margin-bottom: 1rem; padding: 0.75rem 1rem; border: 1px solid #22c55e; border-radius: var(--radius); background: rgba(34,197,94,0.1); font-size: 0.9rem;">&#10003; {{ t("event-type-form-saved") }}</div>
+  <div class="success" role="status">{{ t("event-type-form-saved") }}</div>
 {% endif %}
 {% if booking_window_warnings is defined and booking_window_warnings %}
-  <div style="margin-bottom: 1rem; padding: 0.75rem 1rem; border: 1px solid #eab308; border-radius: var(--radius); background: rgba(234,179,8,0.1); font-size: 0.9rem;">
+  <div role="status" style="margin-bottom: 1rem; padding: 0.75rem 1rem; border: 1px solid var(--warn-border); border-radius: var(--radius); background: var(--warn-bg); color: var(--warning-text); font-size: 0.9rem;">
     {% for w in booking_window_warnings %}
-      <div>&#9888; {{ w.text }}{% if w.link %} <a href="{{ w.link }}" style="color: var(--accent);">{{ t("event-type-form-bookable-range-bookings-link") }} &rarr;</a>{% endif %}</div>
+      <div>{{ w.text }}{% if w.link %} <a href="{{ w.link }}">{{ t("event-type-form-bookable-range-bookings-link") }} &rarr;</a>{% endif %}</div>
     {% endfor %}
   </div>
 {% endif %}
 
 {% if editing and form_enabled is defined and not form_enabled %}
-<div style="margin-bottom: 1rem; padding: 1rem 1.25rem; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); display: flex; justify-content: space-between; align-items: center; gap: 1rem;">
+<div class="card" style="border-left: 3px solid var(--accent); display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap;">
   <span>{{ t("etf-disabled-banner") }}</span>
   <form method="post" action="{{ toggle_url }}" style="margin: 0;">
     <input type="hidden" name="then" value="edit">
-    <button type="submit" class="slot-btn" style="font-size: 0.8rem; cursor: pointer;">{{ t("event-types-enable") }}</button>
+    <button type="submit" class="btn btn-sm btn-auto">{{ t("event-types-enable") }}</button>
   </form>
 </div>
 {% endif %}
@@ -33,13 +33,13 @@
 {% if preset is defined and preset %}
 <div style="padding: 0.75rem 1rem; border-radius: var(--radius); background: var(--accent-subtle); border: 1px solid var(--accent-border); font-size: 0.875rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
   {% if preset == "public" %}
-    <span>&#127760;</span> {{ t("etf-preset-public") | safe }}
+    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg><span>{{ t("etf-preset-public") | safe }}</span>
   {% elif preset == "private" %}
-    <span>&#128274;</span> {{ t("etf-preset-private") | safe }}
+    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4.5" y="10.5" width="15" height="11" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg><span>{{ t("etf-preset-private") | safe }}</span>
   {% elif preset == "internal" %}
-    <span>&#127970;</span> {{ t("etf-preset-internal") | safe }}
+    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13.5a4.5 4.5 0 0 0 6.8.5l3-3a4.5 4.5 0 0 0-6.36-6.36l-1.72 1.7"/><path d="M14 10.5a4.5 4.5 0 0 0-6.8-.5l-3 3a4.5 4.5 0 0 0 6.36 6.36l1.7-1.7"/></svg><span>{{ t("etf-preset-internal") | safe }}</span>
   {% elif preset == "team" %}
-    <span>&#128101;</span> {{ t("etf-preset-team") | safe }}
+    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20.5a6.5 6.5 0 0 1 13 0M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 14.3a6.5 6.5 0 0 1 3 6.2"/></svg><span>{{ t("etf-preset-team") | safe }}</span>
   {% endif %}
 </div>
 {% endif %}
@@ -51,7 +51,7 @@
   {% if not editing and teams is defined and teams %}
   <div class="form-group">
     <label for="team_id">{{ t("etf-team") }} <span class="hint">{{ t("etf-team-hint") }}</span></label>
-    <select id="team_id" name="team_id" style="padding: 0.625rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.925rem; font-family: inherit; background: var(--surface); color: var(--text); width: 100%;">
+    <select id="team_id" name="team_id" style="padding: 0.625rem 0.75rem; border: 1px solid var(--field-border); border-radius: var(--radius); font-size: 0.925rem; font-family: inherit; background: var(--surface); color: var(--text); width: 100%;">
       <option value="">{{ t("etf-team-personal") }}</option>
       {% for t in teams %}
       <option value="{{ t.id }}" {% if form_team_id is defined and form_team_id == t.id %}selected{% endif %}>{{ t.name }}</option>
@@ -62,7 +62,7 @@
 
   <div class="form-group" id="scheduling-mode-group" style="{% if not (is_group is defined and is_group) %}display:none;{% endif %}">
     <label for="scheduling_mode">{{ t("etf-scheduling-mode") }}</label>
-    <select id="scheduling_mode" name="scheduling_mode" style="padding: 0.625rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.925rem; font-family: inherit; background: var(--surface); color: var(--text); width: 100%;">
+    <select id="scheduling_mode" name="scheduling_mode" style="padding: 0.625rem 0.75rem; border: 1px solid var(--field-border); border-radius: var(--radius); font-size: 0.925rem; font-family: inherit; background: var(--surface); color: var(--text); width: 100%;">
       <option value="round_robin" {% if form_scheduling_mode is defined and form_scheduling_mode == "round_robin" %}selected{% endif %}>{{ t("etf-mode-round-robin") }}</option>
       <option value="collective" {% if form_scheduling_mode is defined and form_scheduling_mode == "collective" %}selected{% endif %}>{{ t("etf-mode-collective") }}</option>
     </select>
@@ -81,13 +81,12 @@
 
   <div class="form-group">
     <label for="description">{{ t("team-form-description") }} <span class="hint">{{ t("team-form-optional") }}</span></label>
-    <div style="border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;">
-      <div class="md-toolbar" data-target="description" style="display: flex; gap: 0.25rem; padding: 0.375rem 0.5rem; background: var(--surface-hover); border-bottom: 1px solid var(--border);">
-        <button type="button" data-action="bold" title="{{ t('editor-bold-short') }}" style="padding: 0.25rem 0.5rem; background: none; border: 1px solid transparent; border-radius: 3px; cursor: pointer; font-weight: 700; font-size: 0.85rem; color: var(--text); font-family: inherit; line-height: 1;">B</button>
-        <button type="button" data-action="italic" title="{{ t('editor-italic-short') }}" style="padding: 0.25rem 0.5rem; background: none; border: 1px solid transparent; border-radius: 3px; cursor: pointer; font-style: italic; font-size: 0.85rem; color: var(--text); font-family: inherit; line-height: 1;">I</button>
-        <button type="button" data-action="link" title="{{ t('editor-link-short') }}" style="padding: 0.25rem 0.5rem; background: none; border: 1px solid transparent; border-radius: 3px; cursor: pointer; font-size: 0.85rem; color: var(--text); font-family: inherit; line-height: 1;">&#128279;</button>
-        <div style="flex: 1;"></div>
-        <button type="button" class="md-preview-toggle" title="{{ t('editor-toggle-preview') }}" style="padding: 0.25rem 0.5rem; background: none; border: 1px solid transparent; border-radius: 3px; cursor: pointer; font-size: 0.75rem; color: var(--text-muted); font-family: inherit; line-height: 1;">{{ t("editor-preview") }}</button>
+    <div style="border: 1px solid var(--field-border); border-radius: var(--radius); overflow: hidden;">
+      <div class="md-toolbar" data-target="description">
+        <button type="button" data-action="bold" title="{{ t('editor-bold-short') }}" aria-label="{{ t('editor-bold-short') }}">B</button>
+        <button type="button" data-action="italic" title="{{ t('editor-italic-short') }}" aria-label="{{ t('editor-italic-short') }}">I</button>
+        <button type="button" data-action="link" title="{{ t('editor-link-short') }}" aria-label="{{ t('editor-link-short') }}"><svg class="icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></button>
+        <button type="button" class="md-preview-toggle" title="{{ t('editor-toggle-preview') }}">{{ t("editor-preview") }}</button>
       </div>
       <textarea id="description" name="description" placeholder="{{ t('etf-description-placeholder') }}" style="border: none; border-radius: 0; width: 100%; resize: vertical; padding: 0.5rem 0.75rem; font-family: inherit; font-size: 0.9rem; background: var(--surface); color: var(--text); box-sizing: border-box;">{{ form_description }}</textarea>
       <div id="description-preview" style="display: none; padding: 0.5rem 0.75rem; min-height: 4rem; font-size: 0.9rem; color: var(--text); background: var(--surface);"></div>
@@ -95,10 +94,10 @@
     <span class="hint" style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">{{ t("etf-description-help") }}</span>
   </div>
 
-  <div style="display: grid; grid-template-columns: auto 1fr; gap: 0.75rem; align-items: start;" class="form-grid-2">
-    <div class="form-group" style="min-width: 140px;">
+  <div class="form-grid-2" style="align-items: start;">
+    <div class="form-group">
       <label for="location_type">{{ t("etf-location") }}</label>
-      <select id="location_type" name="location_type" style="padding: 0.625rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.925rem; font-family: inherit; background: var(--surface); color: var(--text); width: 100%;">
+      <select id="location_type" name="location_type" style="padding: 0.625rem 0.75rem; border: 1px solid var(--field-border); border-radius: var(--radius); font-size: 0.925rem; font-family: inherit; background: var(--surface); color: var(--text); width: 100%;">
         <option value="link" {% if form_location_type == "link" %}selected{% endif %}>{{ t("etf-location-link") }}</option>
         <option value="jitsi_auto" {% if form_location_type == "jitsi_auto" %}selected{% endif %}>{{ t("etf-location-jitsi") }}</option>
         <option value="webhook_auto" {% if form_location_type == "webhook_auto" %}selected{% endif %}>{{ t("etf-location-webhook") }}</option>
@@ -115,8 +114,8 @@
       <span id="meeting-pattern-hint" class="hint" style="font-size: 0.8rem; color: var(--text-muted); display: none; margin-top: 0.25rem;">
         {{ t("etf-pattern-hint") | safe }}
       </span>
-      <span id="meeting-pattern-random-warning" style="display: none; font-size: 0.8rem; color: var(--warning-text, #b45309); margin-top: 0.25rem;">
-        ⚠ {{ t("etf-pattern-random-warning") | safe }}
+      <span id="meeting-pattern-random-warning" style="display: none; font-size: 0.8rem; color: var(--warning-text); margin-top: 0.25rem;">
+        {{ t("etf-pattern-random-warning") | safe }}
       </span>
       <span id="meeting-webhook-hint" class="hint" style="font-size: 0.8rem; color: var(--text-muted); display: none; margin-top: 0.25rem;">
         {{ t("etf-webhook-hint") | safe }}
@@ -183,7 +182,7 @@
     })();
   </script>
 
-  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;" class="form-grid-2">
+  <div class="form-grid-2">
     <div class="form-group">
       <label for="duration_min">{{ t("etf-duration") }}</label>
       <input type="number" id="duration_min" name="duration_min" required value="{{ form_duration }}" min="5" max="480" step="5">
@@ -271,8 +270,8 @@
   }
   .priority-btn:hover { background: var(--surface-hover); }
   .priority-btn.active-high { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
-  .priority-btn.active-medium { background: var(--text-muted); color: #fff; border-color: var(--text-muted); }
-  .priority-btn.active-low { background: var(--surface-hover); color: var(--text-secondary); border-color: var(--border); font-style: italic; }
+  .priority-btn.active-medium { background: var(--text-muted); color: var(--surface); border-color: var(--text-muted); }
+  .priority-btn.active-low { background: var(--surface-hover); color: var(--text); border-color: var(--border-hover); font-style: italic; }
 </style>
 
 <!-- Card 2: Members (round-robin priority OR collective inclusion) -->
@@ -288,11 +287,11 @@
   {% endif %}
 
   {% for m in priority_members %}
-  <div data-row-uid="{{ m.user_id }}" style="display: flex; align-items: center; padding: 0.5rem 0; gap: 0.75rem; {% if not loop.last %}border-bottom: 1px solid var(--border);{% endif %}">
+  <div data-row-uid="{{ m.user_id }}" style="display: flex; flex-wrap: wrap; align-items: center; padding: 0.5rem 0; gap: 0.75rem; {% if not loop.last %}border-bottom: 1px solid var(--border);{% endif %}">
     <input type="checkbox" data-include="{{ m.user_id }}" {% if m.weight > 0 %}checked{% endif %}
       style="accent-color: var(--accent); width: 1rem; height: 1rem; flex-shrink: 0; cursor: pointer;"
       onchange="toggleMember('{{ m.user_id }}', this.checked)">
-    <div style="display: flex; align-items: center; gap: 0.5rem; flex: 1; min-width: 0; transition: opacity 0.15s;" data-member-info="{{ m.user_id }}">
+    <div style="display: flex; align-items: center; gap: 0.5rem; flex: 1 1 8rem; min-width: 0; transition: opacity 0.15s;" data-member-info="{{ m.user_id }}">
       <div class="avatar-circle" style="width: 28px; height: 28px; font-size: 0.65rem;">
         {% if m.has_avatar %}
           <img src="/avatar/{{ m.user_id }}" alt="">
@@ -301,17 +300,17 @@
         {% endif %}
       </div>
       <div style="min-width: 0;">
-        <div style="font-weight: 500; font-size: 0.875rem;">{{ m.name }}</div>
+        <div style="font-weight: 500; font-size: 0.875rem; overflow-wrap: anywhere;">{{ m.name }}</div>
         {% if m.timezone %}
         <div style="font-size: 0.75rem; color: var(--text-muted);" title="{{ t('etf-member-timezone-title') }}">{{ m.timezone }}</div>
         {% endif %}
       </div>
     </div>
     {% if not is_collective_card %}
-    <div data-priority-btns="{{ m.user_id }}" style="display: flex; gap: 0.25rem; flex-shrink: 0;">
-      <button type="button" data-priority="high" class="priority-btn {% if m.weight >= 3 %}active-high{% endif %}" onclick="setPriority(this, '{{ m.user_id }}', 'high')">{{ t("etf-priority-high") }}</button>
-      <button type="button" data-priority="medium" class="priority-btn {% if m.weight == 2 %}active-medium{% endif %}" onclick="setPriority(this, '{{ m.user_id }}', 'medium')">{{ t("etf-priority-medium") }}</button>
-      <button type="button" data-priority="low" class="priority-btn {% if m.weight >= 1 and m.weight <= 1 %}active-low{% endif %}" onclick="setPriority(this, '{{ m.user_id }}', 'low')">{{ t("etf-priority-low") }}</button>
+    <div data-priority-btns="{{ m.user_id }}" style="display: flex; gap: 0.25rem; flex-shrink: 0; margin-left: auto;">
+      <button type="button" data-priority="high" class="priority-btn {% if m.weight >= 3 %}active-high{% endif %}" aria-pressed="{{ 'true' if m.weight >= 3 else 'false' }}" onclick="setPriority(this, '{{ m.user_id }}', 'high')">{{ t("etf-priority-high") }}</button>
+      <button type="button" data-priority="medium" class="priority-btn {% if m.weight == 2 %}active-medium{% endif %}" aria-pressed="{{ 'true' if m.weight == 2 else 'false' }}" onclick="setPriority(this, '{{ m.user_id }}', 'medium')">{{ t("etf-priority-medium") }}</button>
+      <button type="button" data-priority="low" class="priority-btn {% if m.weight >= 1 and m.weight <= 1 %}active-low{% endif %}" aria-pressed="{{ 'true' if m.weight == 1 else 'false' }}" onclick="setPriority(this, '{{ m.user_id }}', 'low')">{{ t("etf-priority-low") }}</button>
     </div>
     {% endif %}
   </div>
@@ -334,7 +333,7 @@
   <div class="collapsible-body">
     <div class="form-group" style="margin-bottom: 1rem;">
       <label for="event_type_timezone">{{ t("settings-timezone") }}</label>
-      <select id="event_type_timezone" name="timezone" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); font-size: 0.9rem;">
+      <select id="event_type_timezone" name="timezone">
         {% for group in tz_options %}
           <optgroup label="{{ group.label }}">
           {% for tz in group.options %}
@@ -348,12 +347,12 @@
     {% set week_start_inherit = "owner" %}
     {% include "week_start_select.html" %}
     <div id="schedule-container" style="display: flex; flex-direction: column; gap: 0.25rem;"></div>
-    <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.5rem;">
-      <button type="button" id="reset-to-default-btn" style="padding: 0.25rem 0.625rem; border: 1px solid var(--border); border-radius: var(--radius); background: transparent; color: var(--text-muted); cursor: pointer; font-size: 0.75rem; transition: all 0.15s ease;" title="{{ t('etf-reset-default-title') }}">{{ t("etf-reset-default") }}</button>
-      <button type="button" id="copy-to-all-btn" style="padding: 0.25rem 0.625rem; border: 1px solid var(--border); border-radius: var(--radius); background: transparent; color: var(--text-muted); cursor: pointer; font-size: 0.75rem; transition: all 0.15s ease;" title="{{ t('settings-copy-to-all-title') }}">{{ t("settings-copy-to-all") }}</button>
+    <div class="btn-row" style="justify-content: flex-end; gap: 0.5rem; margin-top: 0.5rem;">
+      <button type="button" id="reset-to-default-btn" class="btn btn-ghost btn-sm btn-auto" title="{{ t('etf-reset-default-title') }}">{{ t("etf-reset-default") }}</button>
+      <button type="button" id="copy-to-all-btn" class="btn btn-ghost btn-sm btn-auto" title="{{ t('settings-copy-to-all-title') }}">{{ t("settings-copy-to-all") }}</button>
     </div>
     <input type="hidden" name="avail_schedule" id="avail_schedule" value="{{ form_avail_schedule | default(value='') }}">
-    <span class="hint" style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-top: 0.5rem;">{{ t("etf-availability-prefilled", link='<a href="/dashboard/settings#availability" style="color: var(--accent);">' ~ (t("etf-availability-prefilled-link") | escape) ~ '</a>') | safe }}</span>
+    <span class="hint" style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-top: 0.5rem;">{{ t("etf-availability-prefilled", link='<a href="/dashboard/settings#availability">' ~ (t("etf-availability-prefilled-link") | escape) ~ '</a>') | safe }}</span>
   </div>
 </details>
 
@@ -365,7 +364,7 @@
     <span class="collapsible-chevron"></span>
   </summary>
   <div class="collapsible-body">
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;" class="form-grid-2">
+    <div class="form-grid-2">
       <div class="form-group">
         <label for="buffer_before">{{ t("etf-buffer-before") }}</label>
         <input type="number" id="buffer_before" name="buffer_before" value="{{ form_buffer_before }}" min="0" max="120" step="5">
@@ -379,7 +378,7 @@
       <label for="min_notice_value">{{ t("etf-min-notice") }}</label>
       <div style="display: flex; gap: 0.5rem; align-items: center;">
         <input type="number" id="min_notice_value" value="" min="0" step="1" style="flex: 1; max-width: 120px;">
-        <select id="min_notice_unit" style="padding: 0.625rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.925rem; font-family: inherit; background: var(--surface); color: var(--text);">
+        <select id="min_notice_unit" style="padding: 0.625rem 0.75rem; border: 1px solid var(--field-border); border-radius: var(--radius); font-size: 0.925rem; font-family: inherit; background: var(--surface); color: var(--text);">
           <option value="1">{{ t("event-type-form-notice-unit-minutes") }}</option>
           <option value="60">{{ t("event-type-form-notice-unit-hours") }}</option>
           <option value="1440">{{ t("event-type-form-notice-unit-days") }}</option>
@@ -395,7 +394,7 @@
         <input type="number" min="0" step="1" id="cancel_notice_value" name="cancel_notice_value"
                value="{% if form_cancel_notice_value is defined and form_cancel_notice_value > 0 %}{{ form_cancel_notice_value }}{% endif %}"
                placeholder="0" style="flex: 1; max-width: 120px;">
-        <select name="cancel_notice_unit" id="cancel_notice_unit" style="padding: 0.625rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.925rem; font-family: inherit; background: var(--surface); color: var(--text);">
+        <select name="cancel_notice_unit" id="cancel_notice_unit" style="padding: 0.625rem 0.75rem; border: 1px solid var(--field-border); border-radius: var(--radius); font-size: 0.925rem; font-family: inherit; background: var(--surface); color: var(--text);">
           <option value="minutes" {% if form_cancel_notice_unit is defined and form_cancel_notice_unit == "minutes" %}selected{% endif %}>{{ t("event-type-form-notice-unit-minutes") }}</option>
           <option value="hours" {% if form_cancel_notice_unit is defined and form_cancel_notice_unit == "hours" %}selected{% endif %}>{{ t("event-type-form-notice-unit-hours") }}</option>
           <option value="days" {% if form_cancel_notice_unit is defined and form_cancel_notice_unit == "days" %}selected{% endif %}>{{ t("event-type-form-notice-unit-days") }}</option>
@@ -410,7 +409,7 @@
         <input type="number" min="0" step="1" id="reschedule_notice_value" name="reschedule_notice_value"
                value="{% if form_reschedule_notice_value is defined and form_reschedule_notice_value > 0 %}{{ form_reschedule_notice_value }}{% endif %}"
                placeholder="0" style="flex: 1; max-width: 120px;">
-        <select name="reschedule_notice_unit" id="reschedule_notice_unit" style="padding: 0.625rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.925rem; font-family: inherit; background: var(--surface); color: var(--text);">
+        <select name="reschedule_notice_unit" id="reschedule_notice_unit" style="padding: 0.625rem 0.75rem; border: 1px solid var(--field-border); border-radius: var(--radius); font-size: 0.925rem; font-family: inherit; background: var(--surface); color: var(--text);">
           <option value="minutes" {% if form_reschedule_notice_unit is defined and form_reschedule_notice_unit == "minutes" %}selected{% endif %}>{{ t("event-type-form-notice-unit-minutes") }}</option>
           <option value="hours" {% if form_reschedule_notice_unit is defined and form_reschedule_notice_unit == "hours" %}selected{% endif %}>{{ t("event-type-form-notice-unit-hours") }}</option>
           <option value="days" {% if form_reschedule_notice_unit is defined and form_reschedule_notice_unit == "days" %}selected{% endif %}>{{ t("event-type-form-notice-unit-days") }}</option>
@@ -430,17 +429,21 @@
     <div class="form-group">
       <label for="bookable_from">{{ t("event-type-form-bookable-range-label") }}</label>
       <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-        <span style="font-size: 0.85rem; color: var(--text-muted);">{{ t("event-type-form-bookable-from") }}</span>
-        <input type="date" id="bookable_from" name="bookable_from"
-               value="{% if form_bookable_from is defined %}{{ form_bookable_from }}{% endif %}"
-               style="max-width: 170px;">
-        <span style="font-size: 0.85rem; color: var(--text-muted);">{{ t("event-type-form-bookable-until") }}</span>
-        <input type="date" id="bookable_until" name="bookable_until"
-               value="{% if form_bookable_until is defined %}{{ form_bookable_until }}{% endif %}"
-               data-order-error="{{ t('form-error-bookable-range-order') }}"
-               style="max-width: 170px;">
+        <span class="bookable-pair" style="display: inline-flex; align-items: center; gap: 0.5rem;">
+          <span style="font-size: 0.85rem; color: var(--text-muted);">{{ t("event-type-form-bookable-from") }}</span>
+          <input type="date" id="bookable_from" name="bookable_from"
+                 value="{% if form_bookable_from is defined %}{{ form_bookable_from }}{% endif %}"
+                 style="max-width: 170px;">
+        </span>
+        <span class="bookable-pair" style="display: inline-flex; align-items: center; gap: 0.5rem;">
+          <span style="font-size: 0.85rem; color: var(--text-muted);">{{ t("event-type-form-bookable-until") }}</span>
+          <input type="date" id="bookable_until" name="bookable_until"
+                 value="{% if form_bookable_until is defined %}{{ form_bookable_until }}{% endif %}"
+                 data-order-error="{{ t('form-error-bookable-range-order') }}"
+                 style="max-width: 170px;">
+        </span>
       </div>
-      <span class="hint" style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">{{ t("event-type-form-bookable-range-help") }}{% if editing and form_slug %} <a href="/dashboard/event-types/{{ form_slug }}/overrides" style="color: var(--accent);">{{ t("event-types-overrides") }} &rarr;</a>{% endif %}</span>
+      <span class="hint" style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">{{ t("event-type-form-bookable-range-help") }}{% if editing and form_slug %} <a href="/dashboard/event-types/{{ form_slug }}/overrides">{{ t("event-types-overrides") }} &rarr;</a>{% endif %}</span>
     </div>
   </div>
 </details>
@@ -453,36 +456,26 @@
     <span class="collapsible-chevron"></span>
   </summary>
   <div class="collapsible-body">
-    <!-- One slot per day toggle -->
-    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius);">
+    <!-- One slot per day (ilia fork: the shared checkbox card, like "requires confirmation") -->
+    <label style="display: flex; align-items: flex-start; gap: 0.625rem; cursor: pointer; padding: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius);">
+      <input type="checkbox" name="first_slot_only" id="first-slot-toggle" {% if form_first_slot_only %}checked{% endif %} autocomplete="off" aria-describedby="first-slot-help" style="accent-color: var(--accent); width: 1.125rem; height: 1.125rem; margin-top: 0.18rem; flex-shrink: 0;">
       <div>
         <strong style="font-size: 0.925rem;">{{ t("etf-first-slot-only") }}</strong>
-        <div style="color: var(--text-muted); font-size: 0.825rem;">{{ t("etf-first-slot-only-help") }}</div>
+        <div id="first-slot-help" style="color: var(--text-muted); font-size: 0.825rem;">{{ t("etf-first-slot-only-help") }}</div>
       </div>
-      <label style="position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0;">
-        <input type="checkbox" name="first_slot_only" {% if form_first_slot_only %}checked{% endif %} autocomplete="off" style="opacity: 0; width: 0; height: 0;" id="first-slot-toggle">
-        <span style="position: absolute; cursor: pointer; inset: 0; background: #71717a; border-radius: 24px; transition: 0.2s;" id="first-slot-track">
-          <span style="position: absolute; height: 18px; width: 18px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.2s;" id="first-slot-knob"></span>
-        </span>
-      </label>
-    </div>
+    </label>
 
-    <!-- Frequency limits toggle -->
-    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); margin-top: 0.5rem;">
+    <!-- Frequency limits (ilia fork: the shared checkbox card) -->
+    <label style="display: flex; align-items: flex-start; gap: 0.625rem; cursor: pointer; padding: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); margin-top: 0.5rem;">
+      <input type="checkbox" id="freq-limit-toggle" autocomplete="off" aria-describedby="freq-limit-help" style="accent-color: var(--accent); width: 1.125rem; height: 1.125rem; margin-top: 0.18rem; flex-shrink: 0;">
       <div>
         <strong style="font-size: 0.925rem;">{{ t("etf-freq-limit") }}</strong>
-        <div style="color: var(--text-muted); font-size: 0.825rem;">{{ t("etf-freq-limit-help") }}</div>
+        <div id="freq-limit-help" style="color: var(--text-muted); font-size: 0.825rem;">{{ t("etf-freq-limit-help") }}</div>
       </div>
-      <label style="position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0;">
-        <input type="checkbox" id="freq-limit-toggle" autocomplete="off" style="opacity: 0; width: 0; height: 0;">
-        <span style="position: absolute; cursor: pointer; inset: 0; background: #71717a; border-radius: 24px; transition: 0.2s;" id="freq-toggle-track">
-          <span style="position: absolute; height: 18px; width: 18px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.2s;" id="freq-toggle-knob"></span>
-        </span>
-      </label>
-    </div>
+    </label>
     <div id="freq-limits-container" style="display: none; margin-top: 0.5rem; padding: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius);">
       <div id="freq-limits-list" style="display: flex; flex-direction: column; gap: 0.5rem;"></div>
-      <button type="button" id="add-freq-limit" style="margin-top: 0.75rem; padding: 0.375rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); background: transparent; color: var(--text-muted); cursor: pointer; font-size: 0.85rem; transition: all 0.15s ease;">+ {{ t("etf-add-limit") }}</button>
+      <button type="button" id="add-freq-limit" class="btn btn-secondary btn-sm btn-auto" style="margin-top: 0.75rem;">+ {{ t("etf-add-limit") }}</button>
     </div>
     <input type="hidden" name="frequency_limits" id="frequency_limits" value="{{ form_frequency_limits | default(value='') }}">
   </div>
@@ -496,8 +489,8 @@
     <span class="collapsible-chevron"></span>
   </summary>
   <div class="collapsible-body">
-    <label style="display: flex; align-items: center; gap: 0.625rem; cursor: pointer; padding: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); transition: all 0.15s ease;">
-      <input type="checkbox" name="requires_confirmation" {% if form_requires_confirmation %}checked{% endif %} style="accent-color: var(--accent); width: 1.125rem; height: 1.125rem;">
+    <label style="display: flex; align-items: flex-start; gap: 0.625rem; cursor: pointer; padding: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); transition: all 0.15s ease;">
+      <input type="checkbox" name="requires_confirmation" {% if form_requires_confirmation %}checked{% endif %} style="accent-color: var(--accent); width: 1.125rem; height: 1.125rem; margin-top: 0.18rem; flex-shrink: 0;">
       <div>
         <strong style="font-size: 0.925rem;">{{ t("etf-requires-confirmation") }}</strong>
         <div style="color: var(--text-muted); font-size: 0.825rem;">{{ t("etf-requires-confirmation-help") }}</div>
@@ -505,8 +498,8 @@
     </label>
 
     <div id="pending-options" style="margin-top: 0.75rem; padding: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius);{% if not form_requires_confirmation %} display: none;{% endif %}">
-      <label style="display: flex; align-items: center; gap: 0.625rem; cursor: pointer;">
-        <input type="checkbox" name="pending_blocks_slot" {% if form_pending.blocks_slot %}checked{% endif %} style="accent-color: var(--accent); width: 1.125rem; height: 1.125rem;">
+      <label style="display: flex; align-items: flex-start; gap: 0.625rem; cursor: pointer;">
+        <input type="checkbox" name="pending_blocks_slot" {% if form_pending.blocks_slot %}checked{% endif %} style="accent-color: var(--accent); width: 1.125rem; height: 1.125rem; margin-top: 0.18rem; flex-shrink: 0;">
         <div>
           <strong style="font-size: 0.925rem;">{{ t("etf-pending-blocks-slot") }}</strong>
           <div style="color: var(--text-muted); font-size: 0.825rem;">{{ t("etf-pending-blocks-slot-help") }}</div>
@@ -514,7 +507,7 @@
       </label>
       <div class="form-group" style="margin-top: 0.75rem; margin-bottom: 0;">
         <label for="pending_expiry_hours">{{ t("etf-pending-expiry") }}</label>
-        <select id="pending_expiry_hours" name="pending_expiry_hours" style="padding: 0.625rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.925rem; font-family: inherit; background: var(--surface); color: var(--text); width: 100%;">
+        <select id="pending_expiry_hours" name="pending_expiry_hours" style="padding: 0.625rem 0.75rem; border: 1px solid var(--field-border); border-radius: var(--radius); font-size: 0.925rem; font-family: inherit; background: var(--surface); color: var(--text); width: 100%;">
           {% for o in form_pending.options %}
           <option value="{{ o.value }}" {% if o.value == form_pending.selected %}selected{% endif %}>{% if o.hours is none %}{{ t("etf-pending-expiry-never") }}{% else %}{{ t("etf-pending-expiry-hours", hours=o.hours) }}{% endif %}</option>
           {% endfor %}
@@ -526,20 +519,20 @@
     {% if can_enable_sms is defined and can_enable_sms %}
     <div class="form-group" style="margin-top: 0.75rem;">
       <label for="sms_phone_mode">{{ t("etf-sms") }}</label>
-      <select id="sms_phone_mode" name="sms_phone_mode" style="padding: 0.625rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.925rem; font-family: inherit; background: var(--surface); color: var(--text); width: 100%;">
+      <select id="sms_phone_mode" name="sms_phone_mode" style="padding: 0.625rem 0.75rem; border: 1px solid var(--field-border); border-radius: var(--radius); font-size: 0.925rem; font-family: inherit; background: var(--surface); color: var(--text); width: 100%;">
         <option value="off" {% if form_sms_phone_mode == "off" %}selected{% endif %}>{{ t("etf-sms-off") }}</option>
         <option value="optional" {% if form_sms_phone_mode == "optional" %}selected{% endif %}>{{ t("etf-sms-optional") }}</option>
         <option value="required" {% if form_sms_phone_mode == "required" %}selected{% endif %}>{{ t("etf-sms-required") }}</option>
       </select>
       <span class="hint" style="font-size: 0.825rem; color: var(--text-muted); display: block; margin-top: 0.375rem;">
-        {{ t("etf-sms-help", link='<a href="/dashboard/admin" style="color: var(--accent); text-decoration: none;">' ~ (t("etf-admin-panel-link") | escape) ~ '</a>') | safe }}
+        {{ t("etf-sms-help", link='<a href="/dashboard/admin">' ~ (t("etf-admin-panel-link") | escape) ~ '</a>') | safe }}
       </span>
     </div>
     {% endif %}
 
     <div class="form-group" style="margin-top: 0.75rem;">
       <label for="max_additional_guests">{{ t("etf-additional-guests") }}</label>
-      <select id="max_additional_guests" name="max_additional_guests" style="padding: 0.625rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.925rem; font-family: inherit; background: var(--surface); color: var(--text); width: 100%;">
+      <select id="max_additional_guests" name="max_additional_guests" style="padding: 0.625rem 0.75rem; border: 1px solid var(--field-border); border-radius: var(--radius); font-size: 0.925rem; font-family: inherit; background: var(--surface); color: var(--text); width: 100%;">
         <option value="0" {% if form_max_additional_guests == 0 %}selected{% endif %}>{{ t("etf-guests-none") }}</option>
         <option value="1" {% if form_max_additional_guests == 1 %}selected{% endif %}>{{ t("etf-guests-up-to", count=1) }}</option>
         <option value="3" {% if form_max_additional_guests == 3 %}selected{% endif %}>{{ t("etf-guests-up-to", count=3) }}</option>
@@ -551,7 +544,7 @@
 
     <div class="form-group" style="margin-top: 0.75rem;">
       <label for="default_calendar_view">{{ t("etf-default-view") }}</label>
-      <select id="default_calendar_view" name="default_calendar_view" style="padding: 0.625rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.925rem; font-family: inherit; background: var(--surface); color: var(--text); width: 100%;">
+      <select id="default_calendar_view" name="default_calendar_view" style="padding: 0.625rem 0.75rem; border: 1px solid var(--field-border); border-radius: var(--radius); font-size: 0.925rem; font-family: inherit; background: var(--surface); color: var(--text); width: 100%;">
         <option value="month" {% if form_default_calendar_view is not defined or form_default_calendar_view == "month" %}selected{% endif %}>{{ t("etf-view-month") }}</option>
         <option value="week" {% if form_default_calendar_view == "week" %}selected{% endif %}>{{ t("etf-view-week") }}</option>
         <option value="column" {% if form_default_calendar_view == "column" %}selected{% endif %}>{{ t("etf-view-column") }}</option>
@@ -604,7 +597,7 @@
     {% elif can_manage_resources is defined and can_manage_resources %}
     <div style="border-top: 1px solid var(--border); padding-top: 1rem; margin-top: 0.75rem;">
       <label style="font-weight: 600; font-size: 0.925rem; display: block; margin-bottom: 0.5rem;">{{ t("event-type-form-resources-label") }}</label>
-      <span class="hint" style="font-size: 0.825rem; color: var(--text-muted); display: block;">{{ t("etf-no-resources", link='<a href="/dashboard/admin" style="color: var(--accent); text-decoration: none;">' ~ (t("etf-admin-panel-link") | escape) ~ '</a>') | safe }}</span>
+      <span class="hint" style="font-size: 0.825rem; color: var(--text-muted); display: block;">{{ t("etf-no-resources", link='<a href="/dashboard/admin">' ~ (t("etf-admin-panel-link") | escape) ~ '</a>') | safe }}</span>
     </div>
     {% endif %}
   </div>
@@ -622,7 +615,7 @@
   <div class="collapsible-body">
     <div class="form-group">
       <label for="visibility">{{ t("team-form-visibility") }}</label>
-      <select id="visibility" name="visibility" style="padding: 0.625rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.925rem; font-family: inherit; background: var(--surface); color: var(--text); width: 100%;">
+      <select id="visibility" name="visibility" style="padding: 0.625rem 0.75rem; border: 1px solid var(--field-border); border-radius: var(--radius); font-size: 0.925rem; font-family: inherit; background: var(--surface); color: var(--text); width: 100%;">
         <option value="public" {% if form_visibility is not defined or form_visibility == "public" %}selected{% endif %}>{{ t("etf-visibility-public") }}</option>
         <option value="internal" {% if form_visibility == "internal" %}selected{% endif %}>{{ t("etf-visibility-internal") }}</option>
         <option value="private" {% if form_visibility == "private" %}selected{% endif %}>{{ t("etf-visibility-private") }}</option>
@@ -631,7 +624,7 @@
     </div>
     <div class="form-group" style="margin-top: 0.75rem;">
       <label for="reminder_minutes">{{ t("etf-reminder") }}</label>
-      <select id="reminder_minutes" name="reminder_minutes" style="padding: 0.625rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.925rem; font-family: inherit; background: var(--surface); color: var(--text); width: 100%;">
+      <select id="reminder_minutes" name="reminder_minutes" style="padding: 0.625rem 0.75rem; border: 1px solid var(--field-border); border-radius: var(--radius); font-size: 0.925rem; font-family: inherit; background: var(--surface); color: var(--text); width: 100%;">
         <option value="0" {% if form_reminder_minutes == 0 %}selected{% endif %}>{{ t("etf-reminder-none") }}</option>
         <option value="60" {% if form_reminder_minutes == 60 %}selected{% endif %}>{{ t("etf-reminder-hours", count=1) }}</option>
         <option value="240" {% if form_reminder_minutes == 240 %}selected{% endif %}>{{ t("etf-reminder-hours", count=4) }}</option>
@@ -651,7 +644,7 @@
     {{ t("etf-dynamic-group-help") }}
   </p>
   <div style="position: relative;">
-    <input type="text" id="dg-search-input" autocomplete="off" placeholder="{{ t('etf-dynamic-group-search') }}" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.85rem; font-family: inherit; background: var(--surface); color: var(--text);">
+    <input type="text" id="dg-search-input" autocomplete="off" placeholder="{{ t('etf-dynamic-group-search') }}" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--field-border); border-radius: var(--radius); font-size: 0.85rem; font-family: inherit; background: var(--surface); color: var(--text);">
     <div id="dg-search-results" style="display: none; position: absolute; top: 100%; left: 0; right: 0; background: var(--surface); border: 1px solid var(--border); border-top: none; border-radius: 0 0 var(--radius) var(--radius); max-height: 250px; overflow-y: auto; z-index: 10; box-shadow: var(--shadow);"></div>
   </div>
   <span style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">{{ t("etf-dynamic-group-note") }}</span>
@@ -659,8 +652,8 @@
   <div id="dg-url-box" style="display: none; margin-top: 0.75rem;">
     <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">{{ t("etf-dynamic-group-url") }}</label>
     <div style="display: flex; gap: 0.5rem; align-items: center;">
-      <input type="text" id="dg-url" readonly style="flex: 1; min-width: 0; padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.85rem; font-family: monospace; background: var(--surface); color: var(--text);">
-      <button type="button" id="dg-copy-btn" class="slot-btn" style="font-size: 0.8rem; padding: 0.375rem 0.75rem; flex-shrink: 0; cursor: pointer;">{{ t("settings-copy") }}</button>
+      <input type="text" id="dg-url" readonly style="flex: 1; min-width: 0; padding: 0.5rem 0.75rem; border: 1px solid var(--field-border); border-radius: var(--radius); font-size: 0.85rem; font-family: monospace; background: var(--surface); color: var(--text);">
+      <button type="button" id="dg-copy-btn" class="btn btn-secondary btn-sm btn-auto" style="flex-shrink: 0;">{{ t("settings-copy") }}</button>
     </div>
   </div>
 </div>
@@ -826,9 +819,10 @@ function sub(tpl, a, b) {
   function setPriority(btn, userId, priority) {
     sendPriority(userId, priority).then(function() {
       var container = document.querySelector('[data-priority-btns="' + userId + '"]');
-      container.querySelectorAll('.priority-btn').forEach(function(b) { b.className = 'priority-btn'; });
+      container.querySelectorAll('.priority-btn').forEach(function(b) { b.className = 'priority-btn'; b.setAttribute('aria-pressed', 'false'); });
       var cls = priority === 'high' ? 'active-high' : priority === 'medium' ? 'active-medium' : 'active-low';
       btn.classList.add(cls);
+      btn.setAttribute('aria-pressed', 'true');
     });
   }
 
@@ -839,8 +833,10 @@ function sub(tpl, a, b) {
       if (info) info.style.opacity = '1';
       if (btns) {
         btns.style.visibility = 'visible';
-        btns.querySelectorAll('.priority-btn').forEach(function(b) { b.className = 'priority-btn'; });
-        btns.querySelector('[data-priority="low"]').classList.add('active-low');
+        btns.querySelectorAll('.priority-btn').forEach(function(b) { b.className = 'priority-btn'; b.setAttribute('aria-pressed', 'false'); });
+        var low = btns.querySelector('[data-priority="low"]');
+        low.classList.add('active-low');
+        low.setAttribute('aria-pressed', 'true');
       }
       sendPriority(userId, 'low');
     } else {
@@ -885,9 +881,9 @@ function sub(tpl, a, b) {
     var teamMembers = {};
     {% if teams is defined and teams %}
     {% for t in teams %}
-    teamMembers["{{ t.id }}"] = [
+    teamMembers[{{ t.id | default('') | tojson }}] = [
       {% if t.members is defined %}{% for m in t.members %}
-      { userId: "{{ m.user_id }}", name: "{{ m.name }}", hasAvatar: {{ m.has_avatar | lower }}, initials: "{{ m.initials }}", timezone: "{{ m.timezone | default(value='') }}" },
+      { userId: {{ m.user_id | default('') | tojson }}, name: {{ m.name | default('') | tojson }}, hasAvatar: {{ m.has_avatar | lower }}, initials: {{ m.initials | default('') | tojson }}, timezone: {{ m.timezone | default('') | tojson }} },
       {% endfor %}{% endif %}
     ];
     {% endfor %}
@@ -937,7 +933,7 @@ function sub(tpl, a, b) {
         memberPriorities[m.userId] = pw >= 3 ? 'high' : pw === 2 ? 'medium' : 'low';
         memberIncluded[m.userId] = pw !== 0;
         var row = document.createElement('div');
-        row.style.cssText = 'display: flex; align-items: center; padding: 0.5rem 0; gap: 0.75rem;' + (i < members.length - 1 ? ' border-bottom: 1px solid var(--border);' : '');
+        row.style.cssText = 'display: flex; flex-wrap: wrap; align-items: center; padding: 0.5rem 0; gap: 0.75rem;' + (i < members.length - 1 ? ' border-bottom: 1px solid var(--border);' : '');
         // Include checkbox (collective mode only)
         if (dynamicMode === 'collective') {
           var cb = document.createElement('input');
@@ -953,7 +949,7 @@ function sub(tpl, a, b) {
         }
         // Avatar + name (wrapped so we can dim them when excluded)
         var nameWrap = document.createElement('div');
-        nameWrap.style.cssText = 'display: flex; align-items: center; gap: 0.5rem; flex: 1; min-width: 0; transition: opacity 0.15s;';
+        nameWrap.style.cssText = 'display: flex; align-items: center; gap: 0.5rem; flex: 1 1 8rem; min-width: 0; transition: opacity 0.15s;';
         if (!memberIncluded[m.userId]) nameWrap.style.opacity = '0.4';
         var avatar = document.createElement('div');
         avatar.className = 'avatar-circle';
@@ -967,13 +963,13 @@ function sub(tpl, a, b) {
         var nameStack = document.createElement('div');
         nameStack.style.cssText = 'min-width: 0;';
         var name = document.createElement('div');
-        name.style.cssText = 'font-weight: 500; font-size: 0.875rem;';
+        name.style.cssText = 'font-weight: 500; font-size: 0.875rem; overflow-wrap: anywhere;';
         name.textContent = m.name;
         nameStack.appendChild(name);
         if (m.timezone) {
           var tz = document.createElement('div');
           tz.style.cssText = 'font-size: 0.75rem; color: var(--text-muted);';
-          tz.title = "Member's timezone. Their personal working hours are interpreted in this TZ.";
+          tz.title = {{ t('etf-member-timezone-title') | tojson }};
           tz.textContent = m.timezone;
           nameStack.appendChild(tz);
         }
@@ -982,17 +978,20 @@ function sub(tpl, a, b) {
         // Priority buttons (round-robin only)
         if (dynamicMode === 'round_robin') {
           var btns = document.createElement('div');
-          btns.style.cssText = 'display: flex; gap: 0.25rem; flex-shrink: 0;';
+          btns.style.cssText = 'display: flex; gap: 0.25rem; flex-shrink: 0; margin-left: auto;';
+          var priorityLabels = {high: {{ t('etf-priority-high') | tojson }}, medium: {{ t('etf-priority-medium') | tojson }}, low: {{ t('etf-priority-low') | tojson }}};
           ['high', 'medium', 'low'].forEach(function(level) {
             var btn = document.createElement('button');
             btn.type = 'button';
             var current = memberPriorities[m.userId];
             btn.className = 'priority-btn' + (level !== current ? '' : level === 'high' ? ' active-high' : level === 'medium' ? ' active-medium' : ' active-low');
-            btn.textContent = level.charAt(0).toUpperCase() + level.slice(1);
+            btn.textContent = priorityLabels[level];
+            btn.setAttribute('aria-pressed', level === current ? 'true' : 'false');
             btn.onclick = function() {
               memberPriorities[m.userId] = level;
-              btns.querySelectorAll('.priority-btn').forEach(function(b) { b.className = 'priority-btn'; });
+              btns.querySelectorAll('.priority-btn').forEach(function(b) { b.className = 'priority-btn'; b.setAttribute('aria-pressed', 'false'); });
               btn.classList.add(level === 'high' ? 'active-high' : level === 'medium' ? 'active-medium' : 'active-low');
+              btn.setAttribute('aria-pressed', 'true');
               syncPriorityInputs();
             };
             btns.appendChild(btn);
@@ -1297,7 +1296,7 @@ function sub(tpl, a, b) {
           opts += '<option value="' + t + '"' + (t === val ? ' selected' : '') + '>' + t + '</option>';
         }
       }
-      return '<select class="' + cls + '" style="padding:0.4rem 0.5rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text);font-family:inherit;font-size:0.85rem;min-width:90px;">' + opts + '</select>';
+      return '<select class="' + cls + '" style="padding:0.4rem 0.5rem;border:1px solid var(--field-border);border-radius:var(--radius);background:var(--surface);color:var(--text);font-family:inherit;font-size:0.85rem;min-width:90px;">' + opts + '</select>';
     }
 
     var weekStartSelect = document.getElementById('week_start');
@@ -1321,7 +1320,7 @@ function sub(tpl, a, b) {
         var toggle = document.createElement('input');
         toggle.type = 'checkbox';
         toggle.checked = enabled;
-        toggle.style.cssText = 'accent-color:var(--accent);width:1rem;height:1rem;margin-top:0.3rem;cursor:pointer;flex-shrink:0;';
+        toggle.style.cssText = 'accent-color:var(--accent);width:1rem;height:1rem;margin-top:0.5rem;cursor:pointer;flex-shrink:0;';
         toggle.dataset.day = d;
         toggle.addEventListener('change', (function(day) {
           return function() {
@@ -1338,7 +1337,7 @@ function sub(tpl, a, b) {
 
         // Day name
         var label = document.createElement('div');
-        label.style.cssText = 'width:80px;font-size:0.875rem;font-weight:500;padding-top:0.25rem;flex-shrink:0;' + (!enabled ? 'color:var(--text-muted);' : '');
+        label.style.cssText = 'width:3rem;font-size:0.875rem;font-weight:500;padding-top:0.3rem;flex-shrink:0;' + (!enabled ? 'color:var(--text-muted);' : '');
         label.textContent = dayShort[d];
         dayRow.appendChild(label);
 
@@ -1369,7 +1368,9 @@ function sub(tpl, a, b) {
               addBtn.type = 'button';
               addBtn.textContent = '+';
               addBtn.title = {{ t('settings-add-window') | tojson }};
-              addBtn.style.cssText = 'padding:0.2rem 0.5rem;border:1px solid var(--border);border-radius:var(--radius);background:transparent;color:var(--text-muted);cursor:pointer;font-size:0.85rem;line-height:1;';
+              addBtn.className = 'btn btn-secondary btn-sm btn-auto';
+              addBtn.setAttribute('aria-label', addBtn.title);
+              addBtn.style.minWidth = '2rem';
               addBtn.addEventListener('click', (function(day) {
                 return function() {
                   schedule[day].push({ start: '09:00', end: '17:00' });
@@ -1386,7 +1387,10 @@ function sub(tpl, a, b) {
               rmBtn.type = 'button';
               rmBtn.innerHTML = '&times;';
               rmBtn.title = {{ t('settings-remove-window') | tojson }};
-              rmBtn.style.cssText = 'padding:0.2rem 0.4rem;border:none;background:transparent;color:var(--text-muted);cursor:pointer;font-size:1rem;line-height:1;';
+              rmBtn.className = 'btn btn-ghost btn-sm btn-auto';
+              rmBtn.setAttribute('aria-label', rmBtn.title);
+              rmBtn.style.minWidth = '2rem';
+              rmBtn.style.fontSize = '1rem';
               rmBtn.addEventListener('click', (function(day, idx) {
                 return function() {
                   schedule[day].splice(idx, 1);
@@ -1523,27 +1527,6 @@ function sub(tpl, a, b) {
     unitEl.addEventListener('change', sync);
   })();
 
-  // --- First slot only toggle styling ---
-  (function() {
-    const toggle = document.getElementById('first-slot-toggle');
-    const track = document.getElementById('first-slot-track');
-    const knob = document.getElementById('first-slot-knob');
-    if (!toggle || !track || !knob) return;
-    function updateStyle() {
-      if (toggle.checked) {
-        track.style.background = 'var(--accent, #6366f1)';
-        knob.style.background = 'var(--on-accent, #fff)';
-        knob.style.transform = 'translateX(20px)';
-      } else {
-        track.style.background = '#71717a';
-        knob.style.background = 'white';
-        knob.style.transform = 'translateX(0)';
-      }
-    }
-    updateStyle();
-    toggle.addEventListener('change', updateStyle);
-  })();
-
   // --- Booking frequency limits ---
   (function() {
     const toggle = document.getElementById('freq-limit-toggle');
@@ -1551,22 +1534,8 @@ function sub(tpl, a, b) {
     const list = document.getElementById('freq-limits-list');
     const addBtn = document.getElementById('add-freq-limit');
     const hidden = document.getElementById('frequency_limits');
-    const track = document.getElementById('freq-toggle-track');
-    const knob = document.getElementById('freq-toggle-knob');
     const periods = ['day', 'week', 'month', 'year'];
     const periodLabels = ETF_I18N.periodLabels;
-
-    function updateToggleStyle() {
-      if (toggle.checked) {
-        track.style.background = 'var(--accent)';
-        knob.style.background = 'var(--on-accent, #fff)';
-        knob.style.transform = 'translateX(20px)';
-      } else {
-        track.style.background = '#71717a';
-        knob.style.background = 'white';
-        knob.style.transform = 'translateX(0)';
-      }
-    }
 
     function updateAddBtn() {
       const used = list.querySelectorAll('select').length;
@@ -1623,11 +1592,11 @@ function sub(tpl, a, b) {
       input.min = '1';
       input.max = '999';
       input.value = count || 1;
-      input.style.cssText = 'width: 70px; padding: 0.5rem 0.625rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.9rem; background: var(--surface); color: var(--text); font-family: inherit;';
+      input.style.cssText = 'width: 70px; padding: 0.5rem 0.625rem; border: 1px solid var(--field-border); border-radius: var(--radius); font-size: 0.9rem; background: var(--surface); color: var(--text); font-family: inherit;';
       input.addEventListener('input', serialize);
 
       const select = document.createElement('select');
-      select.style.cssText = 'padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.9rem; background: var(--surface); color: var(--text); font-family: inherit;';
+      select.style.cssText = 'padding: 0.5rem 0.75rem; border: 1px solid var(--field-border); border-radius: var(--radius); font-size: 0.9rem; background: var(--surface); color: var(--text); font-family: inherit;';
       periods.forEach(function(p) {
         const opt = document.createElement('option');
         opt.value = p;
@@ -1647,15 +1616,16 @@ function sub(tpl, a, b) {
       memberCheck.style.cssText = 'accent-color: var(--accent); width: 0.95rem; height: 0.95rem;';
       memberCheck.addEventListener('change', serialize);
       memberWrap.appendChild(memberCheck);
-      memberWrap.appendChild(document.createTextNode(' Per team member'));
+      memberWrap.appendChild(document.createTextNode(' ' + {{ t('etf-freq-per-member') | tojson }}));
 
       const del = document.createElement('button');
       del.type = 'button';
-      del.textContent = '\u{1F5D1}';
+      // ilia fork: the shared ghost button with ×, as the schedule editor's remove button.
+      del.innerHTML = '&times;';
       del.title = {{ t('etf-js-remove-limit') | tojson }};
-      del.style.cssText = 'padding: 0.375rem 0.5rem; border: none; background: none; cursor: pointer; font-size: 1rem; color: var(--text-muted); opacity: 0.6; transition: opacity 0.15s; margin-left: auto;';
-      del.addEventListener('mouseenter', function() { del.style.opacity = '1'; });
-      del.addEventListener('mouseleave', function() { del.style.opacity = '0.6'; });
+      del.setAttribute('aria-label', del.title);
+      del.className = 'btn btn-ghost btn-sm btn-auto';
+      del.style.cssText = 'min-width: 2rem; font-size: 1rem; margin-left: auto;';
       del.addEventListener('click', function() { row.remove(); serialize(); updateAddBtn(); });
 
       row.appendChild(input);
@@ -1685,10 +1655,8 @@ function sub(tpl, a, b) {
       list.innerHTML = '';
       hidden.value = '';
     }
-    updateToggleStyle();
 
     toggle.addEventListener('change', function() {
-      updateToggleStyle();
       if (toggle.checked) {
         container.style.display = 'block';
         if (list.children.length === 0) createRow(1, 'day', false);
@@ -1740,13 +1708,13 @@ function sub(tpl, a, b) {
     var urlBox = document.getElementById('dg-url-box');
     var urlInput = document.getElementById('dg-url');
     var copyBtn = document.getElementById('dg-copy-btn');
-    var owner = '{{ owner_username }}';
-    var slug = '{{ form_slug }}';
+    var owner = {{ owner_username | default('') | tojson }};
+    var slug = {{ form_slug | default('') | tojson }};
     var selected = []; // [{username, name, id, hasAvatar, initials}]
 
     var allUsers = [
       {% for u in dg_eligible_users %}
-      { id: '{{ u.id }}', username: '{{ u.username }}', name: '{{ u.name }}', hasAvatar: {{ u.has_avatar|lower }}, initials: '{{ u.initials }}' }{% if not loop.last %},{% endif %}
+      { id: {{ u.id | default('') | tojson }}, username: {{ u.username | default('') | tojson }}, name: {{ u.name | default('') | tojson }}, hasAvatar: {{ u.has_avatar|lower }}, initials: {{ u.initials | default('') | tojson }} }{% if not loop.last %},{% endif %}
       {% endfor %}
     ];
 

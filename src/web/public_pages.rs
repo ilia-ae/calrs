@@ -866,12 +866,18 @@ pub(super) async fn user_profile(
         Err(e) => return internal_error_html("template render", &e),
     };
 
-    let et_ctx: Vec<minijinja::Value> = event_types
-        .iter()
-        .map(|(slug, title, desc, duration, _)| {
-            context! { slug => slug, title => title, description => desc.as_deref().map(crate::utils::render_inline_markdown), duration_min => duration }
-        })
-        .collect();
+    // ilia fork: a paid event type shows its price here too (docs/ton.md),
+    // so a guest tells it from a free one before opening it.
+    let mut et_ctx: Vec<minijinja::Value> = Vec::with_capacity(event_types.len());
+    for (slug, title, desc, duration, id) in &event_types {
+        et_ctx.push(context! {
+            slug => slug,
+            title => title,
+            description => desc.as_deref().map(crate::utils::render_inline_markdown),
+            duration_min => duration,
+            price => ton_pay::price_badge(&state, id).await,
+        });
+    }
 
     Html(
         tmpl.render(context! {

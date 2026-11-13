@@ -1,5 +1,6 @@
 {# ilia fork: "Get notifications in Telegram", the booking's single-use deep link
-   (src/telegram/mod.rs, `booking_created`). Telegram's own blue, the shared button shape. #}
+   (src/telegram/mod.rs, `booking_created`). Telegram's own blue, the shared button shape
+   (.btn-telegram in base.html). #}
 <style>
   .tg-card { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
   .tg-card-icon { flex: none; width: 2.75rem; height: 2.75rem; border-radius: 50%; background: #229ED9; display: grid; place-items: center; }
@@ -7,8 +8,6 @@
   .tg-card-text { flex: 1 1 12rem; min-width: 0; }
   .tg-card-text h2 { margin: 0 0 0.125rem; font-size: 1rem; color: var(--text); }
   .tg-card-text p { color: var(--text-muted); font-size: 0.875rem; margin: 0; line-height: 1.5; }
-  .btn-telegram { background: #229ED9; color: #fff; }
-  .btn-telegram:hover { background: #1b8bc2; color: #fff; }
   @media (max-width: 600px) { .tg-card .btn { width: 100%; } }
 </style>
 <div class="card tg-card">

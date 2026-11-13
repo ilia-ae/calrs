@@ -360,6 +360,52 @@ async fn embedded_error_page_follows_the_embed_theme() {
     );
 }
 
+/// The page links back to the company site when one is set. Without one
+/// there is no button (this site's root `/` redirects to the owner's login),
+/// and none when embedded.
+#[tokio::test]
+async fn the_error_page_links_back_to_the_company_site_only() {
+    let (app, _, _, _) = setup_test_app().await;
+    let (status, _, html) = fetch(&app, page_request("/u/nobody", "en")).await;
+    assert_eq!(status, 404);
+    assert!(!html.contains("Back to the site"), "{html}");
+    assert!(
+        !html.contains(r#"class="btn btn-secondary btn-auto""#),
+        "{html}"
+    );
+    assert!(
+        html.contains(r#"<span class="result-icon muted""#),
+        "{html}"
+    );
+    let (status, _, html) = fetch(&app, page_request("/u/nobody?embed=1", "en")).await;
+    assert_eq!(status, 404);
+    assert!(!html.contains("Back to the site"), "{html}");
+
+    let pool = setup_test_db().await;
+    seed_test_data(&pool).await;
+    sqlx::query("UPDATE auth_config SET company_link = ? WHERE id = 'singleton'")
+        .bind("https://example.com/")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let data_dir = std::sync::Arc::new(TestDataDir::new());
+    let app = create_router(pool, data_dir.to_path_buf(), [0u8; 32])
+        .await
+        .layer(axum::Extension(data_dir))
+        .layer(local_proxy_peer());
+    let (status, _, html) = fetch(&app, page_request("/u/nobody", "ru")).await;
+    assert_eq!(status, 404);
+    // minijinja escapes the slashes of an attribute value (`&#x2f;`).
+    let start = html
+        .find(r#"<a class="btn btn-secondary btn-auto" href=""#)
+        .unwrap_or_else(|| panic!("no way back: {html}"));
+    let button = &html[start..start + html[start..].find("</a>").unwrap()];
+    assert!(
+        button.contains("example.com") && button.ends_with(">На сайт"),
+        "{button}"
+    );
+}
+
 /// Every shipped translation of a mapped message is recognised, with the
 /// status of its key.
 #[test]

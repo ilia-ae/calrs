@@ -13,6 +13,7 @@
 //! | `company_link`                         | Company link                        |
 //! | `jitsi`                                | Jitsi (`admin_update_jitsi`)        |
 //! | `oidc`, `google_oauth2`, `captcha`, `meeting_webhook` | their cards, all fields empty |
+//! | `sms` (ilia fork, only `"off"`)        | SMS gateway, its Clear button (`admin_update_sms_clear`) |
 //! | `sms_allow_all_users`                  | SMS policy                          |
 //! | `ton` (ilia fork)                      | none: `apply/ton.rs` writes `ton_settings` as the TON page does |
 //!
@@ -40,6 +41,13 @@ use axum::http::header;
 use axum::response::{IntoResponse, Response};
 use serde_json::{json, Value};
 use std::collections::HashSet;
+
+/// ilia fork: the marker of a calrs whose `config apply` knows `site.sms`
+/// (part of the refusal below, so it is in the binary). The ilia-booking
+/// role greps the commit and the release for it before it sends the key:
+/// a raw string, so the source holds the same bytes as the binary (an
+/// escaped `\"` would not match `git grep -F` on the commit).
+pub(crate) const SMS_OFF_SHAPE: &str = r#"site.sms: "off" deletes the stored SMS gateway"#;
 
 /// Every check of the section, reading only (pipeline step 1). The document
 /// alone decides: each value must be in the form the handler stores as is.
@@ -71,6 +79,17 @@ pub(super) async fn check(ctx: &Ctx, site: &Site) -> Result<(), ApplyError> {
     }
     if let Some(Jitsi::On(jitsi)) = &site.jitsi {
         check_jitsi(jitsi)?;
+    }
+    if site.sms.is_some() && crate::sms::sms_env_active() {
+        // The card's handler refuses to clear (it redirects without a
+        // word) while the environment block governs the gateway.
+        return Err(ApplyError::refused(
+            "site.sms",
+            format!(
+                "{SMS_OFF_SHAPE}, but the CALRS_SMS_* environment block sets the gateway \
+                 (it wins over the database): remove one of the two"
+            ),
+        ));
     }
     Ok(())
 }
@@ -210,6 +229,19 @@ pub(super) async fn apply(ctx: &mut Ctx, site: &Site) -> Result<(), ApplyError> 
         .into_response();
         posted("site.meeting_webhook", response).await?;
     }
+    if cards.contains(&Card::Sms) {
+        // Every row, the encrypted secret with it: the card's Clear button.
+        let (headers, form) = super::form(&[]).await?;
+        let response = admin::admin_update_sms_clear(
+            State(ctx.state.clone()),
+            ctx.admin_user(),
+            headers,
+            form,
+        )
+        .await
+        .into_response();
+        posted("site.sms", response).await?;
+    }
     for secret in Secret::ALL {
         if cards.contains(&Card::Secret(secret)) {
             sqlx::query(secret.clear())
@@ -290,6 +322,8 @@ pub(super) async fn export(ctx: &Ctx) -> Result<Option<Site>, ApplyError> {
         google_oauth2: off(s.google_is_off()),
         captcha: off(s.captcha_is_off()),
         meeting_webhook: off(s.webhook_is_off()),
+        // A gateway in the environment is not the document's to clear.
+        sms: off(s.sms.is_none() && !crate::sms::sms_env_active()),
         sms_allow_all_users: Some(s.sms_allow_all_users),
         ton: super::ton::export(ctx).await?,
     }))
@@ -441,11 +475,25 @@ struct Stored {
     sms_allow_all_users: bool,
     base_url: Option<String>,
     allow_private_hosts: Option<String>,
+    /// ilia fork: the stored SMS gateway (`sms_config`), the enabled row
+    /// first; `None` when there is none.
+    #[sqlx(skip)]
+    sms: Option<SmsRow>,
+}
+
+/// The columns of an `sms_config` row the report names (`site.sms.*`).
+#[derive(sqlx::FromRow)]
+struct SmsRow {
+    provider: String,
+    api_key: Option<String>,
+    api_secret_enc: Option<String>,
+    sender: String,
+    base_url: Option<String>,
 }
 
 impl Stored {
     async fn load(ctx: &Ctx) -> Result<Self, ApplyError> {
-        Ok(sqlx::query_as::<_, Stored>(
+        let mut stored = sqlx::query_as::<_, Stored>(
             "SELECT theme, custom_accent, custom_accent_hover, custom_bg, custom_surface, \
              custom_text, week_start, german_formal, registration_enabled, \
              allowed_email_domains, mfa_required, company_link, jitsi_base_url, jitsi_pattern, \
@@ -458,7 +506,14 @@ impl Stored {
              FROM auth_config WHERE id = 'singleton'",
         )
         .fetch_one(ctx.pool())
-        .await?)
+        .await?;
+        stored.sms = sqlx::query_as::<_, SmsRow>(
+            "SELECT provider, api_key, api_secret_enc, sender, base_url FROM sms_config \
+             ORDER BY enabled DESC, id LIMIT 1",
+        )
+        .fetch_optional(ctx.pool())
+        .await?;
+        Ok(stored)
     }
 
     fn colours(&self) -> Option<CustomColors> {
@@ -556,6 +611,8 @@ enum Card {
     Google,
     Captcha,
     Webhook,
+    /// ilia fork: the SMS gateway's Clear button (row and secret at once).
+    Sms,
     /// No card clears a secret: a statement does.
     Secret(Secret),
     SmsPolicy,
@@ -775,6 +832,27 @@ fn pairs(site: &Site, s: &Stored) -> Vec<Pair> {
             true,
         );
     }
+    if site.sms.is_some() {
+        // One pair per column the card shows; the row goes as a whole.
+        let row = s.sms.as_ref();
+        let text = |v: Option<&String>| match v {
+            Some(v) if !v.is_empty() => json!(v),
+            _ => Value::Null,
+        };
+        for (name, stored) in [
+            ("provider", text(row.map(|r| &r.provider))),
+            ("api_key", text(row.and_then(|r| r.api_key.as_ref()))),
+            ("sender", text(row.map(|r| &r.sender))),
+            ("base_url", text(row.and_then(|r| r.base_url.as_ref()))),
+            (
+                "api_secret",
+                row.map_or(Value::Null, |r| secret(&r.api_secret_enc)),
+            ),
+        ] {
+            let path = format!("sms.{name}");
+            pair(&path, null(), stored, Card::Sms, false);
+        }
+    }
     if let Some(all) = site.sms_allow_all_users {
         pair(
             "sms_allow_all_users",
@@ -948,6 +1026,20 @@ mod tests {
         );
         assert_eq!(redirect_error("/dashboard/admin"), None);
         assert_eq!(redirect_error("/dashboard/admin?resource_notice=ok"), None);
+    }
+
+    /// The ilia-booking role greps for this exact text
+    /// (`calrs_apply_sms_off_mark` in its vars/main.yml): change both or
+    /// neither.
+    #[test]
+    fn the_sms_off_marker_is_the_one_the_role_greps_for() {
+        assert_eq!(
+            SMS_OFF_SHAPE,
+            "site.sms: \"off\" deletes the stored SMS gateway"
+        );
+        // resolve.yml greps the commit's source with -F for the plain text.
+        let source = include_str!("site.rs");
+        assert!(source.contains(&format!("r#\"{SMS_OFF_SHAPE}\"#")));
     }
 
     #[test]

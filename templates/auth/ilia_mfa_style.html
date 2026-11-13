@@ -1,16 +1,15 @@
-{# ilia fork: passkeys (docs/passkeys-plan.md). Styles of the passkey parts of the MFA pages; theme variables only, so dark mode and every theme follow. #}
+{# ilia fork: passkeys (docs/passkeys-plan.md). Styles of the passkey parts of the MFA pages; theme variables only, so dark mode and every theme follow. The buttons are base.html's shared classes (`.btn-passkey` is only a marker); this file sets their stacking, nothing of their look. #}
 <style>
-  .ilia-mfa [hidden] { display: none !important; }
   .ilia-mfa h2 { font-size: 1.1rem; margin-bottom: 0.5rem; }
   .ilia-mfa p { margin-bottom: 0.75rem; }
   .ilia-mfa small { display: block; color: var(--text-muted); font-size: 0.8rem; margin-top: 0.35rem; }
-  .ilia-mfa .btn { display: block; text-align: center; text-decoration: none; margin-top: 0.75rem; }
-  .ilia-mfa .btn-passkey { padding: 1rem 1.5rem; font-size: 1.05rem; }
-  .ilia-mfa .btn-secondary { background: transparent; color: var(--accent); border: 1px solid var(--accent-border); font-weight: 500; }
-  .ilia-mfa .btn-secondary:hover { background: var(--accent-subtle); border-color: var(--accent); box-shadow: none; }
-  .ilia-mfa .mfa-status { font-weight: 600; }
+  .ilia-mfa .btn { margin-top: 0.75rem; }
+  .ilia-mfa .form-group ~ .btn { margin-top: 0; }
+  .ilia-mfa .mfa-status { font-weight: 600; margin-bottom: 1.25rem; }
   .ilia-mfa .mfa-status::before { content: ""; display: inline-block; width: 0.6rem; height: 0.6rem; border-radius: 50%; margin-right: 0.5rem; background: var(--border-hover); vertical-align: 0.05rem; }
   .ilia-mfa .mfa-status-on::before { background: var(--success); }
+  .ilia-mfa .mfa-back { margin: 1.25rem 0 0; }
+  .ilia-mfa .warn { color: var(--text); background: var(--warn-bg); border: 1px solid var(--warn-border); box-shadow: inset 3px 0 0 var(--warn); border-radius: var(--radius); padding: 0.75rem 1rem; font-size: 0.9rem; }
   .ilia-mfa .passkey-list { list-style: none; padding: 0; margin: 0.75rem 0; }
   .ilia-mfa .passkey-list li { border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem 1rem; margin-bottom: 0.5rem; background: var(--surface); }
   .ilia-mfa .passkey-name { overflow-wrap: anywhere; }
@@ -18,8 +17,11 @@
   .ilia-mfa .passkey-kind-synced { border-color: var(--accent-border); background: var(--accent-subtle); color: var(--accent); }
   .ilia-mfa .passkey-meta { color: var(--text-muted); font-size: 0.85rem; margin: 0.25rem 0; }
   .ilia-mfa .passkey-meta.error { color: var(--error-text); padding: 0.5rem 0.75rem; margin: 0.5rem 0; }
-  .ilia-mfa .passkey-actions { margin: 0.5rem 0 0; }
-  .ilia-mfa .passkey-actions a { margin-right: 1rem; font-size: 0.9rem; }
+  .ilia-mfa .passkey-actions { margin: 0.5rem 0 0; gap: 0.5rem; }
+  .ilia-mfa .passkey-actions .btn { margin-top: 0; }
+  .ilia-mfa .passkey-actions .passkey-delete, .ilia-mfa .passkey-actions .passkey-delete:hover { color: var(--error-text); }
+  .ilia-mfa .recovery-codes { list-style: none; padding: 0; margin: 1rem 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr)); gap: 0.5rem; }
+  .ilia-mfa .recovery-code { display: block; font-family: var(--mono); font-size: 0.9rem; padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-hover); color: var(--text); text-align: center; overflow-wrap: anywhere; user-select: all; -webkit-user-select: all; }
   .ilia-mfa section { margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--border); }
   .ilia-mfa .notice { margin: 0.75rem 0; }
 </style>

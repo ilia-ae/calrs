@@ -6,7 +6,7 @@
   <form method="post" action="/auth/mfa/passkey" id="webauthn-form">
     <input type="hidden" name="_csrf" value="{{ csrf_token }}">
     {% with create = false %}{% include "auth/ilia_webauthn_fields.html" %}{% endwith %}
-    <button type="button" class="btn btn-passkey" data-webauthn="get" data-form="webauthn-form" hidden>{{ t("ilia-passkey-sign-in") }}</button>
+    <button type="button" class="btn btn-lg btn-passkey" data-webauthn="get" data-form="webauthn-form" hidden>{{ t("ilia-passkey-sign-in") }}</button>
   </form>
   {% include "auth/ilia_webauthn_notices.html" %}
   {% if has_totp %}<a class="btn btn-secondary" href="/auth/mfa?method=totp">{{ t("ilia-mfa-use-totp") }}</a>{% endif %}
@@ -21,5 +21,5 @@
   {% include "auth/ilia_webauthn_notices.html" %}
   <a class="btn btn-secondary" href="/auth/mfa?method=totp">{{ t("ilia-mfa-use-app-instead") }}</a>
 {% endif %}
-  <p style="margin-top: 1rem;"><a href="/auth/login">{{ t("mfa-restart") }}</a></p>
+  <p class="mfa-back"><a href="/auth/login">{{ t("mfa-restart") }}</a></p>
 </div>

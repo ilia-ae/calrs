@@ -8,8 +8,11 @@
 {% block title %}{{ t("ton-quote-title") }}{% endblock %}
 
 {% block content %}
+{% from "partials/result_icon.html" import result_icon %}
+<div class="page-narrow">
+<div class="logo">{% if company_link %}<a href="{{ company_link }}" target="_blank" rel="noopener noreferrer">{% endif %}<img src="/logo" alt="" onerror="this.closest('.logo').style.display='none'">{% if company_link %}</a>{% endif %}</div>
 <div class="card" style="text-align: center;">
-  <div class="check" style="background: #d97706;">!</div>
+  {{ result_icon("wait", "alert") }}
   <h1>{{ t("ton-quote-title") }}</h1>
   <p class="subtitle">
     {% if was_shown %}{% if was_ton %}{{ t("ton-quote-was", ton=was_ton) }}{% else %}{{ t("ton-quote-was-free") }}{% endif %}<br>{% endif %}
@@ -40,7 +43,8 @@
       ></cap-widget>
     </div>
     {% endif %}
-    <button type="submit" class="btn" style="width: 100%;">{% if now_ton %}{{ t("ton-quote-confirm", ton=now_ton) }}{% else %}{{ t("ton-quote-confirm-free") }}{% endif %}</button>
+    <button type="submit" class="btn">{% if now_ton %}{{ t("ton-quote-confirm", ton=now_ton) }}{% else %}{{ t("ton-quote-confirm-free") }}{% endif %}</button>
   </form>
+</div>
 </div>
 {% endblock %}

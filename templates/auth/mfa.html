@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ t("mfa-title") }} — calrs{% endblock %}
 {% block content %}
+<div class="page-narrow">
 <div class="card" style="margin-top: 3rem;">
   <h1>{{ t("mfa-title") }}</h1>
   {% if invalid %}<div class="error" role="alert">{{ t("ilia-passkey-invalid") if invalid == "passkey" else t("mfa-invalid") }}</div>{% endif %}
@@ -10,9 +11,45 @@
     <p><a href="/auth/login">{{ t("mfa-restart") }}</a></p>
     {% if logged_in %}<p><a href="/dashboard/settings/mfa">{{ t("mfa-manage") }}</a></p>{% endif %}
   {% elif mode == "recovery" %}
+    <div class="ilia-mfa">
+    {% include "auth/ilia_mfa_style.html" %}
     <p>{{ t("ilia-mfa-recovery-help") }}</p>
-    <ul>{% for code in codes %}<li><code class="recovery-code">{{ code }}</code></li>{% endfor %}</ul>
-    <p><a href="/dashboard">{{ t("mfa-continue") }}</a></p>
+    <ul class="recovery-codes" id="recovery-codes">{% for code in codes %}<li><code class="recovery-code">{{ code }}</code></li>{% endfor %}</ul>
+    {# ilia fork: one button copies every code, one per line; where the clipboard is refused the codes are selected for a manual copy. #}
+    <button type="button" class="btn btn-secondary" id="recovery-copy" data-copied="{{ t('ilia-mfa-recovery-copied') }}" hidden>{{ t("ilia-mfa-recovery-copy") }}</button>
+    {# ilia fork: an always-present live region, empty until the copy succeeds or fails, so a screen reader announces either outcome. #}
+    <p class="passkey-meta" id="recovery-copy-manual" role="status" data-manual="{{ t('ilia-mfa-recovery-copy-manual') }}"></p>
+    <a class="btn" href="/dashboard">{{ t("mfa-continue") }}</a>
+    </div>
+    <script>
+    (function () {
+      var button = document.getElementById("recovery-copy");
+      var list = document.getElementById("recovery-codes");
+      var manual = document.getElementById("recovery-copy-manual");
+      if (!button || !list) return;
+      var label = button.textContent;
+      var codes = function () {
+        return Array.prototype.map.call(list.querySelectorAll(".recovery-code"), function (n) { return n.textContent; }).join("\n");
+      };
+      var selectAll = function () {
+        var range = document.createRange();
+        range.selectNodeContents(list);
+        var selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+        manual.textContent = manual.dataset.manual;
+      };
+      button.hidden = false;
+      button.addEventListener("click", function () {
+        if (!navigator.clipboard || !navigator.clipboard.writeText) { selectAll(); return; }
+        navigator.clipboard.writeText(codes()).then(function () {
+          manual.textContent = button.dataset.copied;
+          button.textContent = button.dataset.copied;
+          setTimeout(function () { button.textContent = label; manual.textContent = ""; }, 2000);
+        }, selectAll);
+      });
+    })();
+    </script>
   {% elif mode == "settings" %}
     {# ilia fork: passkeys, the authenticator app and recovery codes. #}
     {% include "auth/ilia_mfa_settings.html" %}
@@ -45,7 +82,8 @@
       <button class="btn" type="submit">{{ t("mfa-verify") }}</button>
     </form>
     {% include "auth/ilia_mfa_methods.html" %}
-    <p><a href="/auth/login">{{ t("mfa-restart") }}</a></p>
+    <div class="ilia-mfa">{% include "auth/ilia_mfa_style.html" %}<p class="mfa-back"><a href="/auth/login">{{ t("mfa-restart") }}</a></p></div>
   {% endif %}
+</div>
 </div>
 {% endblock %}

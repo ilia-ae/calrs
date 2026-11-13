@@ -3,11 +3,28 @@
     address, with a real status (404, 410, 403, 400). Shows the message upstream answered, or a
     generic one, and nothing from the request. #}
 {% block title %}{{ title }} — calrs{% endblock %}
+{% block head %}
+<style>
+  /* ilia fork: the card's padding stays even below the last element. */
+  .err-card > :last-child { margin-bottom: 0; }
+</style>
+{% endblock %}
 {% block content %}
+{% from "partials/result_icon.html" import result_icon %}
+<div class="page-narrow">
 <div class="logo">{% if company_link %}<a href="{{ company_link }}" target="_blank" rel="noopener noreferrer">{% endif %}<img src="/logo" alt="" onerror="this.closest('.logo').style.display='none'">{% if company_link %}</a>{% endif %}</div>
-<div class="card" style="text-align: center;">
-  <div class="check" style="background: var(--text-muted);">!</div>
+<div class="card err-card" style="text-align: center;">
+  {{ result_icon("muted", "alert") }}
   <h1>{{ title }}</h1>
   <p class="subtitle">{{ message }}</p>
+  {#- A way back to the company site when one is set. None without one: this
+      site's root `/` redirects to the owner's login form, no place for a
+      guest. None when embedded, where the page sits in someone else's frame. #}
+  {% if not embed and company_link %}
+  <div class="btn-row" style="justify-content: center;">
+    <a class="btn btn-secondary btn-auto" href="{{ company_link }}">{{ t("ilia-error-back-to-site") }}</a>
+  </div>
+  {% endif %}
+</div>
 </div>
 {% endblock %}

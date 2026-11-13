@@ -2,16 +2,16 @@
 {# ilia fork: Profile & Settings → Telegram (src/web/telegram.rs). #}
 {% block title %}{{ t("tg-settings-nav") }} — calrs{% endblock %}
 {% block dashboard_content %}
+<a href="/dashboard/settings" class="back-link">&larr; {{ t("settings-heading") }}</a>
 <div class="card">
   <h1>{{ t("tg-settings-title") }}</h1>
-  <p><a href="/dashboard/settings">&larr; {{ t("settings-heading") }}</a></p>
   {% if not enabled %}
     <p style="color: var(--text-muted);">{{ t("tg-settings-off") }}</p>
     {% if linked and not impersonating %}
     {# Telegram is off, but a chat linked earlier can still be forgotten. #}
     <p>{{ linked_line }}</p>
     <form method="post" action="/dashboard/settings/telegram/unlink" style="margin: 0;">
-      <button type="submit" class="slot-btn" style="cursor: pointer; color: var(--error-text);">{{ t("tg-settings-unlink") }}</button>
+      <button type="submit" class="btn btn-danger btn-auto">{{ t("tg-settings-unlink") }}</button>
     </form>
     {% endif %}
   {% else %}
@@ -26,22 +26,22 @@
     {% endif %}
     {% if deep_link %}
       <div style="margin: 1rem 0; padding: 1rem; border-radius: var(--radius); border: 1px solid var(--border);">
-        <a href="{{ deep_link }}" target="_blank" rel="noopener noreferrer" style="display: inline-block; padding: 0.625rem 1.125rem; border-radius: var(--radius); background: #229ED9; color: #fff; text-decoration: none; font-weight: 600;">{{ t("tg-settings-link-open") }}</a>
+        <a class="btn btn-auto btn-telegram" href="{{ deep_link }}" target="_blank" rel="noopener noreferrer">{{ t("tg-settings-link-open") }}</a>
         <p style="color: var(--text-muted); font-size: 0.85rem; margin: 0.5rem 0 0;">{{ t("tg-settings-link-expires") }}</p>
       </div>
     {% elif not bot_ready %}
       <p style="color: var(--text-muted);">{{ t("tg-settings-no-bot-name") }}</p>
     {% endif %}
     {% if not impersonating %}
-    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem;">
+    <div class="btn-row" style="margin-top: 0.5rem;">
       {% if bot_ready %}
-      <form method="post" action="/dashboard/settings/telegram/link" style="margin: 0;">
-        <button type="submit" class="slot-btn" style="cursor: pointer; font-weight: 600; color: var(--accent); border-color: var(--accent);">{{ t("tg-settings-link") }}</button>
+      <form method="post" action="/dashboard/settings/telegram/link">
+        <button type="submit" class="btn btn-auto">{{ t("tg-settings-link") }}</button>
       </form>
       {% endif %}
       {% if linked %}
-      <form method="post" action="/dashboard/settings/telegram/unlink" style="margin: 0;">
-        <button type="submit" class="slot-btn" style="cursor: pointer; color: var(--error-text);">{{ t("tg-settings-unlink") }}</button>
+      <form method="post" action="/dashboard/settings/telegram/unlink">
+        <button type="submit" class="btn btn-danger btn-auto">{{ t("tg-settings-unlink") }}</button>
       </form>
       {% endif %}
     </div>
@@ -54,21 +54,23 @@
   <h2>{{ t("tg-settings-modes") }}</h2>
   <p style="color: var(--text-muted); font-size: 0.875rem;">{{ t("tg-settings-modes-help") }}</p>
   {% if saved %}
-    <div class="success" style="margin: 0.75rem 0;">{{ t("tg-settings-saved") }}</div>
+    <div class="success" role="status">{{ t("tg-settings-saved") }}</div>
   {% endif %}
   {% if event_types %}
   <form method="post" action="/dashboard/settings/telegram/modes">
     {% for et in event_types %}
     <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 0.5rem 0; {% if not loop.last %}border-bottom: 1px solid var(--border);{% endif %}">
       <label for="mode_{{ et.id }}" style="flex: 1;">{{ et.title }}{% if et.team %} <span style="color: var(--text-muted); font-size: 0.8rem;">{{ t("tg-settings-team", team=et.team) }}</span>{% endif %}</label>
-      <select id="mode_{{ et.id }}" name="mode_{{ et.id }}" style="padding: 0.4rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text);">
-        <option value="off"{% if et.mode == "off" %} selected{% endif %}>{{ t("tg-settings-mode-off") }}</option>
-        <option value="optional"{% if et.mode == "optional" %} selected{% endif %}>{{ t("tg-settings-mode-optional") }}</option>
-        <option value="required"{% if et.mode == "required" %} selected{% endif %}>{{ t("tg-settings-mode-required") }}</option>
-      </select>
+      <div class="form-group" style="margin: 0; flex: 0 0 11rem; max-width: 50%;">
+        <select id="mode_{{ et.id }}" name="mode_{{ et.id }}">
+          <option value="off"{% if et.mode == "off" %} selected{% endif %}>{{ t("tg-settings-mode-off") }}</option>
+          <option value="optional"{% if et.mode == "optional" %} selected{% endif %}>{{ t("tg-settings-mode-optional") }}</option>
+          <option value="required"{% if et.mode == "required" %} selected{% endif %}>{{ t("tg-settings-mode-required") }}</option>
+        </select>
+      </div>
     </div>
     {% endfor %}
-    <button type="submit" class="slot-btn" style="margin-top: 0.75rem; cursor: pointer; font-weight: 600; color: var(--accent); border-color: var(--accent);">{{ t("tg-settings-save") }}</button>
+    <button type="submit" class="btn btn-auto" style="margin-top: 0.75rem;">{{ t("tg-settings-save") }}</button>
   </form>
   {% else %}
     <p style="color: var(--text-muted);">{{ t("tg-settings-modes-none") }}</p>
